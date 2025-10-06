@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Factor Victoria – Landing</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="min-h-screen bg-gray-50 py-12">
+    <div class="max-w-6xl mx-auto px-4">
+      <div class="mb-6 text-center text-sm">
+        <span class="inline-block rounded-full bg-indigo-50 px-3 py-1 text-indigo-700">
+          Paga con <strong>Flow</strong> o <strong>Mercado Pago</strong> • hasta 6 cuotas*
+        </span>
+      </div>
+
+      <div class="text-center mb-12">
+        <h1 class="text-4xl font-bold tracking-tight">Convierte información en ventaja</h1>
+        <p class="mt-3 text-gray-600 max-w-2xl mx-auto">
+          Accede a estadísticas, pronósticos y simuladores de apuestas con cuotas exclusivas.
+          Elige tu plan y descubre cuánto podrías ganar.
+        </p>
+      </div>
+
+      <div id="pricing" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16"></div>
+
+      <div class="bg-white rounded-2xl shadow-md p-8 max-w-3xl mx-auto">
+        <h2 class="text-2xl font-bold text-center mb-4">Simula tus ganancias</h2>
+        <p class="text-center text-gray-600 mb-6">Ingresa un monto a apostar y descubre cuánto podrías ganar.</p>
+
+        <div class="flex justify-center mb-6">
+          <input id="amountInput" type="number" class="w-48 px-4 py-2 border rounded-lg text-center" value="10000" min="1000" />
+        </div>
+
+        <div id="cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"></div>
+        <p class="mt-6 text-center text-xs text-gray-500">
+          *Las cuotas dependen del medio y emisor de la tarjeta. Las ganancias simuladas son referenciales.
+        </p>
+      </div>
+    </div>
+
+    <script>
+      const plans = [
+        {
+          key: "pro-100",
+          name: "Mensual",
+          price: 19990,
+          multiplier: 10,
+          label: "Cuotas x10",
+          note: "Ideal para probar",
+          bullets: ["Ebook para principiantes","Picks y análisis básicos diarios","Simulador de ganancias incluido","Cuotas potenciadas x10","100 cupos disponibles"],
+        },
+        {
+          key: "pro-45",
+          name: "3 meses",
+          price: 44990,
+          multiplier: 20,
+          label: "Cuotas x20",
+          note: "≈ $14.997 / mes",
+          bullets: ["Guía de estrategia y gestión de banca","Picks y análisis ampliados","Alertas clave de partido (cuando las actives)","Cuotas potenciadas x20","50 cupos disponibles"],
+        },
+        {
+          key: "pro-250",
+          name: "Anual",
+          price: 99990,
+          multiplier: 50,
+          label: "Cuotas x50",
+          note: "≈ $8.333 / mes",
+          highlight: true,
+          bullets: ["Guía de estrategia PRO","Informe premium mensual","Cuotas potenciadas x50","30 cupos disponibles"],
+        },
+        {
+          key: "lifetime",
+          name: "Vitalicio",
+          price: 249990,
+          multiplier: 100,
+          label: "Cuotas x100",
+          note: "Acceso de por vida",
+          bullets: ["Acceso de por vida a todas las mejoras","Informe premium mensual","Cuotas potenciadas x100","15 cupos disponibles"],
+        },
+      ];
+      const clp = (n) => n.toLocaleString("es-CL", { maximumFractionDigits: 0 });
+
+      function cardHTML(p) {
+        return `
+          <div class="relative rounded-2xl border bg-white p-6 flex flex-col shadow-sm ${p.highlight ? "border-indigo-600 shadow-xl" : "border-gray-200"}">
+            ${p.highlight ? '<div class="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 text-xs font-semibold rounded-full bg-indigo-600 text-white shadow">Más popular</div>' : ""}
+            <h3 class="text-xl font-bold">${p.name}</h3>
+            <p class="mt-1 text-sm text-indigo-700 font-medium">${p.label}</p>
+            <div class="mt-4 flex items-baseline gap-1">
+              <span class="text-3xl font-extrabold ${p.highlight ? "text-indigo-700" : "text-gray-900"}">$${clp(p.price)}</span>
+              <span class="text-sm text-gray-500">/ ${p.name === "Mensual" ? "mes" : "plan"}</span>
+            </div>
+            <p class="mt-1 text-sm text-gray-600">${p.note}</p>
+            <ul class="mt-4 space-y-2 text-sm text-gray-700">
+              ${p.bullets.map(b => `<li class="flex gap-2"><span class="mt-1 inline-block h-2 w-2 rounded-full bg-indigo-600"></span><span>${b}</span></li>`).join("")}
+            </ul>
+            <div class="mt-6 grid grid-cols-1 gap-2">
+              <button onclick="buy('${p.key}','flow')" class="w-full rounded-xl px-4 py-3 text-center font-semibold transition shadow bg-gray-900 text-white hover:bg-black">Elegir ${p.name} • Flow</button>
+              <button onclick="buy('${p.key}','mp')" class="w-full rounded-xl px-4 py-3 text-center font-semibold transition shadow bg-white border hover:bg-gray-50">Elegir ${p.name} • Mercado Pago</button>
+            </div>
+          </div>`;
+      }
+
+      function renderPricing() {
+        document.getElementById("pricing").innerHTML = plans.map(cardHTML).join("");
+      }
+
+      function renderCards(amount) {
+        document.getElementById("cards").innerHTML = plans.map(p => `
+          <div class="bg-gray-50 rounded-xl p-4 text-center border">
+            <h3 class="font-bold text-lg mb-1">${p.name}</h3>
+            <p class="text-sm text-indigo-700 font-medium mb-2">${p.label}</p>
+            <p class="text-gray-600 text-sm mb-1">Apuesta: $${clp(amount)}</p>
+            <p class="text-green-700 font-bold text-xl">Ganancia: $${clp(amount * p.multiplier)}</p>
+          </div>`).join("");
+      }
+
+      async function buy(plan, provider) {
+        const res = await fetch(`/api/pay/checkout?provider=${provider}&plan=${plan}`, { method: "POST" });
+        const { payment_url } = await res.json();
+        location.href = payment_url;
+      }
+
+      const amountInput = document.getElementById("amountInput");
+      amountInput.addEventListener("input", () => renderCards(Math.max(0, Number(amountInput.value || 0))));
+      renderPricing(); renderCards(Number(amountInput.value || 0));
+    </script>
+  </body>
+</html>

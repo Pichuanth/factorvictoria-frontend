@@ -1,0 +1,48 @@
+/* Base tabla/controles existentes */
+:root { font-family: system-ui, Arial, sans-serif; }
+body { margin: 24px; }
+h1 { margin: 0 0 12px; }
+.controls { display: flex; gap: 12px; flex-wrap: wrap; margin: 12px 0 16px; }
+.controls > * { padding: 6px 10px; }
+.muted { color: #666; }
+.error { color: #b00020; font-weight: 600; }
+.table-wrap { overflow: auto; max-height: calc(100vh - 180px); }
+table { width: 100%; border-collapse: collapse; }
+th, td { border: 1px solid #e1e1e1; padding: 8px; text-align: left; }
+th { background: #f7f7f7; position: sticky; top: 0; }
+tbody tr:nth-child(even) { background: #fafafa; }
+.right { text-align: right; }
+.tiers{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:12px 0}
+.tier{border:1px solid #e5e7eb;border-radius:12px;padding:12px;background:#fff;cursor:default;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.tier.current{outline:2px solid #10b981}
+.tier.locked{filter:grayscale(.2);opacity:.9;cursor:pointer;position:relative}
+.tier .tier-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.tier .tier-mult{font-weight:700;font-size:22px}
+.tier .lock{font-size:18px}
+.tier .ok{color:#10b981;font-weight:700}
+.tier .tier-price{font-size:14px;color:#374151}
+.tier .btn-upgrade{margin-top:8px;border:0;background:#111827;color:#fff;border-radius:8px;padding:6px 10px}
+.tier.locked:hover{outline:2px dashed #6366f1}
+
+/* === Branding Factor Victoria === */
+:root{
+  --fv-bg:#0B2847;      /* azul petróleo */
+  --fv-gold:#D4AF37;    /* dorado */
+}
+.fv-bg   { background: var(--fv-bg); }
+.fv-gold { color: var(--fv-gold); }
+.fv-btn-primary{
+  background: var(--fv-bg);
+  color:#fff;
+  border-radius: 12px;
+  padding: 12px 16px;
+  box-shadow: 0 6px 18px rgba(11,40,71,.15);
+}
+.fv-btn-primary:hover{ filter:brightness(1.05); }
+.fv-chip{
+  background:#E6EDF6;
+  color:#27496D;
+  border-radius:999px;
+  padding:6px 10px;
+  font-weight:600;
+}
