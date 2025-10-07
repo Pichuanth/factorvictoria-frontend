@@ -1,48 +1,53 @@
 import { useState } from "react";
 
-export default function Comparator(){
-  const [tier, setTier] = useState("x10");
+const TIERS = [
+  { key:"x10",  title:"x10",  price:19990, included:true  },
+  { key:"x20",  title:"x20",  price:44990, included:false },
+  { key:"x50",  title:"x50",  price:99990, included:false },
+  { key:"x100", title:"x100", price:249000, included:false },
+];
 
-  const TierCard = ({t, price, locked}) => (
-    <div className="relative plan-card {locked?'locked':''}" style={{marginBottom:16}}>
-      <div style={{fontSize:'22px', fontWeight:800, marginBottom:6}}> {t} </div>
-      <div style={{color:'#6b7280', marginBottom:12}}>${price.toLocaleString("es-CL")}</div>
-      {locked ? (
-        <button className="btn-navy">Mejorar</button>
-      ) : (
-        <button className="fv-btn-primary" style={{width:'100%'}}>Incluido</button>
-      )}
-    </div>
-  );
+export default function Comparator(){
+  const [q,setQ]=useState("");
 
   return (
-    <div style={{padding:16}}>
-      <h2 style={{fontSize:24, fontWeight:800, marginBottom:12}}>Comparador de Cuotas</h2>
+    <div className="max-w-6xl mx-auto px-4 py-8">
+      <h1 className="text-3xl font-extrabold mb-4">Comparador de Cuotas</h1>
 
       <input
+        className="w-full mb-4 rounded-2xl border px-4 py-3 bg-white"
         placeholder="Buscar (equipo/mercado/selección)"
-        style={{width:'100%', padding:'10px 12px', border:'1px solid #e5e7eb', borderRadius:12, marginBottom:12}}
+        value={q} onChange={(e)=>setQ(e.target.value)}
       />
 
-      <div style={{display:'grid', gridTemplateColumns:'repeat(4,minmax(0,1fr))', gap:16}}>
-        <div onClick={()=>setTier('x10')}><TierCard t="x10" price={19990} locked={false}/></div>
-        <div><TierCard t="x20" price={44990} locked/></div>
-        <div><TierCard t="x50" price={99990} locked/></div>
-        <div><TierCard t="x100" price={249990} locked/></div>
+      {/* Tiers */}
+      <div className="tiers-grid mb-4">
+        {TIERS.map(t=>(
+          <div key={t.key} className={`plan-card ${t.included?"":"locked"}`}>
+            <div className="text-2xl font-extrabold">{t.title}</div>
+            <div className="text-sm opacity-70">${t.price.toLocaleString("es-CL")}</div>
+
+            {t.included ? (
+              <button className="btn-navy mt-4">Incluido</button>
+            ) : (
+              <button className="btn-navy mt-4">Mejorar</button>
+            )}
+          </div>
+        ))}
       </div>
 
-      {/* Controles: simple layout visual (puedes conectar a tu backend cuando quieras) */}
-      <div style={{display:'flex', gap:12, alignItems:'center', marginTop:12, flexWrap:'wrap'}}>
-        <div>Objetivo</div>
-        <select defaultValue="x10"><option>Objetivo x10</option><option>Objetivo x20</option><option>Objetivo x50</option><option>Objetivo x100</option></select>
-        <div>Tolerancia</div>
-        <select defaultValue="+-10%"> <option>±10%</option><option>±5%</option><option>±2%</option></select>
-        <div>Min legs</div><input style={{width:60}} defaultValue={3}/>
-        <div>Max legs</div><input style={{width:60}} defaultValue={6}/>
-        <button className="btn-outline">Generar</button>
+      {/* Filtros de ejemplo (placeholder, deja tu lógica actual si la tienes) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <div className="rounded-xl border px-3 py-2">Objetivo <select className="ml-2"><option>Objetivo x10</option></select></div>
+        <div className="rounded-xl border px-3 py-2">Tolerancia <select className="ml-2"><option>±10%</option></select></div>
+        <div className="rounded-xl border px-3 py-2">Min legs: 3</div>
+        <div className="rounded-xl border px-3 py-2">Max legs: 6</div>
       </div>
 
-      <div className="table-wrap" style={{marginTop:12}}>
+      <button className="fv-btn-primary">Generar</button>
+
+      {/* Tabla (placeholder sin datos mientras no haya backend) */}
+      <div className="table-wrap mt-4">
         <table>
           <thead>
             <tr>
@@ -50,7 +55,7 @@ export default function Comparator(){
             </tr>
           </thead>
           <tbody>
-            <tr><td colSpan={8} className="fv-muted">Sin datos.</td></tr>
+            <tr><td className="muted" colSpan={8}>Sin datos.</td></tr>
           </tbody>
         </table>
       </div>
