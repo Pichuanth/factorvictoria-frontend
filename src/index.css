@@ -45,4 +45,71 @@ tbody tr:nth-child(even) { background: #fafafa; }
   border-radius:999px;
   padding:6px 10px;
   font-weight:600;
+  :root{
+  --fv-navy:#0d1b2a;         /* azul marino */
+  --fv-navy-2:#111f31;
+  --fv-gold:#d4af37;         /* dorado */
+  --fv-gold-2:#f0d98a;       /* dorado claro */
+}
+
+/* Fondo azul marino de marca */
+.fv-bg{ background: var(--fv-navy); }
+
+/* Texto dorado rápido */
+.fv-gold{ color: var(--fv-gold); }
+
+/* Botón primario dorado */
+.fv-btn-primary{
+  background: linear-gradient(90deg,var(--fv-gold),var(--fv-gold-2));
+  color:#1c2230; font-weight:700; border-radius:14px; padding:.75rem 1.25rem;
+  display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+  box-shadow: 0 8px 24px rgba(212,175,55,.25);
+  transition: transform .15s ease, filter .15s ease;
+}
+.fv-btn-primary:hover{ filter:brightness(1.02); transform: translateY(-1px); }
+
+/* Píldora superior */
+.fv-chip{
+  background: rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.1);
+  border-radius: 999px; padding: .4rem .8rem;
+}
+
+/* Navegación: enlace y activo */
+.nav-link{
+  padding:.5rem .75rem; border-radius:999px; font-weight:600;
+  color:#1f2937; /* slate-800 */
+}
+.nav-link:hover{ background:rgba(17,31,49,.06); }
+.nav-link-active{
+  background: linear-gradient(90deg,var(--fv-gold),var(--fv-gold-2));
+  color:var(--fv-navy); box-shadow: 0 8px 18px rgba(212,175,55,.25);
+}
+
+/* Tarjetas de tiers bloqueadas (x20/x50/x100) */
+.tier-card-locked{
+  background: linear-gradient(90deg,var(--fv-gold),var(--fv-gold-2));
+  color:var(--fv-navy);
+  border: none !important;
+}
+.tier-card-locked .price{ color:var(--fv-navy); }
+.tier-card-locked .lock{ opacity:.9; }
+
+/* Contenedor oscuro para el simulador */
+.simulator-wrap{
+  background: var(--fv-navy); color:white;
+  border-radius: 16px; padding: 2rem; box-shadow: 0 10px 24px rgba(13,27,42,.35);
+}
+
+/* Input moneda dorado */
+.money-input{
+  background: linear-gradient(90deg,var(--fv-gold),var(--fv-gold-2));
+  color: var(--fv-navy); border-radius: 14px; font-weight:800;
+  text-align:center; letter-spacing:.5px; outline: none; width: 100%;
+  padding: .9rem 1.2rem; border: 2px solid rgba(28,34,48,.15);
+}
+.money-input::placeholder{ color: rgba(28,34,48,.6); }
+
+/* Mini tono gris elegante */
+.fv-muted{ color: rgba(255,255,255,.75); }
 }

@@ -1,4 +1,4 @@
-import { Routes, Route, Link, useLocation } from "react-router-dom";
+import { Routes, Route, NavLink, useLocation } from "react-router-dom";
 import LandingPage from "./pages/LandingPage.jsx";
 import Comparator  from "./pages/Comparator.jsx";
 import Fixtures    from "./components/Fixtures.jsx";
@@ -9,19 +9,33 @@ function NotFound({ loc }) {
     <div style={{ padding: 24 }}>
       <h2>404</h2>
       <p>Ruta no encontrada: <code>{loc.pathname}</code></p>
-      <p><Link to="/app">Ir al comparador</Link></p>
+      <p><NavLink to="/app" className="nav-link">Ir al comparador</NavLink></p>
     </div>
   );
 }
 
-export default function App() {
+export default function App(){
   const loc = useLocation();
+
+  const linkClass = ({isActive}) =>
+    `nav-link ${isActive ? "nav-link-active" : ""}`;
+
   return (
     <>
-      <div style={{ padding: 12, borderBottom: "1px solid #eee" }}>
-        <Link to="/" style={{ marginRight: 12 }}>Inicio</Link>
-        <Link to="/app" style={{ marginRight: 12 }}>Comparador</Link>
-        <Link to="/fixtures" style={{ marginRight: 12 }}>Partidos</Link>
+      {/* Barra superior simple */}
+      <div className="w-full border-b border-gray-100 bg-white/95 backdrop-blur sticky top-0 z-40">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-2">
+          <img src="/logo-fv.png" alt="Factor Victoria" className="h-10 w-10 md:h-12 md:w-12 rounded-md" />
+          <div className="font-extrabold tracking-tight text-xl md:text-2xl text-slate-900">
+            Factor <span className="fv-gold">Victoria</span>
+          </div>
+
+          <nav className="ml-auto flex items-center gap-2">
+            <NavLink to="/"        className={linkClass} end>Inicio</NavLink>
+            <NavLink to="/app"     className={linkClass}>Comparador</NavLink>
+            <NavLink to="/fixtures"className={linkClass}>Partidos</NavLink>
+          </nav>
+        </div>
       </div>
 
       <Routes>
