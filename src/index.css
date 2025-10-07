@@ -1,115 +1,100 @@
-/* Base tabla/controles existentes */
-:root { font-family: system-ui, Arial, sans-serif; }
-body { margin: 24px; }
-h1 { margin: 0 0 12px; }
-.controls { display: flex; gap: 12px; flex-wrap: wrap; margin: 12px 0 16px; }
-.controls > * { padding: 6px 10px; }
-.muted { color: #666; }
-.error { color: #b00020; font-weight: 600; }
-.table-wrap { overflow: auto; max-height: calc(100vh - 180px); }
-table { width: 100%; border-collapse: collapse; }
-th, td { border: 1px solid #e1e1e1; padding: 8px; text-align: left; }
-th { background: #f7f7f7; position: sticky; top: 0; }
-tbody tr:nth-child(even) { background: #fafafa; }
-.right { text-align: right; }
-.tiers{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:12px 0}
-.tier{border:1px solid #e5e7eb;border-radius:12px;padding:12px;background:#fff;cursor:default;box-shadow:0 1px 3px rgba(0,0,0,.05)}
-.tier.current{outline:2px solid #10b981}
-.tier.locked{filter:grayscale(.2);opacity:.9;cursor:pointer;position:relative}
-.tier .tier-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.tier .tier-mult{font-weight:700;font-size:22px}
-.tier .lock{font-size:18px}
-.tier .ok{color:#10b981;font-weight:700}
-.tier .tier-price{font-size:14px;color:#374151}
-.tier .btn-upgrade{margin-top:8px;border:0;background:#111827;color:#fff;border-radius:8px;padding:6px 10px}
-.tier.locked:hover{outline:2px dashed #6366f1}
-
-/* === Branding Factor Victoria === */
 :root{
-  --fv-bg:#0B2847;      /* azul petróleo */
-  --fv-gold:#D4AF37;    /* dorado */
+  --fv-navy:#0e1a2b;
+  --fv-navy-2:#121f33;
+  --fv-gold:#D4AF37;
+  --fv-gold-2:#F0D98A;
 }
-.fv-bg   { background: var(--fv-bg); }
-.fv-gold { color: var(--fv-gold); }
-.fv-btn-primary{
-  background: var(--fv-bg);
-  color:#fff;
-  border-radius: 12px;
-  padding: 12px 16px;
-  box-shadow: 0 6px 18px rgba(11,40,71,.15);
+
+/* Topbar con tabs activos en dorado */
+.topbar{
+  background:#fff; border-bottom:1px solid #eee;
+  display:flex; justify-content:flex-end; gap:14px;
+  padding:10px 16px; position:sticky; top:0; z-index:50;
 }
-.fv-btn-primary:hover{ filter:brightness(1.05); }
+.navlink{
+  color:var(--fv-navy); font-weight:600; text-decoration:none;
+  padding:6px 12px; border-radius:10px;
+}
+.navlink:hover{ background:#f5f7fa; }
+.navlink.active{
+  background:linear-gradient(90deg,var(--fv-gold),var(--fv-gold-2));
+  color:#0f172a;
+}
+
+/* Hero/branding */
+.fv-bg{
+  background:radial-gradient(1200px 500px at 20% -100px,#162640 0,#0e1a2b 60%,#0a1422 100%);
+}
 .fv-chip{
-  background:#E6EDF6;
-  color:#27496D;
-  border-radius:999px;
-  padding:6px 10px;
-  font-weight:600;
-  :root{
-  --fv-navy:#0d1b2a;         /* azul marino */
-  --fv-navy-2:#111f31;
-  --fv-gold:#d4af37;         /* dorado */
-  --fv-gold-2:#f0d98a;       /* dorado claro */
+  display:inline-block; padding:8px 14px; border-radius:22px;
+  background:#ffffff14; color:#e6edf7; font-weight:600;
 }
 
-/* Fondo azul marino de marca */
-.fv-bg{ background: var(--fv-navy); }
-
-/* Texto dorado rápido */
-.fv-gold{ color: var(--fv-gold); }
-
-/* Botón primario dorado */
+/* Botones */
 .fv-btn-primary{
-  background: linear-gradient(90deg,var(--fv-gold),var(--fv-gold-2));
-  color:#1c2230; font-weight:700; border-radius:14px; padding:.75rem 1.25rem;
-  display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
-  box-shadow: 0 8px 24px rgba(212,175,55,.25);
-  transition: transform .15s ease, filter .15s ease;
+  display:inline-block; padding:12px 20px; border-radius:14px;
+  font-weight:800; text-align:center;
+  background:linear-gradient(90deg,var(--fv-gold),var(--fv-gold-2));
+  color:#0f172a; box-shadow:0 8px 20px #0000003a;
 }
-.fv-btn-primary:hover{ filter:brightness(1.02); transform: translateY(-1px); }
-
-/* Píldora superior */
-.fv-chip{
-  background: rgba(255,255,255,.08);
-  border:1px solid rgba(255,255,255,.1);
-  border-radius: 999px; padding: .4rem .8rem;
+.fv-btn-primary:hover{ transform:translateY(-1px); }
+.btn-outline{
+  border:1px solid #e5e7eb; background:#fff; color:#111827;
+  border-radius:12px; padding:12px 16px; font-weight:600;
 }
-
-/* Navegación: enlace y activo */
-.nav-link{
-  padding:.5rem .75rem; border-radius:999px; font-weight:600;
-  color:#1f2937; /* slate-800 */
-}
-.nav-link:hover{ background:rgba(17,31,49,.06); }
-.nav-link-active{
-  background: linear-gradient(90deg,var(--fv-gold),var(--fv-gold-2));
-  color:var(--fv-navy); box-shadow: 0 8px 18px rgba(212,175,55,.25);
+.btn-navy{
+  background:#f4e7b2; color:var(--fv-navy); font-weight:800;
+  padding:12px 16px; border-radius:12px; text-align:center;
 }
 
-/* Tarjetas de tiers bloqueadas (x20/x50/x100) */
-.tier-card-locked{
-  background: linear-gradient(90deg,var(--fv-gold),var(--fv-gold-2));
-  color:var(--fv-navy);
-  border: none !important;
+/* Cards de planes */
+.plan-card{
+  border:1px solid #e5e7eb; background:#fff; border-radius:16px;
+  padding:24px; display:flex; flex-direction:column; box-shadow:0 2px 8px #00000010;
 }
-.tier-card-locked .price{ color:var(--fv-navy); }
-.tier-card-locked .lock{ opacity:.9; }
+.plan-card.highlight{ border-color:var(--fv-gold); box-shadow:0 10px 30px #00000020; }
+.plan-badge{
+  position:absolute; left:50%; transform:translateX(-50%); top:-12px;
+  background:linear-gradient(90deg,var(--fv-gold),var(--fv-gold-2));
+  color:#1c2230; border-radius:999px; padding:6px 12px; font-size:.75rem; font-weight:700;
+}
+.plan-card.locked{
+  background:linear-gradient(0deg,#f9f6e6 0,#fff 40%);
+  border-color:#f0e6bd;
+}
 
-/* Contenedor oscuro para el simulador */
+/* Bloque simulador (azul marino) */
 .simulator-wrap{
-  background: var(--fv-navy); color:white;
-  border-radius: 16px; padding: 2rem; box-shadow: 0 10px 24px rgba(13,27,42,.35);
+  margin:0 auto; background:linear-gradient(180deg,var(--fv-navy-2),var(--fv-navy));
+  color:#fff; border-radius:18px; padding:28px; max-width:900px;
+  box-shadow:0 10px 30px #00000030;
 }
+.fv-muted{ color:#c7d3e6; }
 
-/* Input moneda dorado */
+/* Input dinero serio (no monoespaciado) */
 .money-input{
-  background: linear-gradient(90deg,var(--fv-gold),var(--fv-gold-2));
-  color: var(--fv-navy); border-radius: 14px; font-weight:800;
-  text-align:center; letter-spacing:.5px; outline: none; width: 100%;
-  padding: .9rem 1.2rem; border: 2px solid rgba(28,34,48,.15);
+  width:100%; background:#ffffff;
+  border:2px solid #0c1524; border-radius:14px;
+  padding:14px 16px; text-align:center; outline:none;
 }
-.money-input::placeholder{ color: rgba(28,34,48,.6); }
+.money-elegant{
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji";
+  font-variant-numeric: lining-nums tabular-nums;
+  letter-spacing:.02em; font-weight:700;
+}
 
-/* Mini tono gris elegante */
-.fv-muted{ color: rgba(255,255,255,.75); }
+/* Tabla/contendor */
+.table-wrap{ overflow:auto; background:#fff; border-radius:12px; border:1px solid #e5e7eb; }
+table{ width:100%; border-collapse:collapse; }
+th, td{ padding:10px 12px; border-bottom:1px solid #f1f3f5; text-align:left; }
+th{ background:#f7f9fc; }
+
+/* Admin box en Fixtures */
+.admin-box{
+  background:#f8fafc; border:1px dashed #cbd5e1; color:#334155;
+  border-radius:12px; padding:10px 12px; display:flex; gap:12px; align-items:center;
+}
+.admin-tag{
+  font-size:.75rem; font-weight:800; color:#0f172a;
+  background:#e2e8f0; border-radius:999px; padding:4px 8px;
 }
