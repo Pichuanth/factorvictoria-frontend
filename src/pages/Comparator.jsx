@@ -1,53 +1,97 @@
 import { useState } from "react";
 
-const TIERS = [
-  { key:"x10",  title:"x10",  price:19990, included:true  },
-  { key:"x20",  title:"x20",  price:44990, included:false },
-  { key:"x50",  title:"x50",  price:99990, included:false },
-  { key:"x100", title:"x100", price:249000, included:false },
+const PLANS = [
+  { key:"x10", name:"x10", price:19990, included:true },
+  { key:"x20", name:"x20", price:44990 },
+  { key:"x50", name:"x50", price:99990 },
+  { key:"x100", name:"x100", price:249990 },
 ];
 
+const clp = (n)=> n.toLocaleString("es-CL",{maximumFractionDigits:0});
+
 export default function Comparator(){
-  const [q,setQ]=useState("");
+  const [q, setQ] = useState("");
+  const [rows] = useState([]); // cuando conectemos backend: setRows(...)
+  const [minLegs, setMinLegs] = useState(3);
+  const [maxLegs, setMaxLegs] = useState(6);
+  const [goal, setGoal] = useState("Objetivo x10");
+  const [tol, setTol] = useState("±10%");
+
+  const upgrade = (planKey)=>{
+    // Por ahora redirigimos a la landing para comprar
+    window.location.href = "/#planes";
+  };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      <h1 className="text-3xl font-extrabold mb-4">Comparador de Cuotas</h1>
+    <div className="container" style={{padding:"18px 16px 26px"}}>
+      <h1 style={{fontSize:28,fontWeight:900}}>Comparador de Cuotas</h1>
 
       <input
-        className="w-full mb-4 rounded-2xl border px-4 py-3 bg-white"
+        className="input" style={{margin:"12px 0 16px"}}
         placeholder="Buscar (equipo/mercado/selección)"
         value={q} onChange={(e)=>setQ(e.target.value)}
       />
 
-      {/* Tiers */}
-      <div className="tiers-grid mb-4">
-        {TIERS.map(t=>(
-          <div key={t.key} className={`plan-card ${t.included?"":"locked"}`}>
-            <div className="text-2xl font-extrabold">{t.title}</div>
-            <div className="text-sm opacity-70">${t.price.toLocaleString("es-CL")}</div>
+      {/* Tarjetas de planes (móvil: 1 por fila) */}
+      <div style={{display:"grid",gap:16}}>
+        {PLANS.map((p)=>(
+          <div key={p.key} className={`plan-card ${!p.included ? 'locked':''}`} style={{margin:0}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div>
+                <div style={{fontWeight:900,fontSize:20,textTransform:"uppercase"}}>{p.name}</div>
+                <div style={{fontWeight:800,opacity:.9}}>${clp(p.price)}</div>
+              </div>
+              {p.included ? (
+                <div className="badge">✔ Incluido</div>
+              ) : (
+                <div className="badge" style={{background:"#fef3c7",color:"#7c5a02"}}>🔒 Bloqueado</div>
+              )}
+            </div>
 
-            {t.included ? (
-              <button className="btn-navy mt-4">Incluido</button>
-            ) : (
-              <button className="btn-navy mt-4">Mejorar</button>
-            )}
+            <div style={{marginTop:12}}>
+              {p.included ? (
+                <button className="btn-navy" disabled style={{opacity:.9}}>Incluido</button>
+              ) : (
+                <button className="btn-navy" onClick={()=>upgrade(p.key)}>Mejorar</button>
+              )}
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Filtros de ejemplo (placeholder, deja tu lógica actual si la tienes) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <div className="rounded-xl border px-3 py-2">Objetivo <select className="ml-2"><option>Objetivo x10</option></select></div>
-        <div className="rounded-xl border px-3 py-2">Tolerancia <select className="ml-2"><option>±10%</option></select></div>
-        <div className="rounded-xl border px-3 py-2">Min legs: 3</div>
-        <div className="rounded-xl border px-3 py-2">Max legs: 6</div>
+      {/* Filtros básicos */}
+      <div style={{display:"grid",gap:12,gridTemplateColumns:"repeat(2,1fr)",marginTop:18}}>
+        <div>
+          <label className="muted" style={{fontWeight:800}}>Objetivo</label>
+          <select className="input" value={goal} onChange={(e)=>setGoal(e.target.value)}>
+            <option>Objetivo x10</option>
+            <option>Objetivo x20</option>
+            <option>Objetivo x50</option>
+            <option>Objetivo x100</option>
+          </select>
+        </div>
+        <div>
+          <label className="muted" style={{fontWeight:800}}>Tolerancia</label>
+          <select className="input" value={tol} onChange={(e)=>setTol(e.target.value)}>
+            <option>±5%</option><option>±10%</option><option>±15%</option>
+          </select>
+        </div>
+        <div>
+          <label className="muted" style={{fontWeight:800}}>Min legs</label>
+          <input className="input" type="number" min={1} max={20} value={minLegs} onChange={(e)=>setMinLegs(+e.target.value)} />
+        </div>
+        <div>
+          <label className="muted" style={{fontWeight:800}}>Max legs</label>
+          <input className="input" type="number" min={minLegs} max={30} value={maxLegs} onChange={(e)=>setMaxLegs(+e.target.value)} />
+        </div>
       </div>
 
-      <button className="fv-btn-primary">Generar</button>
+      <div style={{marginTop:16}}>
+        <button className="fv-btn-primary">Generar</button>
+      </div>
 
-      {/* Tabla (placeholder sin datos mientras no haya backend) */}
-      <div className="table-wrap mt-4">
+      {/* Tabla resultados (placeholder) */}
+      <div className="table-wrap" style={{marginTop:16}}>
         <table>
           <thead>
             <tr>
@@ -55,10 +99,35 @@ export default function Comparator(){
             </tr>
           </thead>
           <tbody>
-            <tr><td className="muted" colSpan={8}>Sin datos.</td></tr>
+            {rows.length === 0
+              ? <tr><td className="muted" colSpan={8}>Sin datos.</td></tr>
+              : rows.map((r)=>(
+                <tr key={r.id}>
+                  <td>{r.date}</td><td>{r.home}</td><td>{r.away}</td><td>{r.bookmaker}</td><td>{r.market}</td><td>{r.pick}</td><td>{r.odds}</td><td>{r.updatedAt}</td>
+                </tr>
+              ))}
           </tbody>
         </table>
       </div>
+
+      {/* Explicación y upsell */}
+      <section style={{marginTop:22,display:"grid",gap:12}}>
+        <h3 style={{fontSize:18,fontWeight:900}}>Cuotas generadas y porcentaje de acierto</h3>
+
+        <div className="info-card"><b>Cuota de regalo:</b> 1.5 a 3 máximo (una selección individual muy probable, para todos los planes).</div>
+        <div className="info-card"><b>Cuota generada:</b> Ajustamos legs y tolerancia para alcanzar <b>{goal}</b> (o la más cercana) sin forzar picks arriesgados.</div>
+        <div className="info-card"><b>Probabilidad promedio por selección:</b> 85–90% aprox. (cada pick por separado).</div>
+        <div className="info-card"><b>Error de cuota / desfase de mercado:</b> si aparece una oportunidad, la verás aquí marcada para aprovecharla a tiempo.</div>
+
+        <h4 style={{marginTop:6,fontWeight:900}}>¿Listo para mejorar tus ganancias?</h4>
+        <div style={{display:"grid",gap:10,gridTemplateColumns:"1fr"}}>
+          {PLANS.filter(p=>!p.included).map(p=>(
+            <button key={p.key} className="fv-btn-primary" onClick={()=>upgrade(p.key)}>
+              Cuota mejorada {p.name.toUpperCase()} 🔒
+            </button>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

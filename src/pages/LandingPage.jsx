@@ -5,7 +5,6 @@ export default function LandingPage() {
   const [amountRaw, setAmountRaw] = useState("10000");
   const amount = Number(amountRaw || 0);
 
-  // En landing: NINGÚN plan bloqueado (los bloqueos se ven en el comparador)
   const plans = [
     { key:"pro-100",  name:"Mensual",  price:19990, multiplier:10,  label:"Cuotas x10",
       note:"Ideal para probar",
@@ -38,56 +37,55 @@ export default function LandingPage() {
   return (
     <div>
       {/* HERO */}
-      <section className="fv-bg">
-        <div className="max-w-6xl mx-auto px-4 py-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-3">
-            <img src="/logo-fv.png" alt="Factor Victoria" className="h-12 w-12 md:h-14 md:w-14 rounded-md" />
-            <span className="text-xl md:text-2xl font-extrabold tracking-tight">Factor Victoria</span>
+      <section className="fv-bg text-white">
+        <div className="container" style={{padding:"18px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <img src="/logo-fv.png" alt="Factor Victoria" className="hero-logo" />
+            <span style={{fontSize:22,fontWeight:900,letterSpacing:.2}}>Factor Victoria</span>
           </div>
           <span className="fv-chip">Paga con <b>Flow</b> o <b>Mercado Pago</b> • hasta 6 cuotas*</span>
         </div>
 
-        <div className="max-w-6xl mx-auto px-4 pb-10 text-center text-white">
-          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight leading-tight">
-            Convierte información en ventaja
-          </h1>
-          <p className="mt-3 opacity-80 text-lg max-w-2xl mx-auto">
+        <div className="container" style={{padding:"0 16px 26px"}}>
+          <h1 style={{fontSize:42,lineHeight:1.1,margin:"6px 0 6px",fontWeight:900}}>Convierte información en ventaja</h1>
+          <p className="muted" style={{color:"#cbd5e1",fontSize:18,maxWidth:720}}>
             Estadísticas, pronósticos y simulador de ganancias para apostar con criterio.
           </p>
-          <div className="mt-6">
+          <div style={{marginTop:16}}>
             <a href="#planes" className="fv-btn-primary">Ver planes</a>
           </div>
         </div>
       </section>
 
       {/* PRICING */}
-      <main className="bg-gray-50">
-        <div id="planes" className="max-w-6xl mx-auto px-4 py-12">
-          <div className="grid-plans mb-16">
+      <main style={{background:"#f9fafb"}}>
+        <div id="planes" className="container" style={{padding:"24px 16px 28px"}}>
+          <div className="plan-grid" style={{marginBottom:24}}>
             {plans.map((p)=>(
               <div key={p.key} className={`plan-card ${p.highlight?"highlight":""}`}>
                 {p.highlight && <div className="plan-badge">Más popular</div>}
-                <h3 className="text-xl font-bold">{p.name}</h3>
-                <p className="mt-1 text-sm" style={{color:"var(--fv-gold)"}}>{p.label}</p>
+                <h3 style={{fontSize:20,fontWeight:800}}>{p.name}</h3>
+                <p className="muted" style={{color:"var(--fv-gold)",fontWeight:700}}>{p.label}</p>
 
-                <div className="mt-3 flex items-baseline gap-1">
-                  <span className={`text-3xl font-extrabold ${p.highlight ? "text-[var(--fv-gold)]" : "text-gray-900"}`}>${clp(p.price)}</span>
-                  <span className="text-sm text-gray-500">/ {p.name==="Mensual"?"mes":"plan"}</span>
+                <div style={{display:"flex",alignItems:"baseline",gap:6,marginTop:6}}>
+                  <span style={{fontSize:28,fontWeight:900}}>${clp(p.price)}</span>
+                  <span className="muted">/ {p.name==="Mensual"?"mes":"plan"}</span>
                 </div>
-                <p className="mt-1 text-sm text-gray-600">{p.note}</p>
 
-                <ul className="mt-4 space-y-2 text-sm text-gray-700">
+                <p className="muted">{p.note}</p>
+
+                <ul style={{marginTop:8,display:"grid",gap:6}}>
                   {p.bullets.map((b,i)=>(
-                    <li key={i} className="flex gap-2">
-                      <span className="mt-[6px] inline-block h-2 w-2 rounded-full" style={{background:"var(--fv-gold)"}}/>
+                    <li key={i} style={{display:"flex",gap:8,alignItems:"flex-start"}}>
+                      <span style={{marginTop:8,display:"inline-block",height:8,width:8,borderRadius:999,background:"var(--fv-gold)"}} />
                       <span>{b}</span>
                     </li>
                   ))}
                 </ul>
 
-                <div className="mt-6 grid grid-cols-1 gap-2">
-                  <button onClick={()=>buy(p,"flow")} className="fv-btn-primary w-full">Elegir {p.name} • Flow</button>
-                  <button onClick={()=>buy(p,"mp")}   className="btn-outline w-full">Elegir {p.name} • Mercado Pago</button>
+                <div style={{marginTop:14,display:"grid",gap:8}}>
+                  <button onClick={()=>buy(p,"flow")} className="fv-btn-primary">Elegir {p.name} • Flow</button>
+                  <button onClick={()=>buy(p,"mp")} className="btn-outline">Elegir {p.name} • Mercado Pago</button>
                 </div>
               </div>
             ))}
@@ -95,13 +93,13 @@ export default function LandingPage() {
 
           {/* SIMULADOR azul marino */}
           <div className="simulator-wrap">
-            <h2 className="text-2xl font-bold text-center mb-2">Simula tus ganancias</h2>
-            <p className="text-center opacity-80 mb-6">Ingresa un monto a apostar y descubre cuánto podrías ganar.</p>
+            <h2 style={{fontSize:22,fontWeight:900,textAlign:"center",margin:"0 0 6px"}}>Simula tus ganancias</h2>
+            <p style={{textAlign:"center",color:"#9fb0c9",margin:"0 0 16px"}}>Ingresa un monto a apostar y descubre cuánto podrías ganar.</p>
 
-            <div className="max-w-md mx-auto mb-8">
+            <div style={{maxWidth:460,margin:"0 auto 16px"}}>
               <input
                 type="text" inputMode="numeric" pattern="[0-9]*"
-                className="money-input money-elegant text-3xl md:text-4xl"
+                className="money-input money-elegant"
                 placeholder="$0"
                 value={formatCLP(amountRaw)}
                 onChange={onMoneyChange}
@@ -109,21 +107,37 @@ export default function LandingPage() {
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="plan-grid" style={{gridTemplateColumns:"repeat(4,1fr)"}}>
               {plans.map((p)=>(
-                <div key={p.key} className="bg-white/95 text-slate-900 rounded-xl p-4 text-center border">
-                  <h3 className="font-bold text-lg mb-1">{p.name}</h3>
-                  <p className="text-sm" style={{color:"var(--fv-gold)"}}>{p.label}</p>
-                  <p className="text-gray-600 text-sm mb-1">Apuesta: {formatCLP(amountRaw)}</p>
-                  <p className="text-green-700 font-bold text-xl">Ganancia: ${clp(amount * p.multiplier)}</p>
+                <div key={p.key} style={{background:"#fff",color:"#0f172a",borderRadius:14,padding:14,textAlign:"center",border:"1px solid #e5e7eb"}}>
+                  <h3 style={{fontWeight:800,margin:0}}>{p.name}</h3>
+                  <p style={{margin:"2px 0",color:"var(--fv-gold)",fontWeight:700}}>{p.label}</p>
+                  <p className="muted" style={{margin:"4px 0"}}>Apuesta: {formatCLP(amountRaw)}</p>
+                  <p style={{color:"#166534",fontWeight:900,fontSize:18}}>Ganancia: ${clp(amount * p.multiplier)}</p>
                 </div>
               ))}
             </div>
 
-            <p className="mt-6 text-center text-xs opacity-80">
-              *Las ganancias son estimadas y pueden variar según bookmaker y método de pago.
-            </p>
+            <p className="section-note">*Las ganancias son estimadas y pueden variar según bookmaker y método de pago.</p>
           </div>
+
+          {/* Breve explicación + imagen final */}
+          <section style={{padding:"22px 0"}}>
+            <h3 style={{fontSize:22,fontWeight:900,marginBottom:8}}>¿Qué es Factor Victoria?</h3>
+            <p className="muted" style={{maxWidth:900}}>
+              En Factor Victoria aprenderás a apostar como un profesional:
+              técnicas de <b>doble oportunidad</b> (cuotas bajas y consistentes)
+              y <b>desfase del mercado</b> (cuando la cuota se “equivoca” por unos minutos).
+              Nuestro enfoque prioriza picks con <b>85–90% de acierto</b> por selección, según estadísticas y contexto.
+              Antes de apostar, te recomendamos leer nuestra <b>guía</b> incluida en tu plan.
+            </p>
+
+            <div style={{marginTop:14,display:"grid",placeItems:"center"}}>
+              {/* Sube tu imagen a public/img/players-laptop.jpg */}
+              <img src="/img/players-laptop.jpg" alt="Jugada saliendo del notebook – Factor Victoria" style={{borderRadius:20,maxWidth:920,width:"100%"}} onError={(e)=>{e.currentTarget.style.display="none"}}/>
+              <p className="section-note" style={{marginTop:8,color:"#64748b"}}>Aprende a apostar como un profesional.</p>
+            </div>
+          </section>
         </div>
       </main>
     </div>

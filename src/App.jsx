@@ -1,45 +1,47 @@
-import { Routes, Route, NavLink, Link, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
 import LandingPage from "./pages/LandingPage.jsx";
-import Comparator  from "./pages/Comparator.jsx";
-import Fixtures    from "./pages/Fixtures.jsx";
-import Gracias     from "./pages/Gracias.jsx";
-import Login       from "./pages/Login.jsx";
+import Comparator from "./pages/Comparator.jsx";
+import Fixtures from "./pages/Fixtures.jsx";
+import Login from "./pages/Login.jsx";
+import Forgot from "./pages/Forgot.jsx";
 
-function NotFound({ loc }) {
+function Tab({ to, children }) {
   return (
-    <div style={{ padding: 24 }}>
-      <h2>404</h2>
-      <p>Ruta no encontrada: <code>{loc.pathname}</code></p>
-      <p><Link to="/app">Ir al comparador</Link></p>
-    </div>
+    <NavLink
+      to={to}
+      className={({ isActive }) => "tab" + (isActive ? " active" : "")}
+    >
+      {children}
+    </NavLink>
   );
 }
 
-export default function App(){
-  const loc = useLocation();
+export default function App() {
   return (
-    <>
-      {/* Navbar */}
-      <header className="navbar">
-        <div className="navbar-inner">
-          <nav className="navlinks">
-            <NavLink className={({isActive})=>`navlink ${isActive?"active":""}`} to="/">Inicio</NavLink>
-            <NavLink className={({isActive})=>`navlink ${isActive?"active":""}`} to="/app">Comparador</NavLink>
-            <NavLink className={({isActive})=>`navlink ${isActive?"active":""}`} to="/fixtures">Partidos</NavLink>
-          </nav>
-          <Link className="navlink" to="/login">Iniciar sesión</Link>
+    <BrowserRouter>
+      <nav className="nav">
+        <div className="nav-inner container">
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <img src="/logo-fv.png" alt="Factor Victoria" className="hero-logo" />
+            <b>Factor Victoria</b>
+          </div>
+          <div className="tabs">
+            <Tab to="/">Inicio</Tab>
+            <Tab to="/app">Comparador</Tab>
+            <Tab to="/fixtures">Partidos</Tab>
+            <Tab to="/login">Iniciar sesión</Tab>
+          </div>
         </div>
-      </header>
+      </nav>
 
-      {/* Rutas */}
       <Routes>
-        <Route path="/"         element={<LandingPage />} />
-        <Route path="/app"      element={<Comparator />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/app" element={<Comparator />} />
         <Route path="/fixtures" element={<Fixtures />} />
-        <Route path="/gracias"  element={<Gracias />} />
-        <Route path="/login"    element={<Login />} />
-        <Route path="*"         element={<NotFound loc={loc} />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/forgot" element={<Forgot />} />
+        <Route path="*" element={<LandingPage />} />
       </Routes>
-    </>
+    </BrowserRouter>
   );
 }
