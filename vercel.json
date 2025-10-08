@@ -1,8 +1,5 @@
 {
   "rewrites": [
-    { "source": "/assets/(.*)", "destination": "/assets/$1" },
-    { "source": "/favicon.ico", "destination": "/favicon.ico" },
-    { "source": "/manifest.webmanifest", "destination": "/manifest.webmanifest" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!assets/|favicon\\.ico|robots\\.txt|manifest\\.json|.*\\.[a-z0-9]+$).*)", "destination": "/index.html" }
   ]
 }
