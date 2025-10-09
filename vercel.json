@@ -1,8 +1,7 @@
 {
-  "rewrites": [
-    {
-      "source": "/((?!assets/|favicon\\.ico|robots\\.txt|site\\.webmanifest|manifest\\.webmanifest|apple-touch-icon\\.png|android-chrome-.*\\.png|.*\\.(png|jpg|jpeg|svg|webp|ico)).*)",
-      "destination": "/index.html"
-    }
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/(assets/.*|src/.*|favicon\\.ico|logo-fv\\.png|hero-players\\.png)", "dest": "/$1" },
+    { "src": "/.*", "dest": "/index.html" }
   ]
 }
