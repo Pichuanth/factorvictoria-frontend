@@ -1,7 +1,7 @@
 {
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "/(assets/.*|src/.*|favicon\\.ico|logo-fv\\.png|hero-players\\.png)", "dest": "/$1" },
-    { "src": "/.*", "dest": "/index.html" }
+  "rewrites": [
+    { "source": "/assets/(.*)", "destination": "/assets/$1" },
+    { "source": "/(favicon.ico|logo-fv.png|robots.txt|sitemap.xml|hero-players.png)", "destination": "/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
