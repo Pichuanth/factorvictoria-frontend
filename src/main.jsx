@@ -1,9 +1,7 @@
-import { StrictMode } from "react";
+// src/main.jsx
+import React from "react";
 import { createRoot } from "react-dom/client";
-import App from "./App.jsx";
 
 createRoot(document.getElementById("root")).render(
-  <StrictMode>
-    <App />
-  </StrictMode>
+  <div style={{padding: 24, fontSize: 24}}>Hola Factor Victoria 👋</div>
 );
