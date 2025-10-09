@@ -1,7 +1,5 @@
 {
   "rewrites": [
-    { "source": "/assets/(.*)", "destination": "/assets/$1" },
-    { "source": "/(favicon.ico|logo-fv.png|robots.txt|sitemap.xml|hero-players.png)", "destination": "/$1" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!assets/|favicon\\.ico|logo-fv\\.png).*)", "destination": "/" }
   ]
 }
