@@ -1,5 +1,13 @@
 {
+  "redirects": [
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "factorvictoria.com" }],
+      "destination": "https://www.factorvictoria.com",
+      "permanent": true
+    }
+  ],
   "rewrites": [
-    { "source": "/((?!assets/|favicon\\.ico|robots\\.txt|manifest\\.json|.*\\.[a-z0-9]+$).*)", "destination": "/index.html" }
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
