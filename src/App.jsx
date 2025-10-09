@@ -1,19 +1,44 @@
-import React from 'react'
-
+// src/App.jsx
 export default function App() {
   return (
-    <div style={{
-      padding: '32px',
-      margin: '48px auto',
-      maxWidth: 720,
-      border: '1px solid #e5e7eb',
-      borderRadius: 12,
-      textAlign: 'center',
-      fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, "Helvetica Neue", Arial'
-    }}>
-      <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 8 }}>Factor Victoria</h1>
-      <p style={{ color: '#374151' }}>Render mínimo OK. Luego volvemos a la app completa.</p>
-      <img src="/hero-players.png" alt="Hero" style={{ marginTop: 16, width: '100%', borderRadius: 12 }}/>
+    <div className="bg-white min-h-screen">
+      {/* Header muy simple */}
+      <header className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+        <a href="/" className="flex items-center gap-3">
+          <img src="/logo-fv.png" alt="Factor Victoria" className="h-9 w-auto" />
+          <span className="font-bold text-lg tracking-tight">Factor Victoria</span>
+        </a>
+
+        <nav className="hidden sm:flex items-center gap-6 text-sm">
+          <a href="/app" className="hover:opacity-80">Iniciar</a>
+          <a href="#planes" className="hover:opacity-80">Planes</a>
+          <a href="#contacto" className="hover:opacity-80">Contacto</a>
+        </nav>
+      </header>
+
+      {/* Tu hero mínimo que ya estaba funcionando */}
+      <main className="max-w-5xl mx-auto px-6 pb-16">
+        <section className="rounded-3xl border border-[#e5e7eb] p-8 sm:p-10 mt-4">
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-center">
+            Factor Victoria
+          </h1>
+          <p className="text-center mt-3 text-[#0b1730]/80">
+            Render mínimo OK. Luego volvemos a la app completa.
+          </p>
+
+          <div className="mt-8">
+            <img
+              src="/hero-players.png"
+              alt="Jugadores de fútbol"
+              className="w-full rounded-xl"
+            />
+          </div>
+        </section>
+      </main>
+
+      <footer className="text-center text-xs text-neutral-500 pb-10">
+        © {new Date().getFullYear()} Factor Victoria
+      </footer>
     </div>
-  )
+  );
 }
