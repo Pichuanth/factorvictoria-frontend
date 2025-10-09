@@ -1,17 +1,11 @@
 export default function App() {
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "grid",
-        placeItems: "center",
-        background: "#0ea5e9",
-        color: "white",
-        fontSize: 24,
-        fontFamily: "system-ui, sans-serif",
-      }}
-    >
-      Hola Factor Victoria
+    <div style={{
+      padding: '32px',
+      fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto',
+      fontSize: '20px'
+    }}>
+      ✅ Hola, Factor Victoria — render mínimo OK
     </div>
   );
 }
