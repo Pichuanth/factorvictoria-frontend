@@ -1,41 +1,63 @@
-import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
+// src/App.jsx
+import { Routes, Route, NavLink } from "react-router-dom";
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <div className="bg-white min-h-screen">
-        <Header />
+    <div className="bg-white min-h-screen">
+      {/* Header */}
+      <header className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+        <a href="/" className="flex items-center gap-3">
+          <img src="/logo-fv.png" alt="Factor Victoria" className="h-8 w-auto" />
+          <span className="font-semibold tracking-tight">Factor Victoria</span>
+        </a>
 
-        <main className="max-w-5xl mx-auto px-6 pb-16">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/planes" element={<Planes />} />
-            <Route path="/contacto" element={<Contacto />} />
-          </Routes>
-        </main>
+        <nav className="flex items-center gap-6 text-sm">
+          <NavLink
+            to="/"
+            end
+            className={({ isActive }) =>
+              isActive ? "font-medium" : "hover:opacity-80"
+            }
+          >
+            Inicio
+          </NavLink>
+          <NavLink
+            to="/planes"
+            className={({ isActive }) =>
+              isActive ? "font-medium" : "hover:opacity-80"
+            }
+          >
+            Planes
+          </NavLink>
+          <NavLink
+            to="/contacto"
+            className={({ isActive }) =>
+              isActive ? "font-medium" : "hover:opacity-80"
+            }
+          >
+            Contacto
+          </NavLink>
+        </nav>
+      </header>
 
-        <Footer />
-      </div>
-    </BrowserRouter>
+      {/* Contenido según la ruta */}
+      <main className="max-w-6xl mx-auto px-6 pb-16">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/planes" element={<Planes />} />
+          <Route path="/contacto" element={<Contacto />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </main>
+
+      <footer className="text-center text-xs text-neutral-500 pb-10">
+        © {new Date().getFullYear()} Factor Victoria
+      </footer>
+    </div>
   );
 }
 
-function Header() {
-  return (
-    <header className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-      <Link to="/" className="flex items-center gap-3">
-        <img src="/logo-fv.png" alt="Factor Victoria" className="h-9 w-auto" />
-        <span className="font-bold text-lg tracking-tight">Factor Victoria</span>
-      </Link>
-
-      <nav className="hidden sm:flex items-center gap-6 text-sm">
-        <Link to="/" className="hover:opacity-80">Inicio</Link>
-        <Link to="/planes" className="hover:opacity-80">Planes</Link>
-        <Link to="/contacto" className="hover:opacity-80">Contacto</Link>
-      </nav>
-    </header>
-  );
-}
+/* ====== Páginas ====== */
 
 function Home() {
   return (
@@ -46,7 +68,6 @@ function Home() {
       <p className="text-center mt-3 text-[#0b1730]/80">
         Render mínimo OK. Luego volvemos a la app completa.
       </p>
-
       <div className="mt-8">
         <img
           src="/hero-players.png"
@@ -59,17 +80,30 @@ function Home() {
 }
 
 function Planes() {
-  return <div className="p-6">Planes</div>;
+  return (
+    <section className="p-6">
+      <h2 className="text-2xl font-semibold mb-2">Planes</h2>
+      <p className="text-[#0b1730]/80">Contenido de planes (placeholder).</p>
+    </section>
+  );
 }
 
 function Contacto() {
-  return <div className="p-6">Contacto</div>;
+  return (
+    <section className="p-6">
+      <h2 className="text-2xl font-semibold mb-2">Contacto</h2>
+      <p className="text-[#0b1730]/80">Contenido de contacto (placeholder).</p>
+    </section>
+  );
 }
 
-function Footer() {
+function NotFound() {
   return (
-    <footer className="text-center text-xs text-neutral-500 pb-10">
-      © {new Date().getFullYear()} Factor Victoria
-    </footer>
+    <section className="p-6">
+      <h2 className="text-2xl font-semibold mb-2">Página no encontrada</h2>
+      <p className="text-[#0b1730]/80">
+        La ruta que abriste no existe. Vuelve al Inicio.
+      </p>
+    </section>
   );
 }
