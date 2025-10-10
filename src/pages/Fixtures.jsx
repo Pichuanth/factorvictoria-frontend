@@ -1,32 +1,26 @@
-import { useEffect, useMemo, useState } from "react";
+// src/pages/Fixtures.jsx
+import React, { useEffect, useState, useMemo } from "react";
 
-const API_BASE =
-  (typeof localStorage !== "undefined" && localStorage.getItem("apiBase")) ||
-  import.meta.env.VITE_API_BASE ||
-  "http://localhost:3001";
+const API_BASE = import.meta.env.VITE_API_BASE || ""; // ej: https://tu-api
+const isProd = import.meta.env.PROD;                  // true en Vercel (prod)
 
-/* Mapeo simple a bandera emoji por país (fallback = 🇺🇳) */
-const FLAG = (country="")=>{
-  const c = country.trim().toLowerCase();
+const FLAG = (country = "") => {
   const map = {
-    chile:"🇨🇱", argentina:"🇦🇷", brasil:"🇧🇷", brazil:"🇧🇷",
-    uruguay:"🇺🇾", paraguay:"🇵🇾", peru:"🇵🇪", bolivia:"🇧🇴",
-    colombia:"🇨🇴", mexico:"🇲🇽", españa:"🇪🇸", spain:"🇪🇸",
-    francia:"🇫🇷", france:"🇫🇷", inglaterra:"🇬🇧", italy:"🇮🇹", italia:"🇮🇹",
-    alemania:"🇩🇪", germany:"🇩🇪", usa:"🇺🇸", estados:"🇺🇸", portugal:"🇵🇹"
+    ar: "🇦🇷", cl: "🇨🇱", br: "🇧🇷", uy: "🇺🇾", py: "🇵🇾",
+    pe: "🇵🇪", co: "🇨🇴", mx: "🇲🇽", es: "🇪🇸", pt: "🇵🇹",
+    de: "🇩🇪", it: "🇮🇹", fr: "🇫🇷", gb: "🇬🇧", us: "🇺🇸",
   };
-  return map[c] || "🇺🇳";
+  return map[country?.toLowerCase()] || "🏳️";
 };
 
 export default function Fixtures() {
-  const [date, setDate] = useState(() =>
-    new Date().toISOString().slice(0, 10)
-  );
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState("");
   const [adminToken, setAdminToken] = useState("");
 
+  // Cargar partidos del día
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -45,89 +39,111 @@ export default function Fixtures() {
     })();
   }, [date]);
 
-  const filtered = useMemo(() => {
-    const t = q.trim().toLowerCase();
-    if (!t) return rows;
-    return rows.filter((x) =>
-      [x.home, x.away, x.league, x.country].some((v) =>
-        String(v || "").toLowerCase().includes(t)
-      )
-    );
-  }, [rows, q]);
-
-  const syncDay = async ()=>{
-    if(!adminToken){ alert("Ingresa el token de administrador."); return; }
-    try{
-      const r = await fetch(`${API_BASE}/api/fixtures/sync-day`,{
-        method:"POST",
-        headers:{ "Content-Type":"application/json","x-admin-token":adminToken },
-        body: JSON.stringify({ date })
+  // Sincronizar (solo visible en dev)
+  const syncDay = async () => {
+    try {
+      if (!adminToken) { alert("Ingresa X-ADMIN-TOKEN"); return; }
+      setLoading(true);
+      const r = await fetch(`${API_BASE}/admin/sync?date=${encodeURIComponent(date)}`, {
+        method: "POST",
+        headers: { "X-ADMIN-TOKEN": adminToken }
       });
-      if(!r.ok) throw new Error(`HTTP ${r.status}`);
-      alert("Sincronización enviada. Revisa los partidos en unos minutos.");
-    }catch(e){
-      alert("No se pudo sincronizar. Revisa el token y el backend.");
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      alert("Sincronizado OK");
+    } catch (e) {
       console.error(e);
+      alert("Error al sincronizar");
+    } finally {
+      setLoading(false);
     }
   };
 
+  const filtered = useMemo(() => {
+    const txt = q.trim().toLowerCase();
+    if (!txt) return rows;
+    return rows.filter(r =>
+      [r.home, r.away, r.league, r.country].some(v => String(v).toLowerCase().includes(txt))
+    );
+  }, [q, rows]);
+
   return (
-    <div className="container" style={{padding:"18px 16px 26px"}}>
-      <h1 style={{fontSize:28,fontWeight:900}}>Partidos</h1>
+    <div className="max-w-6xl mx-auto px-4 py-8">
+      <h1 className="text-2xl md:text-3xl font-bold text-white mb-6">Partidos</h1>
 
-      {/* Panel ADMINISTRADOR (solo uso interno) */}
-      <div style={{background:"#0b1322",border:"1px solid #1f2a3b",padding:16,borderRadius:20,color:"#e5e7eb",margin:"10px 0 14px"}}>
-        <div className="badge" style={{background:"#e2e8f0"}}>ADMINISTRADOR</div>
-        <p style={{margin:"10px 0 8px",color:"#cbd5e1",fontWeight:800}}>Token interno (no publicar en producción):</p>
-        <div className="form-row">
-          <input className="input" type="text" placeholder="x-admin-token" value={adminToken} onChange={(e)=>setAdminToken(e.target.value)} />
-          <button className="fv-btn-primary" onClick={syncDay}>Sincronizar día a Base de Datos</button>
+      {/* ADMIN – oculto en producción */}
+      {!isProd && (
+        <div className="border border-indigo-500/40 rounded-2xl p-4 mb-6 bg-indigo-900/20">
+          <p className="text-sm font-semibold text-white mb-2">ADMIN</p>
+          <p className="text-xs text-indigo-200 mb-2">TOKEN INTERNO (NO PUBLICAR EN PRODUCCIÓN)</p>
+          <input
+            className="w-full rounded-xl px-3 py-2 bg-white text-slate-900 mb-3"
+            placeholder="X-ADMIN-TOKEN"
+            value={adminToken}
+            onChange={e => setAdminToken(e.target.value)}
+          />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <input
+              type="date"
+              className="rounded-xl px-3 py-2 bg-white text-slate-900"
+              value={date}
+              onChange={e => setDate(e.target.value)}
+            />
+            <button
+              onClick={syncDay}
+              className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-900 font-semibold shadow"
+            >
+              Sincronizar día a BD
+            </button>
+          </div>
         </div>
+      )}
+
+      {/* Filtros públicos */}
+      <div className="border border-white/10 rounded-2xl p-4 mb-4 bg-white/5 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <input
+          type="date"
+          className="rounded-xl px-3 py-2 bg-white text-slate-900"
+          value={date}
+          onChange={e => setDate(e.target.value)}
+        />
+        <input
+          className="flex-1 rounded-xl px-3 py-2 bg-white text-slate-900"
+          placeholder="Buscar (equipo / liga / país)"
+          value={q}
+          onChange={e => setQ(e.target.value)}
+        />
+        <div className="text-sm text-white/70">{filtered.length} partidos</div>
       </div>
 
-      {/* Controles */}
-      <div style={{display:"grid",gridTemplateColumns:"220px 1fr",gap:12,marginBottom:12}}>
-        <input className="input" type="date" value={date} onChange={(e)=>setDate(e.target.value)} />
-        <input className="input" placeholder="Buscar (equipo/liga/país)" value={q} onChange={(e)=>setQ(e.target.value)} />
-      </div>
-      <span className="muted">{loading ? "Cargando…" : `${filtered.length} partidos`}</span>
-
-      {/* Tabla */}
-      <div className="table-wrap" style={{marginTop:10}}>
-        <table>
-          <thead>
-            <tr>
-              <th>Hora</th>
-              <th>Local</th>
-              <th>Visita</th>
-              <th>Liga</th>
-              <th>País</th>
-              <th>Estadio</th>
-              <th>TV</th>
-              <th>Estado</th>
+      <div className="overflow-x-auto rounded-2xl border border-white/10">
+        <table className="min-w-full text-sm text-white/90">
+          <thead className="bg-gradient-to-r from-amber-400 to-amber-300 text-slate-900">
+            <tr className="text-left">
+              <th className="px-3 py-2">Hora</th>
+              <th className="px-3 py-2">Local</th>
+              <th className="px-3 py-2">Visita</th>
+              <th className="px-3 py-2">Liga</th>
+              <th className="px-3 py-2">País</th>
+              <th className="px-3 py-2">Estadio</th>
             </tr>
           </thead>
-          <tbody>
-            {loading ? (
-              <tr><td className="muted" colSpan={8}>Cargando…</td></tr>
-            ) : filtered.length === 0 ? (
-              <tr><td className="muted" colSpan={8}>Sin partidos.</td></tr>
-            ) : (
-              filtered.map((r) => (
-                <tr key={r.id}>
-                  <td>
-                    {new Date(r.date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                  </td>
-                  <td>{r.home}</td>
-                  <td>{r.away}</td>
-                  <td>{r.league}</td>
-                  <td>{FLAG(r.country)} {r.country}</td>
-                  <td>{r.venue || "-"}</td>
-                  <td>{r.tv || "-"}</td>
-                  <td>{r.status || "-"}</td>
-                </tr>
-              ))
+          <tbody className="divide-y divide-white/10 bg-white/5">
+            {loading && (
+              <tr><td className="px-3 py-4" colSpan={6}>Cargando…</td></tr>
             )}
+            {!loading && filtered.length === 0 && (
+              <tr><td className="px-3 py-4" colSpan={6}>Sin datos</td></tr>
+            )}
+            {filtered.map((m, i) => (
+              <tr key={i}>
+                <td className="px-3 py-2 whitespace-nowrap">{m.time || "-"}</td>
+                <td className="px-3 py-2">{m.home}</td>
+                <td className="px-3 py-2">{m.away}</td>
+                <td className="px-3 py-2">{m.league}</td>
+                <td className="px-3 py-2">{FLAG(m.country)} {m.country?.toUpperCase()}</td>
+                <td className="px-3 py-2">{m.stadium || "-"}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

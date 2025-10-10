@@ -1,110 +1,142 @@
 // src/copy.ts
 export type Plan = {
-  key: string;
+  id: string;
   name: string;
-  priceCLP: number;
-  label: string;        // ej: "Cuotas x10"
-  multiplier: number;   // para el simulador
-  highlight?: boolean;  // “Más popular”
-  note?: string;        // texto chico bajo el precio
+  price: number;     // CLP sin puntos
+  badge?: "Recomendado" | "Más popular" | "Nuevo";
   bullets: string[];
+  cta: string;       // texto botón
+  includedSimulator: boolean; // simulador visible en este plan
+  locked?: boolean;  // para pintar "Mejorar" / candado
 };
 
-export const copy = {
-  brand: {
-    name: "Factor Victoria",
-    badge: "Paga con Flow o Mercado Pago • hasta 6 cuotas*",
-  },
+const currencyCLP = (n: number) =>
+  new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(n);
+
+const copy = {
+  brand: "Factor Victoria",
   hero: {
+    kicker: "Paga con Flow o Mercado Pago • hasta 6 cuotas*",
     title: "Convierte información en ventaja",
     subtitle:
       "Estadísticas, pronósticos y simulador de ganancias para apostar con criterio.",
-    ctaPrimary: "Ver planes",
+    primaryCta: "Ver planes",
   },
-  // planes en pesos chilenos
-  plans: <Plan[]>[
+
+  why: {
+    title: "¿Por qué Factor Victoria?",
+    items: [
+      { n: "1", title: "Setup veloz", text: "Arrancamos con un MVP que valida sin esperar meses." },
+      { n: "2", title: "Diseño claro", text: "Interfaz limpia y enfocada en conversión." },
+      { n: "3", title: "Data que suma", text: "Comparador, simulador y alertas orientadas a ROI." },
+    ],
+  },
+
+  // ====== PLANES ======
+  plans: [
     {
-      key: "pro-100",
+      id: "x10",
       name: "Mensual",
-      priceCLP: 19990,
-      label: "Cuotas x10",
-      multiplier: 10,
-      note: "Ideal para probar",
+      price: 19990,
+      badge: undefined,
       bullets: [
         "Ebook para principiantes",
         "Picks y análisis básicos diarios",
         "Simulador de ganancias incluido",
-        "Cuotas potenciadas x10",
-        "100 cupos disponibles",
+        "Cuotas objetivo x10",
+        "15 cupos disponibles",
       ],
+      cta: "Empezar",
+      includedSimulator: true,
+      locked: false,
     },
     {
-      key: "pro-45",
+      id: "x20",
       name: "3 meses",
-      priceCLP: 44990,
-      label: "Cuotas x20",
-      multiplier: 20,
-      note: "≈ $14.997 / mes",
+      price: 44990,
+      badge: "Recomendado",
       bullets: [
         "Guía de estrategia y gestión de banca",
         "Picks y análisis ampliados",
-        "Alertas clave de partido (cuando las actives)",
+        "Alertas clave de partido",
         "Cuotas potenciadas x20",
         "50 cupos disponibles",
       ],
+      cta: "Mejorar",
+      includedSimulator: true,
+      locked: true,
     },
     {
-      key: "pro-250",
+      id: "x50",
       name: "Anual",
-      priceCLP: 99990,
-      label: "Cuotas x50",
-      multiplier: 50,
-      highlight: true,
-      note: "≈ $8.333 / mes",
+      price: 99990,
+      badge: "Más popular",
       bullets: [
         "Guía de estrategia PRO",
         "Informe premium mensual",
         "Cuotas potenciadas x50",
         "30 cupos disponibles",
       ],
+      cta: "Mejorar",
+      includedSimulator: true,
+      locked: true,
     },
     {
-      key: "lifetime",
-      name: "Vitalicio",
-      priceCLP: 249990,
-      label: "Cuotas x100",
-      multiplier: 100,
-      note: "Acceso de por vida",
+      id: "x100",
+      name: "PRO+",
+      price: 249990,
+      badge: "Nuevo",
       bullets: [
-        "Acceso de por vida a todas las mejoras",
-        "Informe premium mensual",
-        "Cuotas potenciadas x100",
-        "15 cupos disponibles",
+        "Acceso a research avanzado",
+        "Automatizaciones y reportes",
+        "Cuotas objetivo x100",
+        "Cupos limitados",
       ],
+      cta: "Hablar con nosotros",
+      includedSimulator: true,
+      locked: true,
     },
-  ],
+  ] as Plan[],
+
+  // ====== COMPARADOR (landing / upsell) ======
+  comparator: {
+    header: "Comparador de cuotas",
+    searchPlaceholder: "Buscar (equipo/mercado/selección)",
+    tiers: [
+      { id: "x10", title: "X10", price: currencyCLP(19990), included: true, locked: false },
+      { id: "x20", title: "X20", price: currencyCLP(44990), included: false, locked: true },
+      { id: "x50", title: "X50", price: currencyCLP(99990), included: false, locked: true },
+      { id: "x100", title: "X100", price: currencyCLP(249990), included: false, locked: true },
+    ],
+    ctas: { included: "Incluido", upgrade: "Mejorar" },
+  },
+
+  // ====== SIMULADOR (visible en todos los planes) ======
   simulator: {
-    // monto inicial que aparece en el input del simulador (puedes cambiarlo)
-    defaultStake: 10000,
-    stakeLabel: "Ingresa un monto a apostar y descubre cuánto podrías ganar.",
+    title: "Simula tus ganancias",
+    placeholder: "Ingresa un monto a apostar",
+    rows: [
+      { id: "x10", label: "Mensual", times: 10 },
+      { id: "x20", label: "3 meses", times: 20 },
+      { id: "x50", label: "Anual", times: 50 },
+      { id: "x100", label: "PRO+", times: 100 },
+    ],
+    notes: [
+      "La cuota segura de regalo: de 1.5 a 3 máximo (≈95% de acierto por cada una por separado).",
+      "La cuota generada apunta a x10 o cercana para no cometer errores.",
+      "Probabilidad objetivo por selección: ≥ 85%.",
+      "Incluye bloque de desfase del mercado (todas las membresías).",
+    ],
   },
+
+  // ====== FAQ ======
   faq: [
-    {
-      q: "¿Las ganancias están garantizadas?",
-      a: "No. Ofrecemos datos, estrategia y herramientas. Las apuestas siempre conllevan riesgo.",
-    },
-    {
-      q: "¿Cómo funcionan las cuotas potenciadas?",
-      a: "Mediante análisis, combinaciones y alertas, buscamos cuotas con mayor valor esperado.",
-    },
-    {
-      q: "¿Puedo pagar en cuotas?",
-      a: "Sí, con Flow o Mercado Pago (hasta 6 cuotas, sujeto al emisor).",
-    },
+    { q: "¿Cómo pago?", a: "Aceptamos Flow y Mercado Pago. Habilitamos pago en cuotas." },
+    { q: "¿Reembolsos?", a: "Si no te sirve en 7 días, contáctanos y lo vemos caso a caso." },
+    { q: "¿El simulador está en todos los planes?", a: "Sí, el simulador está incluido en todas las membresías." },
   ],
-  contact: {
-    title: "¿Dudas? Hablemos",
-    subtitle: "Escríbenos y te ayudamos a elegir el plan ideal.",
-    cta: "Hablar con nosotros",
-  },
-} as const;
+
+  currencyCLP,
+};
+
+export default copy;
