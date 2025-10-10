@@ -1,5 +1,4 @@
 // src/copy.ts
-// Tipado opcional simple. Si te da lata, puedes eliminar estas dos líneas.
 type Plan = {
   id: string;
   title: string;
@@ -20,12 +19,10 @@ const copy: {
     subclaim:
       "Estadísticas, pronósticos y simulador de ganancias para apostar con criterio.",
   },
-
   ctas: {
     verPlanes: "Ver planes",
     comprar: "Comprar",
   },
-
   planes: [
     {
       id: "x10",
@@ -35,9 +32,10 @@ const copy: {
       bullets: [
         "Cuotas x10",
         "Ebook para principiantes",
-        "Cuota segura (1.5 a 3)",
-        "Desfase del mercado",
+        "Análisis básicos diarios",
         "Simulador de ganancias incluido",
+        "Cuota segura de regalo (1.5 a 3)",
+        "Desfase del mercado (búsqueda de errores)",
       ],
     },
     {
@@ -46,14 +44,12 @@ const copy: {
       priceCLP: "$44.990",
       note: "≈ $14.997 / mes",
       bullets: [
-        "Todo lo del Mensual",
+        "Todo lo del plan Mensual",
         "Guía de estrategia y gestión de banca",
         "Picks y análisis ampliados",
         "Alertas clave de partido (cuando las actives)",
         "Cuotas potenciadas x20",
         "50 cupos disponibles",
-        "Cuota segura (1.5 a 3) incluida",
-        "Desfase del mercado incluido",
       ],
     },
     {
@@ -61,39 +57,33 @@ const copy: {
       title: "Anual",
       priceCLP: "$99.990",
       note: "≈ $8.333 / mes",
-      badge: "Más popular",
       bullets: [
-        "Todo lo de Crecimiento",
+        "TODO lo del plan de $44.990",
         "Guía de estrategia PRO",
         "Informe premium mensual",
+        "Estrategia Doble oportunidad",
+        "Estrategia “Supera a la casa”",
         "Cuotas potenciadas x50",
-        "Estrategia doble oportunidad",
-        "Estrategia supera a la casa",
-        "Cuota segura (1.5 a 3) incluida",
-        "Desfase del mercado incluido",
         "30 cupos disponibles",
       ],
     },
     {
       id: "x100",
-      title: "Vitalicia",
+      title: "X100",
       priceCLP: "$249.990",
-      badge: "Membresía vitalicia",
+      badge: "Más potente",
       bullets: [
-        "Todo lo del Anual",
+        "Membresía vitalicia",
+        "TODO lo anterior incluido",
+        "Acceso prioritario a nuevas funciones",
         "Cuotas potenciadas x100",
-        "Acceso de por vida a actualizaciones",
-        "Cuota segura (1.5 a 3) incluida",
-        "Desfase del mercado incluido",
-        // Quitar “soporte 1 a 1” y “límites extendidos” como pediste
       ],
     },
   ],
-
   home: {
     simuladorTitulo: "Simula tus ganancias",
     simuladorSub:
-      "Ingresa un monto y revisa cuánto podrías ganar con cada membresía.",
+      "Ingresa un monto a apostar y descubre cuánto podrías ganar con cada membresía.",
     imagenCierreAlt: "Jugadores saliendo del notebook",
   },
 };

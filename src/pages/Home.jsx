@@ -1,16 +1,23 @@
+// src/pages/Home.jsx
 import { Link } from "react-router-dom";
-import copy from "../copy";                     // export default desde copy.ts
-import Simulator from "../components/Simulator"; // ajusta ruta si difiere
+import copy from "../copy";
+import Simulator from "../components/Simulator";
 
 export default function Home() {
   return (
     <div className="bg-slate-900">
       {/* Héroe */}
       <section className="max-w-6xl mx-auto px-4 pt-10 pb-14">
-        {/* Logo y nombre van AQUÍ (no en la barra) */}
+        {/* Logo + nombre (debajo del header) */}
         <div className="flex items-center gap-3">
-          <img src="/logo-fv.png" alt="Factor Victoria" className="w-10 h-10 object-contain" />
-          <span className="text-white text-2xl md:text-3xl font-bold">Factor Victoria</span>
+          <img
+            src="/logo-fv.png"
+            alt="Factor Victoria"
+            className="w-10 h-10 object-contain"
+          />
+          <span className="text-white text-2xl md:text-3xl font-bold">
+            Factor Victoria
+          </span>
         </div>
 
         <div className="mt-4">
@@ -51,7 +58,12 @@ export default function Home() {
               <h3 className="text-white text-2xl font-bold">{p.title}</h3>
               <div className="mt-2 text-3xl md:text-4xl font-extrabold text-white">
                 {p.priceCLP}
-                {p.freq && <span className="text-white/60 text-base font-medium"> {p.freq}</span>}
+                {p.freq && (
+                  <span className="text-white/60 text-base font-medium">
+                    {" "}
+                    {p.freq}
+                  </span>
+                )}
               </div>
               {p.note && (
                 <div className="text-white/60 text-sm mt-1">{p.note}</div>
@@ -67,7 +79,6 @@ export default function Home() {
               </ul>
 
               <div className="mt-6">
-                {/* Redirige a tu flujo real de pago (Flow/Mercado Pago) */}
                 <a
                   href={`/checkout?plan=${p.id}`}
                   className="inline-flex px-6 py-3 rounded-2xl bg-slate-900 text-white font-semibold hover:opacity-90"
@@ -80,21 +91,23 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Simulador */}
+      {/* Simulador en Inicio */}
       <section className="max-w-6xl mx-auto px-4 py-12">
+        <h2 className="text-white text-2xl font-bold mb-3">
+          {copy.home.simuladorTitulo}
+        </h2>
+        <p className="text-white/80 mb-6">{copy.home.simuladorSub}</p>
         <Simulator />
       </section>
 
-      {/* Imagen de cierre (opcional) */}
-      {/* 
-      <section className="max-w-6xl mx-auto px-4 pb-16">
+      {/* Imagen de cierre (cuando la tengas en /public) */}
+      {/* <section className="max-w-6xl mx-auto px-4 pb-16">
         <img
           src="/closing-players.jpg"
           className="rounded-3xl w-full object-cover"
-          alt={copy.home?.imagenCierreAlt || "Factor Victoria"}
+          alt={copy.home.imagenCierreAlt}
         />
-      </section>
-      */}
+      </section> */}
     </div>
   );
 }

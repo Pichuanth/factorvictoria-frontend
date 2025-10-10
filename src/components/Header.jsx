@@ -1,40 +1,47 @@
+// src/components/Header.jsx
 import { NavLink } from "react-router-dom";
 
 export default function Header() {
   const base =
-    "px-4 py-2 text-sm md:text-base font-medium transition";
+    "inline-flex items-center px-5 py-2 rounded-xl transition font-semibold";
   const active =
-    "bg-amber-300 text-slate-900 rounded-xl shadow";
-  const inactive =
-    "text-slate-700 hover:text-slate-900";
+    "bg-amber-400 text-slate-900 shadow";
+  const idle =
+    "bg-slate-900/10 text-slate-800 hover:bg-slate-900/20";
 
   return (
     <header className="w-full bg-white border-b border-slate-200">
-      <nav className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-2">
-        <NavLink
-          to="/"
-          className={({ isActive }) => `${base} ${isActive ? active : inactive}`}
-        >
-          Inicio
-        </NavLink>
-        <NavLink
-          to="/app"
-          className={({ isActive }) => `${base} ${isActive ? active : inactive}`}
-        >
-          Comparador
-        </NavLink>
-        <NavLink
-          to="/fixture"
-          className={({ isActive }) => `${base} ${isActive ? active : inactive}`}
-        >
-          Partidos
-        </NavLink>
-        <NavLink
-          to="/login"
-          className={({ isActive }) => `${base} ${isActive ? active : inactive} ml-auto`}
-        >
-          Iniciar sesión
-        </NavLink>
+      <nav className="max-w-6xl mx-auto px-4 h-[64px] flex items-center gap-3">
+        <div className="mr-2 text-slate-900 font-bold">
+          Factor <span className="text-slate-700">Victoria</span>
+        </div>
+
+        <div className="flex gap-3">
+          <NavLink
+            to="/"
+            className={({ isActive }) => `${base} ${isActive ? active : idle}`}
+          >
+            Inicio
+          </NavLink>
+          <NavLink
+            to="/app"
+            className={({ isActive }) => `${base} ${isActive ? active : idle}`}
+          >
+            Comparador
+          </NavLink>
+          <NavLink
+            to="/fixture"
+            className={({ isActive }) => `${base} ${isActive ? active : idle}`}
+          >
+            Partidos
+          </NavLink>
+          <NavLink
+            to="/login"
+            className={({ isActive }) => `${base} ${isActive ? active : idle}`}
+          >
+            Iniciar sesión
+          </NavLink>
+        </div>
       </nav>
     </header>
   );
