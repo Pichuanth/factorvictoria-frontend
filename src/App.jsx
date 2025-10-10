@@ -1,7 +1,8 @@
+// Header simple + “héroe” mínimo (lo que ya viste funcionando)
 export default function App() {
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header simple */}
+    <div className="bg-white min-h-screen">
+      {/* Header */}
       <header className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
         <a href="/" className="flex items-center gap-3">
           <img src="/logo-fv.png" alt="Factor Victoria" className="h-9 w-auto" />
@@ -10,12 +11,12 @@ export default function App() {
 
         <nav className="hidden sm:flex items-center gap-6 text-sm">
           <a href="/" className="hover:opacity-80">Inicio</a>
-          <a href="/planes" className="hover:opacity-80">Planes</a>
-          <a href="/contacto" className="hover:opacity-80">Contacto</a>
+          <a href="#planes" className="hover:opacity-80">Planes</a>
+          <a href="#contacto" className="hover:opacity-80">Contacto</a>
         </nav>
       </header>
 
-      {/* Hero mínimo visible */}
+      {/* Héroe mínimo */}
       <main className="max-w-5xl mx-auto px-6 pb-16">
         <section className="rounded-3xl border border-[#e5e7eb] p-8 sm:p-10 mt-4">
           <h1 className="text-3xl sm:text-4xl font-extrabold text-center">
