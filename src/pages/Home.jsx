@@ -1,58 +1,37 @@
-// src/pages/Home.jsx
-import React from "react";
-import copy from "../copy";
-import Simulator from "../components/Simulator";
 import { Link } from "react-router-dom";
-
-const money = (n: number) =>
-  `$${n.toLocaleString("es-CL")}`;
+import copy from "../copy";               // tu copy.ts exporta default
+import Simulator from "../components/Simulator"; // si tu componente vive en otro path, ajusta el import
 
 export default function Home() {
   return (
-    <div className="pb-16">
-      {/* Héroe (logo + nombre) sobre fondo azul */}
-      <section className="bg-[#0f1a2a]">
-        <div className="max-w-6xl mx-auto px-4 pt-8 pb-10">
-          {/* Logo + Nombre */}
-          <div className="flex items-center gap-3">
-            <img src="/logo-fv.png" alt="Logo" className="h-10 w-10" />
-            <h1 className="text-white text-2xl md:text-3xl font-bold">
-              {copy.marca.nombre}
-            </h1>
-          </div>
-
-          {/* Banner pago */}
-          <div className="mt-4 inline-flex items-center rounded-2xl px-4 py-2 bg-white/10 text-white/90">
-            {copy.marca.bannerPago}
-          </div>
-
-          {/* Claim */}
-          <div className="mt-6 text-white">
-            <h2 className="text-4xl md:text-6xl font-extrabold leading-tight">
-              {copy.marca.claim.split(" en ").length === 2 ? (
-                <>
-                  {copy.marca.claim.split(" en ")[0]}{" "}
-                  <span className="text-white/80">en</span>{" "}
-                  <span className="inline-block bg-gradient-to-r from-amber-300 to-yellow-400 text-slate-900 px-2 py-1 rounded-xl">
-                    ventaja
-                  </span>
-                </>
-              ) : (
-                copy.marca.claim
-              )}
-            </h2>
-            <p className="mt-4 text-lg md:text-xl text-white/80 max-w-3xl">
-              {copy.marca.subclaim}
-            </p>
-
-            <Link
-              to="#planes"
-              className="inline-flex mt-6 px-6 py-3 rounded-2xl bg-gradient-to-r from-amber-300 to-yellow-400 text-slate-900 font-semibold shadow"
-            >
-              {copy.ctas.verPlanes}
-            </Link>
-          </div>
+    <div className="bg-slate-900">
+      {/* Héroe */}
+      <section className="max-w-6xl mx-auto px-4 pt-10 pb-14">
+        {/* Logo y nombre van AQUÍ (no en la barra) */}
+        <div className="flex items-center gap-3">
+          <img src="/logo-fv.png" alt="Factor Victoria" className="w-10 h-10 object-contain" />
+          <span className="text-white text-2xl md:text-3xl font-bold">Factor Victoria</span>
         </div>
+
+        <div className="mt-4 inline-flex text-slate-900 bg-white/10">
+          <span className="px-4 py-1 rounded-full bg-slate-800 text-white/80 text-sm">
+            Paga con Flow o Mercado Pago · hasta 6 cuotas*
+          </span>
+        </div>
+
+        <h1 className="mt-6 text-white text-4xl md:text-6xl font-extrabold leading-tight max-w-3xl">
+          Convierte información <br /> en ventaja
+        </h1>
+        <p className="mt-4 text-white/80 text-lg max-w-3xl">
+          {copy.marca.subclaim}
+        </p>
+
+        <Link
+          to="#planes"
+          className="inline-flex mt-6 px-6 py-3 rounded-2xl bg-gradient-to-r from-amber-300 to-yellow-400 text-slate-900 font-semibold shadow hover:opacity-90"
+        >
+          {copy.ctas.verPlanes}
+        </Link>
       </section>
 
       {/* Planes */}
@@ -61,33 +40,26 @@ export default function Home() {
           {copy.planes.map((p) => (
             <div
               key={p.id}
-              className={[
-                "rounded-3xl border p-6 md:p-8",
-                p.destacado
-                  ? "bg-gradient-to-b from-amber-50 to-white border-amber-100 shadow"
-                  : "bg-white border-slate-200",
-              ].join(" ")}
+              className="rounded-3xl border border-white/10 bg-white/5 p-6 md:p-8"
             >
-              {p.destacado && (
-                <div className="inline-block text-xs font-bold px-2 py-1 rounded-full bg-amber-100 text-amber-700 mb-2">
-                  Recomendado
-                </div>
-              )}
-              <div className="text-2xl font-bold text-slate-900">{p.nombre}</div>
-              <div className="text-sm text-slate-500 mt-1">
-                Cuotas x{p.multiplo} • {p.periodicidad}
-              </div>
-
-              <div className="text-4xl font-extrabold text-slate-900 mt-4">
-                {money(p.precioCLP)}{" "}
-                <span className="text-base font-semibold text-slate-500">
-                  / {p.periodicidad === "único" ? "plan" : p.periodicidad}
+              {p.badge && (
+                <span className="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-amber-300 text-slate-900 mb-4">
+                  {p.badge}
                 </span>
-              </div>
+              )}
 
-              <ul className="mt-4 space-y-2">
+              <h3 className="text-white text-2xl font-bold">{p.title}</h3>
+              <div className="mt-2 text-3xl md:text-4xl font-extrabold text-white">
+                {p.priceCLP}
+                {p.freq && <span className="text-white/60 text-base font-medium"> {p.freq}</span>}
+              </div>
+              {p.note && (
+                <div className="text-white/60 text-sm mt-1">{p.note}</div>
+              )}
+
+              <ul className="mt-5 space-y-2 text-white/90">
                 {p.bullets.map((b, i) => (
-                  <li key={i} className="flex items-start gap-2 text-slate-700">
+                  <li key={i} className="flex items-start gap-2">
                     <span className="mt-1 h-2 w-2 rounded-full bg-amber-400" />
                     <span>{b}</span>
                   </li>
@@ -95,9 +67,9 @@ export default function Home() {
               </ul>
 
               <div className="mt-6">
-                {/* Redirige a tu flujo de pago (Flow/Mercado Pago) */}
+                {/* Redirige a tu checkout real de Flow o Mercado Pago */}
                 <a
-                  href={`/checkout?plan=${p.id}`} // reemplaza por tu URL real a Flow o MP
+                  href={`/checkout?plan=${p.id}`}
                   className="inline-flex px-6 py-3 rounded-2xl bg-slate-900 text-white font-semibold hover:opacity-90"
                 >
                   {copy.ctas.comprar}
@@ -109,16 +81,14 @@ export default function Home() {
       </section>
 
       {/* Simulador */}
-      <Simulator />
-
-      {/* Imagen de cierre */}
-      <section className="max-w-6xl mx-auto px-4 mt-10">
-        <img
-          src="/assets/landing-cierre.jpg" // pon aquí tu imagen (los 2 jugadores)
-          alt={copy.home.imagenCierreAlt}
-          className="w-full rounded-3xl border border-slate-200 shadow"
-        />
+      <section className="max-w-6xl mx-auto px-4 py-12">
+        <Simulator />
       </section>
+
+      {/* Imagen de cierre – si ya tienes la imagen en /public, ajusta el nombre */}
+      {/* <section className="max-w-6xl mx-auto px-4 pb-16">
+        <img src="/closing-players.jpg" className="rounded-3xl w-full object-cover" alt="Factor Victoria" />
+      </section> */}
     </div>
   );
 }
