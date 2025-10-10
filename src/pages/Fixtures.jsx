@@ -1,8 +1,8 @@
 // src/pages/Fixtures.jsx
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "";     // ej: https://tu-api
-const isProd   = import.meta.env.PROD;                    // true en Vercel (prod)
+const API_BASE = import.meta.env.VITE_API_BASE || "";
+const IS_PROD = import.meta.env.PROD;
 
 const FLAG = (country = "") => {
   const map = {
@@ -14,15 +14,12 @@ const FLAG = (country = "") => {
 };
 
 export default function Fixtures() {
-  const [date, setDate] = useState(() =>
-    new Date().toISOString().slice(0, 10)
-  );
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState("");
   const [adminToken, setAdminToken] = useState("");
 
-  // Cargar partidos del día
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -41,18 +38,14 @@ export default function Fixtures() {
     })();
   }, [date]);
 
-  // Sincronizar (visible solo en desarrollo)
   const handleSync = async () => {
     try {
-      if (!adminToken) {
-        alert("Ingresa X-ADMIN-TOKEN");
-        return;
-      }
+      if (!adminToken) { alert("Ingresa X-ADMIN-TOKEN"); return; }
       setLoading(true);
-      const r = await fetch(
-        `${API_BASE}/admin/sync?date=${encodeURIComponent(date)}`,
-        { method: "POST", headers: { "X-ADMIN-TOKEN": adminToken } }
-      );
+      const r = await fetch(`${API_BASE}/admin/sync?date=${encodeURIComponent(date)}`, {
+        method: "POST",
+        headers: { "X-ADMIN-TOKEN": adminToken },
+      });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       alert("Sincronizado OK");
     } catch (e) {
@@ -66,20 +59,17 @@ export default function Fixtures() {
   const filtered = useMemo(() => {
     const txt = q.trim().toLowerCase();
     if (!txt) return rows;
-    return rows.filter((r) =>
-      [r.home, r.away, r.league, r.country]
-        .some((v) => String(v).toLowerCase().includes(txt))
+    return rows.filter(r =>
+      [r.home, r.away, r.league, r.country].some(v => String(v).toLowerCase().includes(txt))
     );
   }, [q, rows]);
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      <h1 className="text-2xl md:text-3xl font-bold text-white mb-6">
-        Partidos
-      </h1>
+      <h1 className="text-2xl md:text-3xl font-bold text-white mb-6">Partidos</h1>
 
-      {/* ADMIN — oculto en producción */}
-      {!isProd && (
+      {/* ADMIN: visible solo en desarrollo */}
+      {!IS_PROD && (
         <div className="rounded-3xl border border-slate-700/40 p-4 md:p-6 bg-slate-900/40 mb-6">
           <h3 className="text-white font-semibold mb-2">ADMIN</h3>
           <p className="text-xs text-slate-300 mb-2">
@@ -103,9 +93,9 @@ export default function Fixtures() {
             />
             <button
               onClick={handleSync}
-              className="rounded-xl px-4 py-3 bg-gradient-to-r from-yellow-400 to-amber-500 text-slate-900 font-semibold"
+              className="rounded-xl px-4 py-2 bg-gradient-to-r from-yellow-400 to-amber-500 text-slate-900 font-semibold"
             >
-              SINCRONIZAR DÍA A BD
+              Sincronizar día a BD
             </button>
           </div>
         </div>
@@ -128,7 +118,6 @@ export default function Fixtures() {
         <div className="text-sm text-white/70">{filtered.length} partidos</div>
       </div>
 
-      {/* Tabla */}
       <div className="overflow-x-auto rounded-2xl border border-white/10">
         <table className="min-w-full text-sm text-white/90">
           <thead className="bg-gradient-to-r from-amber-400 to-amber-300 text-slate-900">
@@ -142,11 +131,9 @@ export default function Fixtures() {
             </tr>
           </thead>
           <tbody className="divide-y divide-white/10 bg-white/5">
-            {loading && (
-              <tr><td className="px-3 py-4" colSpan={6}>Cargando…</td></tr>
-            )}
+            {loading && <tr><td colSpan={6} className="px-3 py-4">Cargando…</td></tr>}
             {!loading && filtered.length === 0 && (
-              <tr><td className="px-3 py-4" colSpan={6}>Sin datos</td></tr>
+              <tr><td colSpan={6} className="px-3 py-4">Sin datos</td></tr>
             )}
             {filtered.map((m, i) => (
               <tr key={i}>
@@ -154,9 +141,7 @@ export default function Fixtures() {
                 <td className="px-3 py-2">{m.home}</td>
                 <td className="px-3 py-2">{m.away}</td>
                 <td className="px-3 py-2">{m.league}</td>
-                <td className="px-3 py-2">
-                  {FLAG(m.country)} {m.country?.toUpperCase()}
-                </td>
+                <td className="px-3 py-2">{FLAG(m.country)} {m.country?.toUpperCase()}</td>
                 <td className="px-3 py-2">{m.stadium || "-"}</td>
               </tr>
             ))}
