@@ -1,54 +1,110 @@
 // src/pages/Home.jsx
-import { brand, plans, simulator, footer } from "../copy";
+import React from "react";
+import copy from "../copy";
+import Simulator from "../components/Simulator";
+import { Link } from "react-router-dom";
 
-const fmt = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 });
-
-function PlanCard({ p }) {
-  return (
-    <div className="rounded-3xl border border-white/10 bg-white/5 p-5 md:p-6 text-white">
-      {p.badge && (
-        <div className="inline-block mb-3 px-3 py-1 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 text-slate-900 text-xs font-bold">
-          {p.badge}
-        </div>
-      )}
-      <h3 className="text-xl font-semibold mb-1">{p.name}</h3>
-      <div className="text-4xl font-black tracking-tight mb-4">{p.priceText}</div>
-      <ul className="space-y-2 mb-5">
-        {p.bullets.map((b, i) => (
-          <li key={i} className="flex items-start gap-2">
-            <span className="mt-1 h-2 w-2 rounded-full bg-amber-400" />
-            <span className="text-white/90">{b}</span>
-          </li>
-        ))}
-      </ul>
-      <button className="w-full rounded-xl py-3 font-semibold bg-gradient-to-r from-amber-400 to-amber-500 text-slate-900">
-        Quiero este
-      </button>
-    </div>
-  );
-}
+const money = (n: number) =>
+  `$${n.toLocaleString("es-CL")}`;
 
 export default function Home() {
   return (
-    <div className="max-w-6xl mx-auto px-4 text-white">
-      {/* Héroe */}
-      <section className="rounded-3xl border border-white/10 bg-white/5 p-6 md:p-10 mb-8">
-        <h1 className="text-3xl md:text-5xl font-black tracking-tight mb-4">
-          {brand.hero.titleH1}
-        </h1>
-        <p className="text-white/80 text-lg md:text-xl mb-6">{brand.hero.subtitle}</p>
-        <a
-          href="#planes"
-          className="inline-block rounded-xl px-6 py-3 font-semibold bg-gradient-to-r from-amber-400 to-amber-500 text-slate-900"
-        >
-          {brand.hero.cta}
-        </a>
+    <div className="pb-16">
+      {/* Héroe (logo + nombre) sobre fondo azul */}
+      <section className="bg-[#0f1a2a]">
+        <div className="max-w-6xl mx-auto px-4 pt-8 pb-10">
+          {/* Logo + Nombre */}
+          <div className="flex items-center gap-3">
+            <img src="/logo-fv.png" alt="Logo" className="h-10 w-10" />
+            <h1 className="text-white text-2xl md:text-3xl font-bold">
+              {copy.marca.nombre}
+            </h1>
+          </div>
+
+          {/* Banner pago */}
+          <div className="mt-4 inline-flex items-center rounded-2xl px-4 py-2 bg-white/10 text-white/90">
+            {copy.marca.bannerPago}
+          </div>
+
+          {/* Claim */}
+          <div className="mt-6 text-white">
+            <h2 className="text-4xl md:text-6xl font-extrabold leading-tight">
+              {copy.marca.claim.split(" en ").length === 2 ? (
+                <>
+                  {copy.marca.claim.split(" en ")[0]}{" "}
+                  <span className="text-white/80">en</span>{" "}
+                  <span className="inline-block bg-gradient-to-r from-amber-300 to-yellow-400 text-slate-900 px-2 py-1 rounded-xl">
+                    ventaja
+                  </span>
+                </>
+              ) : (
+                copy.marca.claim
+              )}
+            </h2>
+            <p className="mt-4 text-lg md:text-xl text-white/80 max-w-3xl">
+              {copy.marca.subclaim}
+            </p>
+
+            <Link
+              to="#planes"
+              className="inline-flex mt-6 px-6 py-3 rounded-2xl bg-gradient-to-r from-amber-300 to-yellow-400 text-slate-900 font-semibold shadow"
+            >
+              {copy.ctas.verPlanes}
+            </Link>
+          </div>
+        </div>
       </section>
 
       {/* Planes */}
-      <section id="planes" className="mb-10">
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {plans.map((p) => <PlanCard key={p.id} p={p} />)}
+      <section id="planes" className="max-w-6xl mx-auto px-4 -mt-8">
+        <div className="grid gap-6 md:grid-cols-2">
+          {copy.planes.map((p) => (
+            <div
+              key={p.id}
+              className={[
+                "rounded-3xl border p-6 md:p-8",
+                p.destacado
+                  ? "bg-gradient-to-b from-amber-50 to-white border-amber-100 shadow"
+                  : "bg-white border-slate-200",
+              ].join(" ")}
+            >
+              {p.destacado && (
+                <div className="inline-block text-xs font-bold px-2 py-1 rounded-full bg-amber-100 text-amber-700 mb-2">
+                  Recomendado
+                </div>
+              )}
+              <div className="text-2xl font-bold text-slate-900">{p.nombre}</div>
+              <div className="text-sm text-slate-500 mt-1">
+                Cuotas x{p.multiplo} • {p.periodicidad}
+              </div>
+
+              <div className="text-4xl font-extrabold text-slate-900 mt-4">
+                {money(p.precioCLP)}{" "}
+                <span className="text-base font-semibold text-slate-500">
+                  / {p.periodicidad === "único" ? "plan" : p.periodicidad}
+                </span>
+              </div>
+
+              <ul className="mt-4 space-y-2">
+                {p.bullets.map((b, i) => (
+                  <li key={i} className="flex items-start gap-2 text-slate-700">
+                    <span className="mt-1 h-2 w-2 rounded-full bg-amber-400" />
+                    <span>{b}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="mt-6">
+                {/* Redirige a tu flujo de pago (Flow/Mercado Pago) */}
+                <a
+                  href={`/checkout?plan=${p.id}`} // reemplaza por tu URL real a Flow o MP
+                  className="inline-flex px-6 py-3 rounded-2xl bg-slate-900 text-white font-semibold hover:opacity-90"
+                >
+                  {copy.ctas.comprar}
+                </a>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -56,54 +112,13 @@ export default function Home() {
       <Simulator />
 
       {/* Imagen de cierre */}
-      <section className="mt-10 rounded-3xl overflow-hidden border border-white/10">
-        <img src={footer.heroImage} alt="escena futbol" className="w-full h-auto" />
+      <section className="max-w-6xl mx-auto px-4 mt-10">
+        <img
+          src="/assets/landing-cierre.jpg" // pon aquí tu imagen (los 2 jugadores)
+          alt={copy.home.imagenCierreAlt}
+          className="w-full rounded-3xl border border-slate-200 shadow"
+        />
       </section>
     </div>
-  );
-}
-
-function Simulator() {
-  const [amount, setAmount] = React.useState(10000);
-
-  const onChange = (e) => {
-    const v = Number(String(e.target.value).replace(/[^\d]/g, "")) || 0;
-    setAmount(v);
-  };
-
-  return (
-    <section className="rounded-3xl border border-white/10 bg-white/5 p-6 md:p-8 mb-8">
-      <h2 className="text-2xl md:text-3xl font-black mb-4">{simulator.title}</h2>
-      <p className="text-white/80 mb-4">
-        Ingresa un monto a apostar y descubre cuánto podrías ganar.
-      </p>
-
-      <input
-        inputMode="numeric"
-        value={amount}
-        onChange={onChange}
-        className="w-full max-w-md rounded-2xl bg-white text-slate-900 px-4 py-3 mb-6"
-      />
-
-      <div className="grid md:grid-cols-3 gap-4">
-        {simulator.cards.map((c, i) => (
-          <div key={i} className="rounded-3xl p-5 bg-white/5 border border-white/10">
-            <div className="text-xl font-bold mb-1">{c.label}</div>
-            <div className="text-white/70 mb-3">{c.caption}</div>
-            <div className="text-3xl font-black">
-              Ganancia: {fmt.format(amount * c.x)}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-6 grid gap-3">
-        {simulator.notes.map((n, i) => (
-          <div key={i} className="rounded-xl px-4 py-3 bg-gradient-to-r from-amber-400/90 to-amber-500/90 text-slate-900 text-sm font-semibold">
-            {n}
-          </div>
-        ))}
-      </div>
-    </section>
   );
 }

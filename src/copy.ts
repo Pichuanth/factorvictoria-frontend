@@ -1,50 +1,106 @@
 // src/copy.ts
-type Plan = { name: string; price: string; per?: string; bullets: string[]; cta: string; tag?: string };
-type Copy = {
-  brand: { name: string; tagline: string };
-  hero: { badge: string; title: string; subtitle: string; cta: string };
-  plans: Plan[];
-  simulator: { title: string; subtitle: string; placeholder: string; tiers: { label: string; mult: number }[]; notes: string[] };
-  footer: { legal: string };
+type Plan = {
+  id: "x10" | "x20" | "x50" | "x100";
+  nombre: string;
+  precioCLP: number;
+  periodicidad: "mensual" | "único" | "anual" | "vitalicia";
+  bullets: string[];
+  destacado?: boolean;
+  multiplo: number;
 };
 
-const copy: Copy = {
-  brand: { name: "Factor Victoria", tagline: "Convierte información en ventaja" },
-
-  hero: {
-    badge: "Paga con Flow o Mercado Pago • hasta 6 cuotas*",
-    title: "Convierte información en ventaja",
-    subtitle: "Estadísticas, pronósticos y simulador de ganancias para apostar con criterio.",
-    cta: "Ver planes",
+const copy = {
+  marca: {
+    nombre: "Factor Victoria",
+    claim: "Convierte información en ventaja",
+    subclaim:
+      "Estadísticas, pronósticos y simulador de ganancias para apostar con criterio.",
+    bannerPago: "Paga con Flow o Mercado Pago · hasta 6 cuotas*",
   },
 
-  // CLP tal como pediste
-  plans: [
-    { name: "Mensual",   price: "$19.990", per: "/ mes", bullets: ["Ebook para principiantes", "Picks y análisis básicos diarios", "Simulador de ganancias incluido"], cta: "Mejorar" },
-    { name: "3 meses",   price: "$44.990", per: "/ plan", bullets: ["Guía de estrategia y gestión de banca", "Picks y análisis ampliados", "Alertas clave de partido", "Cuotas potenciadas x20", "50 cupos disponibles"], cta: "Mejorar", tag: "Recomendado" },
-    { name: "Anual",     price: "$99.990", per: "/ plan", bullets: ["Guía de estrategia PRO", "Informe premium mensual", "Cuotas potenciadas x50", "30 cupos disponibles"], cta: "Mejorar", tag: "Más popular" },
-    { name: "PRO+",      price: "$249.990", per: "/ plan", bullets: ["Todo lo anterior", "Acceso prioritario y soporte 1:1", "Features beta y límites extendidos"], cta: "Hablar con nosotros" },
+  nav: {
+    inicio: "Inicio",
+    comparador: "Comparador",
+    partidos: "Partidos",
+    login: "Iniciar sesión",
+  },
+
+  ctas: {
+    verPlanes: "Ver planes",
+    comprar: "Comprar",
+  },
+
+  planes: <Plan[]>[
+    {
+      id: "x10",
+      nombre: "Mensual",
+      precioCLP: 19990,
+      periodicidad: "mensual",
+      multiplo: 10,
+      bullets: [
+        "Ebook para principiantes",
+        "Picks y análisis básicos diarios",
+        "Simulador de ganancias incluido",
+        "Cuota segura de regalo (1.5 a 3)",
+        "Desfase del mercado (básico)",
+      ],
+    },
+    {
+      id: "x20",
+      nombre: "Trimestral",
+      precioCLP: 44990,
+      periodicidad: "único",
+      multiplo: 20,
+      destacado: true,
+      bullets: [
+        "Todo lo del Mensual",
+        "Guía de estrategia y gestión de banca",
+        "Picks y análisis ampliados",
+        "Alertas clave de partido (cuando las actives)",
+        "Cuotas potenciadas x20",
+        "Cuota segura de regalo (1.5 a 3)",
+        "Desfase del mercado",
+        "50 cupos disponibles",
+      ],
+    },
+    {
+      id: "x50",
+      nombre: "Anual",
+      precioCLP: 99990,
+      periodicidad: "anual",
+      multiplo: 50,
+      bullets: [
+        "Todo lo del Trimestral",
+        "Guía de estrategia PRO",
+        "Informe premium mensual",
+        "Cuotas potenciadas x50",
+        "Cuota segura de regalo (1.5 a 3)",
+        "Desfase del mercado",
+        "Estrategia Doble Oportunidad",
+        "Estrategia Supera a la Casa",
+        "30 cupos disponibles",
+      ],
+    },
+    {
+      id: "x100",
+      nombre: "Premium",
+      precioCLP: 249990,
+      periodicidad: "vitalicia",
+      multiplo: 100,
+      bullets: [
+        "Todo lo del Anual",
+        "Acceso anticipado a herramientas",
+        "Membresía vitalicia",
+      ],
+    },
   ],
 
-  simulator: {
-    title: "Simula tus ganancias",
-    subtitle: "Ingresa un monto a apostar y descubre cuánto podrías ganar.",
-    placeholder: "Ingresa monto en CLP",
-    // este orden debe coincidir con lo visual que tienes (x10, x20, x50)
-    tiers: [
-      { label: "Mensual", mult: 10 },
-      { label: "3 meses", mult: 20 },
-      { label: "Anual", mult: 50 },
-    ],
-    notes: [
-      "Cuota segura de regalo: de 1.5 a 3 máximo (sobre el 95% de acierto por cada una por separado).",
-      "Cuota generada: (x10 o cercana para no cometer errores).",
-      "Probabilidad de acierto de cada una: ≥ 90% (ejemplo, sobre 85% por cada una hasta completar).",
-      "Cuota desfase del mercado (para todas las membresías).",
-    ],
+  home: {
+    simuladorTitulo: "Simula tus ganancias",
+    simuladorSub:
+      "Ingresa un monto y revisa cuánto podrías ganar con cada membresía.",
+    imagenCierreAlt: "Jugadores saliendo del notebook",
   },
-
-  footer: { legal: "© 2025 Factor Victoria" },
 };
 
 export default copy;
