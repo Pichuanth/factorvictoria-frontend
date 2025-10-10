@@ -1,58 +1,25 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-
-export default function Login(){
-  const [email, setEmail] = useState("");
-  const [pass, setPass]   = useState("");
-  const [busy, setBusy]   = useState(false);
-
-  const submit = async(e)=>{
-    e.preventDefault();
-    setBusy(true);
-    try{
-      // DEMO: sin backend todavía
-      if(email && pass){
-        alert("Demo: login exitoso. (Cuando conectemos backend, te redirigiremos a tu panel)");
-        window.location.href = "/app";
-      }else{
-        alert("Completa correo y contraseña");
-      }
-    }finally{ setBusy(false); }
-  };
-
+// src/pages/Login.jsx
+export default function Login() {
   return (
-    <div className="fv-bg" style={{minHeight:"calc(100vh - 64px)",padding:"28px 0"}}>
-      <div className="container" style={{maxWidth:560}}>
-        <h1 style={{color:"#e5e7eb",fontWeight:900,marginBottom:12}}>Iniciar sesión</h1>
+    <div className="max-w-2xl mx-auto px-4 py-10 text-white">
+      <h1 className="text-3xl font-black mb-6">Iniciar sesión</h1>
+      <div className="rounded-3xl border border-white/10 bg-white/5 p-6 md:p-8">
+        <div className="flex justify-center mb-6">
+          <img src="/logo-fv.png" alt="logo" className="h-16" />
+        </div>
 
-        <div style={{background:"#0b1322",border:"1px solid #1f2a3b",borderRadius:24,padding:22,color:"#e5e7eb"}}>
-          <form onSubmit={submit} style={{display:"grid",gap:14}}>
-            <div>
-              <label className="label">Correo</label>
-              <input
-                type="email"
-                className="input"
-                placeholder="tu@correo.com"
-                value={email} onChange={(e)=>setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <label className="label">Contraseña</label>
-              <input
-                type="password"
-                className="input"
-                placeholder="••••••••"
-                value={pass} onChange={(e)=>setPass(e.target.value)}
-                required
-              />
-            </div>
-            <button className="fv-btn-primary" disabled={busy}>{busy ? "Entrando…" : "Entrar"}</button>
-            <div style={{display:"flex",justifyContent:"space-between",color:"#cbd5e1"}}>
-              <Link to="/#planes" style={{color:"#f0d98a",fontWeight:800,textDecoration:"none"}}>¿Aún no tienes cuenta? Regístrate</Link>
-              <Link to="/forgot" style={{color:"#f0d98a",fontWeight:800,textDecoration:"none"}}>Recuperar contraseña</Link>
-            </div>
-          </form>
+        <label className="block text-sm mb-2">Correo</label>
+        <input className="w-full mb-4 rounded-2xl bg-white text-slate-900 px-4 py-3" />
+
+        <label className="block text-sm mb-2">Contraseña</label>
+        <input type="password" className="w-full mb-6 rounded-2xl bg-white text-slate-900 px-4 py-3" />
+
+        <button className="w-full rounded-xl py-3 font-semibold bg-gradient-to-r from-amber-400 to-amber-500 text-slate-900">
+          Entrar
+        </button>
+
+        <div className="mt-4 text-sm text-white/70">
+          ¿Aún no tienes cuenta? Regístrate
         </div>
       </div>
     </div>
