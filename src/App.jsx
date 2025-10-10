@@ -1,18 +1,20 @@
-// src/App.jsx
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
-// Si tienes un Header, descomenta e importa:
-// import Header from "./components/Header.jsx";
-
+// Páginas
 import Home from "./pages/Home.jsx";
-import Comparador from "./pages/Comparador.jsx"; // o la ruta que uses para /app
-import Fixtures from "./pages/Fixtures.jsx";      // o Fixtures.jsx/tsx según tu archivo
+import Fixtures from "./pages/Fixtures.jsx";
 import Login from "./pages/Login.jsx";
+// Si tu comparador está en otro archivo, ajusta este import:
+import Comparador from "./pages/Comparador.jsx";
+
+// Layout
+import Header from "./components/Header.jsx";
 
 export default function App() {
   return (
     <BrowserRouter>
-      {/* <Header /> */}
+      <Header />
+
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/app" element={<Comparador />} />

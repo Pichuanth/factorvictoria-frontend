@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import copy from "../copy";               // tu copy.ts exporta default
-import Simulator from "../components/Simulator"; // si tu componente vive en otro path, ajusta el import
+import copy from "../copy";                     // export default desde copy.ts
+import Simulator from "../components/Simulator"; // ajusta ruta si difiere
 
 export default function Home() {
   return (
@@ -13,8 +13,8 @@ export default function Home() {
           <span className="text-white text-2xl md:text-3xl font-bold">Factor Victoria</span>
         </div>
 
-        <div className="mt-4 inline-flex text-slate-900 bg-white/10">
-          <span className="px-4 py-1 rounded-full bg-slate-800 text-white/80 text-sm">
+        <div className="mt-4">
+          <span className="inline-flex px-4 py-1 rounded-xl bg-slate-800 text-white/80 text-sm">
             Paga con Flow o Mercado Pago · hasta 6 cuotas*
           </span>
         </div>
@@ -67,7 +67,7 @@ export default function Home() {
               </ul>
 
               <div className="mt-6">
-                {/* Redirige a tu checkout real de Flow o Mercado Pago */}
+                {/* Redirige a tu flujo real de pago (Flow/Mercado Pago) */}
                 <a
                   href={`/checkout?plan=${p.id}`}
                   className="inline-flex px-6 py-3 rounded-2xl bg-slate-900 text-white font-semibold hover:opacity-90"
@@ -85,10 +85,16 @@ export default function Home() {
         <Simulator />
       </section>
 
-      {/* Imagen de cierre – si ya tienes la imagen en /public, ajusta el nombre */}
-      {/* <section className="max-w-6xl mx-auto px-4 pb-16">
-        <img src="/closing-players.jpg" className="rounded-3xl w-full object-cover" alt="Factor Victoria" />
-      </section> */}
+      {/* Imagen de cierre (opcional) */}
+      {/* 
+      <section className="max-w-6xl mx-auto px-4 pb-16">
+        <img
+          src="/closing-players.jpg"
+          className="rounded-3xl w-full object-cover"
+          alt={copy.home?.imagenCierreAlt || "Factor Victoria"}
+        />
+      </section>
+      */}
     </div>
   );
 }
