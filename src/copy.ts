@@ -1,28 +1,24 @@
 // src/copy.ts
+// Tipado opcional simple. Si te da lata, puedes eliminar estas dos líneas.
 type Plan = {
-  id: "x10" | "x20" | "x50" | "x100";
-  nombre: string;
-  precioCLP: number;
-  periodicidad: "mensual" | "único" | "anual" | "vitalicia";
+  id: string;
+  title: string;
+  priceCLP: string;
+  freq?: string;
+  note?: string;
+  badge?: string;
   bullets: string[];
-  destacado?: boolean;
-  multiplo: number;
 };
 
-const copy = {
+const copy: {
+  marca: { subclaim: string };
+  ctas: { verPlanes: string; comprar: string };
+  planes: Plan[];
+  home: { simuladorTitulo: string; simuladorSub: string; imagenCierreAlt: string };
+} = {
   marca: {
-    nombre: "Factor Victoria",
-    claim: "Convierte información en ventaja",
     subclaim:
       "Estadísticas, pronósticos y simulador de ganancias para apostar con criterio.",
-    bannerPago: "Paga con Flow o Mercado Pago · hasta 6 cuotas*",
-  },
-
-  nav: {
-    inicio: "Inicio",
-    comparador: "Comparador",
-    partidos: "Partidos",
-    login: "Iniciar sesión",
   },
 
   ctas: {
@@ -30,67 +26,66 @@ const copy = {
     comprar: "Comprar",
   },
 
-  planes: <Plan[]>[
+  planes: [
     {
       id: "x10",
-      nombre: "Mensual",
-      precioCLP: 19990,
-      periodicidad: "mensual",
-      multiplo: 10,
+      title: "Mensual",
+      priceCLP: "$19.990",
+      freq: "/ mes",
       bullets: [
+        "Cuotas x10",
         "Ebook para principiantes",
-        "Picks y análisis básicos diarios",
+        "Cuota segura (1.5 a 3)",
+        "Desfase del mercado",
         "Simulador de ganancias incluido",
-        "Cuota segura de regalo (1.5 a 3)",
-        "Desfase del mercado (básico)",
       ],
     },
     {
       id: "x20",
-      nombre: "Trimestral",
-      precioCLP: 44990,
-      periodicidad: "único",
-      multiplo: 20,
-      destacado: true,
+      title: "Crecimiento",
+      priceCLP: "$44.990",
+      note: "≈ $14.997 / mes",
       bullets: [
         "Todo lo del Mensual",
         "Guía de estrategia y gestión de banca",
         "Picks y análisis ampliados",
         "Alertas clave de partido (cuando las actives)",
         "Cuotas potenciadas x20",
-        "Cuota segura de regalo (1.5 a 3)",
-        "Desfase del mercado",
         "50 cupos disponibles",
+        "Cuota segura (1.5 a 3) incluida",
+        "Desfase del mercado incluido",
       ],
     },
     {
       id: "x50",
-      nombre: "Anual",
-      precioCLP: 99990,
-      periodicidad: "anual",
-      multiplo: 50,
+      title: "Anual",
+      priceCLP: "$99.990",
+      note: "≈ $8.333 / mes",
+      badge: "Más popular",
       bullets: [
-        "Todo lo del Trimestral",
+        "Todo lo de Crecimiento",
         "Guía de estrategia PRO",
         "Informe premium mensual",
         "Cuotas potenciadas x50",
-        "Cuota segura de regalo (1.5 a 3)",
-        "Desfase del mercado",
-        "Estrategia Doble Oportunidad",
-        "Estrategia Supera a la Casa",
+        "Estrategia doble oportunidad",
+        "Estrategia supera a la casa",
+        "Cuota segura (1.5 a 3) incluida",
+        "Desfase del mercado incluido",
         "30 cupos disponibles",
       ],
     },
     {
       id: "x100",
-      nombre: "Premium",
-      precioCLP: 249990,
-      periodicidad: "vitalicia",
-      multiplo: 100,
+      title: "Vitalicia",
+      priceCLP: "$249.990",
+      badge: "Membresía vitalicia",
       bullets: [
         "Todo lo del Anual",
-        "Acceso anticipado a herramientas",
-        "Membresía vitalicia",
+        "Cuotas potenciadas x100",
+        "Acceso de por vida a actualizaciones",
+        "Cuota segura (1.5 a 3) incluida",
+        "Desfase del mercado incluido",
+        // Quitar “soporte 1 a 1” y “límites extendidos” como pediste
       ],
     },
   ],
