@@ -1,4 +1,3 @@
-// src/copy.ts
 type Plan = {
   id: string;
   title: string;
@@ -16,8 +15,7 @@ const copy: {
   home: { simuladorTitulo: string; simuladorSub: string; imagenCierreAlt: string };
 } = {
   marca: {
-    subclaim:
-      "Estadísticas, pronósticos y simulador de ganancias para apostar con criterio.",
+    subclaim: "Estadísticas, pronósticos y simulador de ganancias para apostar con criterio.",
   },
   ctas: {
     verPlanes: "Ver planes",
@@ -31,59 +29,50 @@ const copy: {
       freq: "/ mes",
       bullets: [
         "Cuotas x10",
-        "Ebook para principiantes",
-        "Análisis básicos diarios",
-        "Simulador de ganancias incluido",
-        "Cuota segura de regalo (1.5 a 3)",
-        "Desfase del mercado (búsqueda de errores)",
+        "Cuota segura (1.5 a 3) de regalo",
+        "Desfase del mercado de regalo",
       ],
     },
     {
       id: "x20",
-      title: "Crecimiento",
+      title: "X20",
       priceCLP: "$44.990",
-      note: "≈ $14.997 / mes",
       bullets: [
-        "Todo lo del plan Mensual",
-        "Guía de estrategia y gestión de banca",
-        "Picks y análisis ampliados",
-        "Alertas clave de partido (cuando las actives)",
+        "Todo lo de X10",
         "Cuotas potenciadas x20",
-        "50 cupos disponibles",
+        "Cuota segura de regalo",
+        "Desfase del mercado de regalo",
       ],
     },
     {
       id: "x50",
-      title: "Anual",
+      title: "X50",
       priceCLP: "$99.990",
-      note: "≈ $8.333 / mes",
       bullets: [
-        "TODO lo del plan de $44.990",
-        "Guía de estrategia PRO",
-        "Informe premium mensual",
-        "Estrategia Doble oportunidad",
-        "Estrategia “Supera a la casa”",
-        "Cuotas potenciadas x50",
-        "30 cupos disponibles",
+        "Todo lo de $44.990 (X20)",
+        "Estrategia PRO",
+        "Doble oportunidad",
+        "Supera a la casa",
+        "Cuota segura de regalo",
+        "Desfase del mercado de regalo",
       ],
     },
     {
       id: "x100",
       title: "X100",
       priceCLP: "$249.990",
-      badge: "Más potente",
+      note: "Membresía vitalicia",
       bullets: [
+        "Todo lo de X50",
         "Membresía vitalicia",
-        "TODO lo anterior incluido",
-        "Acceso prioritario a nuevas funciones",
-        "Cuotas potenciadas x100",
+        "Cuota segura de regalo",
+        "Desfase del mercado de regalo",
       ],
     },
   ],
   home: {
     simuladorTitulo: "Simula tus ganancias",
-    simuladorSub:
-      "Ingresa un monto a apostar y descubre cuánto podrías ganar con cada membresía.",
+    simuladorSub: "Ingresa un monto y revisa cuánto podrías ganar con cada membresía.",
     imagenCierreAlt: "Jugadores saliendo del notebook",
   },
 };

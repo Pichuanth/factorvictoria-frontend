@@ -1,13 +1,11 @@
-// src/App.jsx
+import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+
 import Header from "./components/Header.jsx";
-
 import Home from "./pages/Home.jsx";
-import Fixtures from "./pages/Fixtures.jsx";
-import Login from "./pages/Login.jsx";
-
-// OJO: si tu comparador real está en otro archivo, cambia el import aquí:
 import Comparador from "./pages/Comparador.jsx";
+import Fixtures from "./pages/Fixtures.jsx";   // si no lo tienes, crea un placeholder
+import Login from "./pages/Login.jsx";         // si no lo tienes, crea un placeholder
 
 export default function App() {
   return (
