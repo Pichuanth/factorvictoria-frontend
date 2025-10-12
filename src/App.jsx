@@ -3,7 +3,7 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 
 import Home from "./pages/Home.jsx";
-import Comparador from "./pages/Comparador.jsx";   // <— NOMBRE Y RUTA EXACTOS
+import Comparador from "./pages/Comparator.jsx";   // ✅ nombre y ruta EXACTOS
 import Fixtures from "./pages/Fixtures.jsx";
 import Login from "./pages/Login.jsx";
 
