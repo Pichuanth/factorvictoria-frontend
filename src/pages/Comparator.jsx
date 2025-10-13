@@ -1,39 +1,75 @@
 // src/pages/Comparador.jsx
-import React from "react";
+import React, { useState } from "react";
 import Simulator from "../components/Simulator";
 
 export default function Comparador() {
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [q, setQ] = useState("");
+
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 text-white">
-      <h1 className="text-2xl md:text-3xl font-bold mb-4">Comparador de cuotas</h1>
+    <div className="bg-slate-900 min-h-screen">
+      <section className="max-w-6xl mx-auto px-4 py-8 text-white">
+        {/* Barra: fecha + búsqueda + generar */}
+        <div className="flex flex-col gap-3 md:flex-row md:items-center mb-6">
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="rounded-xl px-3 py-2 bg-amber-400 text-slate-900"
+          />
+          <input
+            placeholder="Equipo / liga"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            className="flex-1 rounded-xl px-3 py-2 bg-amber-400 text-slate-900"
+          />
+          <button className="rounded-xl px-4 py-2 bg-amber-400 text-slate-900 font-semibold">
+            Generar
+          </button>
+        </div>
 
-      {/* Módulo abierto X10 (demo) */}
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-2">Plan X10 (incluido)</h2>
-        <p className="text-white/80 text-sm">
-          Busca equipos/mercados y revisa la cuota base (X10). Para planes superiores se desbloquean mejoras.
-        </p>
-      </div>
+        {/* Aquí podrías renderizar las 3 cuotas por partido (mock o real). */}
 
-      {/* Upsell bloqueado para X20/X50/X100 */}
-      <div className="grid sm:grid-cols-3 gap-4">
-        {["X20", "X50", "X100"].map((tier) => (
-          <div key={tier} className="rounded-2xl border border-amber-500/30 bg-amber-400/10 p-5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">{tier}</h3>
-              <span className="text-xs px-2 py-1 rounded-full bg-amber-300 text-slate-900">Bloqueado</span>
+        {/* Bloques resumen */}
+        <div className="grid md:grid-cols-2 gap-4">
+          {[
+            "Cuota segura (regalo) 1.5–3 · 90–95% acierto",
+            "Cuota generada x10",
+            "Probabilidad de acierto (prom.) 90%",
+            "Desfase del mercado (todas las membresías)",
+          ].map((t, i) => (
+            <div key={i} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="text-white font-semibold">{t}</div>
+              <div className="text-white/70 text-sm mt-1">
+                Próximamente: resultados basados en tus filtros.
+              </div>
             </div>
-            <p className="text-white/70 text-sm mt-2">
-              Mejora tus cuotas y desbloquea estrategias. <br /> Compra el plan para ver este módulo.
-            </p>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
 
-      {/* Simulador también visible aquí */}
-      <div className="mt-10">
-        <Simulator />
-      </div>
+        {/* Upsell bloqueado (ejemplo visual) */}
+        <div className="mt-8">
+          <h3 className="text-white text-xl font-bold mb-3">
+            ¿Estás listo para mejorar tus ganancias?
+          </h3>
+          <div className="grid md:grid-cols-3 gap-4">
+            {["x20", "x50", "x100"].map((id) => (
+              <div
+                key={id}
+                className="rounded-2xl border border-white/10 bg-white/5 p-4 opacity-60"
+              >
+                <div className="text-white font-semibold">Plan {id.toUpperCase()}</div>
+                <div className="text-sm text-white/70">Contenido bloqueado 🔒</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Simulador al final */}
+        <div className="mt-10">
+          <Simulator />
+        </div>
+      </section>
     </div>
   );
 }
