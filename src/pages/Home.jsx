@@ -9,16 +9,16 @@ export default function Home() {
       {/* Héroe */}
       <section className="max-w-6xl mx-auto px-4 pt-10 pb-14">
         {/* Logo y nombre */}
-<div className="flex items-center gap-3">
-  <img
-    src="/logo-fv.png"
-    alt="Factor Victoria"
-    className="w-16 h-16 object-contain"   /* antes era más pequeño */
-  />
-  <span className="text-white text-3xl md:text-4xl font-bold">
-    Factor Victoria
-  </span>
-</div>
+        <div className="flex items-center gap-3">
+          <img
+            src="/logo-fv.png"
+            alt="Factor Victoria"
+            className="w-16 h-16 object-contain"
+          />
+          <span className="text-white text-3xl md:text-4xl font-bold">
+            Factor Victoria
+          </span>
+        </div>
 
         <div className="mt-4 inline-flex">
           <span className="px-4 py-1 rounded-full bg-slate-800 text-white/80 text-sm">
@@ -106,19 +106,20 @@ export default function Home() {
         <img
           src="/hero-players.png"
           className="w-full object-cover"
-          alt={copy.home.imagenCierreAlt}
+          alt={copy.home?.imagenCierreAlt || "Jugadores"}
         />
       </section>
 
       {/* Acerca de / Cómo funciona */}
       <section className="max-w-6xl mx-auto px-4 pb-16">
         <h2 className="text-white text-3xl font-bold mb-3">
-          {copy.home.acercaTitulo}
+          {copy.home?.acercaTitulo || "Convierte información en ventaja"}
         </h2>
         <p className="text-white/80 whitespace-pre-line">
-          {copy.home.acercaTexto}
+          {copy.home?.acercaTexto ||
+            "Nuestra IA analiza estadísticas, tendencias y señales del mercado para detectar cuotas con valor."}
         </p>
-        <div className="mt-6 text-white/50 text-sm">
+        <div className="mt-6 text-white/50 text-sm text-center">
           © 2025 Factor Victoria
         </div>
       </section>
