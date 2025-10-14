@@ -8,13 +8,14 @@ export default function Home() {
     <div className="bg-slate-900">
       {/* Héroe */}
       <section className="max-w-6xl mx-auto px-4 pt-10 pb-14">
+        {/* Logo + nombre (más grande) */}
         <div className="flex items-center gap-3">
           <img
             src="/logo-fv.png"
             alt="Factor Victoria"
-            className="w-12 h-12 md:w-14 md:h-14 object-contain"
+            className="w-16 h-16 object-contain" /* <-- más grande */
           />
-          <span className="text-white text-3xl md:text-4xl font-extrabold">
+          <span className="text-white text-3xl md:text-4xl font-bold">
             Factor Victoria
           </span>
         </div>
@@ -28,42 +29,55 @@ export default function Home() {
         <h1 className="mt-6 text-white text-4xl md:text-6xl font-extrabold leading-tight max-w-3xl">
           Convierte información <br /> en ventaja
         </h1>
-        <p className="mt-4 text-white/80 text-lg max-w-3xl">{copy.marca.subclaim}</p>
+        <p className="mt-4 text-white/80 text-lg max-w-3xl">
+          {copy.marca.subclaim}
+        </p>
 
         <Link
           to="#planes"
-          className="inline-flex mt-6 px-6 py-3 rounded-2xl bg-amber-400 text-slate-900 font-semibold shadow hover:opacity-90"
+          className="inline-flex mt-6 px-6 py-3 rounded-2xl bg-[#E6C464] text-slate-900 font-semibold shadow hover:opacity-90"
         >
           {copy.ctas.verPlanes}
         </Link>
       </section>
 
       {/* Planes */}
-      <section id="planes" className="max-w-6xl mx-auto px-4 -mt-6">
+      <section id="planes" className="max-w-6xl mx-auto px-4 -mt-8">
         <div className="grid gap-6 md:grid-cols-2">
           {copy.planes.map((p) => (
             <div
               key={p.id}
-              className="rounded-3xl border border-white/10 bg-white/5 p-6 md:p-8"
+              className={
+                "rounded-3xl border border-white/10 bg-white/5 p-6 md:p-8 relative " +
+                (p.badge ? "ring-2 ring-[#E6C464]" : "")
+              }
             >
               {p.badge && (
-                <span className="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-amber-300 text-slate-900 mb-4">
+                <span className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 text-xs font-semibold rounded-full bg-[#E6C464] text-slate-900 shadow">
                   {p.badge}
                 </span>
               )}
 
               <h3 className="text-white text-2xl font-bold">{p.title}</h3>
-              <div className="mt-2 text-3xl md:text-4xl font-extrabold text-white">
-                {p.priceCLP}
+
+              <div className="mt-2 text-3xl md:text-4xl font-extrabold text-white flex items-baseline gap-2">
+                <span>{p.priceCLP}</span>
                 {p.freq && (
-                  <span className="text-white/60 text-base font-medium"> {p.freq}</span>
+                  <span className="text-white/60 text-base font-medium">
+                    {p.freq}
+                  </span>
+                )}
+                {p.note && (
+                  <span className="text-white/80 text-sm font-medium">
+                    {p.note}
+                  </span>
                 )}
               </div>
 
               <ul className="mt-5 space-y-2 text-white/90">
                 {p.bullets.map((b, i) => (
                   <li key={i} className="flex items-start gap-2">
-                    <span className="mt-1 h-2 w-2 rounded-full bg-amber-400" />
+                    <span className="mt-2 h-2 w-2 rounded-full bg-[#E6C464]" />
                     <span>{b}</span>
                   </li>
                 ))}
@@ -72,7 +86,7 @@ export default function Home() {
               <div className="mt-6">
                 <a
                   href={`/checkout?plan=${p.id}`}
-                  className="inline-flex px-6 py-3 rounded-2xl bg-amber-400 text-slate-900 font-semibold hover:opacity-90"
+                  className="inline-flex px-6 py-3 rounded-2xl bg-[#E6C464] text-slate-900 font-semibold hover:opacity-90"
                 >
                   {copy.ctas.comprar}
                 </a>
@@ -87,36 +101,26 @@ export default function Home() {
         <Simulator />
       </section>
 
-      {/* Imagen de cierre (full width en mobile) */}
-      <section className="max-w-6xl mx-auto px-4 pb-12">
+      {/* Imagen de cierre (full width en móvil) */}
+      <section className="max-w-6xl mx-auto px-0 pb-4">
         <img
           src="/hero-players.png"
+          className="w-full object-cover"
           alt={copy.home.imagenCierreAlt}
-          className="w-full h-auto object-cover rounded-none md:rounded-3xl"
         />
       </section>
 
-      {/* Acerca de / Cómo funciona + CTA + © 2025 */}
-      <section className="max-w-6xl mx-auto px-4 pb-16 text-white/90">
-        <h2 className="text-2xl md:text-3xl font-bold text-white">
-          Convierte información en ventaja
+      {/* Acerca de / Cómo funciona */}
+      <section className="max-w-6xl mx-auto px-4 pb-16">
+        <h2 className="text-white text-3xl font-bold mb-3">
+          {copy.home.acercaTitulo}
         </h2>
-        <p className="mt-3">
-          Nuestra IA combina estadísticas, momentum y señales de mercado para
-          encontrar cuotas con valor. Tú eliges el plan y nosotros te damos
-          herramientas: picks, simulador y estrategias para decidir mejor.
+        <p className="text-white/80 whitespace-pre-line">
+          {copy.home.acercaTexto}
         </p>
-        <p className="mt-2">
-          Cuanto mejor tu plan, mayor el potencial: cuotas potenciadas, alertas
-          y estrategias PRO para subir tu expectativa de ganancia.
-        </p>
-        <a
-          href="#planes"
-          className="inline-flex mt-6 px-6 py-3 rounded-2xl bg-amber-400 text-slate-900 font-semibold"
-        >
-          Empieza ahora
-        </a>
-        <div className="mt-10 text-center text-white/60">© 2025 Factor Victoria</div>
+        <div className="mt-6 text-white/50 text-sm">
+          © 2025 Factor Victoria
+        </div>
       </section>
     </div>
   );
