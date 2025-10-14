@@ -8,17 +8,17 @@ export default function Home() {
     <div className="bg-slate-900">
       {/* Héroe */}
       <section className="max-w-6xl mx-auto px-4 pt-10 pb-14">
-        {/* Logo + nombre (más grande) */}
-        <div className="flex items-center gap-3">
-          <img
-            src="/logo-fv.png"
-            alt="Factor Victoria"
-            className="w-16 h-16 object-contain" /* <-- más grande */
-          />
-          <span className="text-white text-3xl md:text-4xl font-bold">
-            Factor Victoria
-          </span>
-        </div>
+        {/* Logo y nombre */}
+<div className="flex items-center gap-3">
+  <img
+    src="/logo-fv.png"
+    alt="Factor Victoria"
+    className="w-16 h-16 object-contain"   /* antes era más pequeño */
+  />
+  <span className="text-white text-3xl md:text-4xl font-bold">
+    Factor Victoria
+  </span>
+</div>
 
         <div className="mt-4 inline-flex">
           <span className="px-4 py-1 rounded-full bg-slate-800 text-white/80 text-sm">

@@ -1,26 +1,5 @@
-// src/copy.ts (fragmento clave)
-type Plan = {
-  id: string;
-  title: string;
-  priceCLP: string;
-  freq?: string;   // texto junto al precio (p.ej. / Anual, / Vitalicio)
-  note?: string;   // leyenda pequeña (p.ej. +1 Mes de Regalo 🎁)
-  badge?: string;  // “Más popular”
-  bullets: string[];
-};
-
-const copy: {
-  marca: { subclaim: string };
-  ctas: { verPlanes: string; comprar: string };
-  planes: Plan[];
-  home: {
-    simuladorTitulo: string;
-    simuladorSub: string;
-    imagenCierreAlt: string;
-    acercaTitulo: string;
-    acercaTexto: string;
-  };
-} = {
+// src/copy.ts
+const copy = {
   marca: {
     subclaim:
       "Estadísticas, pronósticos y simulador de ganancias para apostar con criterio.",
@@ -29,13 +8,35 @@ const copy: {
     verPlanes: "Ver planes",
     comprar: "Comprar",
   },
-
+  home: {
+    simuladorTitulo: "Simula tus ganancias",
+    simuladorSub: "Ingresa tu monto y calcula cuánto podrías ganar según tu plan.",
+  },
+  // IMPORTANTÍSIMO: $19.990 vuelve y queda primero
   planes: [
+    {
+      id: "x10",
+      title: "Mensual",
+      priceCLP: "$19.990",
+      freq: "",
+      note: "",
+      badge: "",
+      bullets: [
+        "Ebook para principiantes",
+        "Picks análisis básicos diarios",
+        "Simulador de ganancias incluido",
+        "Cuotas x1.5 de regalo",
+        "Cuotas potenciadas x10",
+        "100 cupos disponibles",
+      ],
+    },
     {
       id: "x20",
       title: "Trimestral",
       priceCLP: "$44.990",
+      freq: "",
       note: "+1 Mes de Regalo 🎁",
+      badge: "",
       bullets: [
         "Guía de estrategia y gestión de banca",
         "1 Estrategia VIP incluida",
@@ -51,7 +52,8 @@ const copy: {
       id: "x50",
       title: "Anual",
       priceCLP: "$99.990",
-      freq: "/ Anual",
+      freq: "Anual",
+      note: "",
       badge: "Más popular",
       bullets: [
         "Guía de estrategia PRO",
@@ -69,7 +71,9 @@ const copy: {
       id: "x100",
       title: "Vitalicio",
       priceCLP: "$249.990",
-      freq: "/ Vitalicio",
+      freq: "Vitalicio",
+      note: "",
+      badge: "",
       bullets: [
         "Guía de estrategia PRO",
         "Alertas claves de partidos al correo",
@@ -84,16 +88,6 @@ const copy: {
       ],
     },
   ],
-
-  home: {
-    simuladorTitulo: "Simula tus ganancias",
-    simuladorSub:
-      "Ingresa un monto y revisa cuánto podrías ganar con cada membresía.",
-    imagenCierreAlt: "Jugadores saliendo del notebook",
-    acercaTitulo: "Convierte información en ventaja",
-    acercaTexto:
-      "Nuestra IA analiza estadísticas, tendencias en tiempo real y señales del mercado para detectar cuotas con verdadero valor. Tú eliges el plan; nosotros te entregamos las herramientas que marcan la diferencia: picks precisos, simuladores avanzados y estrategias inteligentes para apostar con ventaja.\n\nMientras más alto tu plan, mayor tu poder de decisión: accede a cuotas potenciadas, alertas exclusivas y estrategias PRO diseñadas para elevar tu expectativa de ganancia.",
-  },
 };
 
 export default copy;
