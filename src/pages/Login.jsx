@@ -15,11 +15,12 @@ export default function Login() {
           />
         </div>
 
-        {/* Título un poco más pequeño pero con jerarquía */}
-        <h1 className="text-white text-2xl md:text-3xl font-bold mb-6">
+        {/* Título: “Iniciar sesión” más arriba y alineado a la izquierda */}
+        <h1 className="text-white text-3xl font-bold mb-6">
           Iniciar sesión
         </h1>
 
+        {/* Campos */}
         <label className="block">
           <input
             type="email"
