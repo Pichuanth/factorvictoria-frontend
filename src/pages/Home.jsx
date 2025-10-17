@@ -9,12 +9,12 @@ export default function Home() {
       {/* Héroe */}
       <section className="max-w-6xl mx-auto px-4 pt-10 pb-14">
         {/* Logo y nombre */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <img
-  src="/logo-fv.png"
-  alt="Factor Victoria"
-  className="w-20 h-20 md:w-24 md:h-24 lg:w-28 lg:h-28 object-contain"
-/>
+            src="/logo-fv.png"
+            alt="Factor Victoria"
+            className="w-20 h-20 md:w-24 md:h-24 lg:w-28 lg:h-28 object-contain"
+          />
           <span className="text-white text-3xl md:text-4xl font-bold">
             Factor Victoria
           </span>
@@ -33,12 +33,15 @@ export default function Home() {
           {copy.marca.subclaim}
         </p>
 
-        <Link
-          to="#planes"
+        {/* Botón: scroll suave a #planes */}
+        <button
+          onClick={() =>
+            document.getElementById("planes")?.scrollIntoView({ behavior: "smooth" })
+          }
           className="inline-flex mt-6 px-6 py-3 rounded-2xl bg-[#E6C464] text-slate-900 font-semibold shadow hover:opacity-90"
         >
           {copy.ctas.verPlanes}
-        </Link>
+        </button>
       </section>
 
       {/* Planes */}
