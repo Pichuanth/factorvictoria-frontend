@@ -11,10 +11,10 @@ export default function Home() {
         {/* Logo y nombre */}
         <div className="flex items-center gap-3">
           <img
-            src="/logo-fv.png"
-            alt="Factor Victoria"
-            className="w-16 h-16 object-contain"
-          />
+  src="/logo-fv.png"
+  alt="Factor Victoria"
+  className="w-20 h-20 md:w-24 md:h-24 lg:w-28 lg:h-28 object-contain"
+/>
           <span className="text-white text-3xl md:text-4xl font-bold">
             Factor Victoria
           </span>
