@@ -1,40 +1,33 @@
 // src/pages/Comparator.jsx
 import React, { useState } from "react";
+import { useAuth } from "../lib/auth";
 import Simulator from "../components/Simulator";
-import { isLoggedIn, getUser } from "../lib/auth";
 
 export default function Comparator() {
+  const { isLoggedIn, user } = useAuth();
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [q, setQ] = useState("");
 
-  const logged = isLoggedIn();
-  const user = getUser(); // { email, plan } si está logueado
-
-  if (!logged) {
-    // Vista bloqueada (no logueado)
+  // Si NO hay sesión -> mensaje y CTA a planes
+  if (!isLoggedIn) {
     return (
-      <div className="bg-slate-900 min-h-[70vh]">
+      <div className="bg-slate-900 min-h-[60vh]">
         <section className="max-w-6xl mx-auto px-4 py-12 text-white">
-          <h1 className="text-2xl font-bold mb-4">Comparador</h1>
+          <h1 className="text-2xl font-bold mb-3">Comparador</h1>
           <div className="rounded-2xl bg-white/5 border border-white/10 p-6">
             Para generar cuotas, primero{" "}
-            <a href="/#planes" className="text-[#E6C464] underline">
-              compra una membresía
-            </a>{" "}
-            e inicia sesión.
+            <a href="/#planes" className="text-[#E6C464] underline">compra una membresía</a> e inicia sesión.
           </div>
         </section>
       </div>
     );
   }
 
-  // Vista para usuarios con sesión iniciada
   return (
     <div className="bg-slate-900 min-h-screen">
       <section className="max-w-6xl mx-auto px-4 py-8 text-white">
-        <div className="mb-4 text-white/70 text-sm">
-          Sesión: <span className="font-semibold">{user?.email}</span> · Plan:{" "}
-          <span className="font-semibold capitalize">{user?.plan}</span>
+        <div className="mb-4 text-white/80 text-sm">
+          Sesión: <span className="font-semibold">{user?.email}</span> · Plan: <span className="font-semibold">{user?.plan}</span>
         </div>
 
         {/* Barra: fecha + búsqueda + generar */}
@@ -56,7 +49,7 @@ export default function Comparator() {
           </button>
         </div>
 
-        {/* Bloques resumen (placeholder) */}
+        {/* Bloques resumen */}
         <div className="grid md:grid-cols-2 gap-4">
           {[
             "Cuota segura (regalo) 1.5–3 · 90–95% acierto",
@@ -66,9 +59,7 @@ export default function Comparator() {
           ].map((t, i) => (
             <div key={i} className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="text-white font-semibold">{t}</div>
-              <div className="text-white/70 text-sm mt-1">
-                Próximamente: resultados basados en tus filtros.
-              </div>
+              <div className="text-white/70 text-sm mt-1">Próximamente: resultados basados en tus filtros.</div>
             </div>
           ))}
         </div>
@@ -85,8 +76,8 @@ export default function Comparator() {
                 onClick={() => (window.location.href = "/#planes")}
                 className="cursor-pointer rounded-2xl border border-white/10 bg-white/5 p-4 opacity-80 hover:opacity-100"
               >
-                <div className="text-white font-semibold">Plan {id}</div>
-                <div className="text-sm text-white/70">Toca para ver planes</div>
+                <div className="text-white font-semibold">Plan {id.toUpperCase()}</div>
+                <div className="text-sm text-white/70">Mejorar plan →</div>
               </div>
             ))}
           </div>

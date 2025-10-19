@@ -1,15 +1,14 @@
 // src/App.jsx
 import React from "react";
 import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
+import { AuthProvider } from "./lib/auth";   // <<— SOLO el provider aquí
 
 import Home from "./pages/Home.jsx";
-import Comparator from "./pages/Comparator.jsx";
+import Comparator from "./pages/Comparator.jsx"; // nombre/ruta exactos
 import Fixtures from "./pages/Fixtures.jsx";
 import Login from "./pages/Login.jsx";
 
-import { AuthProvider, useAuth } from "./lib/auth";
-
-/* ---------- Header (mármol + tabs) ----------- */
+/* ---------- Header (mármol + tabs delicadas) ----------- */
 function NavItem({ to, children }) {
   const { pathname } = useLocation();
   const active = pathname === to;
@@ -20,8 +19,6 @@ function NavItem({ to, children }) {
 }
 
 function Header() {
-  const { isLoggedIn, user, logout } = useAuth();
-
   return (
     <header className="bg-[#FFFFF0]">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-2">
@@ -29,30 +26,15 @@ function Header() {
           <NavItem to="/">Inicio</NavItem>
           <NavItem to="/app">Comparador</NavItem>
           <NavItem to="/fixture">Partidos</NavItem>
-
-          {!isLoggedIn ? (
-            <Link to="/login" className="text-sm md:text-base font-semibold text-slate-900 hover:underline whitespace-nowrap">
-              Iniciar sesión
-            </Link>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-700 hidden sm:inline">
-                {user?.plan?.toUpperCase()}
-              </span>
-              <button
-                onClick={logout}
-                className="text-sm md:text-base font-semibold text-slate-900 hover:underline"
-              >
-                Salir
-              </button>
-            </div>
-          )}
+          <Link to="/login" className="text-sm md:text-base font-semibold text-slate-900 hover:underline whitespace-nowrap">
+            Iniciar sesión
+          </Link>
         </nav>
       </div>
     </header>
   );
 }
-/* --------------------------------------------------------------- */
+/* ------------------------------------------------------- */
 
 export default function App() {
   return (

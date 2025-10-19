@@ -1,53 +1,75 @@
 // src/lib/auth.js
+import React, { createContext, useContext, useMemo, useState, useEffect } from "react";
 
-// Usuarios DEMO por plan
-export const DEMO_USERS = [
-  { email: "vitalicio@demo.cl",  password: "FV-demo-249990", plan: "vitalicio" },
-  { email: "anual@demo.cl",      password: "FV-demo-99990",  plan: "anual" },
-  { email: "trimestral@demo.cl", password: "FV-demo-44990",  plan: "trimestral" },
-  { email: "basico@demo.cl",     password: "FV-demo-19990",  plan: "basico" },
+const LS_KEY = "fv_auth_v1";
+
+export const PLAN_RANK = {
+  BASIC: 1,      // $19.990
+  PRO: 2,        // $44.990
+  POPULAR: 3,    // $99.990 (Anual)
+  VITALICIO: 4,  // $249.990
+};
+
+const DEMO_USERS = [
+  { email: "basic@demo.cl",     password: "123456", name: "Demo Basic",     plan: "BASIC",     rank: PLAN_RANK.BASIC },
+  { email: "pro@demo.cl",       password: "123456", name: "Demo Pro",       plan: "PRO",       rank: PLAN_RANK.PRO },
+  { email: "anual@demo.cl",     password: "123456", name: "Demo Anual",     plan: "POPULAR",   rank: PLAN_RANK.POPULAR },
+  { email: "vitalicio@demo.cl", password: "123456", name: "Demo Vitalicio", plan: "VITALICIO", rank: PLAN_RANK.VITALICIO },
 ];
 
-const KEY = "fv_auth";
+const AuthCtx = createContext(null);
 
-// Guarda sesión simple en localStorage
-function saveSession(s) {
-  localStorage.setItem(KEY, JSON.stringify(s));
-}
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
 
-export function getUser() {
-  try {
-    const raw = localStorage.getItem(KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
+  // Cargar del localStorage
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) setUser(JSON.parse(raw));
+    } catch (e) {}
+  }, []);
 
-export function isLoggedIn() {
-  return !!getUser();
-}
+  // Guardar en localStorage
+  useEffect(() => {
+    try {
+      if (user) localStorage.setItem(LS_KEY, JSON.stringify(user));
+      else localStorage.removeItem(LS_KEY);
+    } catch (e) {}
+  }, [user]);
 
-export function signOut() {
-  localStorage.removeItem(KEY);
-}
-
-// “Login” demo (match exacto email/clave)
-export function signIn(email, password) {
-  const user = DEMO_USERS.find(
-    (u) => u.email.trim().toLowerCase() === String(email).trim().toLowerCase() &&
-           u.password === String(password)
-  );
-
-  if (!user) {
-    return { ok: false, error: "Correo o contraseña incorrectos." };
-  }
-
-  const session = {
-    email: user.email,
-    plan: user.plan,
-    ts: Date.now(),
+  const login = async (email, password) => {
+    const found = DEMO_USERS.find(
+      u => u.email.toLowerCase() === String(email).toLowerCase() && u.password === password
+    );
+    if (!found) throw new Error("Credenciales inválidas");
+    setUser({ email: found.email, name: found.name, plan: found.plan, rank: found.rank });
+    return true;
   };
-  saveSession(session);
-  return { ok: true, user: session };
+
+  const logout = () => setUser(null);
+
+  const value = useMemo(() => ({
+    user,
+    isLoggedIn: !!user,
+    login,
+    logout,
+    getUser: () => user,
+  }), [user]);
+
+  return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthCtx);
+  if (!ctx) throw new Error("useAuth debe usarse dentro de <AuthProvider>");
+  return ctx;
+}
+
+// Helpers fuera de React (opcionales)
+export function isLoggedIn() {
+  try { return !!JSON.parse(localStorage.getItem(LS_KEY)); } catch { return false; }
+}
+export function getUser() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY)); } catch { return null; }
 }
