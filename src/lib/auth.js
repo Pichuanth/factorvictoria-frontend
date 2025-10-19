@@ -1,63 +1,53 @@
 // src/lib/auth.js
-import React, { createContext, useContext, useEffect, useState } from "react";
 
-/**
- * USUARIOS DEMO (solo pruebas locales / vercel de staging)
- * Puedes cambiar correos o passwords si quieres.
- */
-const DEMO_USERS = [
-  { email: "basic@demo.cl",      password: "demo123",  plan: "basic" },       // $19.990
-  { email: "trimestral@demo.cl", password: "demo123",  plan: "trimestral" },  // $44.990
-  { email: "anual@demo.cl",      password: "demo123",  plan: "anual" },       // $99.990
-  { email: "vitalicio@demo.cl",  password: "demo123",  plan: "vitalicio" },   // $249.990
-  { email: "admin@demo.cl",      password: "admin123", plan: "admin" },       // full
+// Usuarios DEMO por plan
+export const DEMO_USERS = [
+  { email: "vitalicio@demo.cl",  password: "FV-demo-249990", plan: "vitalicio" },
+  { email: "anual@demo.cl",      password: "FV-demo-99990",  plan: "anual" },
+  { email: "trimestral@demo.cl", password: "FV-demo-44990",  plan: "trimestral" },
+  { email: "basico@demo.cl",     password: "FV-demo-19990",  plan: "basico" },
 ];
 
-/**
- * ranking de planes para bloquear/desbloquear secciones
- */
-export const PLAN_RANK = {
-  basic: 1,         // x10 oculto, regalo 1.5–3 visible, etc. (ajusta a tu regla)
-  trimestral: 2,
-  anual: 3,
-  vitalicio: 4,
-  admin: 999,
-};
+const KEY = "fv_auth";
 
-const AuthCtx = createContext(null);
-export const useAuth = () => useContext(AuthCtx);
+// Guarda sesión simple en localStorage
+function saveSession(s) {
+  localStorage.setItem(KEY, JSON.stringify(s));
+}
 
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null); // {email, plan}
+export function getUser() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
-  useEffect(() => {
-    const raw = localStorage.getItem("fv:user");
-    if (raw) {
-      try { setUser(JSON.parse(raw)); } catch {}
-    }
-  }, []);
+export function isLoggedIn() {
+  return !!getUser();
+}
 
-  const login = async (email, password) => {
-    const found = DEMO_USERS.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
-    if (!found) throw new Error("Credenciales inválidas");
-    const payload = { email: found.email, plan: found.plan };
-    localStorage.setItem("fv:user", JSON.stringify(payload));
-    setUser(payload);
-    return payload;
+export function signOut() {
+  localStorage.removeItem(KEY);
+}
+
+// “Login” demo (match exacto email/clave)
+export function signIn(email, password) {
+  const user = DEMO_USERS.find(
+    (u) => u.email.trim().toLowerCase() === String(email).trim().toLowerCase() &&
+           u.password === String(password)
+  );
+
+  if (!user) {
+    return { ok: false, error: "Correo o contraseña incorrectos." };
+  }
+
+  const session = {
+    email: user.email,
+    plan: user.plan,
+    ts: Date.now(),
   };
-
-  const logout = () => {
-    localStorage.removeItem("fv:user");
-    setUser(null);
-  };
-
-  const value = {
-    user,          // null | {email, plan}
-    isLoggedIn: !!user,
-    plan: user?.plan || null,
-    rank: user ? PLAN_RANK[user.plan] ?? 0 : 0,
-    login, logout,
-  };
-
-  return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
+  saveSession(session);
+  return { ok: true, user: session };
 }
