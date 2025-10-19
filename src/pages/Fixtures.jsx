@@ -73,9 +73,7 @@ export default function Fixtures() {
         {!IS_PROD && (
           <div className="rounded-3xl border border-slate-700/40 p-4 md:p-6 bg-slate-900/40 mb-6">
             <h3 className="text-white font-semibold mb-2">ADMIN</h3>
-            <p className="text-xs text-slate-300 mb-2">
-              TOKEN INTERNO (NO PUBLICAR EN PRODUCCIÓN)
-            </p>
+            <p className="text-xs text-slate-300 mb-2">TOKEN INTERNO (NO PUBLICAR EN PRODUCCIÓN)</p>
 
             <input
               type="password"
@@ -104,23 +102,25 @@ export default function Fixtures() {
 
         {/* Filtros públicos */}
         <div className="border border-white/10 rounded-2xl p-4 mb-4 bg-white/5 flex flex-col gap-3">
+          {/* FECHA: marfil */}
           <input
             type="date"
-            className="rounded-xl px-3 py-2 bg-[#E6C464] text-slate-900"
+            className="rounded-xl px-3 py-2 bg-[#FFFFF0] text-slate-900"
             value={date}
             onChange={(e) => setDate(e.target.value)}
           />
 
+          {/* BUSCADOR: marfil */}
           <input
-            className="rounded-xl px-3 py-2 bg-[#E6C464] text-slate-900 placeholder-slate-900/70"
+            className="rounded-xl px-3 py-2 bg-[#FFFFF0] text-slate-900 placeholder-slate-700"
             placeholder="Buscar (equipo / liga / país)"
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
 
-          {/* Botón Buscar */}
+          {/* Botón Buscar: dorado (se mantiene) */}
           <button
-            onClick={() => {/* el filtrado es reactivo; botón como confirmación UX */}}
+            onClick={() => {/* el filtrado ya es reactivo; botón como confirmación UX */}}
             className="rounded-xl px-4 py-2 bg-[#E6C464] text-slate-900 font-semibold self-start"
           >
             Buscar
