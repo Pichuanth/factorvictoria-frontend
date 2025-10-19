@@ -57,7 +57,8 @@ export function AuthProvider({ children }) {
     getUser: () => user,
   }), [user]);
 
-  return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
+  // *** IMPORTANTE: devolver SIN JSX para evitar el parse error en .js ***
+  return React.createElement(AuthCtx.Provider, { value }, children);
 }
 
 export function useAuth() {
