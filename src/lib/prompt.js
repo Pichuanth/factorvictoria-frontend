@@ -1,30 +1,36 @@
 // src/lib/prompt.js
 
-// Texto para IA / futuras integraciones: puedes editar libremente.
+// Texto que podremos mandar a la IA (cuando conectemos la API) según plan
 export const PROMPTS = {
   vitalicio: `
-Eres un generador de selecciones de apuestas deportivas. 
-Debes proponer cuotas con alto valor esperado, basadas en estadísticas y señales de mercado.
-Devuelve siempre un JSON con estas secciones:
-- regalo: una cuota segura x1.5–x3
-- xPlan: una combinada conforme al multiplicador del plan
-- arbitros: 2-3 ligas con árbitros muy tarjeteros y breve justificación
-- desfase: 1-2 picks con posible error de mercado y motivo
-`,
+Eres un generador de selecciones de apuestas deportivas.
+Devuelve SIEMPRE un JSON con cuatro secciones:
+- "regalo": una cuota segura x1.5–x3 con >90% de acierto.
+- "xPlan": una combinada cuyo total respete el multiplicador del plan (x100 en vitalicio).
+- "arbitros": 2–3 ligas con árbitros más tarjeteros y breve motivo.
+- "desfase": 1–2 picks con posible error de mercado y motivo.
+Formato de salida:
+{
+ "regalo":[{ "partido":"...", "mercado":"...", "cuota":1.85, "motivo":"..." }],
+ "xPlan":[{ "partido":"...", "mercado":"...", "cuota":1.35 }, ...],
+ "arbitros":[{ "liga":"...", "arbitro":"...", "promTarjetas": "..." }],
+ "desfase":[{ "partido":"...", "mercado":"...", "cuota":2.10, "motivo":"..." }]
+}`,
+  // (si quieres, luego agregamos variantes por plan)
 };
 
-// Títulos visibles en la UI del Comparador (según lo que pediste)
+// Títulos visibles en UI (como me pediste)
 export const SECTION_TITLES = {
-  regalo: "Cuota segura (Regalo) x1.5 a x3 · 90–95% de acierto",
-  xPlan: "Cuota Generada",
-  arbitros: "Árbitros más tarjeteros",
-  desfase: "Desfase del mercado",
+  regalo: 'Cuota segura (Regalo) 1.5–3 · 90–95% acierto',
+  xPlan: 'Cuota generada',
+  arbitros: 'Árbitros más tarjeteros',
+  desfase: 'Desfase del mercado',
 };
 
-// Multiplicador por plan (PLAN_RANK viene de lib/auth)
+// Mapeo de multiplicador por plan (usa los mismos rangos que auth)
 export const PLAN_MULTIPLIER = {
-  0: 10,  // Básico $19.990 → x10
-  1: 20,  // Trimestral $44.990 → x20
-  2: 50,  // Anual $99.990 → x50
-  3: 100, // Vitalicio $249.990 → x100
+  0: 10,   // Básico $19.990  => x10
+  10: 20,  // Trimestral      => x20
+  50: 50,  // Anual           => x50
+  100: 100 // Vitalicio       => x100
 };
