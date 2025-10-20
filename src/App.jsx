@@ -3,13 +3,13 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
 
 import Home from "./pages/Home.jsx";
-import Comparator from "./pages/Comparator.jsx";
+import Comparator from "./pages/Comparator.jsx"; // ojo: nombre exacto
 import Fixtures from "./pages/Fixtures.jsx";
 import Login from "./pages/Login.jsx";
 
-import { AuthProvider, useAuth } from "./lib/auth";
+import { AuthProvider, useAuth } from "./lib/auth.jsx";
 
-/* ---------- Header (franja mármol + tabs delicadas) ----------- */
+/* ---------- Header (mármol + tabs delicadas) ----------- */
 function NavItem({ to, children }) {
   const { pathname } = useLocation();
   const active = pathname === to;
@@ -26,7 +26,7 @@ function NavItem({ to, children }) {
 }
 
 function Header() {
-  const { isLoggedIn, user, signOut } = useAuth();
+  const { isLoggedIn, logout } = useAuth();
 
   return (
     <header className="bg-[#FFFFF0]">
@@ -37,7 +37,6 @@ function Header() {
           <NavItem to="/fixture">Partidos</NavItem>
 
           {!isLoggedIn ? (
-            // Iniciar sesión: SOLO texto
             <Link
               to="/login"
               className="text-sm md:text-base font-semibold text-slate-900 hover:underline whitespace-nowrap"
@@ -45,28 +44,19 @@ function Header() {
               Iniciar sesión
             </Link>
           ) : (
-            // Usuario logueado: email corto + cerrar sesión
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-slate-700 hidden sm:block">
-                {user?.email}
-              </span>
-              <button
-                onClick={() => {
-                  signOut();
-                  window.location.href = "/";
-                }}
-                className="text-sm md:text-base font-semibold text-slate-900 hover:underline"
-              >
-                Cerrar sesión
-              </button>
-            </div>
+            <button
+              onClick={logout}
+              className="text-sm md:text-base font-semibold text-slate-900 hover:underline whitespace-nowrap"
+            >
+              Cerrar sesión
+            </button>
           )}
         </nav>
       </div>
     </header>
   );
 }
-/* --------------------------------------------------------------- */
+/* ------------------------------------------------------- */
 
 export default function App() {
   return (
