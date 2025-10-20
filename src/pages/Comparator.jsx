@@ -3,7 +3,6 @@ import React, { useState } from "react";
 import Simulator from "../components/Simulator";
 import { useAuth, PLAN_RANK } from "../lib/auth";
 
-// mapa: rank -> multiplicador máximo visible
 const RANK_TO_MAX = {
   [PLAN_RANK.BASIC]: 10,       // $19.990
   [PLAN_RANK.PRO]: 20,         // $44.990
@@ -16,27 +15,26 @@ export default function Comparator() {
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [q, setQ] = useState("");
 
-  // si no está logueado → bloquear la vista
+  // 🔒 Bloqueo con FONDO AZUL MARINO también
   if (!isLoggedIn) {
     return (
-      <div className="max-w-6xl mx-auto px-4 py-12 text-white">
-        <h1 className="text-2xl font-bold mb-3">Comparador</h1>
-        <div className="rounded-2xl bg-white/5 border border-white/10 p-6">
-          Para generar cuotas, primero{" "}
-          <a href="/#planes" className="text-[#E6C464] underline">
-            compra una membresía
-          </a>{" "}
-          e inicia sesión.
-        </div>
+      <div className="bg-slate-900 min-h-screen">
+        <section className="max-w-6xl mx-auto px-4 py-12 text-white">
+          <h1 className="text-2xl font-bold mb-3">Comparador</h1>
+          <div className="rounded-2xl bg-white/5 border border-white/10 p-6">
+            Para generar cuotas, primero{" "}
+            <a href="/#planes" className="text-[#E6C464] underline">
+              compra una membresía
+            </a>{" "}
+            e inicia sesión.
+          </div>
+        </section>
       </div>
     );
   }
 
-  // rank del usuario y multiplicador permitido
   const rank = user?.rank;
   const maxX = RANK_TO_MAX[rank] ?? 10;
-
-  // para mostrar upsells bloqueados (los superiores a tu plan)
   const ladder = [10, 20, 50, 100];
   const locked = ladder.filter((x) => x > maxX);
 
@@ -62,9 +60,7 @@ export default function Comparator() {
           </button>
         </div>
 
-        {/* Aquí podrías renderizar las 3 cuotas por partido (mock o real). */}
-
-        {/* Bloques resumen */}
+        {/* Resumen por plan */}
         <div className="grid md:grid-cols-2 gap-4">
           {[
             "Cuota segura (regalo) 1.5–3 · 90–95% acierto",
@@ -81,7 +77,7 @@ export default function Comparator() {
           ))}
         </div>
 
-        {/* Upsell bloqueado (planes superiores a tu plan actual) */}
+        {/* Upsell bloqueado */}
         {locked.length > 0 && (
           <div className="mt-8">
             <h3 className="text-white text-xl font-bold mb-3">
@@ -95,14 +91,16 @@ export default function Comparator() {
                   className="rounded-2xl border border-white/10 bg-white/5 p-4 opacity-70 hover:opacity-100 cursor-pointer"
                 >
                   <div className="text-white font-semibold">Plan x{x}</div>
-                  <div className="text-sm text-white/70">Contenido bloqueado 🔒 (mejorar plan)</div>
+                  <div className="text-sm text-white/70">
+                    Contenido bloqueado 🔒 (mejorar plan)
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Simulador al final */}
+        {/* Simulador */}
         <div className="mt-10">
           <Simulator />
         </div>

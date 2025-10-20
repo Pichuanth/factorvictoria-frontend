@@ -1,76 +1,67 @@
 // src/lib/auth.js
-import React, { createContext, useContext, useMemo, useState, useEffect } from "react";
-
-const LS_KEY = "fv_auth_v1";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 export const PLAN_RANK = {
-  BASIC: 1,      // $19.990
-  PRO: 2,        // $44.990
-  POPULAR: 3,    // $99.990 (Anual)
-  VITALICIO: 4,  // $249.990
+  BASIC: "BASIC",        // $19.990 → x10
+  PRO: "PRO",            // $44.990 → x20
+  POPULAR: "POPULAR",    // $99.990 → x50 (Anual)
+  VITALICIO: "VITALICIO" // $249.990 → x100
 };
 
+// DEMO: emails y plan. Password demo: Factor1986?
 const DEMO_USERS = [
-  { email: "basic@demo.cl",     password: "123456", name: "Demo Basic",     plan: "BASIC",     rank: PLAN_RANK.BASIC },
-  { email: "pro@demo.cl",       password: "123456", name: "Demo Pro",       plan: "PRO",       rank: PLAN_RANK.PRO },
-  { email: "anual@demo.cl",     password: "123456", name: "Demo Anual",     plan: "POPULAR",   rank: PLAN_RANK.POPULAR },
-  { email: "vitalicio@demo.cl", password: "123456", name: "Demo Vitalicio", plan: "VITALICIO", rank: PLAN_RANK.VITALICIO },
+  { email: "basico@demo.cl",     rank: PLAN_RANK.BASIC },
+  { email: "trimestral@demo.cl", rank: PLAN_RANK.PRO },
+  { email: "anual@demo.cl",      rank: PLAN_RANK.POPULAR },
+  { email: "vitalicio@demo.cl",  rank: PLAN_RANK.VITALICIO },
 ];
 
+const LS_KEY = "fv_user";
 const AuthCtx = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-
-  // Cargar del localStorage
-  useEffect(() => {
+  const [user, setUser] = useState(() => {
     try {
       const raw = localStorage.getItem(LS_KEY);
-      if (raw) setUser(JSON.parse(raw));
-    } catch (e) {}
-  }, []);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
 
-  // Guardar en localStorage
-  useEffect(() => {
-    try {
-      if (user) localStorage.setItem(LS_KEY, JSON.stringify(user));
-      else localStorage.removeItem(LS_KEY);
-    } catch (e) {}
-  }, [user]);
-
-  const login = async (email, password) => {
-    const found = DEMO_USERS.find(
-      u => u.email.toLowerCase() === String(email).toLowerCase() && u.password === password
-    );
-    if (!found) throw new Error("Credenciales inválidas");
-    setUser({ email: found.email, name: found.name, plan: found.plan, rank: found.rank });
-    return true;
+  const signIn = async (email, password) => {
+    const okPass = password === "Factor1986?";
+    const found = DEMO_USERS.find((u) => u.email.toLowerCase() === String(email).toLowerCase());
+    if (!found || !okPass) {
+      throw new Error("Credenciales inválidas");
+    }
+    const logged = { email: found.email, rank: found.rank, ts: Date.now() };
+    setUser(logged);
+    localStorage.setItem(LS_KEY, JSON.stringify(logged));
+    return logged;
   };
 
-  const logout = () => setUser(null);
+  const signOut = () => {
+    setUser(null);
+    localStorage.removeItem(LS_KEY);
+  };
 
-  const value = useMemo(() => ({
-    user,
-    isLoggedIn: !!user,
-    login,
-    logout,
-    getUser: () => user,
-  }), [user]);
+  const value = useMemo(
+    () => ({
+      user,
+      isLoggedIn: !!user,
+      getUser: () => user,
+      signIn,
+      signOut,
+    }),
+    [user]
+  );
 
-  // *** IMPORTANTE: devolver SIN JSX para evitar el parse error en .js ***
-  return React.createElement(AuthCtx.Provider, { value }, children);
+  return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }
 
 export function useAuth() {
   const ctx = useContext(AuthCtx);
-  if (!ctx) throw new Error("useAuth debe usarse dentro de <AuthProvider>");
+  if (!ctx) throw new Error("useAuth must be used within <AuthProvider>");
   return ctx;
-}
-
-// Helpers fuera de React (opcionales)
-export function isLoggedIn() {
-  try { return !!JSON.parse(localStorage.getItem(LS_KEY)); } catch { return false; }
-}
-export function getUser() {
-  try { return JSON.parse(localStorage.getItem(LS_KEY)); } catch { return null; }
 }
