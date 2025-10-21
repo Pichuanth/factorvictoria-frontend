@@ -1,14 +1,12 @@
 // src/pages/Login.jsx
 import React, { useState } from "react";
+import { login } from "../lib/auth";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../lib/auth.jsx";
 
 export default function Login() {
-  const { login } = useAuth();
-  const navigate = useNavigate();
-
+  const nav = useNavigate();
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [pass, setPass] = useState("");
   const [show, setShow] = useState(false);
   const [err, setErr] = useState("");
 
@@ -16,71 +14,61 @@ export default function Login() {
     e.preventDefault();
     setErr("");
     try {
-      await login(email, password);
-      navigate("/app");
-    } catch {
-      setErr("Correo o contraseña inválidos");
+      await login(email, pass);
+      nav("/app"); // al comparador
+    } catch (e) {
+      setErr(e.message || "Error al iniciar sesión");
     }
   };
 
   return (
     <div className="min-h-[70vh] bg-slate-900 flex items-center">
-      <form onSubmit={onSubmit} className="max-w-md mx-auto w-full px-4 py-10">
-        <div className="flex flex-col items-center gap-4 mb-6">
-          <img src="/logo-fv.png" alt="Factor Victoria" className="w-24 h-24 object-contain" />
-          <h1 className="text-white text-2xl font-bold">Iniciar sesión</h1>
-        </div>
+      <div className="max-w-md mx-auto w-full px-4 py-10">
+        <h1 className="text-white text-2xl font-bold flex items-center gap-3 mb-6">
+          <img src="/logo-fv.png" alt="Factor Victoria" className="w-14 h-14" />
+          <span>Iniciar sesión</span>
+        </h1>
 
-        {err && <div className="mb-4 text-red-300 text-sm">{err}</div>}
-
-        <input
-          type="email"
-          placeholder="Correo"
-          className="mt-2 w-full px-4 py-3 rounded-2xl bg-[#FFFFF0] text-slate-900"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-
-        <div className="relative mt-3">
+        <form onSubmit={onSubmit}>
           <input
-            type={show ? "text" : "password"}
-            placeholder="Contraseña"
-            className="w-full px-4 py-3 rounded-2xl bg-[#FFFFF0] text-slate-900 pr-12"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            type="email"
+            placeholder="Correo"
+            className="mt-2 w-full px-4 py-3 rounded-2xl bg-white text-slate-900"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="username"
             required
-            autoComplete="current-password"
           />
+
+          <div className="mt-3 relative">
+            <input
+              type={show ? "text" : "password"}
+              placeholder="Contraseña"
+              className="w-full px-4 py-3 rounded-2xl bg-white text-slate-900 pr-12"
+              value={pass}
+              onChange={(e) => setPass(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShow((s) => !s)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-800"
+              aria-label={show ? "Ocultar contraseña" : "Mostrar contraseña"}
+            >
+              {show ? "🙈" : "👁️"}
+            </button>
+          </div>
+
+          {err && <div className="mt-3 text-sm text-rose-400">{err}</div>}
+
           <button
-            type="button"
-            onClick={() => setShow((s) => !s)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-black/10"
-            aria-label={show ? "Ocultar contraseña" : "Mostrar contraseña"}
-            title={show ? "Ocultar contraseña" : "Mostrar contraseña"}
+            type="submit"
+            className="mt-4 w-full px-4 py-3 rounded-2xl bg-[#E6C464] text-slate-900 font-semibold"
           >
-            {/* ojo simple (sin “monito”) */}
-            {show ? (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path d="M3 3l18 18" strokeWidth="2" />
-                <path d="M10.58 10.58a2 2 0 102.83 2.83" strokeWidth="2" />
-                <path d="M16.88 13.88A10.94 10.94 0 0012 12c-2.7 0-5.1 1.06-6.88 2.88" strokeWidth="2" />
-                <path d="M9.88 6.12A10.94 10.94 0 0112 6c4.84 0 8.94 3.4 10 6- .27 .68-.67 1.31-1.17 1.88" strokeWidth="2" />
-              </svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" strokeWidth="2" />
-                <circle cx="12" cy="12" r="3" strokeWidth="2" />
-              </svg>
-            )}
+            Entrar
           </button>
-        </div>
-
-        <div className="mt-2 text-xs text-white/70">¿Olvidaste tu contraseña?</div>
-
-        <button className="mt-4 w-full px-4 py-3 rounded-2xl bg-[#E6C464] text-slate-900 font-semibold">
-          Entrar
-        </button>
+        </form>
 
         <div className="mt-4 text-sm text-white/80">
           ¿Aún no tienes cuenta?{" "}
@@ -88,7 +76,7 @@ export default function Login() {
             Regístrate
           </a>
         </div>
-      </form>
+      </div>
     </div>
   );
 }
