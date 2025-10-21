@@ -3,13 +3,13 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
 
 import Home from "./pages/Home.jsx";
-import Comparator from "./pages/Comparator.jsx"; // ojo: nombre exacto
+import Comparator from "./pages/Comparator.jsx";
 import Fixtures from "./pages/Fixtures.jsx";
 import Login from "./pages/Login.jsx";
 
-import { AuthProvider, useAuth } from "./lib/auth.jsx";
+import { AuthProvider, useAuth } from "./lib/auth";
 
-/* ---------- Header (mármol + tabs delicadas) ----------- */
+/* ---------- Header (mármol + tabs) ----------- */
 function NavItem({ to, children }) {
   const { pathname } = useLocation();
   const active = pathname === to;
@@ -46,7 +46,7 @@ function Header() {
           ) : (
             <button
               onClick={logout}
-              className="text-sm md:text-base font-semibold text-slate-900 hover:underline whitespace-nowrap"
+              className="text-sm md:text-base font-semibold text-slate-900 underline whitespace-nowrap"
             >
               Cerrar sesión
             </button>
@@ -56,7 +56,6 @@ function Header() {
     </header>
   );
 }
-/* ------------------------------------------------------- */
 
 export default function App() {
   return (
