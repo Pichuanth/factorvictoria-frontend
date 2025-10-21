@@ -4,7 +4,7 @@ import Simulator from "../components/Simulator";
 import { useAuth, PLAN_RANK } from "../lib/auth";
 import { SECTION_TITLES } from "../lib/prompt";
 
-/* ================= Helpers: rank por plan ================= */
+/* ======= Helpers: rank y mapeos ======= */
 
 const PRICE_TO_RANK = {
   19990: PLAN_RANK.basic,       // x10
@@ -18,12 +18,9 @@ const STR_TO_RANK = {
   basico: PLAN_RANK.basic,
   básico: PLAN_RANK.basic,
   mensual: PLAN_RANK.basic,
-
   trimestral: PLAN_RANK.trimestral,
-
   anual: PLAN_RANK.anual,
   yearly: PLAN_RANK.anual,
-
   vitalicio: PLAN_RANK.vitalicio,
   lifetime: PLAN_RANK.vitalicio,
 };
@@ -49,43 +46,48 @@ const RANK_TO_MULT = {
   [PLAN_RANK.vitalicio]: 100,
 };
 
+// Para el upsell: a qué anchor debe ir cada “x…”
+const UPSALE_TARGETS_BY_RANK = {
+  [PLAN_RANK.basic]: [
+    { label: "x20", target: "trimestral" },
+    { label: "x50", target: "anual" },
+    { label: "x100", target: "vitalicio" },
+  ],
+  [PLAN_RANK.trimestral]: [
+    { label: "x50", target: "anual" },
+    { label: "x100", target: "vitalicio" },
+  ],
+  [PLAN_RANK.anual]: [{ label: "x100", target: "vitalicio" }],
+  [PLAN_RANK.vitalicio]: [],
+};
+
 function deriveRank(user) {
-  // 1) rank numérico ya listo
   if (typeof user?.rank === "number") return user.rank;
 
-  // 2) rank string (ej: "vitalicio")
   if (typeof user?.rank === "string") {
     const k = user.rank.trim().toLowerCase();
     if (k in STR_TO_RANK) return STR_TO_RANK[k];
   }
 
-  // 3) por nombre de plan en string (user.plan, user.planName, etc.)
   const planName =
-    user?.plan ||
-    user?.planName ||
-    user?.membership ||
-    user?.tier ||
-    "";
+    user?.plan || user?.planName || user?.membership || user?.tier || "";
   if (typeof planName === "string") {
     const k = planName.trim().toLowerCase();
     if (k in STR_TO_RANK) return STR_TO_RANK[k];
   }
 
-  // 4) por precio (CLP) si viene en algún campo
   const price =
     Number(String(user?.priceCLP || user?.planPrice || user?.price || "").replace(/\D/g, "")) ||
     null;
   if (price && PRICE_TO_RANK[price]) return PRICE_TO_RANK[price];
 
-  // 5) por email demo (solo para las cuentas de prueba)
   const email = (user?.email || "").toLowerCase();
   if (EMAIL_HINT_TO_RANK[email]) return EMAIL_HINT_TO_RANK[email];
 
-  // fallback
   return PLAN_RANK.basic;
 }
 
-/* ========================================================== */
+/* ============== Componente ============== */
 
 export default function Comparator() {
   const { isLoggedIn, user } = useAuth();
@@ -119,20 +121,11 @@ export default function Comparator() {
     );
   }
 
-  // ¿Mostrar upsell (bloques bloqueados)?
   const showUpsell = rank < PLAN_RANK.vitalicio;
-  const lockedPlans =
-    rank === PLAN_RANK.basic
-      ? ["x20", "x50", "x100"]
-      : rank === PLAN_RANK.trimestral
-      ? ["x50", "x100"]
-      : rank === PLAN_RANK.anual
-      ? ["x100"]
-      : [];
+  const upsellTargets = UPSALE_TARGETS_BY_RANK[rank];
 
-  // Secciones habilitadas por plan:
-  const hasArbitros = rank >= PLAN_RANK.anual;     // Anual y Vitalicio
-  const hasDesfase = rank >= PLAN_RANK.anual;      // Anual y Vitalicio
+  const hasArbitros = rank >= PLAN_RANK.anual;
+  const hasDesfase = rank >= PLAN_RANK.anual;
 
   return (
     <Wrapper>
@@ -167,7 +160,7 @@ export default function Comparator() {
           </div>
         </div>
 
-        {/* xPlan con multiplicador correcto y etiqueta del plan */}
+        {/* xPlan */}
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
           <div className="text-white font-semibold">
             {`${SECTION_TITLES.xPlan} x${mult}`}
@@ -175,7 +168,7 @@ export default function Comparator() {
           <div className="text-white/70 text-sm mt-1">Tu plan: {planLabel}</div>
         </div>
 
-        {/* Árbitros más tarjeteros (solo Anual/Vitalicio) */}
+        {/* Árbitros */}
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
           <div className="text-white font-semibold">
             {SECTION_TITLES.arbitros}
@@ -184,7 +177,7 @@ export default function Comparator() {
             <div className="text-white/70 text-sm mt-1">Próximamente.</div>
           ) : (
             <div
-              onClick={() => (window.location.href = "/#planes")}
+              onClick={() => (window.location.href = "/#plan-anual")}
               className="mt-2 inline-flex px-3 py-1.5 rounded-lg bg-white/10 text-white/80 text-sm cursor-pointer hover:bg-white/15"
               title="Mejorar plan"
             >
@@ -193,7 +186,7 @@ export default function Comparator() {
           )}
         </div>
 
-        {/* Cuota desfase del mercado (solo Anual/Vitalicio) */}
+        {/* Desfase */}
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
           <div className="text-white font-semibold">
             {SECTION_TITLES.desfase}
@@ -202,7 +195,7 @@ export default function Comparator() {
             <div className="text-white/70 text-sm mt-1">Próximamente.</div>
           ) : (
             <div
-              onClick={() => (window.location.href = "/#planes")}
+              onClick={() => (window.location.href = "/#plan-anual")}
               className="mt-2 inline-flex px-3 py-1.5 rounded-lg bg-white/10 text-white/80 text-sm cursor-pointer hover:bg-white/15"
               title="Mejorar plan"
             >
@@ -212,21 +205,21 @@ export default function Comparator() {
         </div>
       </div>
 
-      {/* Upsell final */}
+      {/* Upsell final → va directo al plan tocado */}
       {showUpsell && (
         <div className="mt-8">
           <h3 className="text-white text-xl font-bold mb-3">
             ¿Estás listo para mejorar tus ganancias?
           </h3>
           <div className="grid md:grid-cols-3 gap-4">
-            {lockedPlans.map((id) => (
+            {upsellTargets.map(({ label, target }) => (
               <div
-                key={id}
-                onClick={() => (window.location.href = "/#planes")}
+                key={label}
+                onClick={() => (window.location.href = `/#plan-${target}`)}
                 className="rounded-2xl border border-white/10 bg-white/5 p-4 opacity-70 hover:opacity-100 cursor-pointer"
-                title="Mejorar plan"
+                title={`Ir al plan ${label}`}
               >
-                <div className="text-white font-semibold">Plan {id}</div>
+                <div className="text-white font-semibold">Plan {label}</div>
                 <div className="text-sm text-white/70">Contenido bloqueado 🔒</div>
               </div>
             ))}

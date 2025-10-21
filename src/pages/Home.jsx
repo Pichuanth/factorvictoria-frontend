@@ -9,7 +9,7 @@ export default function Home() {
       {/* Héroe */}
       <section className="max-w-6xl mx-auto px-4 pt-10 pb-14">
         {/* Logo y nombre */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <img
             src="/logo-fv.png"
             alt="Factor Victoria"
@@ -33,15 +33,12 @@ export default function Home() {
           {copy.marca.subclaim}
         </p>
 
-        {/* Botón: scroll suave a #planes */}
-        <button
-          onClick={() =>
-            document.getElementById("planes")?.scrollIntoView({ behavior: "smooth" })
-          }
+        <Link
+          to="#planes"
           className="inline-flex mt-6 px-6 py-3 rounded-2xl bg-[#E6C464] text-slate-900 font-semibold shadow hover:opacity-90"
         >
           {copy.ctas.verPlanes}
-        </button>
+        </Link>
       </section>
 
       {/* Planes */}
@@ -50,6 +47,7 @@ export default function Home() {
           {copy.planes.map((p) => (
             <div
               key={p.id}
+              id={`plan-${p.id}`}  // <-- anchor para aterrizar exacto
               className={
                 "rounded-3xl border border-white/10 bg-white/5 p-6 md:p-8 relative " +
                 (p.badge ? "ring-2 ring-[#E6C464]" : "")
@@ -104,7 +102,7 @@ export default function Home() {
         <Simulator />
       </section>
 
-      {/* Imagen de cierre (full width en móvil) */}
+      {/* Imagen de cierre */}
       <section className="max-w-6xl mx-auto px-0 pb-4">
         <img
           src="/hero-players.png"
@@ -113,7 +111,7 @@ export default function Home() {
         />
       </section>
 
-      {/* Acerca de / Cómo funciona */}
+      {/* Acerca de */}
       <section className="max-w-6xl mx-auto px-4 pb-16">
         <h2 className="text-white text-3xl font-bold mb-3">
           {copy.home?.acercaTitulo || "Convierte información en ventaja"}
