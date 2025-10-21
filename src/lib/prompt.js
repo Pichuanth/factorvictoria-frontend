@@ -1,6 +1,5 @@
 // src/lib/prompt.js
 
-// Texto que podremos mandar a la IA (cuando conectemos la API) según plan
 export const PROMPTS = {
   vitalicio: `
 Eres un generador de selecciones de apuestas deportivas.
@@ -16,21 +15,18 @@ Formato de salida:
  "arbitros":[{ "liga":"...", "arbitro":"...", "promTarjetas": "..." }],
  "desfase":[{ "partido":"...", "mercado":"...", "cuota":2.10, "motivo":"..." }]
 }`,
-  // (si quieres, luego agregamos variantes por plan)
 };
 
-// Títulos visibles en UI (como me pediste)
 export const SECTION_TITLES = {
   regalo: 'Cuota segura (Regalo) 1.5–3 · 90–95% acierto',
   xPlan: 'Cuota generada',
   arbitros: 'Árbitros más tarjeteros',
-  desfase: 'Desfase del mercado',
+  desfase: 'Cuota desfase del mercado',   // <-- nuevo texto
 };
 
-// Mapeo de multiplicador por plan (usa los mismos rangos que auth)
 export const PLAN_MULTIPLIER = {
-  0: 10,   // Básico $19.990  => x10
-  10: 20,  // Trimestral      => x20
-  50: 50,  // Anual           => x50
-  100: 100 // Vitalicio       => x100
+  0: 10,    // Básico
+  10: 20,   // Trimestral
+  50: 50,   // Anual
+  100: 100, // Vitalicio
 };

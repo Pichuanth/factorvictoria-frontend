@@ -4,6 +4,24 @@ import Simulator from "../components/Simulator";
 import { useAuth, PLAN_RANK } from "../lib/auth";
 import { SECTION_TITLES, PLAN_MULTIPLIER } from "../lib/prompt";
 
+// Mapa auxiliar para mostrar el nombre del plan en la UI
+const PLAN_LABEL = {
+  [PLAN_RANK.basic]: "BÁSICO",
+  [PLAN_RANK.trimestral]: "TRIMESTRAL",
+  [PLAN_RANK.anual]: "ANUAL",
+  [PLAN_RANK.vitalicio]: "VITALICIO",
+};
+
+// Si por alguna razón user.rank llega como string, lo normalizamos aquí
+const RANK_FROM_STRING = {
+  basic: PLAN_RANK.basic,
+  básico: PLAN_RANK.basic,
+  basico: PLAN_RANK.basic,
+  trimestral: PLAN_RANK.trimestral,
+  anual: PLAN_RANK.anual,
+  vitalicio: PLAN_RANK.vitalicio,
+};
+
 export default function Comparator() {
   const { isLoggedIn, user } = useAuth();
   const [date, setDate] = useState(() =>
@@ -11,7 +29,6 @@ export default function Comparator() {
   );
   const [q, setQ] = useState("");
 
-  // Fondo y envoltorio común (siempre azul marino)
   const Wrapper = ({ children }) => (
     <div className="bg-slate-900 min-h-screen">
       <section className="max-w-6xl mx-auto px-4 py-8 text-white">
@@ -20,7 +37,6 @@ export default function Comparator() {
     </div>
   );
 
-  // Vista bloqueada (no logged-in)
   if (!isLoggedIn) {
     return (
       <Wrapper>
@@ -36,14 +52,18 @@ export default function Comparator() {
     );
   }
 
-  // Usuario logueado: calculamos su plan y multiplicador
-  const rank = user?.rank ?? PLAN_RANK.basic; // 0,10,50,100…
-  const mult = PLAN_MULTIPLIER[rank] ?? 10;
+  // --- Normalización de rank y cálculo de multiplicador/etiqueta ---
+  let rank = user?.rank;
+  if (typeof rank === "string") {
+    const key = rank.toLowerCase();
+    rank = RANK_FROM_STRING[key] ?? PLAN_RANK.basic;
+  }
+  if (typeof rank !== "number") rank = PLAN_RANK.basic;
 
-  // Etiqueta de la tarjeta xPlan con el multiplicador correcto
+  const mult = PLAN_MULTIPLIER[rank] ?? 10;
+  const planLabel = PLAN_LABEL[rank] ?? "—";
   const xPlanTitle = `${SECTION_TITLES.xPlan} x${mult}`;
 
-  // Upsell: mostrar bloqueados solo si no es Vitalicio
   const showUpsell = rank < PLAN_RANK.vitalicio;
   const lockedPlans =
     rank === PLAN_RANK.basic
@@ -75,7 +95,7 @@ export default function Comparator() {
         </button>
       </div>
 
-      {/* Secciones (4) */}
+      {/* Secciones */}
       <div className="grid md:grid-cols-2 gap-4">
         {/* Regalo */}
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -87,15 +107,13 @@ export default function Comparator() {
           </div>
         </div>
 
-        {/* xPlan con multiplicador correcto */}
+        {/* xPlan con multiplicador correcto y etiqueta de plan */}
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
           <div className="text-white font-semibold">{xPlanTitle}</div>
-          <div className="text-white/70 text-sm mt-1">
-            Tu plan: {user?.planLabel?.toUpperCase() || "—"}
-          </div>
+          <div className="text-white/70 text-sm mt-1">Tu plan: {planLabel}</div>
         </div>
 
-        {/* Árbitros más tarjeteros (reemplaza Probabilidad…) */}
+        {/* Árbitros más tarjeteros */}
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
           <div className="text-white font-semibold">
             {SECTION_TITLES.arbitros}
@@ -103,18 +121,15 @@ export default function Comparator() {
           <div className="text-white/70 text-sm mt-1">Próximamente.</div>
         </div>
 
-        {/* Desfase del mercado */}
+        {/* Cuota desfase del mercado (nuevo título, sin leyenda extra) */}
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
           <div className="text-white font-semibold">
             {SECTION_TITLES.desfase}
           </div>
-          <div className="text-white/70 text-sm mt-1">
-            Incluido en todas las membresías.
-          </div>
         </div>
       </div>
 
-      {/* Upsell bloqueado (no mostrar en Vitalicio) */}
+      {/* Upsell bloqueado (no aparece en Vitalicio) */}
       {showUpsell && (
         <div className="mt-8">
           <h3 className="text-white text-xl font-bold mb-3">
@@ -136,7 +151,7 @@ export default function Comparator() {
         </div>
       )}
 
-      {/* Simulador al final */}
+      {/* Simulador */}
       <div className="mt-10">
         <Simulator />
       </div>
