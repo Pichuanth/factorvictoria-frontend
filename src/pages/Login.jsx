@@ -52,25 +52,26 @@ export default function Login() {
             <button
               type="button"
               onClick={() => setShow((s) => !s)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-700"
               aria-label={show ? "Ocultar contraseña" : "Mostrar contraseña"}
             >
               {show ? (
                 // ojo abierto
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12Z" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-              ) : (
-                // ojo tachado
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.8 21.8 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 5c7 0 11 7 11 7a21.8 21.8 0 0 1-3.2 4.2" />
-                  <line x1="1" y1="1" x2="23" y2="23" />
-                </svg>
-              )}
-            </button>
-          </div>
-
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/>
+        <circle cx="12" cy="12" r="3"/>
+      </svg>
+    ) : (
+      // ojo tachado
+      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.77 21.77 0 0 1 5.06-5.94"/>
+        <path d="M1 1l22 22"/>
+        <path d="M9.88 9.88A3 3 0 0 0 12 15a3 3 0 0 0 2.12-.88"/>
+        <path d="M12 5c7 0 11 7 11 7a21.9 21.9 0 0 1-3.17 4.5"/>
+      </svg>
+    )}
+  </button>
+</div>
           <div className="mt-2 text-xs text-white/70">¿Olvidaste tu contraseña?</div>
 
           {err && <div className="mt-3 text-sm text-red-400">{err}</div>}
