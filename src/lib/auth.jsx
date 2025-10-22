@@ -1,59 +1,54 @@
 // src/lib/auth.jsx
-import React, { createContext, useContext, useMemo, useState, useEffect } from "react";
+import React, { createContext, useContext, useMemo, useState } from "react";
 
-/** Catalogo de planes */
-export const PLAN_RANK = {
-  BASIC: 0,      // $19.990
-  TRIM: 1,       // $44.990
-  ANUAL: 2,      // $99.990
-  VITA: 3,       // $249.990
+/* ===== Usuarios demo por plan ===== */
+const USERS = {
+  "mensual@demo.cl":   { email: "mensual@demo.cl",   planId: "basic",     rank: "basic",     name: "Demo Mensual" },
+  "trimestral@demo.cl":{ email: "trimestral@demo.cl",planId: "trimestral",rank: "trimestral",name: "Demo Trimestral" },
+  "anual@demo.cl":     { email: "anual@demo.cl",     planId: "anual",     rank: "anual",     name: "Demo Anual" },
+  "vitalicio@demo.cl": { email: "vitalicio@demo.cl", planId: "vitalicio", rank: "vitalicio", name: "Demo Vitalicio" },
 };
+// misma contraseña para todos los demos:
+const DEMO_PASS = "Factor1986?";
 
-const DEMO_USERS = [
-  { email: "basico@demo.cl",     password: "Factor1986?", rank: PLAN_RANK.BASIC, planId: "basic" },
-  { email: "trimestral@demo.cl", password: "Factor1986?", rank: PLAN_RANK.TRIM,  planId: "trim"  },
-  { email: "anual@demo.cl",      password: "Factor1986?", rank: PLAN_RANK.ANUAL, planId: "anual" },
-  { email: "vitalicio@demo.cl",  password: "Factor1986?", rank: PLAN_RANK.VITA,  planId: "vita"  },
-];
-
-const STORAGE_KEY = "fv_user";
-
+/* ===== Contexto y hook ===== */
 const AuthCtx = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-
-  // cargar sesión guardada
-  useEffect(() => {
+  // recuperar sesión almacenada (si existe)
+  const [user, setUser] = useState(() => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setUser(JSON.parse(raw));
-    } catch {}
-  }, []);
+      const raw = localStorage.getItem("fv:user");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
 
-  // helpers
-  const login = (email, password) => {
-    const found = DEMO_USERS.find(u => u.email === email && u.password === password);
-    if (!found) return false;
-    const packed = { email: found.email, rank: found.rank, planId: found.planId };
-    setUser(packed);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(packed));
-    return true;
-  };
-
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem(STORAGE_KEY);
-  };
-
-  const value = useMemo(() => ({
-    user,
-    isLoggedIn: !!user,
-    rank: user?.rank ?? null,
-    planId: user?.planId ?? null,
-    login,
-    logout,
-  }), [user]);
+  const value = useMemo(
+    () => ({
+      user,
+      isLoggedIn: !!user,
+      getUser: () => user,
+      login: (email, pass) => {
+        const key = String(email || "").trim().toLowerCase();
+        const u = USERS[key];
+        if (!u || pass !== DEMO_PASS) return false;
+        setUser(u);
+        try {
+          localStorage.setItem("fv:user", JSON.stringify(u));
+        } catch {}
+        return true;
+      },
+      logout: () => {
+        setUser(null);
+        try {
+          localStorage.removeItem("fv:user");
+        } catch {}
+      },
+    }),
+    [user]
+  );
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }
