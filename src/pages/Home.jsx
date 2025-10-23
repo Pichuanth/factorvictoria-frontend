@@ -2,16 +2,16 @@
 import { Link } from "react-router-dom";
 import copy from "../copy";
 import Simulator from "../components/Simulator";
+import { useAuth } from "../lib/auth";
 
-// Mapeo para anclajes en la sección de planes (para upsell desde Comparador)
-const PLAN_ID_TO_ANCHOR = {
-  basic: "plan-basic",
-  trimestral: "plan-trimestral",
-  anual: "plan-anual",
-  vitalicio: "plan-vitalicio",
-};
+const GOLD = "#E6C464";
+const ORDER = { basic: 1, trimestral: 2, anual: 3, vitalicio: 4 }; // jerarquía
 
 export default function Home() {
+  const { isLoggedIn, user } = useAuth();
+  const currentPlanId = user?.planId || null;
+  const currentRank = currentPlanId ? ORDER[currentPlanId] : null;
+
   return (
     <div className="bg-slate-900">
       {/* Héroe */}
@@ -23,9 +23,7 @@ export default function Home() {
             alt="Factor Victoria"
             className="w-20 h-20 md:w-24 md:h-24 lg:w-28 lg:h-28 object-contain"
           />
-          <span className="text-white text-3xl md:text-4xl font-bold">
-            Factor Victoria
-          </span>
+        <span className="text-white text-3xl md:text-4xl font-bold">Factor Victoria</span>
         </div>
 
         <div className="mt-4 inline-flex">
@@ -43,7 +41,8 @@ export default function Home() {
 
         <Link
           to="#planes"
-          className="inline-flex mt-6 px-6 py-3 rounded-2xl bg-[#E6C464] text-slate-900 font-semibold shadow hover:opacity-90"
+          className="inline-flex mt-6 px-6 py-3 rounded-2xl font-semibold shadow hover:opacity-90"
+          style={{ backgroundColor: GOLD, color: "#0f172a" }}
         >
           {copy.ctas.verPlanes}
         </Link>
@@ -52,57 +51,94 @@ export default function Home() {
       {/* Planes */}
       <section id="planes" className="max-w-6xl mx-auto px-4 -mt-8">
         <div className="grid gap-6 md:grid-cols-2">
-          {copy.planes.map((p) => (
-            <div
-              // anclaje para upsell del comparador
-              id={PLAN_ID_TO_ANCHOR[p.id] || undefined}
-              key={p.id}
-              className={
-                "rounded-3xl border border-white/10 bg-white/5 p-6 md:p-8 relative " +
-                (p.badge ? "ring-2 ring-[#E6C464]" : "")
+          {copy.planes.map((p) => {
+            const targetRank = ORDER[p.id] ?? 0;
+
+            // CTA según sesión/jerarquía
+            let ctaLabel = "Comprar";
+            let ctaStyle = { backgroundColor: GOLD, color: "#0f172a" };
+            let ctaDisabled = false;
+
+            if (isLoggedIn && currentRank) {
+              if (targetRank === currentRank) {
+                ctaLabel = "Plan actual";
+                ctaStyle = {
+                  backgroundColor: "rgba(134, 239, 172, 0.25)", // verde suave
+                  color: "#22c55e",
+                };
+                ctaDisabled = true;
+              } else if (targetRank > currentRank) {
+                ctaLabel = "Mejorar";
+                ctaStyle = { backgroundColor: GOLD, color: "#0f172a" };
+              } else {
+                ctaLabel = "Bajar plan";
+                ctaStyle = {
+                  backgroundColor: "transparent",
+                  color: "#ffffff",
+                  border: "1px solid rgba(255,255,255,0.15)",
+                };
               }
-            >
-              {p.badge && (
-                <span className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 text-xs font-semibold rounded-full bg-[#E6C464] text-slate-900 shadow">
-                  {p.badge}
-                </span>
-              )}
+            }
 
-              <h3 className="text-white text-2xl font-bold">{p.title}</h3>
-
-              <div className="mt-2 text-3xl md:text-4xl font-extrabold text-white flex items-baseline gap-2">
-                <span>{p.priceCLP}</span>
-                {p.freq && (
-                  <span className="text-white/60 text-base font-medium">
-                    {p.freq}
+            return (
+              <div
+                key={p.id}
+                id={`plan-${p.id}`} // ancla para aterrizar desde Comparador
+                className={
+                  "rounded-3xl border border-white/10 bg-white/5 p-6 md:p-8 relative " +
+                  (p.badge ? "ring-2" : "")
+                }
+                style={p.badge ? { boxShadow: `0 0 0 4px ${GOLD} inset` } : undefined}
+              >
+                {p.badge && (
+                  <span
+                    className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 text-xs font-semibold rounded-full shadow"
+                    style={{ backgroundColor: GOLD, color: "#0f172a" }}
+                  >
+                    {p.badge}
                   </span>
                 )}
-                {p.note && (
-                  <span className="text-white/80 text-sm font-medium">
-                    {p.note}
-                  </span>
-                )}
-              </div>
 
-              <ul className="mt-5 space-y-2 text-white/90">
-                {p.bullets.map((b, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="mt-2 h-2 w-2 rounded-full bg-[#E6C464]" />
-                    <span>{b}</span>
-                  </li>
-                ))}
-              </ul>
+                <h3 className="text-white text-2xl font-bold">{p.title}</h3>
 
-              <div className="mt-6">
-                <a
-                  href={`/checkout?plan=${p.id}`}
-                  className="inline-flex px-6 py-3 rounded-2xl bg-[#E6C464] text-slate-900 font-semibold hover:opacity-90"
-                >
-                  {copy.ctas.comprar}
-                </a>
+                <div className="mt-2 text-3xl md:text-4xl font-extrabold text-white flex items-baseline gap-2">
+                  <span>{p.priceCLP}</span>
+                  {p.freq && (
+                    <span className="text-white/60 text-base font-medium">{p.freq}</span>
+                  )}
+                  {p.note && (
+                    <span className="text-white/80 text-sm font-medium">{p.note}</span>
+                  )}
+                </div>
+
+                <ul className="mt-5 space-y-2 text-white/90">
+                  {p.bullets.map((b, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span
+                        className="mt-2 h-2 w-2 rounded-full"
+                        style={{ backgroundColor: GOLD }}
+                      />
+                      <span>{b}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="mt-6">
+                  <a
+                    href={ctaDisabled ? undefined : `/checkout?plan=${p.id}`}
+                    onClick={(e) => {
+                      if (ctaDisabled) e.preventDefault();
+                    }}
+                    className="inline-flex px-6 py-3 rounded-2xl font-semibold hover:opacity-90"
+                    style={ctaStyle}
+                    aria-disabled={ctaDisabled}
+                  >
+                    {ctaLabel}
+                  </a>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
@@ -111,7 +147,7 @@ export default function Home() {
         <Simulator />
       </section>
 
-      {/* Imagen de cierre */}
+      {/* Imagen de cierre (full width en móvil) */}
       <section className="max-w-6xl mx-auto px-0 pb-4">
         <img
           src="/hero-players.png"
@@ -120,7 +156,7 @@ export default function Home() {
         />
       </section>
 
-      {/* Acerca de */}
+      {/* Acerca de / Cómo funciona */}
       <section className="max-w-6xl mx-auto px-4 pb-16">
         <h2 className="text-white text-3xl font-bold mb-3">
           {copy.home?.acercaTitulo || "Convierte información en ventaja"}
@@ -129,9 +165,7 @@ export default function Home() {
           {copy.home?.acercaTexto ||
             "Nuestra IA analiza estadísticas, tendencias y señales del mercado para detectar cuotas con valor."}
         </p>
-        <div className="mt-6 text-white/50 text-sm text-center">
-          © 2025 Factor Victoria
-        </div>
+        <div className="mt-6 text-white/50 text-sm text-center">© 2025 Factor Victoria</div>
       </section>
     </div>
   );
