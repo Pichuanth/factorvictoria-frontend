@@ -1,165 +1,208 @@
 // src/pages/Comparator.jsx
-import React, { useState } from "react";
-import Simulator from "../components/Simulator";
+import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../lib/auth";
+import { SECTION_TITLES } from "../lib/prompt"; // si lo tienes; opcional
 
 const GOLD = "#E6C464";
 const IVORY = "#FFFFF0";
 
-const MULT_BY_PLAN = {
-  basic: 10,        // $19.990
-  trimestral: 20,   // $44.990
-  anual: 50,        // $99.990
-  vitalicio: 100,   // $249.990
-};
+export default function Comparator() {
+  const { user, isLoggedIn } = useAuth();
 
-export default function Comparador() {
-  const { isLoggedIn, user } = useAuth();
-  const [date, setDate] = useState(() =>
-    new Date().toISOString().slice(0, 10)
-  );
+  const [dateStr, setDateStr] = useState(() => {
+    const d = new Date();
+    const iso = d.toISOString().slice(0, 10);
+    return iso;
+  });
   const [q, setQ] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const planId = user?.planId || "basic";
-  const mult = MULT_BY_PLAN[planId] ?? 10;
+  const [options, setOptions] = useState({ teams: [], leagues: [], countries: [] });
+  const [picked, setPicked] = useState({ leagueId: "", teamId: "", country: "" });
 
+  const [rows, setRows] = useState([]);
+  const [odds, setOdds] = useState({}); // fixtureId -> {home,draw,away,bookmaker}
+  const [error, setError] = useState("");
+
+  // Busca sugerencias al tipear
+  useEffect(() => {
+    let abort = false;
+    (async () => {
+      if (q.trim().length < 2) {
+        setOptions({ teams: [], leagues: [], countries: [] });
+        return;
+      }
+      try {
+        const r = await fetch(`/api/search?q=${encodeURIComponent(q.trim())}`);
+        const json = await r.json();
+        if (!abort) setOptions(json);
+      } catch (e) {
+        if (!abort) console.error(e);
+      }
+    })();
+    return () => { abort = true; };
+  }, [q]);
+
+  const onPick = (obj) => {
+    // obj = {type: 'league'|'team'|'country', id?, name?}
+    if (obj.type === "league") setPicked({ leagueId: obj.id, teamId: "", country: "" });
+    if (obj.type === "team") setPicked({ teamId: obj.id, leagueId: "", country: "" });
+    if (obj.type === "country") setPicked({ country: obj.name, leagueId: "", teamId: "" });
+    setQ(obj.label || "");
+  };
+
+  const generate = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      setRows([]);
+      setOdds({});
+
+      const u = new URLSearchParams({
+        date: dateStr,
+        ...(picked.leagueId ? { leagueId: picked.leagueId } : {}),
+        ...(picked.teamId ? { teamId: picked.teamId } : {}),
+        ...(picked.country ? { country: picked.country } : {}),
+      }).toString();
+
+      const fr = await fetch(`/api/fixtures?${u}`);
+      const fj = await fr.json();
+      if (fj.error) throw new Error(fj.error);
+
+      setRows(fj.fixtures || []);
+
+      // trae cuotas (limitamos a 20 para no quemar la API en demo)
+      const slice = (fj.fixtures || []).slice(0, 20);
+      await Promise.all(slice.map(async (f) => {
+        try {
+          const r = await fetch(`/api/odds?fixtureId=${f.id}`);
+          const j = await r.json();
+          setOdds(prev => ({ ...prev, [f.id]: j }));
+        } catch (e) {
+          console.warn("odds fail", f.id, e.message);
+        }
+      }));
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Render
   return (
-    <div className="bg-slate-900 min-h-screen">
-      <section className="max-w-6xl mx-auto px-4 py-8 text-white">
-        <h1 className="text-2xl font-bold mb-4">Comparador</h1>
+    <div className="max-w-6xl mx-auto px-4 py-6">
+      <h1 className="text-white text-3xl font-bold mb-4">Comparador</h1>
 
-        {/* ====== BLOQUE NO LOGUEADO ====== */}
-        {!isLoggedIn && (
-          <div className="rounded-2xl bg-white/5 border border-white/10 p-6">
-            <div className="text-white/90">
-              Para generar cuotas, primero{" "}
-              <a href="/#planes" className="underline" style={{ color: GOLD }}>
-                compra una membresía
-              </a>{" "}
-              e inicia sesión.
-            </div>
-          </div>
-        )}
+      {!isLoggedIn ? (
+        <div className="rounded-2xl bg-slate-800/70 text-white p-5">
+          Para generar cuotas, primero{" "}
+          <a className="underline text-[color:#E6C464]" href="/#planes">compra una membresía</a>{" "}
+          e inicia sesión.
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 mb-6">
+          <div className="grid gap-3 md:grid-cols-[240px_1fr_160px]">
+            <input
+              type="date"
+              value={dateStr}
+              onChange={(e) => setDateStr(e.target.value)}
+              className="rounded-xl px-4 py-3"
+              style={{ backgroundColor: IVORY, color: "#0f172a" }}
+            />
 
-        {/* ====== BLOQUE LOGUEADO ====== */}
-        {isLoggedIn && (
-          <>
-            {/* Barra: fecha + búsqueda + generar (estilos pedidos) */}
-            <div className="flex flex-col gap-3 md:flex-row md:items-center mb-6">
+            <div className="relative">
               <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="rounded-xl px-3 py-2"
-                style={{ backgroundColor: IVORY, color: "#0f172a" }} // azul marino oscuro
-              />
-              <input
-                placeholder="Equipo / liga"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                className="flex-1 rounded-xl px-3 py-2"
+                placeholder="Equipo / liga / país"
+                className="w-full rounded-xl px-4 py-3 pr-4"
                 style={{ backgroundColor: IVORY, color: "#0f172a" }}
               />
-              <button
-                className="rounded-xl px-4 py-2 font-semibold"
-                style={{ backgroundColor: GOLD, color: "#0f172a" }}
-              >
-                Generar
-              </button>
-            </div>
-
-            {/* Tarjetas/Secciones (ya adaptadas por plan) */}
-            <div className="grid md:grid-cols-2 gap-4">
-              {/* Regalo */}
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-white font-semibold">
-                  Cuota segura (regalo) 1.5–3 · 90–95% acierto
-                </div>
-                <div className="text-white/70 text-sm mt-1">
-                  Próximamente: resultados basados en tus filtros.
-                </div>
-              </div>
-
-              {/* Generada por plan */}
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-white font-semibold">
-                  Cuota generada x{mult}
-                </div>
-                <div className="text-white/70 text-sm mt-1">
-                  Tu plan: {planId.toUpperCase()}
-                </div>
-              </div>
-
-              {/* Árbitros / aparece solo en anual y vitalicio */}
-              {mult >= 50 && (
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-white font-semibold">
-                    Árbitros más tarjeteros
-                  </div>
-                  <div className="text-white/70 text-sm mt-1">Próximamente.</div>
-                </div>
-              )}
-
-              {/* Desfase / aparece solo en anual y vitalicio */}
-              {mult >= 50 && (
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-white font-semibold">
-                    Cuota desfase del mercado
-                  </div>
-                  <div className="text-white/70 text-sm mt-1">Próximamente.</div>
+              {/* Dropdown simple */}
+              {(options.teams.length + options.leagues.length + options.countries.length) > 0 && (
+                <div className="absolute z-10 mt-1 w-full bg-white rounded-xl shadow max-h-72 overflow-auto">
+                  {options.teams.slice(0,6).map(t => (
+                    <div
+                      key={`t${t.team?.id}`}
+                      className="px-3 py-2 hover:bg-slate-100 cursor-pointer"
+                      onClick={() => onPick({ type: "team", id: t.team.id, label: t.team.name })}
+                    >{t.team?.name}</div>
+                  ))}
+                  {options.leagues.slice(0,6).map(l => (
+                    <div
+                      key={`l${l.league?.id}`}
+                      className="px-3 py-2 hover:bg-slate-100 cursor-pointer"
+                      onClick={() => onPick({ type: "league", id: l.league.id, label: l.league.name })}
+                    >{l.league?.name}</div>
+                  ))}
+                  {options.countries.slice(0,6).map(c => (
+                    <div
+                      key={`c${c.code || c.name}`}
+                      className="px-3 py-2 hover:bg-slate-100 cursor-pointer"
+                      onClick={() => onPick({ type: "country", name: c.name, label: c.name })}
+                    >{c.name}</div>
+                  ))}
                 </div>
               )}
             </div>
 
-            {/* Upsell (ejemplo visual). Ocúltalo si es vitalicio */}
-            {planId !== "vitalicio" && (
-              <div className="mt-8">
-                <h3 className="text-white text-xl font-bold mb-3">
-                  ¿Estás listo para mejorar tus ganancias?
-                </h3>
-                <div className="grid md:grid-cols-3 gap-4">
-                  {["x20", "x50", "x100"]
-                    .filter((tag) => {
-                      // Esconde la actual o inferiores
-                      const want =
-                        tag === "x20" ? 20 : tag === "x50" ? 50 : 100;
-                      return want > mult;
-                    })
-                    .map((id) => (
-                      <a
-                        key={id}
-                        href={
-                          id === "x20"
-                            ? "/#plan-trimestral"
-                            : id === "x50"
-                            ? "/#plan-anual"
-                            : "/#plan-vitalicio"
-                        }
-                        onClick={(e) => {
-                          // scroll suave
-                          // (Vercel/SPA igual navega a la sección)
-                        }}
-                        className="rounded-2xl border border-white/10 bg-white/5 p-4 opacity-100 hover:opacity-90 transition"
-                      >
-                        <div className="text-white font-semibold">
-                          Mejorar a {id}
-                        </div>
-                        <div className="text-sm text-white/70">
-                          Haz clic para ir al plan.
-                        </div>
-                      </a>
-                    ))}
-                </div>
-              </div>
-            )}
-          </>
-        )}
+            <button
+              onClick={generate}
+              disabled={loading}
+              className="rounded-xl px-4 py-3 font-semibold"
+              style={{ backgroundColor: GOLD, color: "#0f172a" }}
+            >
+              {loading ? "Cargando..." : "Generar"}
+            </button>
+          </div>
 
-        {/* Simulador al final */}
-        <div className="mt-10">
-          <Simulator />
+          {error && <div className="mt-3 text-red-400">{error}</div>}
         </div>
-      </section>
+      )}
+
+      {/* Tabla de resultados */}
+      {isLoggedIn && rows.length > 0 && (
+        <div className="rounded-2xl border border-white/10 bg-slate-800/40 overflow-hidden">
+          <div className="grid grid-cols-8 gap-0 px-4 py-3 text-white/80 font-semibold border-b border-white/10">
+            <div>Hora</div>
+            <div className="col-span-2">Local</div>
+            <div className="col-span-2">Visita</div>
+            <div>Liga</div>
+            <div>País</div>
+            <div>1&nbsp;/&nbsp;X&nbsp;/&nbsp;2</div>
+          </div>
+          {rows.map((r) => {
+            const o = odds[r.id] || {};
+            const dt = new Date(r.date);
+            const hh = dt.toTimeString().slice(0,5);
+            return (
+              <div key={r.id} className="grid grid-cols-8 gap-0 px-4 py-3 border-b border-white/5 text-white/90">
+                <div>{hh}</div>
+                <div className="col-span-2">{r.home.name}</div>
+                <div className="col-span-2">{r.away.name}</div>
+                <div>{r.league}</div>
+                <div>{r.country}</div>
+                <div className="font-semibold">
+                  {o.home ?? "–"} / {o.draw ?? "–"} / {o.away ?? "–"}
+                  <span className="text-white/50 text-xs ml-1">{o.bookmaker ? `(${o.bookmaker})` : ""}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Nota: árbitro visible por fixture (debajo de la tabla, compacto) */}
+      {isLoggedIn && rows.length > 0 && (
+        <div className="mt-4 text-white/70 text-sm">
+          {rows.slice(0,10).map(r => (
+            <div key={`ref-${r.id}`}>
+              <span className="text-white/60">{r.home.name} vs {r.away.name}</span>: árbitro <span className="text-white">{r.referee || "N/D"}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
