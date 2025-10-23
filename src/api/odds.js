@@ -1,3 +1,10 @@
+// src/api/odds.js
+import { apiGet } from "./client";
+
+export async function getOddsByFixture(fixtureId) {
+  const json = await apiGet("/odds", { fixture: fixtureId });
+  return Array.isArray(json?.response) ? json.response : [];
+}
 const afetch = require("./_afetch");
 
 // Devuelve cuotas 1X2 del fixture (primer bookmaker disponible)

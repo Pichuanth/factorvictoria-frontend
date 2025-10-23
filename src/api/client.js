@@ -1,47 +1,36 @@
 // src/api/client.js
-const API_HOST = "https://v3.football.api-sports.io";
-const KEY = import.meta.env.VITE_APIFOOTBALL_KEY || "";
-const TZ  = import.meta.env.VITE_API_TZ || "UTC";
+const BASE = "https://v3.football.api-sports.io";
 
-// Construye querystring
 function qs(params = {}) {
-  const u = new URLSearchParams(params);
-  return u.toString();
+  const q = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== "") q.set(k, String(v));
+  });
+  return q.toString();
 }
 
-// Lee como texto y si se puede, parsea JSON.
-// Si el servidor devuelve HTML o texto de error, no revienta el UI.
-async function safeJson(res) {
-  const text = await res.text();
-  let data = null;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    const snippet = text.slice(0, 120);
-    const err = new Error(`Respuesta no-JSON de API: "${snippet}"`);
-    err.raw = text;
-    throw err;
-  }
-  return data;
-}
+// Lectura de variables Vite
+const API_KEY = import.meta.env.VITE_APIFOOTBALL_KEY || "";
+const API_TZ  = import.meta.env.VITE_API_TZ || "UTC";
 
 export async function apiGet(path, params = {}) {
-  // Si no hay KEY devolvemos un error “amigable” sin romper.
-  if (!KEY) {
-    throw new Error("Falta VITE_APIFOOTBALL_KEY. Configura tu .env y variables en Vercel.");
+  if (!API_KEY) {
+    return { error: "Falta VITE_APIFOOTBALL_KEY" };
   }
+  const url = `${BASE}${path}?${qs({ timezone: API_TZ, ...params })}`;
 
-  const url = `${API_HOST}${path}?${qs({ timezone: TZ, ...params })}`;
   const res = await fetch(url, {
     headers: {
+      "x-apisports-key": API_KEY,
       accept: "application/json",
-      "x-apisports-key": KEY,
     },
   });
-  if (!res.ok) {
-    const body = await res.text();
-    const msg = body.slice(0, 160);
-    throw new Error(`HTTP ${res.status}. ${msg}`);
+
+  // Si la API devolviera HTML/403, evitamos parseo roto
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: `Respuesta no JSON (${res.status})`, raw: text };
   }
-  return safeJson(res);
 }

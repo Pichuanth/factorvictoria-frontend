@@ -1,142 +1,148 @@
 // src/pages/Comparator.jsx
-import React, { useMemo, useState } from "react";
-import { getFixturesByDate } from "../api/fixtures";
+import React, { useState } from "react";
 import { useAuth } from "../lib/auth";
+import { getFixturesByDate, } from "../api/fixtures";
+import { getOddsByFixture } from "../api/odds";
 
-// Colores del proyecto
 const GOLD = "#E6C464";
-const IVORY = "#FFFFF0";
-const NAVY  = "#0f172a";
+const BG   = "bg-slate-900";
 
 // Multiplicador por plan
-const PLAN_MULTIPLIER = {
-  basic: 10,
-  trimestral: 20,
-  anual: 50,
-  vitalicio: 100,
+const MULTIPLIER = {
+  basic: 10,         // $19.990
+  trimestral: 20,    // $44.990
+  anual: 50,         // $99.990
+  vitalicio: 100,    // $249.990
 };
 
-// Secciones visibles según plan
-const SECTION_TITLES = {
-  regalo: "Cuota segura (Regalo) x1.5–x3 · 90–95% acierto",
-  generada: (m) => `Cuota generada x${m}`,
-  arbitros: "Árbitros más tarjeteros",
-  desfase: "Cuota desfase del mercado",
-};
-
-function SectionCard({ title, children, locked = false }) {
+function Section({ title, children, muted=false }) {
   return (
-    <div className="rounded-2xl p-5 mt-4" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
-      <div className="text-white font-semibold">{title}</div>
-      {locked ? (
-        <div className="text-white/60 text-sm mt-2">Disponible al mejorar tu plan.</div>
-      ) : (
-        <div className="text-white/80 text-sm mt-2">{children}</div>
-      )}
+    <div className={`rounded-2xl ${muted ? "bg-white/5" : "bg-white/10"} p-5 text-white`}>
+      <h3 className="text-lg font-semibold mb-2">{title}</h3>
+      <div className="text-white/80">{children}</div>
     </div>
   );
 }
 
 export default function Comparator() {
-  const { user } = useAuth();
-  const planId = user?.planId || "basic";
-  const multiplier = PLAN_MULTIPLIER[planId] || 10;
-
-  // Filtros arriba
-  const [date, setDate] = useState(() => {
-    const d = new Date();
-    const iso = d.toISOString().slice(0, 10);
-    return iso;
-  });
-  const [query, setQuery] = useState("");
+  const { isLoggedIn, user } = useAuth();
+  const [date, setDate] = useState(new Date().toISOString().slice(0,10));
+  const [q, setQ]       = useState("");
+  const [err, setErr]   = useState("");
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
   const [fixtures, setFixtures] = useState([]);
 
-  const showArbitrosYDesfase = planId === "anual" || planId === "vitalicio";
+  const apiKeyMissing = !import.meta.env.VITE_APIFOOTBALL_KEY;
+
+  const planId = user?.planId || "basic";
+  const xN     = MULTIPLIER[planId] ?? 10;
+
+  const isAnual      = planId === "anual" || planId === "vitalicio";
+  const isVitalicio  = planId === "vitalicio";
 
   async function onGenerate(e) {
     e?.preventDefault?.();
     setErr("");
-    setLoading(true);
     setFixtures([]);
-
+    if (apiKeyMissing) {
+      setErr("Falta VITE_APIFOOTBALL_KEY. Configura tu .env y variables en Vercel.");
+      return;
+    }
+    if (!isLoggedIn) {
+      setErr("Inicia sesión para generar cuotas.");
+      return;
+    }
     try {
-      const list = await getFixturesByDate(date, query);
-      setFixtures(list);
-    } catch (ex) {
-      setErr(ex.message || String(ex));
+      setLoading(true);
+      const list = await getFixturesByDate(date, q);
+      if (Array.isArray(list)) setFixtures(list);
+      else if (list?.error) setErr(list.error);
+      else setErr("No se pudieron obtener partidos.");
+    } catch (e2) {
+      setErr(String(e2.message || e2));
     } finally {
       setLoading(false);
     }
   }
 
-  const count = fixtures.length;
+  // Vista bloqueada (no logueado)
+  if (!isLoggedIn) {
+    return (
+      <div className={`${BG} min-h-[70vh]`}>
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <div className="rounded-2xl bg-white/10 text-white p-6">
+            Para generar cuotas, primero <a href="/#planes" className="underline" style={{color: GOLD}}>compra una membresía</a> e inicia sesión.
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-[70vh] bg-slate-900">
-      <div className="max-w-6xl mx-auto px-4 py-6">
-        {/* Controles (colores solicitados) */}
-        <form onSubmit={onGenerate} className="rounded-2xl p-4 mb-3" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
-          <div className="grid gap-3">
+    <div className={`${BG} min-h-[70vh]`}>
+      <div className="max-w-5xl mx-auto px-4 py-6 space-y-5">
+        {/* Formulario */}
+        <form onSubmit={onGenerate} className="rounded-2xl bg-white/5 p-4">
+          <div className="grid md:grid-cols-[220px,1fr,160px] gap-3 items-center">
             <input
               type="date"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full rounded-xl px-4 py-3"
-              style={{ background: IVORY, color: NAVY }}
+              onChange={e => setDate(e.target.value)}
+              className="w-full px-4 py-3 rounded-2xl bg-white text-slate-900"
             />
             <input
-              type="text"
-              placeholder="Equipo / liga / país"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="w-full rounded-xl px-4 py-3"
-              style={{ background: IVORY, color: NAVY }}
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              placeholder="Equipo / liga / país (id de liga para filtrar)"
+              className="w-full px-4 py-3 rounded-2xl bg-white text-slate-900"
             />
             <button
-              type="submit"
+              className="px-4 py-3 rounded-2xl font-semibold"
+              style={{ backgroundColor: GOLD, color: "#0f172a" }}
               disabled={loading}
-              className="w-full rounded-xl px-4 py-3 font-semibold"
-              style={{ background: GOLD, color: NAVY }}
             >
-              {loading ? "Generando..." : "Generar"}
+              {loading ? "Generando…" : "Generar"}
             </button>
-            {err && (
-              <div className="text-red-400 text-sm">
-                {err}
-              </div>
-            )}
-            {!err && !loading && count > 0 && (
-              <div className="text-white/70 text-sm">
-                {count} partidos encontrados para {date}.
-              </div>
-            )}
           </div>
+
+          {apiKeyMissing && (
+            <div className="mt-3 text-sm text-rose-400">
+              Falta VITE_APIFOOTBALL_KEY. Configura tu .env y variables en Vercel.
+            </div>
+          )}
+          {!!err && <div className="mt-3 text-sm text-rose-400">{err}</div>}
         </form>
 
-        {/* Secciones */}
-        <SectionCard title={SECTION_TITLES.regalo}>
+        {/* Sección: Cuota segura */}
+        <Section title="Cuota segura (Regalo) x1.5–x3 · 90–95% acierto">
           Próximamente: resultados basados en tus filtros.
-        </SectionCard>
+        </Section>
 
-        <SectionCard title={SECTION_TITLES.generada(multiplier)}>
-          Tu plan: <b className="text-white">{planId.toUpperCase()}</b>
-        </SectionCard>
+        {/* Sección: Cuota generada por plan */}
+        <Section title={`Cuota generada x${xN}`}>
+          <div className="uppercase text-sm opacity-80">Tu plan: {planId}</div>
+          {fixtures.length === 0 ? (
+            <div className="mt-2 opacity-70">Genera para ver partidos y cuotas.</div>
+          ) : (
+            <ul className="mt-2 space-y-1">
+              {fixtures.slice(0, 6).map((fx) => (
+                <li key={fx.fixture?.id} className="opacity-90">
+                  {fx.teams?.home?.name} vs {fx.teams?.away?.name} — {new Date(fx.fixture?.date).toLocaleString()}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
 
-        <SectionCard
-          title={SECTION_TITLES.arbitros}
-          locked={!showArbitrosYDesfase}
-        >
-          Próximamente: árbitros con mayor promedio de tarjetas por liga/país.
-        </SectionCard>
+        {/* Árbitros más tarjeteros (solo Anual/Vitalicia) */}
+        <Section title="Árbitros más tarjeteros" muted={!isAnual}>
+          {isAnual ? "Disponible con tu plan." : "Disponible al mejorar tu plan."}
+        </Section>
 
-        <SectionCard
-          title={SECTION_TITLES.desfase}
-          locked={!showArbitrosYDesfase}
-        >
-          Próximamente: picks con desfase detectado vs mercado.
-        </SectionCard>
+        {/* Desfase del mercado (solo Anual/Vitalicia) */}
+        <Section title="Cuota desfase del mercado" muted={!isAnual}>
+          {isAnual ? "Disponible con tu plan." : "Disponible al mejorar tu plan."}
+        </Section>
       </div>
     </div>
   );
