@@ -2,15 +2,16 @@
 import { Link } from "react-router-dom";
 import copy from "../copy";
 import Simulator from "../components/Simulator";
-import { useAuth } from "../lib/auth";
+import { useAuth, PLAN_RANK } from "../lib/auth";
 
 const GOLD = "#E6C464";
-const ORDER = { basic: 1, trimestral: 2, anual: 3, vitalicio: 4 }; // jerarquía
 
 export default function Home() {
   const { isLoggedIn, user } = useAuth();
+
+  // rank actual desde auth (coincide con lo que ve Comparador)
   const currentPlanId = user?.planId || null;
-  const currentRank = currentPlanId ? ORDER[currentPlanId] : null;
+  const currentRank = currentPlanId != null ? (PLAN_RANK[currentPlanId] ?? null) : null;
 
   return (
     <div className="bg-slate-900">
@@ -23,7 +24,7 @@ export default function Home() {
             alt="Factor Victoria"
             className="w-20 h-20 md:w-24 md:h-24 lg:w-28 lg:h-28 object-contain"
           />
-        <span className="text-white text-3xl md:text-4xl font-bold">Factor Victoria</span>
+          <span className="text-white text-3xl md:text-4xl font-bold">Factor Victoria</span>
         </div>
 
         <div className="mt-4 inline-flex">
@@ -35,9 +36,7 @@ export default function Home() {
         <h1 className="mt-6 text-white text-4xl md:text-6xl font-extrabold leading-tight max-w-3xl">
           Convierte información <br /> en ventaja
         </h1>
-        <p className="mt-4 text-white/80 text-lg max-w-3xl">
-          {copy.marca.subclaim}
-        </p>
+        <p className="mt-4 text-white/80 text-lg max-w-3xl">{copy.marca.subclaim}</p>
 
         <Link
           to="#planes"
@@ -52,18 +51,19 @@ export default function Home() {
       <section id="planes" className="max-w-6xl mx-auto px-4 -mt-8">
         <div className="grid gap-6 md:grid-cols-2">
           {copy.planes.map((p) => {
-            const targetRank = ORDER[p.id] ?? 0;
+            // rank objetivo del card (usa las mismas claves que auth)
+            const targetRank = PLAN_RANK[p.id] ?? 0;
 
-            // CTA según sesión/jerarquía
+            // CTA por defecto
             let ctaLabel = "Comprar";
             let ctaStyle = { backgroundColor: GOLD, color: "#0f172a" };
             let ctaDisabled = false;
 
-            if (isLoggedIn && currentRank) {
+            if (isLoggedIn && currentRank != null) {
               if (targetRank === currentRank) {
                 ctaLabel = "Plan actual";
                 ctaStyle = {
-                  backgroundColor: "rgba(134, 239, 172, 0.25)", // verde suave
+                  backgroundColor: "rgba(34,197,94,0.18)", // verde suave
                   color: "#22c55e",
                 };
                 ctaDisabled = true;
@@ -71,6 +71,7 @@ export default function Home() {
                 ctaLabel = "Mejorar";
                 ctaStyle = { backgroundColor: GOLD, color: "#0f172a" };
               } else {
+                // solo los inferiores muestran "Bajar plan"
                 ctaLabel = "Bajar plan";
                 ctaStyle = {
                   backgroundColor: "transparent",
@@ -83,7 +84,7 @@ export default function Home() {
             return (
               <div
                 key={p.id}
-                id={`plan-${p.id}`} // ancla para aterrizar desde Comparador
+                id={`plan-${p.id}`}
                 className={
                   "rounded-3xl border border-white/10 bg-white/5 p-6 md:p-8 relative " +
                   (p.badge ? "ring-2" : "")
@@ -147,7 +148,7 @@ export default function Home() {
         <Simulator />
       </section>
 
-      {/* Imagen de cierre (full width en móvil) */}
+      {/* Imagen de cierre */}
       <section className="max-w-6xl mx-auto px-0 pb-4">
         <img
           src="/hero-players.png"
@@ -156,7 +157,7 @@ export default function Home() {
         />
       </section>
 
-      {/* Acerca de / Cómo funciona */}
+      {/* Footer */}
       <section className="max-w-6xl mx-auto px-4 pb-16">
         <h2 className="text-white text-3xl font-bold mb-3">
           {copy.home?.acercaTitulo || "Convierte información en ventaja"}
