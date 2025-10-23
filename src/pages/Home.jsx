@@ -2,16 +2,27 @@
 import { Link } from "react-router-dom";
 import copy from "../copy";
 import Simulator from "../components/Simulator";
-import { useAuth, PLAN_RANK } from "../lib/auth"; // <- sin .js
+import { useAuth, PLAN_RANK } from "../lib/auth";
 
 const GOLD = "#E6C464";
+
+// Normaliza IDs de planes del copy/auth a las claves de PLAN_RANK
+const PLAN_KEY_MAP = {
+  mensual: "basic",
+  basico: "basic",
+  basic: "basic",
+  trimestral: "trimestral",
+  anual: "anual",
+  vitalicia: "vitalicio",
+  vitalicio: "vitalicio",
+};
 
 export default function Home() {
   const { isLoggedIn, user } = useAuth();
 
-  // rank actual desde auth (coincide con lo que ve Comparador)
-  const currentPlanId = user?.planId || null;
-  const currentRank = currentPlanId != null ? (PLAN_RANK[currentPlanId] ?? null) : null;
+  // normaliza el plan del usuario y calcula su rank
+  const currentKey = user?.planId ? (PLAN_KEY_MAP[user.planId] ?? user.planId) : null;
+  const currentRank = currentKey != null ? PLAN_RANK[currentKey] ?? null : null;
 
   return (
     <div className="bg-slate-900">
@@ -51,15 +62,16 @@ export default function Home() {
       <section id="planes" className="max-w-6xl mx-auto px-4 -mt-8">
         <div className="grid gap-6 md:grid-cols-2">
           {copy.planes.map((p) => {
-            // rank objetivo del card (usa las mismas claves que auth)
-            const targetRank = PLAN_RANK[p.id] ?? 0;
+            // normaliza el id del card a una clave válida de PLAN_RANK
+            const targetKey = PLAN_KEY_MAP[p.id] ?? p.id;
+            const targetRank = PLAN_RANK[targetKey];
 
-            // CTA por defecto
+            // CTA por defecto (usuario no logueado)
             let ctaLabel = "Comprar";
             let ctaStyle = { backgroundColor: GOLD, color: "#0f172a" };
             let ctaDisabled = false;
 
-            if (isLoggedIn && currentRank != null) {
+            if (isLoggedIn && currentRank != null && targetRank != null) {
               if (targetRank === currentRank) {
                 ctaLabel = "Plan actual";
                 ctaStyle = {
@@ -71,7 +83,6 @@ export default function Home() {
                 ctaLabel = "Mejorar";
                 ctaStyle = { backgroundColor: GOLD, color: "#0f172a" };
               } else {
-                // solo los inferiores muestran "Bajar plan"
                 ctaLabel = "Bajar plan";
                 ctaStyle = {
                   backgroundColor: "transparent",
@@ -104,12 +115,8 @@ export default function Home() {
 
                 <div className="mt-2 text-3xl md:text-4xl font-extrabold text-white flex items-baseline gap-2">
                   <span>{p.priceCLP}</span>
-                  {p.freq && (
-                    <span className="text-white/60 text-base font-medium">{p.freq}</span>
-                  )}
-                  {p.note && (
-                    <span className="text-white/80 text-sm font-medium">{p.note}</span>
-                  )}
+                  {p.freq && <span className="text-white/60 text-base font-medium">{p.freq}</span>}
+                  {p.note && <span className="text-white/80 text-sm font-medium">{p.note}</span>}
                 </div>
 
                 <ul className="mt-5 space-y-2 text-white/90">
