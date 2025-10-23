@@ -1,5 +1,11 @@
 // src/lib/auth.jsx
-import React, { createContext, useContext, useMemo, useState } from "react";
+export { useAuth, AuthProvider, login, logout } // según tengas
+export const PLAN_RANK = {
+  basic: 0,
+  trimestral: 1,
+  anual: 2,
+  vitalicio: 3,
+};
 
 /* ===== Usuarios demo por plan ===== */
 const USERS = {
