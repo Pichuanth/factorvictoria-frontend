@@ -2,8 +2,7 @@
 import { Link } from "react-router-dom";
 import copy from "../copy";
 import Simulator from "../components/Simulator";
-// 👇 fuerza a usar el archivo correcto
-import { useAuth, PLAN_RANK } from "../lib/auth.js";
+import { useAuth, PLAN_RANK } from "../lib/auth"; // <- sin .js
 
 const GOLD = "#E6C464";
 
