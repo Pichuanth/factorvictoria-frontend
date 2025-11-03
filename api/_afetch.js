@@ -1,33 +1,36 @@
 // frontend/api/_afetch.js
-const fetch = require("node-fetch");
+import fetch from "node-fetch";
 
-module.exports = async function afetch(path, params = {}) {
-  const API_KEY = process.env.VITE_APIFOOTBALL_KEY;
-  const TZ = process.env.VITE_API_TZ || "America/Santiago";
+const API_BASE = "https://v3.football.api-sports.io";
 
-  if (!API_KEY) {
-    throw new Error("Falta VITE_APIFOOTBALL_KEY en variables de entorno");
-  }
+const API_KEY =
+  process.env.VITE_APIFOOTBALL_KEY ||
+  process.env.APIFOOTBALL_KEY || // alias por si cambias el nombre
+  "";
 
-  // Armamos querystring
-  const usp = new URLSearchParams({ ...params });
-  if (!usp.has("timezone")) {
-    usp.set("timezone", TZ);
-  }
+if (!API_KEY) {
+  console.warn("[_afetch] Falta VITE_APIFOOTBALL_KEY en Vercel");
+}
 
-  const url = `https://v3.football.api-sports.io${path}?${usp.toString()}`;
+export async function afetch(path, params = {}) {
+  const url = new URL(API_BASE + path);
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && String(v).length) {
+      url.searchParams.set(k, String(v));
+    }
+  });
 
-  const resp = await fetch(url, {
+  const res = await fetch(url.toString(), {
     headers: {
-      "x-apisports-key": API_KEY,
+      "x-rapidapi-key": API_KEY,
+      "x-rapidapi-host": "v3.football.api-sports.io",
     },
   });
 
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`API-Football error ${resp.status}: ${text}`);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`API ${path} ${res.status} - ${text.slice(0, 200)}`);
   }
-
-  const json = await resp.json();
+  const json = await res.json();
   return json;
-};
+}

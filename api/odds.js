@@ -1,67 +1,37 @@
-// frontend/api/odds.js
-const afetch = require("./_afetch");
+// frontend/api/odds.js  (serverless backend en Vercel)
+import afetch from "./_afetch";
 
-/**
- * GET /api/odds?fixture=12345
- * Devuelve cuotas 1X2 (local / empate / visita) para un partido.
- */
-module.exports = async (req, res) => {
-  try {
-    const fixtureId = req.query.fixture;
-    if (!fixtureId) {
-      return res.status(400).json({ error: "fixture es requerido" });
+// Lee cuotas 1X2 del primer bookmaker disponible
+async function getOddsForFixture(fixtureId) {
+  const json = await afetch("/odds", { fixture: fixtureId });
+  const row = json?.response?.[0];
+  const out = { home: null, draw: null, away: null, bookmaker: "" };
+  if (!row?.bookmakers) return out;
+
+  for (const b of row.bookmakers) {
+    const market = b.bets?.find(m => /match winner|1x2/i.test(m?.name || ""));
+    if (!market) continue;
+
+    out.bookmaker = b.name || "";
+    for (const v of market.values || []) {
+      const oddNum = Number(v.odd);
+      if (/home|^1$/i.test(v.value)) out.home = oddNum;
+      if (/draw|^X$/i.test(v.value)) out.draw = oddNum;
+      if (/away|^2$/i.test(v.value)) out.away = oddNum;
     }
-
-    // Llamamos a la API real de odds usando nuestra helper afetch
-    const apiResp = await afetch("/odds", { fixture: fixtureId });
-
-    // apiResp.response es un array de casas de apuesta con mercados
-    // vamos a intentar normalizarlo a { bookmaker, home, draw, away }
-    let out = {
-      bookmaker: "",
-      home: null,
-      draw: null,
-      away: null,
-    };
-
-    // soportar 2 formatos posibles: {response:[...]} o directamente [...]
-    const rawArray = Array.isArray(apiResp?.response)
-      ? apiResp.response
-      : Array.isArray(apiResp)
-      ? apiResp
-      : [];
-
-    for (const item of rawArray) {
-      const book = item.bookmakers?.[0];
-      if (!book) continue;
-
-      // buscamos un market tipo "Match Winner" / "1X2"
-      const market = book.bets?.find((m) =>
-        /match winner|1x2/i.test(m.name || "")
-      );
-      if (!market) continue;
-
-      out.bookmaker = book.name || "";
-
-      for (const opt of market.values || []) {
-        const oddNum = Number(opt.odd);
-
-        // opt.value puede ser "Home", "Draw", "Away" o "1", "X", "2"
-        if (/home|1\b/i.test(opt.value || "")) out.home = oddNum;
-        if (/draw|x\b/i.test(opt.value || "")) out.draw = oddNum;
-        if (/away|2\b/i.test(opt.value || "")) out.away = oddNum;
-      }
-
-      // si ya agarramos cuotas válidas, frenamos
-      if (out.home || out.draw || out.away) break;
-    }
-
-    return res.status(200).json(out);
-  } catch (err) {
-    console.error("Error en /api/odds:", err);
-    return res.status(500).json({
-      error: "No se pudieron obtener cuotas",
-      detail: err.message,
-    });
+    if (out.home || out.draw || out.away) break;
   }
-};
+  return out;
+}
+
+export default async function handler(req, res) {
+  try {
+    const fixture = Number(req.query.fixture || req.query.fixtureId || req.query.id);
+    if (!fixture) return res.status(400).json({ error: "fixture requerido" });
+
+    const data = await getOddsForFixture(fixture);
+    return res.status(200).json(data);
+  } catch (e) {
+    return res.status(500).json({ error: String(e?.message || e) });
+  }
+}
