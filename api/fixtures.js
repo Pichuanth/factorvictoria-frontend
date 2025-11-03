@@ -1,18 +1,21 @@
-// frontend/api/fixtures.js  (serverless)
-import afetch from "./_afetch";
+import afetch from "./_afetch.js";
 
+// GET /api/fixtures?date=YYYY-MM-DD&country=Chile|q=123 (league id)
 export default async function handler(req, res) {
   try {
-    const { date, league, country } = req.query;
+    const date = (req.query.date || "").trim();
+    const q    = (req.query.country || req.query.q || "").trim();
+
     if (!date) return res.status(400).json({ error: "date requerido (YYYY-MM-DD)" });
 
     const params = { date };
-    if (league)  params.league  = league;     // si te pasan id de liga
-    if (country) params.country = country;    // si te pasan nombre de país
+    // si q es numérico, lo usamos como id de liga; si no, probamos por país
+    if (/^\d+$/.test(q)) params.league = q;
+    else if (q) params.country = q;
 
     const json = await afetch("/fixtures", params);
-    return res.status(200).json(json?.response || []);
+    res.status(200).json(Array.isArray(json?.response) ? json.response : []);
   } catch (e) {
-    return res.status(500).json({ error: String(e?.message || e) });
+    res.status(500).json({ error: String(e.message || e) });
   }
 }

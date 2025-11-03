@@ -1,36 +1,25 @@
-// frontend/api/_afetch.js
-import fetch from "node-fetch";
+// Serverless helper para API-Football
+const BASE = "https://v3.football.api-sports.io";
 
-const API_BASE = "https://v3.football.api-sports.io";
+export default async function afetch(path, params = {}) {
+  const key = process.env.VITE_APIFOOTBALL_KEY;
+  if (!key) throw new Error("Falta VITE_APIFOOTBALL_KEY en Vercel");
 
-const API_KEY =
-  process.env.VITE_APIFOOTBALL_KEY ||
-  process.env.APIFOOTBALL_KEY || // alias por si cambias el nombre
-  "";
-
-if (!API_KEY) {
-  console.warn("[_afetch] Falta VITE_APIFOOTBALL_KEY en Vercel");
-}
-
-export async function afetch(path, params = {}) {
-  const url = new URL(API_BASE + path);
+  const url = new URL(BASE + path);
   Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== null && String(v).length) {
-      url.searchParams.set(k, String(v));
-    }
+    if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, v);
   });
 
-  const res = await fetch(url.toString(), {
+  const res = await fetch(url, {
     headers: {
-      "x-rapidapi-key": API_KEY,
-      "x-rapidapi-host": "v3.football.api-sports.io",
-    },
+      "x-apisports-key": key,
+      "x-rapidapi-key": key
+    }
   });
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`API ${path} ${res.status} - ${text.slice(0, 200)}`);
+    throw new Error(`API ${path} ${res.status}: ${text.slice(0, 200)}`);
   }
-  const json = await res.json();
-  return json;
+  return res.json();
 }
