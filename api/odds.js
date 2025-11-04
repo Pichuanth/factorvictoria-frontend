@@ -1,43 +1,35 @@
-// frontend/api/odds.js
-import { afetch } from "./_afetch.js";
+import afetch from "./_afetch.js";
 
 // GET /api/odds?fixture=123456
 export default async function handler(req, res) {
   try {
-    const fixture = Number(req.query?.fixture || req.query?.fixtureId || req.query?.id);
-    if (!fixture) return res.status(400).json({ error: "fixture es requerido (número)" });
+    const fixture = Number(req.query.fixture || req.query.fixtureId);
+    if (!fixture) return res.status(400).json({ error: "fixture requerido" });
 
     const json = await afetch("/odds", { fixture });
-    const items = Array.isArray(json?.response) ? json.response : [];
-
-    // Buscamos el primer bookmaker con market 1X2 / Match Winner
+    // Buscar "Match Winner" / 1X2
     let out = { home: null, draw: null, away: null, bookmaker: "" };
 
-    for (const entry of items) {
-      const book = entry?.bookmakers?.[0];
+    for (const r of json?.response || []) {
+      const book = r.bookmakers?.[0];
       if (!book) continue;
-
-      const market = (book.bets || book.markets || []).find(m =>
-        /match winner|1x2/i.test(m?.name || "")
+      const market = (book.bets || []).find(b =>
+        /match winner|1x2/i.test(b.name || "")
       );
       if (!market) continue;
 
-      out.bookmaker = book?.name || "";
-
-      for (const o of market.values || market.outcomes || []) {
-        const label = String(o?.value || o?.label || "").toLowerCase();
-        const v = Number(o?.odd || o?.price || o?.value);
-        if (Number.isFinite(v)) {
-          if (/(^home\b|\b1\b)/.test(label)) out.home = v;
-          if (/(^draw\b|\bx\b)/.test(label)) out.draw = v;
-          if (/(^away\b|\b2\b)/.test(label)) out.away = v;
-        }
+      out.bookmaker = book.name || "";
+      for (const o of market.values || []) {
+        const odd = Number(o.odd);
+        if (/home|^1$/i.test(o.value)) out.home = odd;
+        if (/draw|^x$/i.test(o.value)) out.draw = odd;
+        if (/away|^2$/i.test(o.value)) out.away = odd;
       }
       if (out.home || out.draw || out.away) break;
     }
 
     res.status(200).json(out);
   } catch (e) {
-    res.status(500).json({ error: String(e?.message || e) });
+    res.status(500).json({ error: String(e.message || e) });
   }
 }
