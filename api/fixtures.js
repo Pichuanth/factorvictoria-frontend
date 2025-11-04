@@ -1,42 +1,37 @@
-import afetch from "./_afetch.js";
+import afetch from './_afetch.js';
 
-// GET /api/fixtures?date=YYYY-MM-DD&country=Chile&league=...&season=...
-// Extra: también acepta ?days=N para rango de N días a partir de "date".
+// GET /api/fixtures?date=YYYY-MM-DD&country=Chile
+//    o /api/fixtures?from=YYYY-MM-DD&to=YYYY-MM-DD&country=Chile
 export default async function handler(req, res) {
   try {
-    const { date, country, league, season, days } = req.query;
-    if (!date && !league && !country) {
-      return res.status(400).json({ error: "Falta 'date' o algún filtro (league/country)" });
+    const { date, from, to, country, league, season } = req.query;
+
+    if (!date && !(from && to)) {
+      return res.status(400).json({ error: 'Provide date or from+to' });
     }
 
-    const baseParams = {};
-    if (country) baseParams.country = country;
-    if (league) baseParams.league = league;
-    if (season) baseParams.season = season;
+    const params = {};
+    if (date) params.date = date;
+    if (from) params.from = from;
+    if (to) params.to = to;
+    if (country) params.country = country;
+    if (league) params.league = league;
+    if (season) params.season = season;
 
-    // Rango de fechas opcional
-    const nDays = Number(days || 1);
-    if (!date && nDays > 1) {
-      return res.status(400).json({ error: "Para 'days', debes indicar 'date' inicial" });
-    }
+    const data = await afetch('/fixtures', params);
 
-    let all = [];
-    if (date) {
-      const start = new Date(date);
-      for (let i = 0; i < nDays; i++) {
-        const d = new Date(start);
-        d.setDate(start.getDate() + i);
-        const ds = d.toISOString().slice(0, 10);
+    const list = Array.isArray(data?.response)
+      ? data.response.map(f => ({
+          id: f?.fixture?.id,
+          date: f?.fixture?.date,
+          league: f?.league?.name,
+          country: f?.league?.country,
+          home: f?.teams?.home?.name,
+          away: f?.teams?.away?.name,
+        }))
+      : [];
 
-        const json = await afetch("/fixtures", { ...baseParams, date: ds });
-        all = all.concat(json.response || []);
-      }
-      return res.status(200).json({ response: all });
-    }
-
-    // Sin fecha: un solo tiro con los filtros dados
-    const json = await afetch("/fixtures", baseParams);
-    res.status(200).json(json);
+    res.status(200).json({ response: list });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
   }

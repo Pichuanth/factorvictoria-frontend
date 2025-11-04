@@ -1,22 +1,28 @@
-// Backend helper para llamar a API-FOOTBALL desde las funciones serverless
+// Usa la clave de API-Football desde variables de entorno en Vercel
+const BASE = 'https://v3.football.api-sports.io';
+
 export default async function afetch(path, params = {}) {
   const key = process.env.APIFOOTBALL_KEY;
-  if (!key) throw new Error("Falta APIFOOTBALL_KEY en variables de entorno");
+  if (!key) throw new Error('Missing APIFOOTBALL_KEY');
 
-  const url = new URL(`https://v3.football.api-sports.io${path}`);
+  const url = new URL(BASE + path);
   for (const [k, v] of Object.entries(params)) {
-    if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, v);
+    if (v !== undefined && v !== null && v !== '') {
+      url.searchParams.set(k, String(v));
+    }
   }
 
-  const resp = await fetch(url, {
-    headers: { "x-apisports-key": key },
-    // Nota: fetch nativo en Node 18+ (Vercel usa Node 18+ por defecto)
+  const r = await fetch(url, {
+    headers: {
+      'x-apisports-key': key,
+      // El host ya no es obligatorio; API-Football lo deduce del dominio v3
+      // 'x-rapidapi-host': 'v3.football.api-sports.io'
+    },
   });
 
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => "");
-    throw new Error(`API error ${resp.status}: ${text || resp.statusText}`);
+  if (!r.ok) {
+    const txt = await r.text().catch(() => '');
+    throw new Error(`API ${r.status}: ${txt.slice(0, 180)}`);
   }
-
-  return resp.json();
+  return r.json();
 }
