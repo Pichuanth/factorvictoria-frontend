@@ -1,31 +1,33 @@
 // /api/fixtures.js
-import afetch from './_afetch.js';
-
 export default async function handler(req, res) {
   try {
-    const { date, country, league, team, days = '1' } = req.query;
-    if (!date) return res.status(400).json({ error: 'date es requerido (YYYY-MM-DD)' });
+    const key = process.env.APIFOOTBALL_KEY;
+    if (!key) throw new Error("Falta APIFOOTBALL_KEY");
 
-    const out = [];
-    const n = Math.max(1, Math.min(10, Number(days))); // 1..10 como pediste
+    const { date, country, league, days } = req.query;
+    if (!date) return res.status(400).json({ error: "date es requerido (YYYY-MM-DD)" });
 
-    for (let i = 0; i < n; i++) {
-      const d = new Date(date);
+    const nDays = Math.max(1, Math.min(Number(days) || 1, 10)); // 1..10
+    const start = new Date(date);
+    const all = [];
+
+    for (let i = 0; i < nDays; i++) {
+      const d = new Date(start);
       d.setDate(d.getDate() + i);
-      const ds = d.toISOString().slice(0, 10);
 
-      const resp = await afetch('/fixtures', {
-        date: ds,
-        ...(country ? { country } : {}),
-        ...(league ? { league } : {}),
-        ...(team ? { team } : {}),
+      const qs = new URLSearchParams({ date: d.toISOString().slice(0, 10) });
+      if (country) qs.set("country", country);
+      if (league) qs.set("league", String(league));
+
+      const r = await fetch(`https://v3.football.api-sports.io/fixtures?${qs}`, {
+        headers: { "x-apisports-key": key }
       });
-
-      out.push(...(resp?.response ?? []));
+      const j = await r.json();
+      if (Array.isArray(j?.response)) all.push(...j.response);
     }
 
-    res.status(200).json({ count: out.length, response: out });
+    res.status(200).json({ ok: true, count: all.length, response: all });
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    res.status(500).json({ error: String(e?.message || e) });
   }
 }
