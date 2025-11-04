@@ -1,42 +1,34 @@
-// frontend/api/odds.js
-import { callApiFootball } from './_afetch.js';
+// /api/odds.js
+import afetch from './_afetch.js';
 
 export default async function handler(req, res) {
   try {
-    const fixture = Number(req.query.fixture || req.query.id || req.query.fixtureId);
-    if (!fixture) {
-      return res.status(400).json({ error: 'fixture es requerido (numérico)' });
-    }
+    const fixture = Number(req.query.fixture || req.query.fixtureId);
+    if (!fixture) return res.status(400).json({ error: 'fixture (id) es requerido' });
 
-    // API-Football: /odds con fixture
-    const json = await callApiFootball('/odds', { fixture });
+    const data = await afetch('/odds', { fixture });
 
-    // Tomamos el primer bookmaker disponible
-    const first = json?.response?.[0];
-    const bookmaker = first?.bookmakers?.[0];
+    // Si quieres devolver rápido el market 1X2 del primer bookmaker:
+    let out = { home: null, draw: null, away: null, bookmaker: '' };
 
-    // Extraemos 1X2 (match-winner) si existe
-    let home = null, draw = null, away = null, bookName = null;
+    for (const b of data?.response ?? []) {
+      const book = b.bookmakers?.[0];
+      if (!book) continue;
+      const market = book.bets?.find(m => /match winner|1x2/i.test(m?.name || ''));
+      if (!market) continue;
 
-    if (bookmaker) {
-      bookName = bookmaker.name;
-      const market1x2 =
-        bookmaker.bets?.find(b => String(b?.name).toLowerCase().includes('match winner')) ||
-        bookmaker.bets?.find(b => b?.id === 1); // id típico para 1x2
-
-      if (market1x2?.values) {
-        for (const v of market1x2.values) {
-          const n = String(v?.value || '').toUpperCase();
-          if (n.includes('HOME') || n === '1') home = Number(v?.odd);
-          else if (n.includes('DRAW') || n === 'X') draw = Number(v?.odd);
-          else if (n.includes('AWAY') || n === '2') away = Number(v?.odd);
-        }
+      out.bookmaker = book?.name || '';
+      for (const o of market.values || []) {
+        const v = Number(o.odd);
+        if (/home|^1$/i.test(o.value)) out.home = v;
+        if (/draw|^x$/i.test(o.value)) out.draw = v;
+        if (/away|^2$/i.test(o.value)) out.away = v;
       }
+      if (out.home || out.draw || out.away) break;
     }
 
-    res.status(200).json({ home, draw, away, bookmaker: bookName, rawCount: json?.response?.length || 0 });
+    res.status(200).json(out);
   } catch (e) {
-    console.error('odds error:', e);
     res.status(500).json({ error: String(e.message || e) });
   }
 }
