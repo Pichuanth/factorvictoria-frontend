@@ -1,27 +1,42 @@
 import afetch from "./_afetch.js";
 
-// GET /api/fixtures?date=YYYY-MM-DD&country=Chile  (country opcional)
+// GET /api/fixtures?date=YYYY-MM-DD&country=Chile&league=...&season=...
+// Extra: también acepta ?days=N para rango de N días a partir de "date".
 export default async function handler(req, res) {
   try {
-    const date = req.query.date;
-    const country = req.query.country; // opcional
+    const { date, country, league, season, days } = req.query;
+    if (!date && !league && !country) {
+      return res.status(400).json({ error: "Falta 'date' o algún filtro (league/country)" });
+    }
 
-    if (!date) return res.status(400).json({ error: "date requerido" });
+    const baseParams = {};
+    if (country) baseParams.country = country;
+    if (league) baseParams.league = league;
+    if (season) baseParams.season = season;
 
-    const params = { date };
-    if (country) params.country = country;
+    // Rango de fechas opcional
+    const nDays = Number(days || 1);
+    if (!date && nDays > 1) {
+      return res.status(400).json({ error: "Para 'days', debes indicar 'date' inicial" });
+    }
 
-    const json = await afetch("/fixtures", params);
-    const list = (json?.response || []).map(x => ({
-      fixtureId: x.fixture?.id,
-      date: x.fixture?.date,
-      league: x.league?.name,
-      country: x.league?.country,
-      home: x.teams?.home?.name,
-      away: x.teams?.away?.name,
-    }));
+    let all = [];
+    if (date) {
+      const start = new Date(date);
+      for (let i = 0; i < nDays; i++) {
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
+        const ds = d.toISOString().slice(0, 10);
 
-    res.status(200).json({ count: list.length, items: list });
+        const json = await afetch("/fixtures", { ...baseParams, date: ds });
+        all = all.concat(json.response || []);
+      }
+      return res.status(200).json({ response: all });
+    }
+
+    // Sin fecha: un solo tiro con los filtros dados
+    const json = await afetch("/fixtures", baseParams);
+    res.status(200).json(json);
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
   }
