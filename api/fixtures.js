@@ -1,29 +1,30 @@
-import { aFetch } from "./_afetch.js";
+import { aFetch } from "./_afetch";
 
+// GET /api/fixtures?date=YYYY-MM-DD&country=Chile&league=39&days=3
 export default async function handler(req, res) {
   try {
-    const { date, country, days } = req.query;
-    if (!date) return res.status(400).json({ error: "date requerido (YYYY-MM-DD)" });
+    const { date, country, league, days } = req.query;
+    if (!date) return res.status(400).json({ error: "date requerido" });
 
-    // rango opcional de días (p.ej. days=4)
+    const addDays = Number(days ?? 0);
     const out = [];
-    const span = Math.max(1, Math.min(Number(days || 1), 10)); // 1..10
-    const start = new Date(date);
 
-    for (let i = 0; i < span; i++) {
-      const d = new Date(start);
-      d.setDate(start.getDate() + i);
-      const dStr = d.toISOString().slice(0,10);
+    for (let i = 0; i <= addDays; i++) {
+      const d = new Date(date);
+      d.setDate(d.getDate() + i);
+      const iso = d.toISOString().slice(0, 10);
 
-      const params = { date: dStr, timezone: "UTC" };
+      const params = { date: iso };
       if (country) params.country = country;
+      if (league) params.league = league;
 
-      const json = await aFetch("/fixtures", params);
-      out.push(...(json?.response || []));
+      const chunk = await aFetch("/fixtures", params);
+      out.push(...chunk);
     }
 
-    res.status(200).json(out); // array de fixtures
+    res.status(200).json(out);
   } catch (e) {
-    res.status(500).json({ error: String(e?.message || e) });
+    console.error("fixtures error:", e);
+    res.status(500).json({ error: String(e.message || e) });
   }
 }

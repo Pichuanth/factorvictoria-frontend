@@ -1,19 +1,26 @@
-export async function aFetch(path, params = {}) {
-  const qs = new URLSearchParams(params).toString();
-  const url = `https://v3.football.api-sports.io${path}${qs ? `?${qs}` : ""}`;
+// Serverless helper para API-FOOTBALL
+const API_BASE = "https://v3.football.api-sports.io";
 
-  const r = await fetch(url, {
+export async function aFetch(endpoint, search = {}) {
+  const key = process.env.APIFOOTBALL_KEY;
+  if (!key) {
+    throw new Error("Falta APIFOOTBALL_KEY en variables de entorno");
+  }
+  const qs = new URLSearchParams(search);
+  const url = `${API_BASE}${endpoint}?${qs.toString()}`;
+
+  const res = await fetch(url, {
     headers: {
-      "x-apisports-key": process.env.APIFOOTBALL_KEY,
-      "x-rapidapi-host": "v3.football.api-sports.io"
+      "x-apisports-key": key,
+      // El host ya no es obligatorio, pero no hace daño:
+      "x-rapidapi-host": "v3.football.api-sports.io",
     },
-    // evita edge caching agresivo
-    cache: "no-store"
   });
 
-  if (!r.ok) {
-    const txt = await r.text().catch(()=>"");
-    throw new Error(`API-FOOTBALL ${r.status}: ${txt}`);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`API ${res.status}: ${text.slice(0, 200)}`);
   }
-  return r.json();
+  const json = await res.json();
+  return json?.response ?? [];
 }

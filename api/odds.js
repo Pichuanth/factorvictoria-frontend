@@ -1,34 +1,37 @@
-import { aFetch } from "./_afetch.js";
+import { aFetch } from "./_afetch";
 
+// GET /api/odds?fixture=123456
 export default async function handler(req, res) {
   try {
     const fixture = Number(req.query.fixture || req.query.id);
     if (!fixture) return res.status(400).json({ error: "fixture requerido" });
 
-    // buscamos 1X2 del primer bookmaker disponible
-    const json = await aFetch("/odds", { fixture, page: 1 });
-    const game = (json?.response || [])[0];
-    if (!game) return res.status(200).json(null);
+    const items = await aFetch("/odds", { fixture });
+    // Tomamos primer bookmaker disponible
+    const bm = items?.[0]?.bookmakers?.[0];
+    const bets = bm?.bets ?? [];
 
-    const firstBk = (game.bookmakers || [])[0];
-    if (!firstBk) return res.status(200).json(null);
+    // Buscar mercado 1X2 (suele llamarse "Match Winner" o id=1)
+    const oneX2 =
+      bets.find((b) => b.id === 1) ||
+      bets.find((b) =>
+        (b.name || "").toLowerCase().includes("match winner")
+      );
 
-    const m = (firstBk.bets || []).find(b => b.name === "Match Winner" || b.id === 1);
-    if (!m) return res.status(200).json(null);
+    if (!oneX2) return res.status(200).json(null);
 
-    const by = {};
-    for (const v of m.values || []) {
-      // posibles: "Home", "Draw", "Away"
-      by[v.value?.toLowerCase()] = Number(v.odd);
+    const odds = {};
+    for (const v of oneX2.values || []) {
+      const val = (v.value || "").toUpperCase();
+      if (val === "HOME" || val === "1") odds.home = Number(v.odd);
+      else if (val === "AWAY" || val === "2") odds.away = Number(v.odd);
+      else if (val === "DRAW" || val === "X") odds.draw = Number(v.odd);
     }
+    odds.bookmaker = bm?.name ?? null;
 
-    res.status(200).json({
-      home: by.home || null,
-      draw: by.draw || null,
-      away: by.away || null,
-      bookmaker: firstBk.name
-    });
+    res.status(200).json(odds);
   } catch (e) {
-    res.status(500).json({ error: String(e?.message || e) });
+    console.error("odds error:", e);
+    res.status(500).json({ error: String(e.message || e) });
   }
 }
