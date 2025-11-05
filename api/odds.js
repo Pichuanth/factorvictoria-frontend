@@ -1,37 +1,38 @@
-import { aFetch } from "./_afetch";
+export const config = { runtime: "nodejs" };
 
-// GET /api/odds?fixture=123456
+import aFetch from "./_afetch.js";
+
 export default async function handler(req, res) {
   try {
-    const fixture = Number(req.query.fixture || req.query.id);
-    if (!fixture) return res.status(400).json({ error: "fixture requerido" });
-
-    const items = await aFetch("/odds", { fixture });
-    // Tomamos primer bookmaker disponible
-    const bm = items?.[0]?.bookmakers?.[0];
-    const bets = bm?.bets ?? [];
-
-    // Buscar mercado 1X2 (suele llamarse "Match Winner" o id=1)
-    const oneX2 =
-      bets.find((b) => b.id === 1) ||
-      bets.find((b) =>
-        (b.name || "").toLowerCase().includes("match winner")
-      );
-
-    if (!oneX2) return res.status(200).json(null);
-
-    const odds = {};
-    for (const v of oneX2.values || []) {
-      const val = (v.value || "").toUpperCase();
-      if (val === "HOME" || val === "1") odds.home = Number(v.odd);
-      else if (val === "AWAY" || val === "2") odds.away = Number(v.odd);
-      else if (val === "DRAW" || val === "X") odds.draw = Number(v.odd);
+    const { fixture } = req.query;
+    if (!fixture) {
+      return res.status(400).json({ error: "Falta 'fixture' (id del partido)" });
     }
-    odds.bookmaker = bm?.name ?? null;
 
-    res.status(200).json(odds);
-  } catch (e) {
-    console.error("odds error:", e);
-    res.status(500).json({ error: String(e.message || e) });
+    // Mercados 1X2 (gana local/empate/gana visita)
+    const data = await aFetch("/odds", {
+      fixture,
+      bet: 1,         // 1X2
+      page: 1,
+    });
+
+    // Elegimos la primera casa disponible y extraemos cuotas 1/ X / 2
+    const first = data?.response?.[0];
+    const bookmaker = first?.bookmakers?.[0];
+    const bets = bookmaker?.bets?.find(b => b.id === 1) || bookmaker?.bets?.[0];
+
+    const out = { bookmaker: bookmaker?.name || null, markets: [] };
+    if (bets?.values?.length) {
+      for (const v of bets.values) {
+        if (!v?.value || !v?.odd) continue;
+        out.markets.push({ label: v.value, odd: Number(v.odd) || null });
+      }
+    }
+
+    return res.status(200).json(out);
+  } catch (err) {
+    console.error("odds error:", err);
+    const msg = (err && err.message) || "Internal error";
+    return res.status(500).json({ error: msg });
   }
 }
