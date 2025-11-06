@@ -117,3 +117,20 @@ tbody td{padding:10px;border-top:1px solid #eef0f3}
 /* Logo en héroe */
 .hero-logo{height:56px;width:auto;border-radius:10px}
 @media(min-width:768px){.hero-logo{height:64px}}
+/* Tema oscuro global (seguro para Tailwind) */
+html, body, #root {
+  height: 100%;
+}
+
+/* ---- Tema oscuro global y tipografía base ---- */
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  background-color: #0b1220;   /* azul petróleo muy oscuro */
+  color: #e5e7eb;              /* slate-200 */
+}
+
+/* Para que browsers respeten dark en controles nativos */
+:root { color-scheme: dark; }
