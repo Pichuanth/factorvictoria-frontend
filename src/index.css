@@ -134,3 +134,15 @@ body {
 
 /* Para que browsers respeten dark en controles nativos */
 :root { color-scheme: dark; }
+/* ===== Tema oscuro global (siempre) ===== */
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  background-color: #0b1220 !important; /* azul petróleo muy oscuro */
+  color: #e5e7eb;                       /* slate-200 */
+}
+
+/* Ayuda a que los controles nativos se vean en dark */
+:root { color-scheme: dark; }
