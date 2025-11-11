@@ -1,46 +1,32 @@
 // frontend/src/pages/Comparator.jsx
 import React, { useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 
 const GOLD = "#E6C464";
 
-/* Util */
 function toYYYYMMDD(d) {
   const pad = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/* Lee ?plan=10|20|50|100 (atajo útil para demos) */
-function targetFromQuery() {
-  const sp = new URLSearchParams(window.location.search);
-  const p = sp.get("plan");
-  if (!p) return null;
-  const n = Number(String(p).replace(/[^\d]/g, ""));
-  return [10, 20, 50, 100].includes(n) ? n : null;
-}
-
-/* Mapea membresía a objetivo de cuota */
+/** Mapea la membresía a objetivo de cuota */
 function targetFromPlan(planRaw) {
-  const id = String(planRaw || "").toLowerCase().trim();
-
-  // cobertura amplia de variantes
-  if (/(vitalici|vitalicio|lifetime|pro-250|x100|100)/.test(id)) return 100;
-  if (/(anual|annual|x50|50)/.test(id)) return 50;
-  if (/(trimestral|quarter|3m|x20|20)/.test(id)) return 20;
-  if (/(mensual|monthly|basico|básico|basic|x10|10|basic)/.test(id)) return 10;
-
+  const id = String(planRaw || "").toLowerCase();
+  if (["vitalicio", "lifetime", "pro-250", "x100"].some((k) => id.includes(k))) return 100;
+  if (["anual", "annual", "x50"].some((k) => id.includes(k))) return 50;
+  if (["trimestral", "quarter", "3m", "x20"].some((k) => id.includes(k))) return 20;
+  if (["mensual", "monthly", "basico", "basic", "x10"].some((k) => id.includes(k))) return 10;
   return null;
 }
 
 export default function Comparator() {
   const { isLoggedIn, user } = useAuth();
-  const [searchParams] = useSearchParams(); // (por si lo necesitas luego)
 
-  /* ---------- BLOQUEO PARA NO LOGUEADOS ---------- */
+  /* ---------- BLOQUEO SI NO ESTÁ LOGUEADO ---------- */
   if (!isLoggedIn) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-10">
+      <main className="max-w-3xl mx-auto px-4 py-10">
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
           <h1 className="text-2xl font-bold">Comparador bloqueado</h1>
           <p className="text-slate-300 mt-2">
@@ -56,27 +42,18 @@ export default function Comparator() {
             </Link>
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
-  /* ---------- USUARIO LOGUEADO: VALIDAR PLAN ---------- */
-  // Soporta tanto tu Auth demo (planId) como posibles variantes
+  /* ---------- VALIDAR PLAN DEL USUARIO ---------- */
   const planGuess =
-    user?.planId ||
-    user?.plan?.id ||
-    user?.plan?.slug ||
-    user?.plan ||
-    user?.membership ||
-    user?.tier ||
-    "";
-
-  const queryTarget = targetFromQuery();
-  const target = queryTarget ?? targetFromPlan(planGuess);
+    user?.planId || user?.plan?.id || user?.plan?.slug || user?.plan || user?.membership || user?.tier || "";
+  const target = targetFromPlan(planGuess);
 
   if (!target) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-10">
+      <main className="max-w-3xl mx-auto px-4 py-10">
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
           <h1 className="text-2xl font-bold">Actualiza tu membresía</h1>
           <p className="text-slate-300 mt-2">
@@ -92,34 +69,53 @@ export default function Comparator() {
             </Link>
           </div>
         </div>
-      </div>
+      </main>
     );
   }
 
-  /* ---------- ESTADO UI (ok, tiene acceso) ---------- */
+  /* ---------- ESTADO UI ---------- */
   const [date, setDate] = useState(toYYYYMMDD(new Date()));
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [data, setData] = useState(null);
 
-  // Placeholder (hasta conectar con picks reales del backend)
+  /* ---------- DEMO onGenerate (mientras conectamos API real) ---------- */
   async function onGenerate() {
     try {
       setLoading(true);
       setErr("");
 
-      // DEMO: estructura compatible con lo que mostraremos
-      const demo = {
-        gift: null, // cuando haya pick x1.5–x3 vendrá aquí
-        parlay: {
-          target,
-          selections: [], // array de { match, market, pick, odd }
-          totalOdd: 1.0,
-        },
+      // DEMO: genera un regalo + 3 selecciones con 1X2 si existe target
+      const demoGift = {
+        match: "Equipo A vs Equipo B",
+        market: "1X2",
+        pick: "1",
+        odd: 1.75,
       };
 
-      setData(demo);
+      const baseSel = [
+        { match: "Partido 1", market: "1X2", pick: "1", odd: 1.35 },
+        { match: "Partido 2", market: "1X2", pick: "X", odd: 3.10 },
+        { match: "Partido 3", market: "1X2", pick: "2", odd: 1.85 },
+      ];
+
+      let total = baseSel.reduce((acc, s) => acc * s.odd, 1);
+      // si el target es alto, agrega placeholders
+      const extra = [];
+      while (total < (target >= 20 ? 20 : 10) && extra.length < 3) {
+        extra.push({ match: `Extra ${extra.length + 1}`, market: "1X2", pick: "1", odd: 1.5 });
+        total *= 1.5;
+      }
+
+      setData({
+        gift: demoGift,
+        parlay: {
+          target,
+          selections: [...baseSel, ...extra],
+          totalOdd: Number(total.toFixed(2)),
+        },
+      });
     } catch (e) {
       setErr(String(e?.message || e));
     } finally {
@@ -127,8 +123,9 @@ export default function Comparator() {
     }
   }
 
+  /* ---------- UI ---------- */
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
+    <main className="max-w-3xl mx-auto px-4 py-6">
       {/* Filtros */}
       <div className="rounded-3xl bg-white/5 border border-white/10 p-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -145,10 +142,12 @@ export default function Comparator() {
             className="rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
           />
           <button
+            type="button"
             onClick={onGenerate}
             disabled={loading}
             className="rounded-2xl font-semibold px-4 py-2"
-            style={{ backgroundColor: GOLD, color: "#0f172a" }}
+            style={{ backgroundColor: GOLD, color: "#0f172a", cursor: loading ? "not-allowed" : "pointer" }}
+            aria-label="Generar cuotas"
           >
             {loading ? "Generando..." : "Generar"}
           </button>
@@ -158,30 +157,23 @@ export default function Comparator() {
 
       {/* Regalo */}
       <div className="mt-5 rounded-3xl bg-white/5 border border-white/10 p-4">
-        <div className="text-white text-xl font-bold">
-          Cuota segura (Regalo) x1.5–x3 · 90–95% acierto
-        </div>
+        <div className="text-white text-xl font-bold">Cuota segura (Regalo) x1.5–x3 · 90–95% acierto</div>
         {data?.gift ? (
           <div className="text-white/90 mt-2">
             <div className="font-semibold">{data.gift.match}</div>
             <div>
-              {data.gift.market} · {data.gift.pick} ·{" "}
-              <span className="font-bold">(x{data.gift.odd})</span>
+              {data.gift.market} · {data.gift.pick} · <span className="font-bold">(x{data.gift.odd})</span>
             </div>
           </div>
         ) : (
-          <div className="text-white/60 mt-2">
-            Próximamente: resultados basados en tus filtros.
-          </div>
+          <div className="text-white/60 mt-2">Próximamente: resultados basados en tus filtros.</div>
         )}
       </div>
 
-      {/* Parlay por plan */}
+      {/* Parlay */}
       <div className="mt-5 rounded-3xl bg-white/5 border border-white/10 p-4">
         <div className="text-white text-xl font-bold">Cuota generada x{target}</div>
-        <div className="text-white/60 text-sm mt-1">
-          Tu plan: {String(planGuess || "").toUpperCase()}
-        </div>
+        <div className="text-white/60 text-sm mt-1">Tu plan: {String(planGuess || "").toUpperCase()}</div>
 
         {data?.parlay?.selections?.length ? (
           <>
@@ -200,7 +192,7 @@ export default function Comparator() {
         )}
       </div>
 
-      {/* Placeholders premium por ahora */}
+      {/* Placeholders premium */}
       <div className="mt-5 rounded-3xl bg-white/5 border border-white/10 p-4 text-white/70">
         <div className="text-white text-xl font-bold">Árbitros más tarjeteros</div>
         <div className="mt-1">Disponible con tu plan.</div>
@@ -209,6 +201,6 @@ export default function Comparator() {
         <div className="text-white text-xl font-bold">Cuota desfase del mercado</div>
         <div className="mt-1">Disponible con tu plan.</div>
       </div>
-    </div>
+    </main>
   );
 }
