@@ -1,32 +1,43 @@
 // frontend/src/pages/Comparator.jsx
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../lib/auth";
-// Si más adelante quieres pedir picks reales desde el backend:
-// import { getSmartPicks } from "../api/fixtures";
 
 const GOLD = "#E6C464";
 
+/* Util */
 function toYYYYMMDD(d) {
   const pad = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/** Mapea la membresía a objetivo de cuota */
+/* Lee ?plan=10|20|50|100 (atajo útil para demos) */
+function targetFromQuery() {
+  const sp = new URLSearchParams(window.location.search);
+  const p = sp.get("plan");
+  if (!p) return null;
+  const n = Number(String(p).replace(/[^\d]/g, ""));
+  return [10, 20, 50, 100].includes(n) ? n : null;
+}
+
+/* Mapea membresía a objetivo de cuota */
 function targetFromPlan(planRaw) {
-  const id = String(planRaw || "").toLowerCase();
-  if (["vitalicio", "lifetime", "pro-250", "x100"].some((k) => id.includes(k))) return 100;
-  if (["anual", "annual", "x50"].some((k) => id.includes(k))) return 50;
-  if (["trimestral", "quarter", "3m", "x20"].some((k) => id.includes(k))) return 20;
-  if (["mensual", "monthly", "basico", "basic", "x10"].some((k) => id.includes(k))) return 10;
-  // Por defecto exigir login/upgrade
+  const id = String(planRaw || "").toLowerCase().trim();
+
+  // cobertura amplia de variantes
+  if (/(vitalici|vitalicio|lifetime|pro-250|x100|100)/.test(id)) return 100;
+  if (/(anual|annual|x50|50)/.test(id)) return 50;
+  if (/(trimestral|quarter|3m|x20|20)/.test(id)) return 20;
+  if (/(mensual|monthly|basico|básico|basic|x10|10|basic)/.test(id)) return 10;
+
   return null;
 }
 
 export default function Comparator() {
   const { isLoggedIn, user } = useAuth();
+  const [searchParams] = useSearchParams(); // (por si lo necesitas luego)
 
-  // ------- BLOQUEO PARA NO LOGUEADOS -------
+  /* ---------- BLOQUEO PARA NO LOGUEADOS ---------- */
   if (!isLoggedIn) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-10">
@@ -49,9 +60,10 @@ export default function Comparator() {
     );
   }
 
-  // ------- USUARIO LOGUEADO: VALIDAR PLAN -------
-  // Intentamos leer el plan desde distintas propiedades
+  /* ---------- USUARIO LOGUEADO: VALIDAR PLAN ---------- */
+  // Soporta tanto tu Auth demo (planId) como posibles variantes
   const planGuess =
+    user?.planId ||
     user?.plan?.id ||
     user?.plan?.slug ||
     user?.plan ||
@@ -59,7 +71,8 @@ export default function Comparator() {
     user?.tier ||
     "";
 
-  const target = targetFromPlan(planGuess);
+  const queryTarget = targetFromQuery();
+  const target = queryTarget ?? targetFromPlan(planGuess);
 
   if (!target) {
     return (
@@ -83,31 +96,29 @@ export default function Comparator() {
     );
   }
 
-  // ------- ESTADO DE UI (cuando sí tiene acceso) -------
+  /* ---------- ESTADO UI (ok, tiene acceso) ---------- */
   const [date, setDate] = useState(toYYYYMMDD(new Date()));
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [data, setData] = useState(null);
 
-  // Placeholder hasta conectar picks reales
+  // Placeholder (hasta conectar con picks reales del backend)
   async function onGenerate() {
     try {
       setLoading(true);
       setErr("");
-      // Ejemplo cuando conectemos backend:
-      // const r = await getSmartPicks(date, planGuess, q);
-      // setData(r);
 
-      // Por ahora: demo estática con misma forma
+      // DEMO: estructura compatible con lo que mostraremos
       const demo = {
-        gift: null, // ← cuando haya un pick seguro x1.5–x3 vendrá aquí
+        gift: null, // cuando haya pick x1.5–x3 vendrá aquí
         parlay: {
-          target, // objetivo según plan
-          selections: [],
+          target,
+          selections: [], // array de { match, market, pick, odd }
           totalOdd: 1.0,
         },
       };
+
       setData(demo);
     } catch (e) {
       setErr(String(e?.message || e));
@@ -118,7 +129,7 @@ export default function Comparator() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
-      {/* filtros */}
+      {/* Filtros */}
       <div className="rounded-3xl bg-white/5 border border-white/10 p-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <input

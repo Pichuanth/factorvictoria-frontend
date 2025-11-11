@@ -3,10 +3,18 @@ import React, { createContext, useContext, useMemo, useState } from "react";
 
 /** Orden/jerarquía de planes (0 = más bajo) */
 export const PLAN_RANK = {
-  basic: 0,        // $19.990 x10
-  trimestral: 1,   // $44.990 x20
-  anual: 2,        // $99.990 x50
-  vitalicio: 3,    // $249.990 x100
+  basic: 0,        // x10
+  trimestral: 1,   // x20
+  anual: 2,        // x50
+  vitalicio: 3,    // x100
+};
+
+/** Meta por plan (útil si la necesitas en otras vistas) */
+export const PLAN_TARGET = {
+  basic: 10,
+  trimestral: 20,
+  anual: 50,
+  vitalicio: 100,
 };
 
 /** Usuarios demo por plan (misma clave para todos) */
