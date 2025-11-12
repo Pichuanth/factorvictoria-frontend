@@ -105,3 +105,13 @@ tbody td{padding:10px;border-top:1px solid #1f2937}
 /* Logo en héroe */
 .hero-logo{height:56px;width:auto;border-radius:10px}
 @media(min-width:768px){.hero-logo{height:64px}}
+
+/* --- Pills doradas para encabezados --- */
+.pill-gold{
+  display:inline-block;
+  padding:6px 12px;
+  border-radius:999px;
+  font-weight:800;
+  background: linear-gradient(90deg,#E6C464,#F0D98A);
+  color:#0b1220; /* azul marino oscuro para el texto */
+}
