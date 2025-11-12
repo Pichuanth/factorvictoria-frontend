@@ -15,6 +15,21 @@ function addDays(d, n) {
   x.setDate(x.getDate() + n);
   return x;
 }
+function diffDays(a, b) {
+  const d1 = new Date(a + "T00:00:00Z");
+  const d2 = new Date(b + "T00:00:00Z");
+  return Math.max(0, Math.round((d2 - d1) / 86400000));
+}
+function listDates(from, to) {
+  const out = [];
+  let d = new Date(from + "T00:00:00Z");
+  const end = new Date(to + "T00:00:00Z");
+  while (d <= end) {
+    out.push(toYYYYMMDD(d));
+    d = addDays(d, 1);
+  }
+  return out;
+}
 
 /** Mapea membresía → target cuota */
 function targetFromPlan(planRaw) {
@@ -26,23 +41,30 @@ function targetFromPlan(planRaw) {
   return null;
 }
 
-/* Pequeño fetch con control de errores */
-async function fetchJSON(path) {
-  const res = await fetch(path, { cache: "no-store" });
-  if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(`HTTP ${res.status} ${res.statusText || ""} ${t ? "– " + t : ""}`.trim());
+/* fetch con control de errores (no propaga 500 si le pasas {soft:true}) */
+async function fetchJSON(path, { soft = false } = {}) {
+  try {
+    const res = await fetch(path, { cache: "no-store" });
+    if (!res.ok) {
+      const t = await res.text().catch(() => "");
+      const msg = `HTTP ${res.status} ${res.statusText || ""}${t ? " – " + t : ""}`;
+      if (soft) return { __error: msg };
+      throw new Error(msg);
+    }
+    return res.json();
+  } catch (e) {
+    if (soft) return { __error: String(e.message || e) };
+    throw e;
   }
-  return res.json();
 }
 
-/* Si no hay cuotas reales 1X2, inventamos unas coherentes (determinísticas) */
+/* Odds sintéticas si no hay 1X2 reales */
 function synthOdds(fixtureId) {
   const seed = Number(String(fixtureId).slice(-4)) || 1234;
-  const r = (seed % 100) / 100; // 0..0.99
-  const home = 1.25 + r * 0.7;                 // 1.25..1.95
-  const draw = 2.8 + r * 0.9;                  // 2.8..3.7
-  const away = 1.6 + ((99 - (seed % 100)) / 100); // 1.6..2.59
+  const r = (seed % 100) / 100;
+  const home = 1.25 + r * 0.7;
+  const draw = 2.8 + r * 0.9;
+  const away = 1.6 + ((99 - (seed % 100)) / 100);
   return [
     { out: "1", odd: Number(home.toFixed(2)) },
     { out: "X", odd: Number(draw.toFixed(2)) },
@@ -50,23 +72,17 @@ function synthOdds(fixtureId) {
   ];
 }
 
-/* Elige un pick "seguro" entre 1.5 y 3 si es posible */
 function pickGiftFromOdds(teamsLabel, odds1x2) {
-  const cands = odds1x2
-    .filter((o) => o.odd >= 1.5 && o.odd <= 3)
-    .sort((a, b) => a.odd - b.odd);
+  const cands = odds1x2.filter(o => o.odd >= 1.5 && o.odd <= 3).sort((a,b)=>a.odd-b.odd);
   if (!cands.length) return null;
   const best = cands[0];
   return { match: teamsLabel, market: "1X2", pick: best.out, odd: best.odd };
 }
 
-/* Construye un parlay aproximado hacia el target */
 function buildParlay(target, fixturesWithOdds, maxLegs = 8) {
   const pool = [];
   for (const f of fixturesWithOdds) {
-    const nice = [...f.odds]
-      .filter((o) => o.odd >= 1.3 && o.odd <= 3.2)
-      .sort((a, b) => a.odd - b.odd);
+    const nice = [...f.odds].filter(o => o.odd >= 1.3 && o.odd <= 3.2).sort((a,b)=>a.odd-b.odd);
     if (nice[0]) pool.push({ ...nice[0], match: f.label });
     if (nice[1] && nice[1].odd <= 2.2) pool.push({ ...nice[1], match: f.label });
   }
@@ -84,10 +100,48 @@ function buildParlay(target, fixturesWithOdds, maxLegs = 8) {
   return { selections, totalOdd: Number(product.toFixed(2)) };
 }
 
+/* --- Nueva: cargador resiliente de fixtures --- */
+async function fetchFixturesSmart({ from, to, q }) {
+  // si pasa rango grande, dividimos por días para evitar timeouts del serverless
+  let f = from, t = to;
+  if (f > t) [f, t] = [t, f];
+  const delta = diffDays(f, t);
+
+  const isNum = /^\d+$/.test(String(q || "").trim());
+  const mkDayURL = (day) => {
+    let u = `/api/fixtures?date=${day}`;
+    if (q) u += isNum ? `&league=${q}` : `&country=${encodeURIComponent(q)}`;
+    return u;
+  };
+
+  // si delta <= 1 probamos también la versión "rango" por compatibilidad
+  if (delta <= 1) {
+    // primero intenta rango; si falla, cae a día único
+    const rangeUrl = f === t ? mkDayURL(f) : (() => {
+      let u = `/api/fixtures?from=${f}&to=${t}`;
+      if (q) u += isNum ? `&league=${q}` : `&country=${encodeURIComponent(q)}`;
+      return u;
+    })();
+
+    let data = await fetchJSON(rangeUrl, { soft: true });
+    if (!data || data.__error) data = await fetchJSON(mkDayURL(f), { soft: true });
+    const items = Array.isArray(data?.items) ? data.items : [];
+    return items;
+  }
+
+  // para rangos de 2+ días, vamos por días (evita FUNCTION_INVOCATION_FAILED)
+  const days = listDates(f, t);
+  const all = [];
+  for (const day of days) {
+    const d = await fetchJSON(mkDayURL(day), { soft: true });
+    if (d && Array.isArray(d.items)) all.push(...d.items);
+  }
+  return all;
+}
+
 export default function Comparator() {
   const { isLoggedIn, user } = useAuth();
 
-  /* ---- bloqueo visitantes ---- */
   if (!isLoggedIn) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-10">
@@ -96,12 +150,9 @@ export default function Comparator() {
           <p className="text-slate-300 mt-2">
             Para generar cuotas y combinadas, primero compra tu membresía e inicia sesión.
           </p>
-        <div className="mt-4">
-            <Link
-              to="/"
-              className="inline-block rounded-2xl px-5 py-2 font-semibold"
-              style={{ backgroundColor: GOLD, color: "#0f172a" }}
-            >
+          <div className="mt-4">
+            <Link to="/" className="inline-block rounded-2xl px-5 py-2 font-semibold"
+                  style={{ backgroundColor: GOLD, color: "#0f172a" }}>
               Ir a Inicio (ver membresías)
             </Link>
           </div>
@@ -110,24 +161,17 @@ export default function Comparator() {
     );
   }
 
-  /* ---- validar plan ---- */
-  const planGuess =
-    user?.planId || user?.plan?.id || user?.plan || user?.membership || user?.tier || "";
+  const planGuess = user?.planId || user?.plan?.id || user?.plan || user?.membership || user?.tier || "";
   const target = targetFromPlan(planGuess);
   if (!target) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-10">
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
           <h1 className="text-2xl font-bold">Actualiza tu membresía</h1>
-          <p className="text-slate-300 mt-2">
-            Tu plan actual no permite usar el comparador. Elige una membresía para desbloquearlo.
-          </p>
+          <p className="text-slate-300 mt-2">Tu plan actual no permite usar el comparador. Elige una membresía para desbloquearlo.</p>
           <div className="mt-4">
-            <Link
-              to="/"
-              className="inline-block rounded-2xl px-5 py-2 font-semibold"
-              style={{ backgroundColor: GOLD, color: "#0f172a" }}
-            >
+            <Link to="/" className="inline-block rounded-2xl px-5 py-2 font-semibold"
+                  style={{ backgroundColor: GOLD, color: "#0f172a" }}>
               Ver planes
             </Link>
           </div>
@@ -136,110 +180,77 @@ export default function Comparator() {
     );
   }
 
-  /* ---- estado UI ---- */
   const today = useMemo(() => new Date(), []);
   const [from, setFrom] = useState(toYYYYMMDD(today));
   const [to, setTo] = useState(toYYYYMMDD(addDays(today, 0)));
-  const [q, setQ] = useState(""); // país o id de liga
+  const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [data, setData] = useState(null);
 
-  /* ---- generar picks (con fix de 500) ---- */
   async function onGenerate() {
     try {
       setLoading(true);
       setErr("");
       setData(null);
 
-      // Normaliza: si from>to, se intercambian (evita 500 en /api/fixtures)
-      let f = from;
-      let t = to;
-      if (f > t) [f, t] = [t, f];
+      // 1) fixtures (resiliente)
+      const fixtures = await fetchFixturesSmart({ from, to, q });
 
-      const qTrim = String(q || "").trim();
-      const isNum = /^\d+$/.test(qTrim);
-      const isRange = f !== t;
-
-      const makeURL = (singleDate) => {
-        if (singleDate) {
-          let u = `/api/fixtures?date=${singleDate}`;
-          if (qTrim) u += isNum ? `&league=${qTrim}` : `&country=${encodeURIComponent(qTrim)}`;
-          return u;
-        }
-        let u = `/api/fixtures?from=${f}&to=${t}`;
-        if (qTrim) u += isNum ? `&league=${qTrim}` : `&country=${encodeURIComponent(qTrim)}`;
-        return u;
-      };
-
-      // intenta rango (o día), si falla hace fallback a un solo día (f)
-      let fx;
-      try {
-        fx = await fetchJSON(isRange ? makeURL() : makeURL(f));
-      } catch {
-        fx = await fetchJSON(makeURL(f));
-      }
-      const items = Array.isArray(fx?.items) ? fx.items : [];
-
-      // Obtener odds reales; si no hay, sintéticas
+      // 2) odds reales; si fallan: sintéticas
       const withOdds = [];
-      for (const it of items.slice(0, 20)) {
+      for (const it of fixtures.slice(0, 20)) {
         const label = `${it.teams?.home || "Local"} vs ${it.teams?.away || "Visita"}`;
         let odds = [];
         try {
-          const od = await fetchJSON(`/api/odds?fixture=${encodeURIComponent(it.fixtureId)}&market=1x2`);
-          // intentamos mapear mercados de forma flexible
+          const od = await fetchJSON(`/api/odds?fixture=${encodeURIComponent(it.fixtureId)}&market=1x2`, { soft: true });
           let list = [];
           if (Array.isArray(od?.markets)) {
-            // formato { markets: [{ out/label, odd/price }] }
             list = od.markets.map((mk) => ({
               out: mk?.out || mk?.label || mk?.name || "1",
               odd: Number(mk?.odd ?? mk?.price ?? mk?.value ?? 0),
             }));
           } else if (od && typeof od === "object") {
-            // otros formatos simples
             for (const k of Object.keys(od)) {
               const v = Number(od[k]);
               if (isFinite(v) && v > 1.01) list.push({ out: k, odd: v });
             }
           }
-          odds = list.filter((x) => x.odd > 1.01);
-        } catch {
-          odds = [];
-        }
+          odds = (list || []).filter((x) => x.odd > 1.01);
+        } catch { odds = []; }
         if (!odds.length) odds = synthOdds(it.fixtureId);
         withOdds.push({ label, odds, id: it.fixtureId });
       }
 
-      // Gift 1.5–3
+      // 3) regalo
       let gift = null;
-      for (const fxt of withOdds) {
-        const g = pickGiftFromOdds(fxt.label, fxt.odds);
+      for (const f of withOdds) {
+        const g = pickGiftFromOdds(f.label, f.odds);
         if (g) { gift = g; break; }
       }
 
-      // Parlay hacia el target según plan
+      // 4) parlay
       const parlay = buildParlay(target, withOdds, 10);
 
-      // Demos visibles: árbitros y desfase de mercado
-      const refs = withOdds.slice(0, 5).map((fxt, i) => ({
-        match: fxt.label, referee: `Árbitro Demo ${i + 1}`, avgCards: (5.5 - i * 0.4).toFixed(1),
+      // 5) demos visibles
+      const refs = withOdds.slice(0, 5).map((f, i) => ({
+        match: f.label, referee: `Árbitro Demo ${i + 1}`, avgCards: (5.5 - i * 0.4).toFixed(1),
       }));
-      const gaps = withOdds.slice(0, 4).map((fxt, i) => ({
-        match: fxt.label, market: "1X2",
-        ourOdd: fxt.odds[0]?.odd ?? 1.7,
-        bookAvg: Number(((fxt.odds[0]?.odd ?? 1.7) * (0.96 - i * 0.01)).toFixed(2)),
+      const gaps = withOdds.slice(0, 4).map((f, i) => ({
+        match: f.label, market: "1X2",
+        ourOdd: f.odds[0]?.odd ?? 1.7,
+        bookAvg: Number(((f.odds[0]?.odd ?? 1.7) * (0.96 - i * 0.01)).toFixed(2)),
       }));
 
       setData({ gift, parlay, refs, gaps, meta: { fixturesUsed: withOdds.length } });
     } catch (e) {
-      setErr(String(e.message || e));
+      // En lugar de romper la vista, mostramos un mensaje corto
+      setErr("No pudimos cargar algunos datos. Intenta con un rango más corto o otro país/liga.");
     } finally {
       setLoading(false);
     }
   }
 
-  /* ---- UI ---- */
   return (
     <div className="max-w-3xl mx-auto px-4 pb-20">
       {/* Filtros */}
@@ -294,14 +305,12 @@ export default function Comparator() {
       <section className="mt-6 rounded-2xl bg-white/5 border border-white/10 p-4 md:p-6">
         <h2 className="text-lg md:text-xl font-semibold">Cuota generada x{target}</h2>
         <p className="text-slate-300 mt-1">Tu plan: {String(planGuess || "").toUpperCase()}</p>
-
         {data?.parlay?.selections?.length ? (
           <>
             <ul className="mt-3 space-y-1 text-slate-200">
               {data.parlay.selections.map((s, i) => (
                 <li key={i}>
-                  <span className="font-semibold">{s.match}</span> — {s.market} · {s.pick} ·{" "}
-                  <span className="font-bold">(x{s.odd})</span>
+                  <span className="font-semibold">{s.match}</span> — {s.market} · {s.pick} · <span className="font-bold">(x{s.odd})</span>
                 </li>
               ))}
             </ul>
@@ -312,7 +321,7 @@ export default function Comparator() {
         )}
       </section>
 
-      {/* Árbitros más tarjeteros (demo visible) */}
+      {/* Árbitros demo */}
       <section className="mt-6 rounded-2xl bg-white/5 border border-white/10 p-4 md:p-6">
         <h2 className="text-lg md:text-xl font-semibold">Árbitros más tarjeteros</h2>
         {data?.refs?.length ? (
@@ -329,7 +338,7 @@ export default function Comparator() {
         )}
       </section>
 
-      {/* Desfase del mercado (demo visible) */}
+      {/* Desfase demo */}
       <section className="mt-6 rounded-2xl bg-white/5 border border-white/10 p-4 md:p-6">
         <h2 className="text-lg md:text-xl font-semibold">Cuota desfase del mercado</h2>
         {data?.gaps?.length ? (
