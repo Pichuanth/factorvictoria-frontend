@@ -1,58 +1,70 @@
-// /api/fixtures.js
-// Devuelve: { items: [{ fixtureId, teams:{home,away}, league, country, date }] }
+// api/fixtures.js
+// Devuelve fixtures normalizados desde API-FOOTBALL.
+// Nunca lanza 500: ante error responde { items: [], error: "..."} con 200.
 
-export default async function handler(req, res) {
+export const config = { runtime: 'edge' }; // frío + rápido
+const API_HOST = process.env.APISPORTS_HOST || "v3.football.api-sports.io";
+const API_KEY  = process.env.APISPORTS_KEY  || "";
+
+function okJson(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8" }
+  });
+}
+
+export default async function handler(req) {
   try {
-    const { date, from, to, country, league } = req.query || {};
-    const key = process.env.APISPORTS_KEY; // <-- ponlo en variables de entorno
-    const host = process.env.APISPORTS_HOST || "v3.football.api-sports.io";
-    if (!key) {
-      res.status(500).json({ error: "Missing APISPORTS_KEY" });
-      return;
+    const url = new URL(req.url);
+    const date = url.searchParams.get("date") || "";
+    const from = url.searchParams.get("from") || "";
+    const to   = url.searchParams.get("to")   || "";
+    const country = url.searchParams.get("country") || "";
+    const league  = url.searchParams.get("league")  || "";
+    const tz = "America/Santiago";
+
+    if (!API_KEY) {
+      return okJson({ items: [], error: "APISPORTS_KEY missing" });
     }
 
-    // Construye query para API-FOOTBALL
-    const params = new URLSearchParams();
-    if (date) params.set("date", date);
-    if (!date && (from || to)) {
-      if (from) params.set("from", from);
-      if (to) params.set("to", to);
-    }
-    if (country) params.set("country", country);
-    if (league) params.set("league", league);
-    // Sugerencia: limitar páginas para no exceder rate limit
-    params.set("timezone", "UTC");
+    // Construir query API-FOOTBALL
+    const q = new URLSearchParams();
+    q.set("timezone", tz);
+    if (date) q.set("date", date);
+    if (from) q.set("from", from);
+    if (to)   q.set("to", to);
+    if (country) q.set("country", country);
+    if (league)  q.set("league", league);
 
-    const url = `https://${host}/fixtures?${params.toString()}`;
-
-    const r = await fetch(url, {
-      headers: { "x-apisports-key": key },
-      cache: "no-store",
+    const resp = await fetch(`https://${API_HOST}/fixtures?${q.toString()}`, {
+      headers: {
+        "x-apisports-key": API_KEY,
+        "x-rapidapi-key": API_KEY // por si tu plan usa wrapper RapidAPI
+      },
+      // no cache para pruebas
+      cache: "no-store"
     });
-    const j = await r.json();
 
-    if (!r.ok) {
-      res
-        .status(r.status)
-        .json({ error: j?.errors || j?.message || "upstream error" });
-      return;
+    const raw = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      const msg = raw?.errors ? JSON.stringify(raw.errors) : `${resp.status} ${resp.statusText}`;
+      return okJson({ items: [], error: `remote ${msg}` });
     }
 
-    const items = Array.isArray(j?.response)
-      ? j.response.map((f) => ({
-          fixtureId: f?.fixture?.id,
-          teams: {
-            home: f?.teams?.home?.name || "Home",
-            away: f?.teams?.away?.name || "Away",
-          },
-          league: f?.league?.name || "",
-          country: f?.league?.country || "",
-          date: f?.fixture?.date?.slice(0, 10) || "",
-        }))
-      : [];
+    const list = Array.isArray(raw?.response) ? raw.response : [];
+    const items = list.map(it => ({
+      fixtureId: it?.fixture?.id,
+      date: it?.fixture?.date,
+      country: it?.league?.country || it?.league?.name,
+      league: it?.league?.name,
+      teams: {
+        home: it?.teams?.home?.name,
+        away: it?.teams?.away?.name
+      }
+    })).filter(x => x.fixtureId);
 
-    res.status(200).json({ items });
+    return okJson({ count: items.length, items });
   } catch (e) {
-    res.status(500).json({ error: String(e?.message || e) });
+    return okJson({ items: [], error: String(e?.message || e) });
   }
 }
