@@ -94,6 +94,19 @@ function UpgradeCTA({ text = "Mejorar membresía" }) {
   );
 }
 
+/* Demo de fixtures cuando la API falla o no hay resultados */
+function makeDemoFixtures(from, to, count = 10) {
+  // crea etiquetas “Equipo A1 vs Equipo B1 (demo)”, etc.
+  const out = [];
+  for (let i = 1; i <= count; i++) {
+    out.push({
+      fixtureId: `demo-${from}-${to}-${i}`,
+      teams: { home: `Equipo A${i}`, away: `Equipo B${i}` },
+    });
+  }
+  return out;
+}
+
 export default function Comparator() {
   const { isLoggedIn, user } = useAuth();
 
@@ -145,36 +158,44 @@ export default function Comparator() {
 
   /* ---- generar picks ---- */
   async function onGenerate() {
+  try {
+    setLoading(true);
+    setErr("");
+    setWarn("");
+    setData(null);
+
+    // ---- construir URL de fixtures
+    const qTrim = String(q || "").trim();
+    const isNum = /^\d+$/.test(qTrim);
+    const isRange = from !== to;
+    let url = isRange ? `/api/fixtures?from=${from}&to=${to}` : `/api/fixtures?date=${from}`;
+    if (qTrim) url += isNum ? `&league=${qTrim}` : `&country=${encodeURIComponent(qTrim)}`;
+
+    // ---- pedir fixtures (con fallback demo si hay 500)
+    let items = [];
     try {
-      setLoading(true);
-      setErr("");
-      setWarn("");
-      setData(null);
-
-      // fixtures
-      const qTrim = String(q || "").trim();
-      const isNum = /^\d+$/.test(qTrim);
-      const isRange = from !== to;
-      let url = isRange ? `/api/fixtures?from=${from}&to=${to}` : `/api/fixtures?date=${from}`;
-      if (qTrim) url += isNum ? `&league=${qTrim}` : `&country=${encodeURIComponent(qTrim)}`;
-
       const fx = await fetchJSON(url); // { count, items }
-      const items = Array.isArray(fx?.items) ? fx.items : [];
+      items = Array.isArray(fx?.items) ? fx.items : [];
+      if (!items.length) {
+        setWarn("No hay suficientes eventos para alcanzar tu cuota objetivo. Amplía el rango de fechas o cambia liga/país.");
+      }
+    } catch (e) {
+      // FALLBACK DEMO: no frenamos la UX
+      setWarn("La API dio error (HTTP 500). Mostrando demo para que puedas seguir probando.");
+      items = makeDemoFixtures(from, to, 12);
+    }
 
-      // odds
-      const withOdds = [];
-      for (const it of items.slice(0, 30)) {
-        const label = `${it.teams?.home || "Equipo A"} vs ${it.teams?.away || "Equipo B"}`;
-        let odds = [];
-        try {
+    // ---- odds (reales cuando existan; si no, sintéticas)
+    const withOdds = [];
+    for (const it of items.slice(0, 30)) {
+      const label = `${it.teams?.home || "Equipo A"} vs ${it.teams?.away || "Equipo B"}${String(it.fixtureId).startsWith("demo-") ? " (demo)" : ""}`;
+      let odds = [];
+      try {
+        // si el id es demo, nos saltamos el fetch y usamos sintéticas directo
+        if (!String(it.fixtureId).startsWith("demo-")) {
           const od = await fetchJSON(`/api/odds?fixture=${encodeURIComponent(it.fixtureId)}&market=1x2`);
-
-          // Normalizamos dos formatos comunes:
-          // 1) { markets: [{ name/label/outcome, odd/price/value }, ...] }
-          // 2) { markets: [{ outcomes: [{ name/label/outcome, odd/price/value }, ...] }, ...] }
           const markets = Array.isArray(od?.markets) ? od.markets : [];
-
-          const flatFromMarkets = [];
+          const flat = [];
           for (const mk of markets) {
             const outs = Array.isArray(mk?.outcomes) ? mk.outcomes : [mk];
             for (const o of outs) {
@@ -185,62 +206,57 @@ export default function Comparator() {
               if (name.includes("draw") || name.includes("emp")) out = "X";
               else if (name.includes("away") || name.includes("visit") || name.includes("2")) out = "2";
               else if (name.includes("home") || name.includes("local") || name.includes("1")) out = "1";
-              flatFromMarkets.push({ out, odd: price });
+              flat.push({ out, odd: price });
             }
           }
-
-          odds = flatFromMarkets.filter((x) => x.odd > 1.01);
-        } catch {
-          odds = [];
+          odds = flat.filter((x) => x.odd > 1.01);
         }
-        if (!odds.length) odds = synthOdds(it.fixtureId);
-        withOdds.push({ label, odds, id: it.fixtureId });
+      } catch {
+        odds = [];
       }
-
-      // regalo
-      let gift = null;
-      for (const f of withOdds) {
-        const g = pickGiftFromOdds(f.label, f.odds);
-        if (g) {
-          gift = g;
-          break;
-        }
-      }
-
-      // parlay
-      const parlay = buildParlay(target, withOdds, 10);
-      if (parlay.totalOdd < target * 0.8) {
-        setWarn(
-          "No hay suficientes eventos para alcanzar tu cuota objetivo. Amplía el rango de fechas o cambia liga/país."
-        );
-      }
-
-      // demos (solo visual, datos sintéticos)
-      const refereesDemo = withOdds.slice(0, 5).map((f, i) => ({
-        match: f.label,
-        referee: `Árbitro Demo ${i + 1}`,
-        avgCards: (5.5 - i * 0.4).toFixed(1),
-      }));
-      const marketGapDemo = withOdds.slice(0, 4).map((f, i) => ({
-        match: f.label,
-        market: "1X2",
-        ourOdd: f.odds[0]?.odd ?? 1.7,
-        bookAvg: Number(((f.odds[0]?.odd ?? 1.7) * (0.96 - i * 0.01)).toFixed(2)),
-      }));
-
-      setData({
-        gift,
-        parlay,
-        refs: refereesDemo,
-        gaps: marketGapDemo,
-        meta: { fixturesUsed: withOdds.length },
-      });
-    } catch (e) {
-      setErr(String(e.message || e));
-    } finally {
-      setLoading(false);
+      if (!odds.length) odds = synthOdds(it.fixtureId);
+      withOdds.push({ label, odds, id: it.fixtureId });
     }
+
+    // ---- regalo
+    let gift = null;
+    for (const f of withOdds) {
+      const g = pickGiftFromOdds(f.label, f.odds);
+      if (g) { gift = g; break; }
+    }
+
+    // ---- parlay
+    const parlay = buildParlay(target, withOdds, 10);
+    if (parlay.totalOdd < target * 0.8 && !warn) {
+      setWarn("No hay suficientes eventos para alcanzar tu cuota objetivo. Amplía el rango de fechas o cambia liga/país.");
+    }
+
+    // ---- demos para módulos premium (si aplica)
+    const refereesDemo = withOdds.slice(0, 5).map((f, i) => ({
+      match: f.label,
+      referee: `Árbitro Demo ${i + 1}`,
+      avgCards: (5.5 - i * 0.4).toFixed(1),
+    }));
+    const marketGapDemo = withOdds.slice(0, 4).map((f, i) => ({
+      match: f.label,
+      market: "1X2",
+      ourOdd: f.odds[0]?.odd ?? 1.7,
+      bookAvg: Number(((f.odds[0]?.odd ?? 1.7) * (0.96 - i * 0.01)).toFixed(2)),
+    }));
+
+    setData({
+      gift,
+      parlay,
+      refs: refereesDemo,
+      gaps: marketGapDemo,
+      meta: { fixturesUsed: withOdds.length },
+    });
+  } catch (e) {
+    setErr(String(e.message || e));
+  } finally {
+    setLoading(false);
   }
+}
 
   /* ---- UI ---- */
   return (

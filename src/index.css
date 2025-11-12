@@ -106,12 +106,18 @@ tbody td{padding:10px;border-top:1px solid #1f2937}
 .hero-logo{height:56px;width:auto;border-radius:10px}
 @media(min-width:768px){.hero-logo{height:64px}}
 
-/* --- Pills doradas para encabezados --- */
+/* Pastilla dorada (mismo look de las tabs superiores) */
 .pill-gold{
-  display:inline-block;
-  padding:6px 12px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:8px 16px;
   border-radius:999px;
-  font-weight:800;
-  background: linear-gradient(90deg,#E6C464,#F0D98A);
-  color:#0b1220; /* azul marino oscuro para el texto */
+  background:linear-gradient(90deg,#E6C464,#F0D98A);
+  color:#0b1730;
+  font-weight:800;       /* grueso elegante */
+  font-size:14px;        /* tamaño similar tabs */
+  letter-spacing:.2px;
+  line-height:1;
+  box-shadow:0 6px 18px rgba(230,196,100,.22);
 }
