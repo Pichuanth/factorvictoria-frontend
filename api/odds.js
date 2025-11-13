@@ -1,61 +1,64 @@
-// /api/odds.js — obtiene mercado 1x2 para un fixture
-// Uso: /api/odds?fixture=12345&market=1x2
+// /api/odds.js
+export const config = { runtime: "edge" };
 
-export default async function handler(req, res) {
-  try {
-    const { APISPORTS_KEY, APISPORTS_HOST } = process.env;
-    if (!APISPORTS_KEY || !APISPORTS_HOST) {
-      return res.status(400).json({ error: "Missing APISPORTS_KEY or APISPORTS_HOST" });
-    }
+const API_KEY  = process.env.APISPORTS_KEY;
+const API_HOST = process.env.APISPORTS_HOST || "v3.football.api-sports.io";
+const TZ       = process.env.VITE_API_TZ || "America/Santiago";
 
-    const url = new URL(req.url, `http://${req.headers.host}`);
-    const fixture = url.searchParams.get("fixture");
-    const market  = (url.searchParams.get("market") || "1x2").toLowerCase();
-    if (!fixture) return res.status(400).json({ error: "Missing fixture" });
+async function api(path, params) {
+  if (!API_KEY) {
+    return new Response(JSON.stringify({ error: "Missing APISPORTS_KEY" }), { status: 500 });
+  }
+  const url = new URL(`https://${API_HOST}${path}`);
+  for (const [k, v] of Object.entries(params || {})) if (v != null && v !== "") url.searchParams.set(k, v);
+  const res = await fetch(url.toString(), {
+    headers: { "x-apisports-key": API_KEY, "x-rapidapi-key": API_KEY },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(()=>"");
+    return new Response(JSON.stringify({ error: `Upstream ${res.status}`, detail: t }), { status: res.status });
+  }
+  const data = await res.json();
+  return data;
+}
 
-    // API-FOOTBALL odds endpoint
-    // https://v3.football.api-sports.io/odds?fixture={id}
-    const apiUrl = `https://${APISPORTS_HOST}/odds?fixture=${encodeURIComponent(fixture)}`;
-
-    const r = await fetch(apiUrl, {
-      headers: {
-        "x-rapidapi-key": APISPORTS_KEY,
-        "x-rapidapi-host": APISPORTS_HOST
-      },
-      cache: "no-store"
-    });
-    if (!r.ok) {
-      const txt = await r.text().catch(() => "");
-      return res.status(502).json({ error: `Upstream ${r.status} ${r.statusText}`, body: txt });
-    }
-
-    const json = await r.json();
-    const marketsOut = [];
-
-    // Adaptar a una forma simple: [{out:'1', odd:1.85}, {out:'X', odd:3.2}, {out:'2', odd:2.1}]
-    (json?.response || []).forEach((book) => {
-      (book?.bookmakers || []).forEach((bm) => {
-        (bm?.bets || []).forEach((bet) => {
-          const name = String(bet?.name || "").toLowerCase();
-          if (name.includes("1x2") || name.includes("match winner") || market === "1x2") {
-            (bet?.values || []).forEach((v) => {
-              const label = String(v?.value || v?.odd || v?.label || "").toLowerCase();
-              let out = null;
-              if (label.includes("home") || label === "1") out = "1";
-              else if (label.includes("draw") || label === "x") out = "X";
-              else if (label.includes("away") || label === "2") out = "2";
-              const price = Number(v?.odd ?? v?.value);
-              if (out && isFinite(price) && price > 1.01) {
-                marketsOut.push({ out, odd: Number(price.toFixed(2)) });
-              }
-            });
+function to1x2Markets(resp) {
+  const out = [];
+  const books = Array.isArray(resp?.response) ? resp.response : [];
+  // estructura: response[ { bookmaker: {...}, bets: [ { name: 'Match Winner'|'1X2' , values: [ {value:'Home',odd:'1.85'} ... ] } ] } ]
+  for (const book of books) {
+    for (const bet of (book?.bets || [])) {
+      const nm = String(bet?.name || "").toLowerCase();
+      if (nm.includes("match winner") || nm.includes("1x2")) {
+        for (const v of (bet?.values || [])) {
+          const label = String(v?.value || "").toLowerCase();
+          let outName = label.includes("home") || label === "1" ? "1" :
+                        label.includes("draw") || label === "x" ? "X" :
+                        label.includes("away") || label === "2" ? "2" : null;
+          const odd = Number(v?.odd);
+          if (outName && isFinite(odd) && odd > 1.01) {
+            out.push({ out: outName, odd });
           }
-        });
-      });
-    });
+        }
+      }
+    }
+  }
+  return out;
+}
 
-    return res.json({ markets: marketsOut });
+export default async function handler(req) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const fixture = searchParams.get("fixture");
+    if (!fixture) return new Response(JSON.stringify({ markets: [] }), { status: 200 });
+
+    const raw = await api("/odds", { fixture });
+    if (raw instanceof Response) return raw;
+
+    const odds = to1x2Markets(raw);
+    return new Response(JSON.stringify({ markets: odds }), { headers: { "content-type": "application/json" } });
   } catch (e) {
-    return res.status(500).json({ error: String(e?.message || e) });
+    return new Response(JSON.stringify({ error: String(e?.message || e) }), { status: 500 });
   }
 }
