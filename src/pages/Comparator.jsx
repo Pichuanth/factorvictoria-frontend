@@ -355,10 +355,11 @@ items = items.filter((it) => {
       }
 
       // ---- parlay
-      const parlay = buildParlay(target, withOdds, 10);
-      if (parlay.totalOdd < target * 0.8 && !warn) {
-        setWarn("No hay suficientes eventos para alcanzar tu cuota objetivo. Amplía el rango de fechas o cambia liga/país.");
-      }
+const parlay = buildParlay(target, withOdds, 10);
+// si no hay partidos, warn; si hay pero la combinada es baja, mostramos igual sin warning duro
+if (!withOdds.length && !warn) {
+  setWarn("No encontramos eventos con tus filtros. Amplía fechas o cambia liga/país.");
+}
 
       // ---- demos para módulos premium (placeholder hasta tener data real)
       const refereesDemo = withOdds.slice(0, 5).map((f, i) => ({
