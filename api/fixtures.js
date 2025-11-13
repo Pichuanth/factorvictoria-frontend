@@ -1,70 +1,53 @@
-// api/fixtures.js
-// Devuelve fixtures normalizados desde API-FOOTBALL.
-// Nunca lanza 500: ante error responde { items: [], error: "..."} con 200.
-
-export const config = { runtime: 'edge' }; // frío + rápido
-const API_HOST = process.env.APISPORTS_HOST || "v3.football.api-sports.io";
-const API_KEY  = process.env.APISPORTS_KEY  || "";
-
-function okJson(body, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json; charset=utf-8" }
-  });
-}
-
-export default async function handler(req) {
+// /api/fixtures.js  — proxy a API-FOOTBALL v3 con fallback elegante
+export default async function handler(req, res) {
   try {
-    const url = new URL(req.url);
-    const date = url.searchParams.get("date") || "";
-    const from = url.searchParams.get("from") || "";
-    const to   = url.searchParams.get("to")   || "";
-    const country = url.searchParams.get("country") || "";
-    const league  = url.searchParams.get("league")  || "";
-    const tz = "America/Santiago";
+    const { date, from, to, league, country } = req.query;
+
+    const API_KEY = process.env.APISPORTS_KEY;             // <- DEBE existir en Vercel
+    const HOST = process.env.APISPORTS_HOST || "v3.football.api-sports.io";
 
     if (!API_KEY) {
-      return okJson({ items: [], error: "APISPORTS_KEY missing" });
+      return res.status(400).json({ error: "Missing APISPORTS_KEY" });
     }
 
-    // Construir query API-FOOTBALL
-    const q = new URLSearchParams();
-    q.set("timezone", tz);
-    if (date) q.set("date", date);
-    if (from) q.set("from", from);
-    if (to)   q.set("to", to);
-    if (country) q.set("country", country);
-    if (league)  q.set("league", league);
+    const qs = new URLSearchParams();
+    if (date) qs.set("date", date);
+    if (from) qs.set("from", from);
+    if (to) qs.set("to", to);
+    if (league) qs.set("league", league);
+    if (country) qs.set("country", country);
 
-    const resp = await fetch(`https://${API_HOST}/fixtures?${q.toString()}`, {
+    const url = `https://${HOST}/fixtures?${qs.toString()}`;
+
+    const r = await fetch(url, {
       headers: {
         "x-apisports-key": API_KEY,
-        "x-rapidapi-key": API_KEY // por si tu plan usa wrapper RapidAPI
       },
-      // no cache para pruebas
-      cache: "no-store"
+      // Evita caché agresiva en Vercel Edge
+      cache: "no-store",
     });
 
-    const raw = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      const msg = raw?.errors ? JSON.stringify(raw.errors) : `${resp.status} ${resp.statusText}`;
-      return okJson({ items: [], error: `remote ${msg}` });
+    if (!r.ok) {
+      const t = await r.text().catch(() => "");
+      throw new Error(`Upstream ${r.status} ${r.statusText} – ${t}`);
     }
 
-    const list = Array.isArray(raw?.response) ? raw.response : [];
-    const items = list.map(it => ({
+    const data = await r.json();
+
+    // Normaliza a un formato sencillo para el frontend
+    const items = (data?.response || []).map((it) => ({
       fixtureId: it?.fixture?.id,
       date: it?.fixture?.date,
-      country: it?.league?.country || it?.league?.name,
       league: it?.league?.name,
+      country: it?.league?.country,
       teams: {
         home: it?.teams?.home?.name,
-        away: it?.teams?.away?.name
-      }
-    })).filter(x => x.fixtureId);
+        away: it?.teams?.away?.name,
+      },
+    }));
 
-    return okJson({ count: items.length, items });
+    return res.status(200).json({ count: items.length, items });
   } catch (e) {
-    return okJson({ items: [], error: String(e?.message || e) });
+    return res.status(500).json({ error: String(e?.message || e) });
   }
 }

@@ -1,67 +1,58 @@
-// api/odds.js
-// Devuelve mercados normalizados (1X2 por defecto). Nunca 500.
-
-export const config = { runtime: 'edge' };
-const API_HOST = process.env.APISPORTS_HOST || "v3.football.api-sports.io";
-const API_KEY  = process.env.APISPORTS_KEY  || "";
-
-function okJson(body, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json; charset=utf-8" }
-  });
-}
-
-export default async function handler(req) {
+// /api/odds.js — odds 1X2 (y otros markets) desde API-FOOTBALL v3
+export default async function handler(req, res) {
   try {
-    const url = new URL(req.url);
-    const fixture = url.searchParams.get("fixture");
-    const want = (url.searchParams.get("market") || "1x2").toLowerCase();
+    const { fixture, market = "1x2", bookmaker } = req.query;
 
-    if (!fixture) return okJson({ markets: [], error: "missing fixture" });
-    if (!API_KEY) return okJson({ markets: [], error: "APISPORTS_KEY missing" });
+    const API_KEY = process.env.APISPORTS_KEY;
+    const HOST = process.env.APISPORTS_HOST || "v3.football.api-sports.io";
+    if (!API_KEY) return res.status(400).json({ error: "Missing APISPORTS_KEY" });
+    if (!fixture) return res.status(400).json({ error: "Missing fixture" });
 
-    const q = new URLSearchParams();
-    q.set("fixture", fixture);
+    const qs = new URLSearchParams();
+    qs.set("fixture", fixture);
+    if (bookmaker) qs.set("bookmaker", bookmaker);
 
-    const resp = await fetch(`https://${API_HOST}/odds?${q.toString()}`, {
-      headers: {
-        "x-apisports-key": API_KEY,
-        "x-rapidapi-key": API_KEY
-      },
-      cache: "no-store"
+    // API-FOOTBALL 1X2 se obtiene en endpoint /odds con response/outcomes
+    const url = `https://${HOST}/odds?${qs.toString()}`;
+
+    const r = await fetch(url, {
+      headers: { "x-apisports-key": API_KEY },
+      cache: "no-store",
     });
-
-    const raw = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      const msg = raw?.errors ? JSON.stringify(raw.errors) : `${resp.status} ${resp.statusText}`;
-      return okJson({ markets: [], error: `remote ${msg}` });
+    if (!r.ok) {
+      const t = await r.text().catch(() => "");
+      throw new Error(`Upstream ${r.status} ${r.statusText} – ${t}`);
     }
 
-    // API-FOOTBALL estructura: response[0].bookmakers[].bets[] con odds
-    const respArr = Array.isArray(raw?.response) ? raw.response : [];
-    const first   = respArr[0] || {};
-    const books   = Array.isArray(first?.bookmakers) ? first.bookmakers : [];
+    const data = await r.json();
 
-    const out = [];
-    for (const b of books) {
-      for (const bet of (b?.bets || [])) {
-        const key = (bet?.name || bet?.label || "").toLowerCase();
-        // buscamos 1x2, pero dejamos pasar más mercados si se piden
-        if (want === "1x2" && !key.includes("1x2") && !key.includes("match winner")) continue;
+    // Aplanamos a un array de markets->outcomes con nombre/cuota
+    // (la estructura completa varía; tomamos el primero por casa)
+    const resp = Array.isArray(data?.response) ? data.response : [];
+    const first = resp[0];
 
-        const outcomes = (bet?.values || bet?.outcomes || []).map(o => {
-          const name = (o?.value || o?.label || o?.name || "").toString();
-          const odd  = Number(o?.odd ?? o?.value ?? o?.price);
-          return { name, odd };
-        }).filter(o => o.odd > 1.01);
-
-        if (outcomes.length) out.push({ key, outcomes });
+    const markets = [];
+    // Busca outcome 1/X/2 si está disponible
+    const bks = first?.bookmakers || [];
+    for (const bk of bks) {
+      for (const lm of bk?.bets || []) {
+        const key = (lm?.name || lm?.bet || "").toLowerCase();
+        // Filtramos a 1X2 si el market pedido es ese
+        if (market.toLowerCase().includes("1x2")) {
+          if (!/1x2|match winner|fulltime/i.test(key)) continue;
+        }
+        const outs = (lm?.values || lm?.outcomes || []).map((o) => ({
+          label: o?.value || o?.label || o?.name,
+          odd: Number(o?.odd || o?.price || o?.value),
+        }));
+        if (outs.length) markets.push({ key: lm?.name || lm?.bet, outcomes: outs });
       }
+      // tomamos el primer bookmaker bueno
+      if (markets.length) break;
     }
 
-    return okJson({ markets: out });
+    return res.status(200).json({ markets });
   } catch (e) {
-    return okJson({ markets: [], error: String(e?.message || e) });
+    return res.status(500).json({ error: String(e?.message || e) });
   }
 }
