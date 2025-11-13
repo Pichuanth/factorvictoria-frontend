@@ -6,6 +6,29 @@ import { useAuth } from "../lib/auth";
 const GOLD = "#E6C464";
 
 /* ---------- helpers ---------- */
+// alias ES -> EN para country en APISports
+const COUNTRY_ALIAS = {
+  francia: "France",
+  inglaterra: "England",
+  españa: "Spain",
+  espana: "Spain",
+  portugal: "Portugal",
+  italia: "Italy",
+  alemania: "Germany",
+  noruega: "Norway",
+  chile: "Chile",
+  argentina: "Argentina",
+  brasil: "Brazil",
+  brasil: "Brazil",
+  mexico: "Mexico",
+  estadosunidos: "USA",
+  eeuu: "USA",
+};
+function normalizeCountryQuery(q) {
+  const key = String(q || "").toLowerCase().replace(/\s+/g, "");
+  return COUNTRY_ALIAS[key] || null;
+}
+
 function toYYYYMMDD(d) {
   const pad = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -205,15 +228,29 @@ export default function Comparator() {
       const days = listDays(from, to);
       const now = new Date();
 
-      // armamos todas las URLs (día por día) y añadimos q MIXTO (para backend que lo soporte)
-      const urls = days.map((d) => {
-        let u = `/api/fixtures?date=${d}`;
-        if (isNum) u += `&league=${qTrim}`;
-        else if (qTrim) u += `&country=${encodeURIComponent(qTrim)}`;
-        if (qTrim) u += `&q=${encodeURIComponent(qTrim)}`; // filtro mixto sugerido
-        u += `&futureOnly=1`; // si el backend lo soporta
-        return u;
-      });
+      // Armamos URLs por día.
+// Si q es numérico → id de liga.
+// Si q es texto → probamos BÚSQUEDA AMPLIA (sin country) + country mapeado si existe.
+const countryEN = !isNum && qTrim ? normalizeCountryQuery(qTrim) : null;
+
+const urls = [];
+for (const d of days) {
+  // siempre una amplia sin country (para qualifiers internacionales, champions, etc.)
+  let base = `/api/fixtures?date=${d}`;
+  if (isNum) base += `&league=${qTrim}`;
+  // q mixto para que el backend use texto libre si lo soporta
+  if (qTrim) base += `&q=${encodeURIComponent(qTrim)}`;
+  base += `&futureOnly=1`;
+  urls.push(base);
+
+  // si tenemos país mapeado, probamos además una segunda URL filtrada por country
+  if (!isNum && countryEN) {
+    let byCountry = `/api/fixtures?date=${d}&country=${encodeURIComponent(countryEN)}`;
+    if (qTrim) byCountry += `&q=${encodeURIComponent(qTrim)}`;
+    byCountry += `&futureOnly=1`;
+    urls.push(byCountry);
+  }
+}
 
       // descargas en paralelo con tolerancia a fallas
       let items = [];
@@ -241,19 +278,25 @@ export default function Comparator() {
         return true;
       });
 
-      // FUTURE ONLY (client-side), y si q es texto, también filtramos por equipos
-      items = items.filter((it) => {
-        const ko = getKickoff(it);
-        const isFuture = ko ? ko >= now : true; // si no sabemos la hora, lo dejamos pasar
-        if (!isFuture) return false;
-        if (!qTrim || isNum) return true;
-        const h = safeLower(it?.teams?.home);
-        const a = safeLower(it?.teams?.away);
-        const txt = safeLower(qTrim);
-        const teamMatch = txt.length >= 3 ? (h.includes(txt) || a.includes(txt)) : true;
-        // además dejamos pasar por país (vía backend) aunque no matchee equipo exacto
-        return teamMatch || true;
-      });
+      // FUTURE ONLY (client-side) + filtro por equipo o liga cuando q es texto
+items = items.filter((it) => {
+  const ko = getKickoff(it);
+  const isFuture = ko ? ko >= now : true;
+  if (!isFuture) return false;
+
+  if (!qTrim || isNum) return true;
+
+  const txt = safeLower(qTrim);
+  const h = safeLower(it?.teams?.home);
+  const a = safeLower(it?.teams?.away);
+  const leagueName = safeLower(it?.league?.name);
+
+  // match por equipo o por liga (p. ej., "francia" para "UEFA World Cup Qualifying")
+  const teamMatch = txt.length >= 3 && (h.includes(txt) || a.includes(txt));
+  const leagueMatch = txt.length >= 3 && leagueName.includes(txt);
+
+  return teamMatch || leagueMatch || true; // true permite lo que haya entrado por backend
+});
 
       // ordenar por popularidad y por kickoff
       items.sort((A, B) => {
