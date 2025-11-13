@@ -1,75 +1,132 @@
-// /api/fixtures.js  — Serverless Node (Vercel)
-// Lee APISPORTS_KEY / APISPORTS_HOST desde env. Si faltan -> 400 informativo.
-// Soporta ?date=YYYY-MM-DD  o  ?from=YYYY-MM-DD&to=YYYY-MM-DD  (+ &country=Chile | &league=140)
-// ?demo=1 fuerza modo demo.
+// api/fixtures.js
+// Serverless: devuelve fixtures desde API-FOOTBALL, con soporte de rango e "upcoming only"
 
-export default async function handler(req, res) {
-  try {
-    const { APISPORTS_KEY, APISPORTS_HOST } = process.env;
-    if (!APISPORTS_KEY || !APISPORTS_HOST) {
-      return res.status(400).json({ error: "Missing APISPORTS_KEY or APISPORTS_HOST" });
-    }
+export const config = { runtime: "edge" };
 
-    const url = new URL(req.url, `http://${req.headers.host}`);
-    const date = url.searchParams.get("date");
-    const from = url.searchParams.get("from");
-    const to   = url.searchParams.get("to");
-    const country = url.searchParams.get("country");
-    const league  = url.searchParams.get("league");
-    const demo = url.searchParams.get("demo");
+const APISPORTS_KEY  = process.env.APISPORTS_KEY;
+const APISPORTS_HOST = process.env.APISPORTS_HOST || "v3.football.api-sports.io";
+const DEFAULT_TZ     = process.env.VITE_API_TZ || "America/Santiago";
 
-    // DEMO opcional para pruebas
-    if (demo === "1") {
-      const items = Array.from({ length: 10 }, (_, i) => ({
-        fixtureId: `demo-${i+1}`,
-        date: date || from || new Date().toISOString().slice(0,10),
-        country: country || "DemoLand",
-        league: league || "999",
-        teams: { home: `Equipo A${i+1}`, away: `Equipo B${i+1}` }
-      }));
-      return res.json({ count: items.length, items });
-    }
-
-    // Construir endpoint de API-FOOTBALL
-    // Docs: https://www.api-football.com/documentation-v3
-    let apiUrl = "";
-    if (date) {
-      apiUrl = `https://${APISPORTS_HOST}/fixtures?date=${encodeURIComponent(date)}`;
-    } else if (from && to) {
-      apiUrl = `https://${APISPORTS_HOST}/fixtures?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
-    } else {
-      return res.status(400).json({ error: "Provide ?date=YYYY-MM-DD OR ?from=YYYY-MM-DD&to=YYYY-MM-DD" });
-    }
-    if (country) apiUrl += `&country=${encodeURIComponent(country)}`;
-    if (league)  apiUrl += `&league=${encodeURIComponent(league)}`;
-
-    const r = await fetch(apiUrl, {
-      headers: {
-        "x-rapidapi-key": APISPORTS_KEY,
-        "x-rapidapi-host": APISPORTS_HOST
-      },
-      cache: "no-store"
+// Pequeño fetch con cabeceras de API-FOOTBALL
+async function apiFootball(path, params = {}) {
+  if (!APISPORTS_KEY) {
+    return new Response(JSON.stringify({ error: "Missing APISPORTS_KEY" }), {
+      status: 500, headers: { "content-type": "application/json" }
     });
+  }
 
-    if (!r.ok) {
-      const txt = await r.text().catch(() => "");
-      return res.status(502).json({ error: `Upstream ${r.status} ${r.statusText}`, body: txt });
+  const qs = new URLSearchParams(params);
+  const url = `https://${APISPORTS_HOST}${path}?${qs.toString()}`;
+
+  const res = await fetch(url, {
+    headers: {
+      "x-apisports-key": APISPORTS_KEY,
+      "x-rapidapi-key": APISPORTS_KEY,        // (algunas cuentas usan este header)
+      "accept": "application/json",
+    },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    return new Response(JSON.stringify({ error: `Upstream ${res.status}`, body: txt }), {
+      status: 500, headers: { "content-type": "application/json" }
+    });
+  }
+
+  return res.json();
+}
+
+// util: yyyy-mm-dd
+function fmt(d) {
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+}
+function* daysBetween(fromStr, toStr) {
+  const from = new Date(fromStr + "T00:00:00");
+  const to   = new Date(toStr   + "T00:00:00");
+  for (let d = new Date(from); d <= to; d.setDate(d.getDate()+1)) {
+    yield fmt(d);
+  }
+}
+
+// mapea respuesta a tu shape
+function mapFixture(x) {
+  const f = x.fixture || {};
+  const l = x.league  || {};
+  const t = x.teams   || {};
+  return {
+    fixtureId: f.id,
+    date: f.date,
+    timestamp: f.timestamp ? f.timestamp * 1000 : null,
+    status: f.status?.short,
+    league: { id: l.id, name: l.name, round: l.round, season: l.season },
+    country: { code: l.country, name: l.country },
+    teams: { home: t.home?.name, away: t.away?.name },
+  };
+}
+
+// decide si es jugable (solo próximos)
+function isUpcoming(fixt, nowMs) {
+  const allowed = new Set(["NS", "TBD", "PST"]); // Not Started, To Be Decided, Postponed
+  const okStatus = allowed.has(String(fixt.status || "").toUpperCase());
+  const tsOk = !fixt.timestamp || fixt.timestamp >= (nowMs - 30 * 60 * 1000); // evita ya finalizados por desfase
+  return okStatus && tsOk;
+}
+
+export default async function handler(req) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const date    = searchParams.get("date");     // yyyy-mm-dd (1 día)
+    const from    = searchParams.get("from");     // yyyy-mm-dd
+    const to      = searchParams.get("to");       // yyyy-mm-dd
+    const country = searchParams.get("country");  // "Chile"
+    const league  = searchParams.get("league");   // id numérico como string
+    const tz      = DEFAULT_TZ;
+
+    // construir lista de días a consultar
+    let days = [];
+    if (date) {
+      days = [date];
+    } else if (from && to) {
+      days = Array.from(daysBetween(from, to));
+    } else {
+      // por defecto hoy
+      days = [fmt(new Date())];
     }
 
-    const json = await r.json();
-    // Adaptar salida básica a tu frontend
-    const items = Array.isArray(json?.response)
-      ? json.response.map((it) => ({
-          fixtureId: it?.fixture?.id,
-          date: it?.fixture?.date?.slice(0,10),
-          country: it?.league?.country,
-          league: it?.league?.id,
-          teams: { home: it?.teams?.home?.name, away: it?.teams?.away?.name }
-        }))
-      : [];
+    const nowMs = Date.now();
+    const allItems = [];
 
-    return res.json({ count: items.length, items });
+    // API-FOOTBALL funciona mejor por fecha individual; iteramos por día
+    for (const d of days) {
+      const params = { date: d, timezone: tz };
+      if (country) params.country = country;
+      if (league)  params.league  = league;
+
+      const json = await apiFootball("/fixtures", params);
+      // Si apiFootball devolvió Response (error), reenviar tal cual
+      if (json instanceof Response) return json;
+
+      const list = Array.isArray(json?.response) ? json.response : [];
+      for (const raw of list) {
+        const m = mapFixture(raw);
+        if (isUpcoming(m, nowMs)) allItems.push(m);
+      }
+    }
+
+    // ordenar por fecha próxima
+    allItems.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+    return new Response(JSON.stringify({
+      count: allItems.length,
+      items: allItems,
+      meta: { days, tz, filteredToUpcoming: true }
+    }), { headers: { "content-type": "application/json" } });
+
   } catch (e) {
-    return res.status(500).json({ error: String(e?.message || e) });
+    return new Response(JSON.stringify({ error: String(e?.message || e) }), {
+      status: 500, headers: { "content-type": "application/json" }
+    });
   }
 }
