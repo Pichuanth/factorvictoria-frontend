@@ -15,6 +15,29 @@ function addDays(d, n) {
   x.setDate(x.getDate() + n);
   return x;
 }
+function listDays(fromStr, toStr) {
+  const out = [];
+  let d = new Date(fromStr);
+  const end = new Date(toStr);
+  while (d <= end) {
+    out.push(toYYYYMMDD(d));
+    d = addDays(d, 1);
+  }
+  return out;
+}
+function safeLower(x) {
+  return String(x || "").toLowerCase();
+}
+function getKickoff(item) {
+  // intentamos varios nombres de campo comunes
+  const ts =
+    item?.timestamp ??
+    item?.fixture?.timestamp ??
+    (item?.date ? Date.parse(item.date) / 1000 : null) ??
+    (item?.fixture?.date ? Date.parse(item.fixture.date) / 1000 : null) ??
+    null;
+  return ts ? new Date(ts * 1000) : null;
+}
 
 /** Mapea membresía → target cuota */
 function targetFromPlan(planRaw) {
@@ -37,8 +60,8 @@ async function fetchJSON(path) {
 function synthOdds(fixtureId) {
   const seed = Number(String(fixtureId).slice(-4)) || 1234;
   const r = (seed % 100) / 100; // 0..0.99
-  const home = 1.25 + r * 0.7;                    // 1.25..1.95
-  const draw = 2.8 + r * 0.9;                     // 2.8..3.7
+  const home = 1.25 + r * 0.7; // 1.25..1.95
+  const draw = 2.8 + r * 0.9; // 2.8..3.7
   const away = 1.6 + ((99 - (seed % 100)) / 100); // 1.6..2.59
   return [
     { out: "1", odd: Number(home.toFixed(2)) },
@@ -64,23 +87,17 @@ function buildParlay(target, fixturesWithOdds, maxLegs = 10) {
     const nice = [...f.odds]
       .filter((o) => o.odd >= 1.3 && o.odd <= 3.2)
       .sort((a, b) => a.odd - b.odd);
-    if (nice[0]) pool.push({ ...nice[0], match: f.label, fid: f.id, homeId: f.homeId, awayId: f.awayId });
-    if (nice[1] && nice[1].odd <= 2.2) pool.push({ ...nice[1], match: f.label, fid: f.id, homeId: f.homeId, awayId: f.awayId });
+    if (nice[0]) pool.push({ ...nice[0], match: f.label });
+    if (nice[1] && nice[1].odd <= 2.2) pool.push({ ...nice[1], match: f.label });
   }
-
   const selections = [];
-  const used = new Set(); // evita dos signos del mismo fixture
   let product = 1;
-
   for (const o of pool) {
     if (selections.length >= maxLegs) break;
-    if (used.has(o.fid)) continue;
-
     const test = product * o.odd;
     if (test <= target * 1.15 || product < target * 0.6) {
       product = Number(test.toFixed(2));
-      selections.push({ match: o.match, market: "1X2", pick: o.out, odd: o.odd, fid: o.fid, homeId: o.homeId, awayId: o.awayId });
-      used.add(o.fid);
+      selections.push({ match: o.match, market: "1X2", pick: o.out, odd: o.odd });
       if (product >= target * 0.92) break;
     }
   }
@@ -107,10 +124,24 @@ function makeDemoFixtures(from, to, count = 10) {
     out.push({
       fixtureId: `demo-${from}-${to}-${i}`,
       teams: { home: `Equipo A${i}`, away: `Equipo B${i}` },
-      league: { name: "Demo League" },
+      league: { name: "DEMO" },
     });
   }
   return out;
+}
+
+/* Popularidad para ordenar (más arriba: Mundial, Qualifiers, Champions, Libertadores, top leagues) */
+function popularityScore(item) {
+  const name = safeLower(item?.league?.name);
+  const checks = [
+    [/world cup|copa mundial|qualifier|eliminatoria/, 100],
+    [/uefa euro|nations league|champions league/, 95],
+    [/libertadores|sudamericana/, 92],
+    [/premier league|la liga|serie a|bundesliga|ligue 1/, 90],
+    [/mls|brasileir|argentina|eredivisie|primeira liga/, 80],
+  ];
+  for (const [re, v] of checks) if (re.test(name)) return v;
+  return 40; // por defecto
 }
 
 export default function Comparator() {
@@ -149,41 +180,17 @@ export default function Comparator() {
     );
   }
 
-  /* ---- flags por plan ---- */
   const isPremium = target >= 50; // Anual o Vitalicio
 
   /* ---- estado UI ---- */
   const today = useMemo(() => new Date(), []);
   const [from, setFrom] = useState(toYYYYMMDD(today));
   const [to, setTo] = useState(toYYYYMMDD(addDays(today, 0)));
-  const [q, setQ] = useState(""); // país / id liga / nombre
+  const [q, setQ] = useState(""); // país / id liga / equipo
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [warn, setWarn] = useState("");
   const [data, setData] = useState(null);
-  const [h2hByFid, setH2hByFid] = useState({}); // { [fid]: { loading, rows } }
-
-  async function loadH2H(fid, homeId, awayId) {
-    if (!fid || h2hByFid[fid]?.loading) return;
-    setH2hByFid((s) => ({ ...s, [fid]: { loading: true, rows: s[fid]?.rows || [] } }));
-    try {
-      let rows = [];
-      if (homeId && awayId) {
-        const r = await fetchJSON(`/api/h2h?home=${homeId}&away=${awayId}&limit=5`);
-        rows = Array.isArray(r?.items) ? r.items : [];
-      }
-      if (!rows.length) {
-        rows = [
-          { score: "2-1", date: "2025-05-10" },
-          { score: "1-0", date: "2024-11-20" },
-          { score: "0-0", date: "2024-07-03" },
-        ];
-      }
-      setH2hByFid((s) => ({ ...s, [fid]: { loading: false, rows } }));
-    } catch {
-      setH2hByFid((s) => ({ ...s, [fid]: { loading: false, rows: [] } }));
-    }
-  }
 
   /* ---- generar picks ---- */
   async function onGenerate() {
@@ -193,71 +200,92 @@ export default function Comparator() {
       setWarn("");
       setData(null);
 
-      // ---- construir URL de fixtures (filtro mixto q= + league/country)
       const qTrim = String(q || "").trim();
       const isNum = /^\d+$/.test(qTrim);
-      const isRange = from !== to;
+      const days = listDays(from, to);
+      const now = new Date();
 
-      let url = isRange
-        ? `/api/fixtures?from=${from}&to=${to}`
-        : `/api/fixtures?date=${from}`;
+      // armamos todas las URLs (día por día) y añadimos q MIXTO (para backend que lo soporte)
+      const urls = days.map((d) => {
+        let u = `/api/fixtures?date=${d}`;
+        if (isNum) u += `&league=${qTrim}`;
+        else if (qTrim) u += `&country=${encodeURIComponent(qTrim)}`;
+        if (qTrim) u += `&q=${encodeURIComponent(qTrim)}`; // filtro mixto sugerido
+        u += `&futureOnly=1`; // si el backend lo soporta
+        return u;
+      });
 
-      if (qTrim) {
-        url += `&q=${encodeURIComponent(qTrim)}`;
-        url += isNum
-          ? `&league=${qTrim}`
-          : `&country=${encodeURIComponent(qTrim)}`;
-      }
-
-      // ---- pedir fixtures
+      // descargas en paralelo con tolerancia a fallas
       let items = [];
       try {
-        const fx = await fetchJSON(url); // { count, items }
-        items = Array.isArray(fx?.items) ? fx.items : [];
-        if (!items.length) {
-          setWarn("No hay suficientes eventos para alcanzar tu cuota objetivo. Amplía el rango de fechas o cambia liga/país.");
+        const batches = await Promise.all(
+          urls.map((u) =>
+            fetchJSON(u).catch(() => ({ items: [] }))
+          )
+        );
+        for (const fx of batches) {
+          if (Array.isArray(fx?.items)) items.push(...fx.items);
         }
-      } catch (e) {
-        setWarn("La API dio error (HTTP 500). Mostrando demo para que puedas seguir probando.");
+      } catch {
+        // si algo muy raro, usamos demo
         items = makeDemoFixtures(from, to, 12);
+        setWarn("La API dio error. Mostrando demo para que puedas seguir probando.");
       }
 
-      // ---- FILTRAR: dejar solo FUTUROS/no finalizados
-      const nowSec = Math.floor(Date.now() / 1000);
+      // dedupe por fixtureId
+      const seen = new Set();
       items = items.filter((it) => {
-        const ts = Number(it?.timestamp ?? it?.ts ?? 0);
-        const status = String(it?.status?.short || it?.status || "").toUpperCase();
-        if (["FT","AET","PEN","POST","CANC"].includes(status)) return false;
-        if (ts) return ts >= nowSec - 300;
+        const id = String(it.fixtureId ?? it.id ?? `${it?.fixture?.id ?? ""}`);
+        if (seen.has(id)) return false;
+        seen.add(id);
         return true;
       });
 
-      // ---- ORDENAR: priorizar importantes (mundial, champions, selecciones, etc.)
-      const hotWords = ["world cup", "copa mundial", "champions", "libertadores", "euro", "qualifier", "eliminatoria"];
-      const bigTeams = ["france","inglaterra","portugal","brasil","argentina","alemania","italia","españa","noruega","real madrid","barcelona","manchester","liverpool","boca","river"];
-      function scoreItem(it) {
-        const t = `${it?.league?.name || ""} ${it?.teams?.home || ""} ${it?.teams?.away || ""}`.toLowerCase();
-        let s = 0;
-        for (const w of hotWords) if (t.includes(w)) s += 5;
-        for (const w of bigTeams) if (t.includes(w)) s += 2;
-        return s;
+      // FUTURE ONLY (client-side), y si q es texto, también filtramos por equipos
+      items = items.filter((it) => {
+        const ko = getKickoff(it);
+        const isFuture = ko ? ko >= now : true; // si no sabemos la hora, lo dejamos pasar
+        if (!isFuture) return false;
+        if (!qTrim || isNum) return true;
+        const h = safeLower(it?.teams?.home);
+        const a = safeLower(it?.teams?.away);
+        const txt = safeLower(qTrim);
+        const teamMatch = txt.length >= 3 ? (h.includes(txt) || a.includes(txt)) : true;
+        // además dejamos pasar por país (vía backend) aunque no matchee equipo exacto
+        return teamMatch || true;
+      });
+
+      // ordenar por popularidad y por kickoff
+      items.sort((A, B) => {
+        const ps = popularityScore(B) - popularityScore(A);
+        if (ps !== 0) return ps;
+        const ta = getKickoff(A)?.getTime() ?? 9e15;
+        const tb = getKickoff(B)?.getTime() ?? 9e15;
+        return ta - tb;
+      });
+
+      if (!items.length) {
+        setWarn("No hay suficientes eventos para alcanzar tu cuota objetivo. Amplía el rango de fechas o cambia liga/país.");
       }
-      items.sort((a, b) => scoreItem(b) - scoreItem(a));
 
       // ---- odds (reales cuando existan; si no, sintéticas)
       const withOdds = [];
-      for (const it of items.slice(0, 30)) {
-        const label = `${it.teams?.home || "Equipo A"} vs ${it.teams?.away || "Equipo B"}${String(it.fixtureId).startsWith("demo-") ? " (demo)" : ""}`;
+      for (const it of items.slice(0, 120)) {
+        const ko = getKickoff(it);
+        const dateStr = ko ? ` · ${ko.toLocaleString()}` : "";
+        const label = `${it.teams?.home || "Equipo A"} vs ${it.teams?.away || "Equipo B"}${String(it.fixtureId).startsWith("demo-") ? " (demo)" : ""}${dateStr}`;
         let odds = [];
         try {
           if (!String(it.fixtureId).startsWith("demo-")) {
-            const od = await fetchJSON(`/api/odds?fixture=${encodeURIComponent(it.fixtureId)}&market=1x2`);
+            const od = await fetchJSON(
+              `/api/odds?fixture=${encodeURIComponent(it.fixtureId)}&market=1x2`
+            );
             const markets = Array.isArray(od?.markets) ? od.markets : [];
             const flat = [];
             for (const mk of markets) {
               const outs = Array.isArray(mk?.outcomes) ? mk.outcomes : [mk];
               for (const o of outs) {
-                const name = String(o?.name || o?.label || o?.outcome || "").toLowerCase();
+                const name = safeLower(o?.name || o?.label || o?.outcome || "");
                 const price = Number(o?.odd ?? o?.price ?? o?.value);
                 if (!isFinite(price)) continue;
                 let out = "1";
@@ -273,13 +301,7 @@ export default function Comparator() {
           odds = [];
         }
         if (!odds.length) odds = synthOdds(it.fixtureId);
-        withOdds.push({
-          label,
-          odds,
-          id: it.fixtureId,
-          homeId: it.teams?.homeId,
-          awayId: it.teams?.awayId,
-        });
+        withOdds.push({ label, odds, id: it.fixtureId });
       }
 
       // ---- regalo
@@ -295,7 +317,7 @@ export default function Comparator() {
         setWarn("No hay suficientes eventos para alcanzar tu cuota objetivo. Amplía el rango de fechas o cambia liga/país.");
       }
 
-      // ---- demos para módulos premium (si aplica)
+      // ---- demos para módulos premium (placeholder hasta tener data real)
       const refereesDemo = withOdds.slice(0, 5).map((f, i) => ({
         match: f.label,
         referee: `Árbitro Demo ${i + 1}`,
@@ -343,7 +365,7 @@ export default function Comparator() {
             title="Hasta"
           />
           <input
-            placeholder="País / liga / equipo / id liga (ej: Chile, Francia, 140)"
+            placeholder="País / equipo / id de liga (ej: Chile, Francia, 39)"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             className="rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10 md:col-span-1"
@@ -393,42 +415,13 @@ export default function Comparator() {
 
         {data?.parlay?.selections?.length ? (
           <>
-            <ul className="mt-3 space-y-2 text-slate-200">
-              {data.parlay.selections.map((s, i) => {
-                const h2h = h2hByFid[s.fid];
-                return (
-                  <li key={i} className="border-b border-white/10 pb-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="font-semibold">{s.match}</span> — {s.market} · {s.pick} ·{" "}
-                        <span className="font-bold">(x{s.odd})</span>
-                      </div>
-                      <button
-                        onClick={() => loadH2H(s.fid, s.homeId, s.awayId)}
-                        className="text-sm underline"
-                      >
-                        Ver H2H
-                      </button>
-                    </div>
-
-                    {h2h && (
-                      <div className="mt-2 text-slate-300">
-                        {h2h.loading ? (
-                          <div className="text-slate-400 text-sm">Cargando historial…</div>
-                        ) : h2h.rows?.length ? (
-                          <ul className="text-sm list-disc ml-5">
-                            {h2h.rows.map((r, j) => (
-                              <li key={j}>{r.date} — {r.score}</li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <div className="text-slate-400 text-sm">Sin historial disponible.</div>
-                        )}
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
+            <ul className="mt-3 space-y-1 text-slate-200">
+              {data.parlay.selections.map((s, i) => (
+                <li key={i}>
+                  <span className="font-semibold">{s.match}</span> — {s.market} · {s.pick} ·{" "}
+                  <span className="font-bold">(x{s.odd})</span>
+                </li>
+              ))}
             </ul>
             <div className="mt-3 text-white font-bold">Cuota total: x{data.parlay.totalOdd}</div>
           </>
