@@ -1,10 +1,6 @@
-// frontend/api/fixtures.js
-import fetch from "node-fetch";
+// api/fixtures.js
+import { afetch, jsonOrError } from "./_apifootball";
 
-const API_HOST = process.env.APISPORTS_HOST || "v3.football.api-sports.io";
-const API_KEY  = process.env.APISPORTS_KEY;
-
-// Alias ES→EN para country
 const COUNTRY_ALIAS = {
   francia: "France",
   inglaterra: "England",
@@ -21,14 +17,6 @@ const COUNTRY_ALIAS = {
   estadosunidos: "USA",
   eeuu: "USA",
 };
-
-const popularChecks = [
-  { re: /world cup|copa mundial|qualifier|eliminatoria/i, score: 100 },
-  { re: /uefa euro|nations league|champions league/i, score: 95 },
-  { re: /libertadores|sudamericana/i, score: 92 },
-  { re: /premier league|la liga|serie a|bundesliga|ligue 1/i, score: 90 },
-  { re: /mls|brasileir|argentina|eredivisie|primeira liga/i, score: 80 },
-];
 
 function toYYYYMMDD(d) {
   const pad = (n) => String(n).padStart(2, "0");
@@ -49,143 +37,124 @@ function listDays(fromStr, toStr) {
   }
   return out;
 }
-function popScore(name = "") {
-  for (const { re, score } of popularChecks) if (re.test(name)) return score;
-  return 40;
-}
+const safeLower = (x) => String(x || "").toLowerCase();
+const normCountry = (q) => {
+  const key = String(q || "").toLowerCase().replace(/\s+/g, "");
+  return COUNTRY_ALIAS[key] || null;
+};
 
-function mapItem(apiIt) {
-  const fix = apiIt?.fixture || apiIt;
-  const lea = apiIt?.league || {};
-  const teams = apiIt?.teams || {};
-  const ts =
-    fix?.timestamp ??
-    (fix?.date ? Math.floor(Date.parse(fix.date) / 1000) : null);
-
+function mapFixture(apiItem) {
+  // normaliza a shape usado por el frontend
+  const f = apiItem?.fixture || {};
+  const t = apiItem?.teams || {};
+  const l = apiItem?.league || {};
+  const ts = f.timestamp ?? (f.date ? Date.parse(f.date) / 1000 : null);
   return {
-    fixtureId: String(fix?.id ?? apiIt?.id ?? ""),
-    timestamp: ts,
-    league: { name: lea?.name || "" },
-    teams: {
-      home: teams?.home?.name || "",
-      away: teams?.away?.name || "",
-      homeId: teams?.home?.id ?? null,
-      awayId: teams?.away?.id ?? null,
-    },
-    _raw: apiIt,
+    fixtureId: f.id ?? apiItem?.id ?? `${l.id || ""}-${ts || ""}`,
+    teams: { home: t.home?.name || "", away: t.away?.name || "" },
+    league: { id: l.id, name: l.name || "" },
+    timestamp: ts || null,
+    raw: apiItem,
   };
-}
-
-async function getFixturesByDate(date, params) {
-  const url = new URL(`https://${API_HOST}/fixtures`);
-  url.searchParams.set("date", date);
-  if (params.league)  url.searchParams.set("league", params.league);
-  if (params.country) url.searchParams.set("country", params.country);
-  // Nota: no filtramos status aquí; filtramos luego con futureOnly.
-
-  const res = await fetch(url.toString(), {
-    headers: {
-      "x-apisports-key": API_KEY || "",
-    },
-  });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`APISports ${res.status}: ${txt.slice(0, 200)}`);
-  }
-  const json = await res.json();
-  const list = Array.isArray(json?.response) ? json.response : [];
-  return list.map(mapItem);
 }
 
 export default async function handler(req, res) {
   try {
-    const { date, from, to, league, country, q, futureOnly } = req.query;
+    const {
+      date,
+      from,
+      to,
+      league,
+      country,
+      q,           // texto libre: equipo / liga / país
+      futureOnly,  // "1" para sólo futuros
+    } = req.query;
 
-    // Fallback demo si no hay KEY
-    if (!API_KEY) {
-      const f = date || from || to || toYYYYMMDD(new Date());
-      const items = Array.from({ length: 10 }).map((_, i) => ({
-        fixtureId: `demo-${f}-${i + 1}`,
-        timestamp: Math.floor(Date.now() / 1000) + 3600 * (i + 1),
-        league: { name: "DEMO" },
-        teams: {
-          home: `Equipo A${i + 1}`,
-          away: `Equipo B${i + 1}`,
-          homeId: null,
-          awayId: null,
-        },
-      }));
-      return res.status(200).json({ count: items.length, items });
+    const today = toYYYYMMDD(new Date());
+    const days = date ? [date] : listDays(from || today, to || from || today);
+
+    // Si hay league numérica, la pasamos tal cual
+    const leagueId = /^\d+$/.test(String(league || "")) ? String(league) : null;
+
+    // País: o viene en country, o intentamos sacarlo de q (alias ES->EN)
+    let countryFilter = country || null;
+    if (!countryFilter && q) {
+      const maybeCountry = normCountry(q);
+      if (maybeCountry) countryFilter = maybeCountry;
     }
 
-    // Parametría
-    const isRange = !!(from && to);
-    const leagueId = league && /^\d+$/.test(String(league)) ? String(league) : null;
-
-    let countryNorm = null;
-    if (country) {
-      const key = String(country).toLowerCase().replace(/\s+/g, "");
-      countryNorm = COUNTRY_ALIAS[key] || country; // intenta alias ES→EN
-    }
-
-    const days = isRange ? listDays(from, to) : [date || toYYYYMMDD(new Date())];
-
-    // Fetch por día: siempre hacemos una consulta "amplia";
-    // si hay country válido, hacemos además otra por country.
-    const promises = [];
+    // Vamos pidiendo por día; si hay league se usa &league, si no se hace por date (+country si viene)
+    const requests = [];
     for (const d of days) {
-      promises.push(getFixturesByDate(d, { league: leagueId, country: null }));
-      if (countryNorm && !leagueId) {
-        promises.push(getFixturesByDate(d, { league: null, country: countryNorm }));
-      }
+      const params = new URLSearchParams({ date: d });
+      if (leagueId) params.set("league", leagueId);
+      if (!leagueId && countryFilter) params.set("country", countryFilter);
+      // status=NS/TBD para forzar futuros; aún así filtramos abajo por timestamp
+      const url = `/fixtures?${params.toString()}`;
+      requests.push(afetch(url).then(jsonOrError).catch(() => ({ response: { fixtures: [] } })));
     }
 
-    const batches = await Promise.allSettled(promises);
+    const batches = await Promise.all(requests);
     let items = [];
-    for (const b of batches) if (b.status === "fulfilled") items.push(...b.value);
+    for (const b of batches) {
+      const arr = Array.isArray(b?.response) ? b.response : b?.response?.fixtures || b?.response || [];
+      items.push(...arr.map(mapFixture));
+    }
 
-    // De-duplicar por fixtureId
+    // dedupe por fixtureId
     const seen = new Set();
     items = items.filter((it) => {
-      if (!it.fixtureId) return false;
-      if (seen.has(it.fixtureId)) return false;
-      seen.add(it.fixtureId);
+      const id = String(it.fixtureId || "");
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
       return true;
     });
 
-    // futureOnly (client-safe desde backend)
+    // Filtro futuro (client-side robusto)
+    const now = Date.now();
     if (String(futureOnly) === "1") {
-      const now = Date.now();
       items = items.filter((it) => {
-        const ms = it.timestamp ? it.timestamp * 1000 : null;
-        if (ms == null) return true; // si no sabemos, no lo descartes
-        return ms >= now;
+        const tsMs = it.timestamp ? it.timestamp * 1000 : null;
+        return tsMs ? tsMs >= now : true;
       });
     }
 
-    // Filtro por q (texto) si viene
-    if (q && String(q).trim().length >= 3) {
-      const qtxt = String(q).trim().toLowerCase();
+    // Filtro de texto libre q (equipo/liga/país)
+    if (q && !leagueId) {
+      const txt = safeLower(q);
       items = items.filter((it) => {
-        const h = (it.teams?.home || "").toLowerCase();
-        const a = (it.teams?.away || "").toLowerCase();
-        const ln = (it.league?.name || "").toLowerCase();
-        return h.includes(qtxt) || a.includes(qtxt) || ln.includes(qtxt);
+        const h = safeLower(it.teams.home);
+        const a = safeLower(it.teams.away);
+        const lg = safeLower(it.league?.name);
+        // también dejamos pasar si coincide con el país normalizado
+        const ctry = normCountry(txt);
+        return (
+          (txt.length >= 3 && (h.includes(txt) || a.includes(txt) || lg.includes(txt))) ||
+          (!!ctry && (!!countryFilter ? countryFilter === ctry : true))
+        );
       });
     }
 
-    // Orden: popularidad + kickoff
+    // Orden por “popularidad” aproximada y kickoff
+    const popularity = (name) => {
+      const s = safeLower(name);
+      if (/world cup|copa mundial|qualifier|eliminatoria/.test(s)) return 100;
+      if (/uefa euro|nations league|champions league/.test(s)) return 95;
+      if (/libertadores|sudamericana/.test(s)) return 92;
+      if (/premier league|la liga|serie a|bundesliga|ligue 1/.test(s)) return 90;
+      if (/mls|brasileir|argentina|eredivisie|primeira liga/.test(s)) return 80;
+      return 40;
+    };
     items.sort((A, B) => {
-      const ps = popScore(B.league?.name) - popScore(A.league?.name);
-      if (ps !== 0) return ps;
-      const ta = A.timestamp ? A.timestamp : Number.MAX_SAFE_INTEGER;
-      const tb = B.timestamp ? B.timestamp : Number.MAX_SAFE_INTEGER;
+      const p = popularity(B.league?.name) - popularity(A.league?.name);
+      if (p !== 0) return p;
+      const ta = A.timestamp ? A.timestamp * 1000 : 9e15;
+      const tb = B.timestamp ? B.timestamp * 1000 : 9e15;
       return ta - tb;
     });
 
-    return res.status(200).json({ count: items.length, items });
-  } catch (err) {
-    console.error("[/api/fixtures] Error:", err);
-    return res.status(500).json({ error: String(err.message || err) });
+    res.status(200).json({ count: items.length, items });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
   }
 }

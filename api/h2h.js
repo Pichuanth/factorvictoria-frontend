@@ -1,38 +1,23 @@
-// frontend/api/h2h.js
+// api/h2h.js
+import { afetch, jsonOrError } from "./_apifootball";
+
+// /api/h2h?team1=33&team2=34&limit=5
 export default async function handler(req, res) {
   try {
-    const host = process.env.APISPORTS_HOST || "v3.football.api-sports.io";
-    const key = process.env.APISPORTS_KEY || process.env.VITE_APIFOOTBALL_KEY || "";
-    const { home, away, limit = 5 } = req.query || {};
-
-    if (!key) return res.status(400).json({ error: "Missing APISPORTS_KEY" });
-    if (!home || !away) return res.status(400).json({ error: "Missing home/away ids" });
-
-    const url = `https://${host}/fixtures/headtohead?h2h=${home}-${away}&last=${limit}`;
-    const r = await fetch(url, {
-      headers: {
-        "x-apisports-key": key,
-      },
-    });
-    if (!r.ok) {
-      const text = await r.text();
-      return res.status(r.status).json({ error: "upstream", body: text });
-    }
-    const j = await r.json();
-
-    // Normaliza a { items: [{ date, score } ...] }
-    const items = Array.isArray(j?.response)
-      ? j.response.map((m) => ({
-          date: m.fixture?.date?.slice(0, 10),
-          score:
-            `${m.goals?.home ?? m.score?.fulltime?.home ?? 0}` +
-            "-" +
-            `${m.goals?.away ?? m.score?.fulltime?.away ?? 0}`,
-        }))
-      : [];
-
-    res.json({ items });
+    const { team1, team2, limit = 5 } = req.query;
+    if (!team1 || !team2) return res.status(400).json({ error: "Missing team1/team2" });
+    const url = `/fixtures/headtohead?h2h=${encodeURIComponent(team1)}-${encodeURIComponent(team2)}&last=${encodeURIComponent(limit)}`;
+    const out = await afetch(url).then(jsonOrError).catch(() => null);
+    const rows = Array.isArray(out?.response) ? out.response : [];
+    const list = rows.map((r) => ({
+      date: r?.fixture?.date,
+      score: `${r?.goals?.home ?? 0}-${r?.goals?.away ?? 0}`,
+      home: r?.teams?.home?.name,
+      away: r?.teams?.away?.name,
+      league: r?.league?.name,
+    }));
+    res.status(200).json({ items: list.slice(0, Number(limit) || 5) });
   } catch (e) {
-    res.status(500).json({ error: String(e?.message || e) });
+    res.status(500).json({ error: String(e.message || e) });
   }
 }
