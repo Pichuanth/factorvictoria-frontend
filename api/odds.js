@@ -1,57 +1,60 @@
-// /api/odds.js — odds 1X2 (y otros markets) desde API-FOOTBALL v3
+// /api/odds.js — obtiene mercado 1x2 para un fixture
+// Uso: /api/odds?fixture=12345&market=1x2
+
 export default async function handler(req, res) {
   try {
-    const { fixture, market = "1x2", bookmaker } = req.query;
+    const { APISPORTS_KEY, APISPORTS_HOST } = process.env;
+    if (!APISPORTS_KEY || !APISPORTS_HOST) {
+      return res.status(400).json({ error: "Missing APISPORTS_KEY or APISPORTS_HOST" });
+    }
 
-    const API_KEY = process.env.APISPORTS_KEY;
-    const HOST = process.env.APISPORTS_HOST || "v3.football.api-sports.io";
-    if (!API_KEY) return res.status(400).json({ error: "Missing APISPORTS_KEY" });
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const fixture = url.searchParams.get("fixture");
+    const market  = (url.searchParams.get("market") || "1x2").toLowerCase();
     if (!fixture) return res.status(400).json({ error: "Missing fixture" });
 
-    const qs = new URLSearchParams();
-    qs.set("fixture", fixture);
-    if (bookmaker) qs.set("bookmaker", bookmaker);
+    // API-FOOTBALL odds endpoint
+    // https://v3.football.api-sports.io/odds?fixture={id}
+    const apiUrl = `https://${APISPORTS_HOST}/odds?fixture=${encodeURIComponent(fixture)}`;
 
-    // API-FOOTBALL 1X2 se obtiene en endpoint /odds con response/outcomes
-    const url = `https://${HOST}/odds?${qs.toString()}`;
-
-    const r = await fetch(url, {
-      headers: { "x-apisports-key": API_KEY },
-      cache: "no-store",
+    const r = await fetch(apiUrl, {
+      headers: {
+        "x-rapidapi-key": APISPORTS_KEY,
+        "x-rapidapi-host": APISPORTS_HOST
+      },
+      cache: "no-store"
     });
     if (!r.ok) {
-      const t = await r.text().catch(() => "");
-      throw new Error(`Upstream ${r.status} ${r.statusText} – ${t}`);
+      const txt = await r.text().catch(() => "");
+      return res.status(502).json({ error: `Upstream ${r.status} ${r.statusText}`, body: txt });
     }
 
-    const data = await r.json();
+    const json = await r.json();
+    const marketsOut = [];
 
-    // Aplanamos a un array de markets->outcomes con nombre/cuota
-    // (la estructura completa varía; tomamos el primero por casa)
-    const resp = Array.isArray(data?.response) ? data.response : [];
-    const first = resp[0];
+    // Adaptar a una forma simple: [{out:'1', odd:1.85}, {out:'X', odd:3.2}, {out:'2', odd:2.1}]
+    (json?.response || []).forEach((book) => {
+      (book?.bookmakers || []).forEach((bm) => {
+        (bm?.bets || []).forEach((bet) => {
+          const name = String(bet?.name || "").toLowerCase();
+          if (name.includes("1x2") || name.includes("match winner") || market === "1x2") {
+            (bet?.values || []).forEach((v) => {
+              const label = String(v?.value || v?.odd || v?.label || "").toLowerCase();
+              let out = null;
+              if (label.includes("home") || label === "1") out = "1";
+              else if (label.includes("draw") || label === "x") out = "X";
+              else if (label.includes("away") || label === "2") out = "2";
+              const price = Number(v?.odd ?? v?.value);
+              if (out && isFinite(price) && price > 1.01) {
+                marketsOut.push({ out, odd: Number(price.toFixed(2)) });
+              }
+            });
+          }
+        });
+      });
+    });
 
-    const markets = [];
-    // Busca outcome 1/X/2 si está disponible
-    const bks = first?.bookmakers || [];
-    for (const bk of bks) {
-      for (const lm of bk?.bets || []) {
-        const key = (lm?.name || lm?.bet || "").toLowerCase();
-        // Filtramos a 1X2 si el market pedido es ese
-        if (market.toLowerCase().includes("1x2")) {
-          if (!/1x2|match winner|fulltime/i.test(key)) continue;
-        }
-        const outs = (lm?.values || lm?.outcomes || []).map((o) => ({
-          label: o?.value || o?.label || o?.name,
-          odd: Number(o?.odd || o?.price || o?.value),
-        }));
-        if (outs.length) markets.push({ key: lm?.name || lm?.bet, outcomes: outs });
-      }
-      // tomamos el primer bookmaker bueno
-      if (markets.length) break;
-    }
-
-    return res.status(200).json({ markets });
+    return res.json({ markets: marketsOut });
   } catch (e) {
     return res.status(500).json({ error: String(e?.message || e) });
   }
