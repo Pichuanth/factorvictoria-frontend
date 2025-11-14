@@ -53,14 +53,16 @@ function safeLower(x) {
   return String(x || "").toLowerCase();
 }
 function getKickoff(item) {
-  // intentamos campos comunes
+  // intentamos varias fuentes de fecha y normalizamos a Date UTC
   const ts =
     item?.timestamp ??
     item?.fixture?.timestamp ??
-    (item?.date ? Date.parse(item.date) / 1000 : null) ??
-    (item?.fixture?.date ? Date.parse(item.fixture.date) / 1000 : null) ??
+    (item?.date ? Math.floor(Date.parse(item.date) / 1000) : null) ??
+    (item?.fixture?.date ? Math.floor(Date.parse(item.fixture.date) / 1000) : null) ??
     null;
-  return ts ? new Date(ts * 1000) : null;
+
+  if (!ts || !Number.isFinite(ts)) return null;
+  return new Date(ts * 1000); // API-Football entrega timestamp UTC en segundos
 }
 
 /** Mapea membresía → target cuota */
@@ -237,15 +239,13 @@ export default function Comparator() {
 
       const urls = [];
       for (const d of days) {
-        let base = `/api/fixtures?date=${d}&futureOnly=1`;
+        let base = `/api/fixtures?date=${d}&status=NS`;
         if (isNum) base += `&league=${qTrim}`;
         if (qTrim) base += `&q=${encodeURIComponent(qTrim)}`;
         urls.push(base);
 
         if (!isNum && countryEN) {
-          let byCountry = `/api/fixtures?date=${d}&futureOnly=1&country=${encodeURIComponent(
-            countryEN
-          )}`;
+          let byCountry = `/api/fixtures?date=${d}&country=${encodeURIComponent(countryEN)}&status=NS`;
           if (qTrim) byCountry += `&q=${encodeURIComponent(qTrim)}`;
           urls.push(byCountry);
         }
@@ -267,12 +267,25 @@ export default function Comparator() {
       // Dedup por fixtureId
       const seen = new Set();
       items = items.filter((it) => {
-        const id = String(it.fixtureId ?? it.id ?? `${it?.fixture?.id ?? ""}`);
-        if (!id) return false;
-        if (seen.has(id)) return false;
-        seen.add(id);
-        return true;
-      });
+  const ko = getKickoff(it);
+  // si no sabemos el kickoff, NO lo mostramos
+  if (!ko) return false;
+
+  const isFuture = ko.getTime() >= Date.now();
+  if (!isFuture) return false;
+
+  if (!qTrim || isNum) return true;
+
+  const txt = safeLower(qTrim);
+  const h = safeLower(it?.teams?.home);
+  const a = safeLower(it?.teams?.away);
+  const leagueName = safeLower(it?.league?.name);
+
+  const teamMatch   = txt.length >= 3 && (h.includes(txt) || a.includes(txt));
+  const leagueMatch = txt.length >= 3 && leagueName.includes(txt);
+
+  return teamMatch || leagueMatch;
+});
 
       // Filtro FUTURO estricto + por equipo/liga si q es texto
       const now = new Date();
