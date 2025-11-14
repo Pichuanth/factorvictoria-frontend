@@ -2,6 +2,13 @@
 import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import React, { useMemo, useState } from "react";
+// ...
+async function fetchJSON(path) {
+  const res = await fetch(path, { cache: "no-store" });
+  if (!res.ok) throw new Error(`HTTP ${res.status} – ${res.statusText}`);
+  return res.json();
+}
 
 const GOLD = "#E6C464";
 
@@ -27,6 +34,24 @@ const COUNTRY_ALIAS = {
 function normalizeCountryQuery(q) {
   const key = String(q || "").toLowerCase().replace(/\s+/g, "");
   return COUNTRY_ALIAS[key] || null;
+}
+
+const [h2hOpenId, setH2hOpenId] = useState(null);
+const [h2hList, setH2hList] = useState([]);
+const [h2hLoading, setH2hLoading] = useState(false);
+
+async function openH2H(fixtureId) {
+  try {
+    setH2hOpenId(fixtureId);
+    setH2hLoading(true);
+    setH2hList([]);
+    const data = await fetchJSON(`/api/h2h?fixture=${encodeURIComponent(fixtureId)}`);
+    setH2hList(Array.isArray(data?.matches) ? data.matches : []);
+  } catch (e) {
+    setH2hList([]);
+  } finally {
+    setH2hLoading(false);
+  }
 }
 
 function toYYYYMMDD(d) {
