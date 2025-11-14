@@ -5,9 +5,9 @@ import { useAuth } from "../lib/auth";
 
 const GOLD = "#E6C464";
 
-/* ---------- helpers ---------- */
+/* ---------------- helpers ---------------- */
 
-// alias ES -> EN para country en APISports
+// Alias ES -> EN para "country" en API-Sports
 const COUNTRY_ALIAS = {
   francia: "France",
   inglaterra: "England",
@@ -23,7 +23,9 @@ const COUNTRY_ALIAS = {
   mexico: "Mexico",
   estadosunidos: "USA",
   eeuu: "USA",
+  estados_unidos: "USA",
 };
+
 function normalizeCountryQuery(q) {
   const key = String(q || "").toLowerCase().replace(/\s+/g, "");
   return COUNTRY_ALIAS[key] || null;
@@ -51,7 +53,9 @@ function listDays(fromStr, toStr) {
 function safeLower(x) {
   return String(x || "").toLowerCase();
 }
+
 function getKickoff(item) {
+  // intentamos varios nombres comunes
   const ts =
     item?.timestamp ??
     item?.fixture?.timestamp ??
@@ -61,17 +65,6 @@ function getKickoff(item) {
   return ts ? new Date(ts * 1000) : null;
 }
 
-/** Mapea membresía → target cuota */
-function targetFromPlan(planRaw) {
-  const id = String(planRaw || "").toLowerCase();
-  if (["vitalicio", "lifetime", "pro-250", "x100"].some((k) => id.includes(k))) return 100;
-  if (["anual", "annual", "x50"].some((k) => id.includes(k))) return 50;
-  if (["trimestral", "quarter", "3m", "x20"].some((k) => id.includes(k))) return 20;
-  if (["mensual", "monthly", "basic", "basico", "x10"].some((k) => id.includes(k))) return 10;
-  return null;
-}
-
-/* Fetch con control de errores */
 async function fetchJSON(path) {
   const res = await fetch(path, { cache: "no-store" });
   if (!res.ok) throw new Error(`HTTP ${res.status} – ${res.statusText}`);
@@ -83,7 +76,7 @@ function synthOdds(fixtureId) {
   const seed = Number(String(fixtureId).slice(-4)) || 1234;
   const r = (seed % 100) / 100; // 0..0.99
   const home = 1.25 + r * 0.7; // 1.25..1.95
-  const draw = 2.8 + r * 0.9; // 2.8..3.7
+  const draw = 2.8 + r * 0.9;  // 2.8..3.7
   const away = 1.6 + ((99 - (seed % 100)) / 100); // 1.6..2.59
   return [
     { out: "1", odd: Number(home.toFixed(2)) },
@@ -94,9 +87,7 @@ function synthOdds(fixtureId) {
 
 /* “Regalo” dentro de 1.5–3 */
 function pickGiftFromOdds(teamsLabel, odds1x2) {
-  const cands = odds1x2
-    .filter((o) => o.odd >= 1.5 && o.odd <= 3)
-    .sort((a, b) => a.odd - b.odd);
+  const cands = odds1x2.filter(o => o.odd >= 1.5 && o.odd <= 3).sort((a,b) => a.odd - b.odd);
   if (!cands.length) return null;
   const best = cands[0];
   return { match: teamsLabel, market: "1X2", pick: best.out, odd: best.odd };
@@ -107,8 +98,8 @@ function buildParlay(target, fixturesWithOdds, maxLegs = 10) {
   const pool = [];
   for (const f of fixturesWithOdds) {
     const nice = [...f.odds]
-      .filter((o) => o.odd >= 1.3 && o.odd <= 3.2)
-      .sort((a, b) => a.odd - b.odd);
+      .filter(o => o.odd >= 1.3 && o.odd <= 3.2)
+      .sort((a,b) => a.odd - b.odd);
     if (nice[0]) pool.push({ ...nice[0], match: f.label });
     if (nice[1] && nice[1].odd <= 2.2) pool.push({ ...nice[1], match: f.label });
   }
@@ -126,7 +117,24 @@ function buildParlay(target, fixturesWithOdds, maxLegs = 10) {
   return { selections, totalOdd: Number(product.toFixed(2)) };
 }
 
-/* CTA upgrade para planes básicos */
+/* Popularidad / prioridad de competiciones */
+const POPULAR_ORDER = [
+  [/world cup|fifa world cup|wc qual|world cup qual|copa mundial|eliminatoria/i, 100],
+  [/uefa euro|nations league|champions league|ucl/i, 96],
+  [/libertadores|sudamericana/i, 93],
+  [/premier league|la liga|serie a|bundesliga|ligue 1/i, 90],
+  [/mls|brasileir|argentina|eredivisie|primeira liga/i, 82],
+  [/friendly|amistoso/i, 80], // amistosos internacionales visibles
+];
+
+function popularityScore(item) {
+  const name = safeLower(item?.league?.name);
+  for (const [re, v] of POPULAR_ORDER) if (re.test(name)) return v;
+  return 40;
+}
+
+/* ---------------- componente ---------------- */
+
 function UpgradeCTA({ text = "Mejorar membresía" }) {
   return (
     <Link
@@ -139,37 +147,9 @@ function UpgradeCTA({ text = "Mejorar membresía" }) {
   );
 }
 
-/* Demo de fixtures cuando la API falla o no hay resultados */
-function makeDemoFixtures(from, to, count = 10) {
-  const out = [];
-  for (let i = 1; i <= count; i++) {
-    out.push({
-      fixtureId: `demo-${from}-${to}-${i}`,
-      teams: { home: `Equipo A${i}`, away: `Equipo B${i}` },
-      league: { name: "DEMO" },
-    });
-  }
-  return out;
-}
-
-/* Popularidad para ordenar (más arriba: Mundial, Qualifiers, Champions, Libertadores, top leagues) */
-function popularityScore(item) {
-  const name = safeLower(item?.league?.name);
-  const checks = [
-    [/world cup|copa mundial|qualifier|eliminatoria/, 100],
-    [/uefa euro|nations league|champions league/, 95],
-    [/libertadores|sudamericana/, 92],
-    [/premier league|la liga|serie a|bundesliga|ligue 1/, 90],
-    [/mls|brasileir|argentina|eredivisie|primeira liga/, 80],
-  ];
-  for (const [re, v] of checks) if (re.test(name)) return v;
-  return 40; // por defecto
-}
-
 export default function Comparator() {
   const { isLoggedIn, user } = useAuth();
 
-  /* ---- bloqueo visitantes ---- */
   if (!isLoggedIn) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-10">
@@ -184,10 +164,17 @@ export default function Comparator() {
     );
   }
 
-  /* ---- validar plan ---- */
   const planGuess =
     user?.planId || user?.plan?.id || user?.plan || user?.membership || user?.tier || "";
-  const target = targetFromPlan(planGuess);
+  const target = (() => {
+    const id = String(planGuess || "").toLowerCase();
+    if (["vitalicio","lifetime","pro-250","x100"].some(k=>id.includes(k))) return 100;
+    if (["anual","annual","x50"].some(k=>id.includes(k))) return 50;
+    if (["trimestral","quarter","3m","x20"].some(k=>id.includes(k))) return 20;
+    if (["mensual","monthly","basic","basico","x10"].some(k=>id.includes(k))) return 10;
+    return null;
+  })();
+
   if (!target) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-10">
@@ -202,38 +189,18 @@ export default function Comparator() {
     );
   }
 
-  const isPremium = target >= 50; // Anual o Vitalicio
+  const isPremium = target >= 50;
 
-  /* ---- estado UI ---- */
+  // estado UI
   const today = useMemo(() => new Date(), []);
   const [from, setFrom] = useState(toYYYYMMDD(today));
-  const [to, setTo] = useState(toYYYYMMDD(addDays(today, 0)));
+  const [to, setTo] = useState(toYYYYMMDD(today));
   const [q, setQ] = useState(""); // país / id liga / equipo
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [warn, setWarn] = useState("");
   const [data, setData] = useState(null);
 
-  /* ---- H2H (dentro del componente) ---- */
-  const [h2hOpenId, setH2hOpenId] = useState(null);
-  const [h2hList, setH2hList] = useState([]);
-  const [h2hLoading, setH2hLoading] = useState(false);
-
-  async function openH2H(fixtureId) {
-    try {
-      setH2hOpenId(fixtureId);
-      setH2hLoading(true);
-      setH2hList([]);
-      const data = await fetchJSON(`/api/h2h?fixture=${encodeURIComponent(fixtureId)}`);
-      setH2hList(Array.isArray(data?.matches) ? data.matches : []);
-    } catch {
-      setH2hList([]);
-    } finally {
-      setH2hLoading(false);
-    }
-  }
-
-  /* ---- generar picks ---- */
   async function onGenerate() {
     try {
       setLoading(true);
@@ -246,70 +213,67 @@ export default function Comparator() {
       const days = listDays(from, to);
       const now = new Date();
 
-      // Armamos URLs por día
+      // Construir URLs (siempre una "amplia" por día + opcional por país)
       const countryEN = !isNum && qTrim ? normalizeCountryQuery(qTrim) : null;
-
       const urls = [];
       for (const d of days) {
-        // amplia sin country (qualifiers internacionales, champions, etc.)
-        let base = `/api/fixtures?date=${d}`;
+        // amplia
+        let base = `/api/fixtures?date=${d}&futureOnly=1`;
         if (isNum) base += `&league=${qTrim}`;
         if (qTrim) base += `&q=${encodeURIComponent(qTrim)}`;
-        base += `&futureOnly=1`;
         urls.push(base);
 
-        // si hay país mapeado, adicional por país
+        // por país (si aplica)
         if (!isNum && countryEN) {
-          let byCountry = `/api/fixtures?date=${d}&country=${encodeURIComponent(countryEN)}`;
+          let byCountry = `/api/fixtures?date=${d}&country=${encodeURIComponent(countryEN)}&futureOnly=1`;
           if (qTrim) byCountry += `&q=${encodeURIComponent(qTrim)}`;
-          byCountry += `&futureOnly=1`;
           urls.push(byCountry);
         }
       }
 
-      // descargas en paralelo con tolerancia a fallas
+      // Descargar con tolerancia a fallas
       let items = [];
       try {
         const batches = await Promise.all(
           urls.map((u) => fetchJSON(u).catch(() => ({ items: [] })))
         );
-        for (const fx of batches) {
-          if (Array.isArray(fx?.items)) items.push(...fx.items);
-        }
+        for (const fx of batches) if (Array.isArray(fx?.items)) items.push(...fx.items);
       } catch {
-        items = makeDemoFixtures(from, to, 12);
-        setWarn("La API dio error. Mostrando demo para que puedas seguir probando.");
+        items = []; // si todo cae, probamos demo abajo
       }
 
-      // dedupe por fixtureId
+      // Quitar duplicados por fixtureId
       const seen = new Set();
       items = items.filter((it) => {
         const id = String(it.fixtureId ?? it.id ?? `${it?.fixture?.id ?? ""}`);
+        if (!id) return false;
         if (seen.has(id)) return false;
         seen.add(id);
         return true;
       });
 
-      // FUTURE ONLY + filtro por equipo/league cuando q es texto
+      // Filtro FUTURE ONLY: ahora es ESTRICTO (si no hay hora -> descartado)
       items = items.filter((it) => {
         const ko = getKickoff(it);
-        const isFuture = ko ? ko >= now : true;
-        if (!isFuture) return false;
-
-        if (!qTrim || isNum) return true;
-
-        const txt = safeLower(qTrim);
-        const h = safeLower(it?.teams?.home);
-        const a = safeLower(it?.teams?.away);
-        const leagueName = safeLower(it?.league?.name);
-
-        const teamMatch = txt.length >= 3 && (h.includes(txt) || a.includes(txt));
-        const leagueMatch = txt.length >= 3 && leagueName.includes(txt);
-
-        return teamMatch || leagueMatch || true;
+        if (!ko) return false; // sin hora: afuera
+        // margen de 5 minutos por si la API trae borde
+        return ko.getTime() >= (now.getTime() - 5 * 60 * 1000);
       });
 
-      // ordenar por popularidad y kickoff
+      // Si q es texto, preferimos coincidencias por equipo/competición
+      if (qTrim && !isNum) {
+        const txt = safeLower(qTrim);
+        items = items.filter((it) => {
+          const h = safeLower(it?.teams?.home);
+          const a = safeLower(it?.teams?.away);
+          const leagueName = safeLower(it?.league?.name);
+          const teamMatch = txt.length >= 3 && (h.includes(txt) || a.includes(txt));
+          const leagueMatch = txt.length >= 3 && leagueName.includes(txt);
+          return teamMatch || leagueMatch;
+        });
+      }
+
+      // Orden: por popularidad (internacionales/top) y luego por kickoff
       items.sort((A, B) => {
         const ps = popularityScore(B) - popularityScore(A);
         if (ps !== 0) return ps;
@@ -318,24 +282,23 @@ export default function Comparator() {
         return ta - tb;
       });
 
+      // Si sigue vacío, mostramos demo para no dejar en blanco
       if (!items.length) {
-        setWarn("No hay suficientes eventos para alcanzar tu cuota objetivo. Amplía el rango de fechas o cambia liga/país.");
+        items = makeDemoFixtures(from, to, 12);
+        setWarn("No encontramos eventos reales con tus filtros. Mostrando DEMO para que pruebes la funcionalidad.");
       }
 
-      // odds (reales o sintéticas)
+      // Traer odds (o sintéticas) y armar etiquetas
       const withOdds = [];
-      for (const it of items.slice(0, 120)) {
+      for (const it of items.slice(0, 150)) {
         const ko = getKickoff(it);
         const dateStr = ko ? ` · ${ko.toLocaleString()}` : "";
-        const label = `${it.teams?.home || "Equipo A"} vs ${it.teams?.away || "Equipo B"}${
-          String(it.fixtureId).startsWith("demo-") ? " (demo)" : ""
-        }${dateStr}`;
+        const label =
+          `${it.teams?.home || "Equipo A"} vs ${it.teams?.away || "Equipo B"}${String(it.fixtureId).startsWith("demo-") ? " (demo)" : ""}${dateStr}`;
         let odds = [];
         try {
           if (!String(it.fixtureId).startsWith("demo-")) {
-            const od = await fetchJSON(
-              `/api/odds?fixture=${encodeURIComponent(it.fixtureId)}&market=1x2`
-            );
+            const od = await fetchJSON(`/api/odds?fixture=${encodeURIComponent(it.fixtureId)}&market=1x2`);
             const markets = Array.isArray(od?.markets) ? od.markets : [];
             const flat = [];
             for (const mk of markets) {
@@ -345,9 +308,9 @@ export default function Comparator() {
                 const price = Number(o?.odd ?? o?.price ?? o?.value);
                 if (!isFinite(price)) continue;
                 let out = "1";
-                if (name.includes("draw") || name.includes("emp")) out = "X";
-                else if (name.includes("away") || name.includes("visit") || name.includes("2")) out = "2";
-                else if (name.includes("home") || name.includes("local") || name.includes("1")) out = "1";
+                if (/\b(draw|emp)\b/.test(name)) out = "X";
+                else if (/(away|visit|^2$)/.test(name)) out = "2";
+                else if (/(home|local|^1$)/.test(name)) out = "1";
                 flat.push({ out, odd: price });
               }
             }
@@ -360,20 +323,20 @@ export default function Comparator() {
         withOdds.push({ label, odds, id: it.fixtureId });
       }
 
-      // regalo
+      // Regalo
       let gift = null;
       for (const f of withOdds) {
         const g = pickGiftFromOdds(f.label, f.odds);
         if (g) { gift = g; break; }
       }
 
-      // parlay
+      // Parlay
       const parlay = buildParlay(target, withOdds, 10);
       if (!withOdds.length && !warn) {
         setWarn("No encontramos eventos con tus filtros. Amplía fechas o cambia liga/país.");
       }
 
-      // placeholders premium
+      // Placeholders premium
       const refereesDemo = withOdds.slice(0, 5).map((f, i) => ({
         match: f.label,
         referee: `Árbitro Demo ${i + 1}`,
@@ -400,7 +363,6 @@ export default function Comparator() {
     }
   }
 
-  /* ---- UI ---- */
   return (
     <div className="max-w-3xl mx-auto px-4 pb-20">
       {/* Filtros */}
@@ -413,8 +375,6 @@ export default function Comparator() {
             className="rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
             title="Desde"
           />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-3">
           <input
             type="date"
             value={to}
@@ -454,16 +414,14 @@ export default function Comparator() {
         {data?.gift ? (
           <div className="text-slate-200 mt-2">
             <div className="font-semibold">{data.gift.match}</div>
-            <div>
-              1X2 · {data.gift.pick} · <span className="font-bold">(x{data.gift.odd})</span>
-            </div>
+            <div>1X2 · {data.gift.pick} · <span className="font-bold">(x{data.gift.odd})</span></div>
           </div>
         ) : (
           <p className="text-slate-300 mt-2">Próximamente: resultados basados en tus filtros.</p>
         )}
       </section>
 
-      {/* Parlay por plan */}
+      {/* Parlay */}
       <section className="mt-6 rounded-2xl bg-white/5 border border-white/10 p-4 md:p-6">
         <h2 className="text-lg md:text-xl font-semibold">
           <span className="pill-gold">Cuota generada</span>
@@ -493,7 +451,6 @@ export default function Comparator() {
         <h2 className="text-lg md:text-xl font-semibold">
           <span className="pill-gold">Árbitros más tarjeteros</span>
         </h2>
-
         {isPremium ? (
           data?.refs?.length ? (
             <ul className="mt-2 text-slate-200 space-y-1">
@@ -522,7 +479,6 @@ export default function Comparator() {
         <h2 className="text-lg md:text-xl font-semibold">
           <span className="pill-gold">Cuota desfase del mercado</span>
         </h2>
-
         {isPremium ? (
           data?.gaps?.length ? (
             <ul className="mt-2 text-slate-200 space-y-1">
@@ -547,4 +503,18 @@ export default function Comparator() {
       </section>
     </div>
   );
+}
+
+/* --- demos (solo si no hay data real) --- */
+function makeDemoFixtures(from, to, count = 10) {
+  const out = [];
+  for (let i = 1; i <= count; i++) {
+    out.push({
+      fixtureId: `demo-${from}-${to}-${i}`,
+      teams: { home: `Equipo A${i}`, away: `Equipo B${i}` },
+      league: { name: "DEMO" },
+      date: new Date(Date.now() + i * 3600_000).toISOString()
+    });
+  }
+  return out;
 }
