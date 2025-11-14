@@ -2,17 +2,11 @@
 import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../lib/auth";
-import React, { useMemo, useState } from "react";
-// ...
-async function fetchJSON(path) {
-  const res = await fetch(path, { cache: "no-store" });
-  if (!res.ok) throw new Error(`HTTP ${res.status} – ${res.statusText}`);
-  return res.json();
-}
 
 const GOLD = "#E6C464";
 
 /* ---------- helpers ---------- */
+
 // alias ES -> EN para country en APISports
 const COUNTRY_ALIAS = {
   francia: "France",
@@ -26,7 +20,6 @@ const COUNTRY_ALIAS = {
   chile: "Chile",
   argentina: "Argentina",
   brasil: "Brazil",
-  brasil: "Brazil",
   mexico: "Mexico",
   estadosunidos: "USA",
   eeuu: "USA",
@@ -34,24 +27,6 @@ const COUNTRY_ALIAS = {
 function normalizeCountryQuery(q) {
   const key = String(q || "").toLowerCase().replace(/\s+/g, "");
   return COUNTRY_ALIAS[key] || null;
-}
-
-const [h2hOpenId, setH2hOpenId] = useState(null);
-const [h2hList, setH2hList] = useState([]);
-const [h2hLoading, setH2hLoading] = useState(false);
-
-async function openH2H(fixtureId) {
-  try {
-    setH2hOpenId(fixtureId);
-    setH2hLoading(true);
-    setH2hList([]);
-    const data = await fetchJSON(`/api/h2h?fixture=${encodeURIComponent(fixtureId)}`);
-    setH2hList(Array.isArray(data?.matches) ? data.matches : []);
-  } catch (e) {
-    setH2hList([]);
-  } finally {
-    setH2hLoading(false);
-  }
 }
 
 function toYYYYMMDD(d) {
@@ -77,7 +52,6 @@ function safeLower(x) {
   return String(x || "").toLowerCase();
 }
 function getKickoff(item) {
-  // intentamos varios nombres de campo comunes
   const ts =
     item?.timestamp ??
     item?.fixture?.timestamp ??
@@ -240,6 +214,25 @@ export default function Comparator() {
   const [warn, setWarn] = useState("");
   const [data, setData] = useState(null);
 
+  /* ---- H2H (dentro del componente) ---- */
+  const [h2hOpenId, setH2hOpenId] = useState(null);
+  const [h2hList, setH2hList] = useState([]);
+  const [h2hLoading, setH2hLoading] = useState(false);
+
+  async function openH2H(fixtureId) {
+    try {
+      setH2hOpenId(fixtureId);
+      setH2hLoading(true);
+      setH2hList([]);
+      const data = await fetchJSON(`/api/h2h?fixture=${encodeURIComponent(fixtureId)}`);
+      setH2hList(Array.isArray(data?.matches) ? data.matches : []);
+    } catch {
+      setH2hList([]);
+    } finally {
+      setH2hLoading(false);
+    }
+  }
+
   /* ---- generar picks ---- */
   async function onGenerate() {
     try {
@@ -253,43 +246,37 @@ export default function Comparator() {
       const days = listDays(from, to);
       const now = new Date();
 
-      // Armamos URLs por día.
-// Si q es numérico → id de liga.
-// Si q es texto → probamos BÚSQUEDA AMPLIA (sin country) + country mapeado si existe.
-const countryEN = !isNum && qTrim ? normalizeCountryQuery(qTrim) : null;
+      // Armamos URLs por día
+      const countryEN = !isNum && qTrim ? normalizeCountryQuery(qTrim) : null;
 
-const urls = [];
-for (const d of days) {
-  // siempre una amplia sin country (para qualifiers internacionales, champions, etc.)
-  let base = `/api/fixtures?date=${d}`;
-  if (isNum) base += `&league=${qTrim}`;
-  // q mixto para que el backend use texto libre si lo soporta
-  if (qTrim) base += `&q=${encodeURIComponent(qTrim)}`;
-  base += `&futureOnly=1`;
-  urls.push(base);
+      const urls = [];
+      for (const d of days) {
+        // amplia sin country (qualifiers internacionales, champions, etc.)
+        let base = `/api/fixtures?date=${d}`;
+        if (isNum) base += `&league=${qTrim}`;
+        if (qTrim) base += `&q=${encodeURIComponent(qTrim)}`;
+        base += `&futureOnly=1`;
+        urls.push(base);
 
-  // si tenemos país mapeado, probamos además una segunda URL filtrada por country
-  if (!isNum && countryEN) {
-    let byCountry = `/api/fixtures?date=${d}&country=${encodeURIComponent(countryEN)}`;
-    if (qTrim) byCountry += `&q=${encodeURIComponent(qTrim)}`;
-    byCountry += `&futureOnly=1`;
-    urls.push(byCountry);
-  }
-}
+        // si hay país mapeado, adicional por país
+        if (!isNum && countryEN) {
+          let byCountry = `/api/fixtures?date=${d}&country=${encodeURIComponent(countryEN)}`;
+          if (qTrim) byCountry += `&q=${encodeURIComponent(qTrim)}`;
+          byCountry += `&futureOnly=1`;
+          urls.push(byCountry);
+        }
+      }
 
       // descargas en paralelo con tolerancia a fallas
       let items = [];
       try {
         const batches = await Promise.all(
-          urls.map((u) =>
-            fetchJSON(u).catch(() => ({ items: [] }))
-          )
+          urls.map((u) => fetchJSON(u).catch(() => ({ items: [] })))
         );
         for (const fx of batches) {
           if (Array.isArray(fx?.items)) items.push(...fx.items);
         }
       } catch {
-        // si algo muy raro, usamos demo
         items = makeDemoFixtures(from, to, 12);
         setWarn("La API dio error. Mostrando demo para que puedas seguir probando.");
       }
@@ -303,27 +290,26 @@ for (const d of days) {
         return true;
       });
 
-      // FUTURE ONLY (client-side) + filtro por equipo o liga cuando q es texto
-items = items.filter((it) => {
-  const ko = getKickoff(it);
-  const isFuture = ko ? ko >= now : true;
-  if (!isFuture) return false;
+      // FUTURE ONLY + filtro por equipo/league cuando q es texto
+      items = items.filter((it) => {
+        const ko = getKickoff(it);
+        const isFuture = ko ? ko >= now : true;
+        if (!isFuture) return false;
 
-  if (!qTrim || isNum) return true;
+        if (!qTrim || isNum) return true;
 
-  const txt = safeLower(qTrim);
-  const h = safeLower(it?.teams?.home);
-  const a = safeLower(it?.teams?.away);
-  const leagueName = safeLower(it?.league?.name);
+        const txt = safeLower(qTrim);
+        const h = safeLower(it?.teams?.home);
+        const a = safeLower(it?.teams?.away);
+        const leagueName = safeLower(it?.league?.name);
 
-  // match por equipo o por liga (p. ej., "francia" para "UEFA World Cup Qualifying")
-  const teamMatch = txt.length >= 3 && (h.includes(txt) || a.includes(txt));
-  const leagueMatch = txt.length >= 3 && leagueName.includes(txt);
+        const teamMatch = txt.length >= 3 && (h.includes(txt) || a.includes(txt));
+        const leagueMatch = txt.length >= 3 && leagueName.includes(txt);
 
-  return teamMatch || leagueMatch || true; // true permite lo que haya entrado por backend
-});
+        return teamMatch || leagueMatch || true;
+      });
 
-      // ordenar por popularidad y por kickoff
+      // ordenar por popularidad y kickoff
       items.sort((A, B) => {
         const ps = popularityScore(B) - popularityScore(A);
         if (ps !== 0) return ps;
@@ -336,12 +322,14 @@ items = items.filter((it) => {
         setWarn("No hay suficientes eventos para alcanzar tu cuota objetivo. Amplía el rango de fechas o cambia liga/país.");
       }
 
-      // ---- odds (reales cuando existan; si no, sintéticas)
+      // odds (reales o sintéticas)
       const withOdds = [];
       for (const it of items.slice(0, 120)) {
         const ko = getKickoff(it);
         const dateStr = ko ? ` · ${ko.toLocaleString()}` : "";
-        const label = `${it.teams?.home || "Equipo A"} vs ${it.teams?.away || "Equipo B"}${String(it.fixtureId).startsWith("demo-") ? " (demo)" : ""}${dateStr}`;
+        const label = `${it.teams?.home || "Equipo A"} vs ${it.teams?.away || "Equipo B"}${
+          String(it.fixtureId).startsWith("demo-") ? " (demo)" : ""
+        }${dateStr}`;
         let odds = [];
         try {
           if (!String(it.fixtureId).startsWith("demo-")) {
@@ -372,21 +360,20 @@ items = items.filter((it) => {
         withOdds.push({ label, odds, id: it.fixtureId });
       }
 
-      // ---- regalo
+      // regalo
       let gift = null;
       for (const f of withOdds) {
         const g = pickGiftFromOdds(f.label, f.odds);
         if (g) { gift = g; break; }
       }
 
-      // ---- parlay
-const parlay = buildParlay(target, withOdds, 10);
-// si no hay partidos, warn; si hay pero la combinada es baja, mostramos igual sin warning duro
-if (!withOdds.length && !warn) {
-  setWarn("No encontramos eventos con tus filtros. Amplía fechas o cambia liga/país.");
-}
+      // parlay
+      const parlay = buildParlay(target, withOdds, 10);
+      if (!withOdds.length && !warn) {
+        setWarn("No encontramos eventos con tus filtros. Amplía fechas o cambia liga/país.");
+      }
 
-      // ---- demos para módulos premium (placeholder hasta tener data real)
+      // placeholders premium
       const refereesDemo = withOdds.slice(0, 5).map((f, i) => ({
         match: f.label,
         referee: `Árbitro Demo ${i + 1}`,
@@ -426,6 +413,8 @@ if (!withOdds.length && !warn) {
             className="rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
             title="Desde"
           />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-3">
           <input
             type="date"
             value={to}
