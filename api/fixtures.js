@@ -1,110 +1,165 @@
-// api/fixtures.js
-import { apisGet } from "./_utils/apisports";
+// frontend/api/fixtures.js
+import { apiSportsBase, apiSportsHeaders, listDays, mapCountry } from "./_utils/apisports";
 
-function toYYYYMMDD(d) {
-  const pad = (n) => String(n).toString().padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-}
-function addDays(d, n) {
-  const x = new Date(d);
-  x.setDate(x.getDate() + n);
-  return x;
-}
-function listDays(fromStr, toStr) {
-  const out = [];
-  let d = new Date(fromStr);
-  const end = new Date(toStr);
-  while (d <= end) {
-    out.push(toYYYYMMDD(d));
-    d = addDays(d, 1);
+export const config = {
+  runtime: "nodejs", // evita Edge para poder usar fetch estándar y Date locales
+};
+
+const ok = (data, extra = {}) => new Response(
+  JSON.stringify({ ok: true, items: data, ...extra }),
+  {
+    status: 200,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+    },
   }
-  return out;
+);
+
+const bad = (status, msg) =>
+  new Response(JSON.stringify({ ok: false, error: msg }), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8" },
+  });
+
+function toUnix(d) {
+  return Math.floor(new Date(d).getTime() / 1000);
 }
 
-export default async function handler(req, res) {
+function isFutureFixture(fx, nowTs) {
+  // APISports: fixture.status.short === NS/TBD/… o timestamp futuro
+  const ts = fx?.fixture?.timestamp ?? (fx?.fixture?.date ? toUnix(fx.fixture.date) : null);
+  const short = fx?.fixture?.status?.short || "";
+  if (["NS", "TBD"].includes(short)) return true;
+  if (typeof ts === "number" && ts > nowTs) return true;
+  return false;
+}
+
+function flatten(fx) {
+  return {
+    fixtureId: fx?.fixture?.id ?? fx?.id ?? null,
+    teams: {
+      home: fx?.teams?.home?.name || fx?.home?.name || "Home",
+      away: fx?.teams?.away?.name || fx?.away?.name || "Away",
+    },
+    league: {
+      name: fx?.league?.name || fx?.competition?.name || "",
+      country: fx?.league?.country || fx?.competition?.area?.name || "",
+    },
+    fixture: {
+      id: fx?.fixture?.id ?? null,
+      date: fx?.fixture?.date ?? null,
+      timestamp: fx?.fixture?.timestamp ?? null,
+      status: fx?.fixture?.status?.short || "",
+    },
+  };
+}
+
+export default async function handler(req) {
   try {
-    const {
-      date,
-      from,
-      to,
-      league,                 // id numérica de liga
-      country,                // texto (ej: "France")
-      q,                      // libre: equipo/país/competición
-      futureOnly = "0",
-      timezone = "America/Santiago", // importante para que coincidan fechas locales
-    } = req.query;
+    const url = new URL(req.url);
+    const from = url.searchParams.get("from") || url.searchParams.get("date");
+    const to = url.searchParams.get("to") || from;
+    const q = (url.searchParams.get("q") || "").trim();
+    const league = url.searchParams.get("league"); // numérico como string
+    const futureOnly = url.searchParams.get("futureOnly") === "1";
+    const countryParam = url.searchParams.get("country"); // ya en inglés
+    const base = apiSportsBase();
+    const headers = apiSportsHeaders();
 
-    // Fechas a consultar (1 o varias)
-    const days = date ? [date] : listDays(from || toYYYYMMDD(new Date()), to || from || toYYYYMMDD(new Date()));
+    if (!from) return bad(400, "Debe enviar ?date=YYYY-MM-DD o ?from=YYYY-MM-DD");
 
-    // Descargamos fixtures por día (en paralelo)
-    const batches = await Promise.all(days.map(async (d) => {
-      // Query base por día
-      const params = { date: d, timezone };
+    // armar lista de días
+    const days = listDays(from, to);
+    const nowTs = Math.floor(Date.now() / 1000);
 
-      // Filtros “duros”
-      if (league) params.league = league;
-      if (country) params.country = country;
+    const queries = [];
+    for (const d of days) {
+      // 1) consulta amplia por día (captura Champions/Qualifiers/amistos)
+      const u1 = new URL(`${base}/fixtures`);
+      u1.searchParams.set("date", d);
+      // solamente partidos no iniciados (reduce ruido de pasados en zona horaria)
+      u1.searchParams.set("status", "NS"); // APISports permite múltiple pero NS es clave
+      queries.push(u1.toString());
 
-      // Llamada principal: /fixtures
-      const fx = await apisGet("/fixtures", params);
+      // 2) si hay league id numérica
+      if (league && /^\d+$/.test(league)) {
+        const u2 = new URL(`${base}/fixtures`);
+        u2.searchParams.set("date", d);
+        u2.searchParams.set("league", league);
+        u2.searchParams.set("status", "NS");
+        queries.push(u2.toString());
+      }
 
-      // Estructuramos
-      const arr = Array.isArray(fx?.response) ? fx.response : [];
-      return arr.map((r) => ({
-        fixtureId: r?.fixture?.id,
-        teams: { home: r?.teams?.home?.name, away: r?.teams?.away?.name },
-        league: { name: r?.league?.name, country: r?.league?.country },
-        timestamp: r?.fixture?.timestamp,        // epoch (s)
-        fixture: r?.fixture,                     // por si luego quieres más campos
-      }));
-    }));
-
-    // Merge + dedupe
-    const seen = new Set();
-    let items = [];
-    for (const arr of batches) {
-      for (const it of arr) {
-        const id = String(it.fixtureId);
-        if (seen.has(id)) continue;
-        seen.add(id);
-        items.push(it);
+      // 3) si q parece país → filtrar también por country
+      const mapped = countryParam || mapCountry(q);
+      if (mapped) {
+        const u3 = new URL(`${base}/fixtures`);
+        u3.searchParams.set("date", d);
+        u3.searchParams.set("country", mapped);
+        u3.searchParams.set("status", "NS");
+        queries.push(u3.toString());
       }
     }
 
-    // FUTURE ONLY: filtra por hora actual si viene activado
-    if (futureOnly === "1") {
-      const now = Date.now() / 1000;
-      items = items.filter((it) => !it.timestamp || it.timestamp >= now);
+    // descargar en paralelo y tolerar errores
+    const results = await Promise.all(
+      queries.map(async (u) => {
+        try {
+          const r = await fetch(u, { headers, cache: "no-store" });
+          if (!r.ok) return [];
+          const j = await r.json();
+          return Array.isArray(j?.response) ? j.response : [];
+        } catch {
+          return [];
+        }
+      })
+    );
+
+    // unir, dedupe por fixtureId
+    const raw = results.flat();
+    const seen = new Set();
+    let items = [];
+    for (const fx of raw) {
+      const id = fx?.fixture?.id ?? fx?.id;
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      if (futureOnly && !isFutureFixture(fx, nowTs)) continue;
+      items.push(fx);
     }
 
-    // Filtro “blando” por q (equipo/competición/país)
-    if (q && String(q).trim().length >= 2) {
-      const txt = String(q).toLowerCase();
-      items = items.filter((it) => {
-        const h = String(it.teams?.home || "").toLowerCase();
-        const a = String(it.teams?.away || "").toLowerCase();
-        const ln = String(it.league?.name || "").toLowerCase();
-        const lc = String(it.league?.country || "").toLowerCase();
-        return h.includes(txt) || a.includes(txt) || ln.includes(txt) || lc.includes(txt);
+    // si q es texto no-numérico: además filtrar por equipo/liga que contenga q
+    if (q && !/^\d+$/.test(q)) {
+      const needle = q.toLowerCase();
+      items = items.filter((fx) => {
+        const h = (fx?.teams?.home?.name || "").toLowerCase();
+        const a = (fx?.teams?.away?.name || "").toLowerCase();
+        const l = (fx?.league?.name || "").toLowerCase();
+        return h.includes(needle) || a.includes(needle) || l.includes(needle);
       });
     }
 
-    // Orden sugerido: primero por popularidad (ligas “grandes”), luego por fecha
-    const pop = (it) => {
-      const name = String(it.league?.name || "").toLowerCase();
-      if (/world cup|qualifier|euro|champions|libertadores|sudamericana/.test(name)) return 100;
-      if (/premier|la liga|serie a|bundesliga|ligue 1/.test(name)) return 90;
+    // ordenar: competiciones populares primero, luego por hora
+    const pop = (fx) => {
+      const l = (fx?.league?.name || "").toLowerCase();
+      if (/world cup|eliminator|qualifier|amistos|friendly/.test(l)) return 100;
+      if (/champions league|euro|libertadores|sudamericana/.test(l)) return 95;
+      if (/premier league|la liga|serie a|bundesliga|ligue 1/.test(l)) return 90;
       return 40;
     };
     items.sort((A, B) => {
-      const p = pop(B) - pop(A);
-      if (p) return p;
-      return (A.timestamp || 9e12) - (B.timestamp || 9e12);
+      const d = pop(B) - pop(A);
+      if (d) return d;
+      const ta = A?.fixture?.timestamp ?? 9e15;
+      const tb = B?.fixture?.timestamp ?? 9e15;
+      return ta - tb;
     });
 
-    res.status(200).json({ count: items.length, items });
+    // dejar forma plana para el frontend
+    const flat = items.map(flatten);
+
+    return ok(flat, { count: flat.length });
   } catch (e) {
-    res.status(500).json({ error: String(e?.message || e) });
+    return bad(500, `fixtures:error ${e.message || e}`);
   }
 }

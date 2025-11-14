@@ -1,31 +1,46 @@
-// api/odds.js
-import { apisGet } from "./_utils/apisports";
+// frontend/api/odds.js
+export const config = { runtime: "nodejs" };
 
-export default async function handler(req, res) {
+import { apiSportsBase, apiSportsHeaders } from "./_utils/apisports";
+
+export default async function handler(req) {
   try {
-    const { fixture, market = "1x2" } = req.query;
-    if (!fixture) return res.status(400).json({ error: "Falta fixture" });
-
-    // APISports: /odds con fixture y tipo de mercado
-    const od = await apisGet("/odds", { fixture, bet: market });
-    // Normalizamos a { markets: [{ outcomes: [{name, odd}]}] }
-    const response = Array.isArray(od?.response) ? od.response : [];
-    const markets = [];
-
-    for (const book of response) {
-      for (const m of (book?.bookmakers || [])) {
-        for (const bet of (m?.bets || [])) {
-          const outs = (bet?.values || []).map(v => ({
-            name: v?.value,
-            odd: Number(v?.odd),
-          }));
-          markets.push({ outcomes: outs, bookmaker: m?.name, label: bet?.name });
-        }
-      }
+    const url = new URL(req.url);
+    const fixture = url.searchParams.get("fixture");
+    if (!fixture) {
+      return new Response(JSON.stringify({ ok: false, error: "falta ?fixture=" }), {
+        status: 400,
+        headers: { "content-type": "application/json" },
+      });
     }
-
-    res.status(200).json({ markets });
+    const r = await fetch(`${apiSportsBase()}/odds?fixture=${fixture}&bookmaker=8`, {
+      headers: apiSportsHeaders(),
+      cache: "no-store",
+    });
+    const j = await r.json();
+    // normaliza a markets/outcomes esperado por el front
+    const markets = [];
+    const list = Array.isArray(j?.response) ? j.response : [];
+    for (const row of list) {
+      const firstBk = row?.bookmakers?.[0];
+      const firstMk = firstBk?.bets?.[0];
+      if (!firstMk?.values) continue;
+      markets.push({
+        name: firstMk.name || "1X2",
+        outcomes: firstMk.values.map((v) => ({
+          name: v?.value,
+          odd: Number(v?.odd),
+        })),
+      });
+    }
+    return new Response(JSON.stringify({ ok: true, markets }), {
+      status: 200,
+      headers: { "content-type": "application/json", "cache-control": "no-store" },
+    });
   } catch (e) {
-    res.status(500).json({ error: String(e?.message || e) });
+    return new Response(JSON.stringify({ ok: false, error: String(e.message || e) }), {
+      status: 500,
+      headers: { "content-type": "application/json" },
+    });
   }
 }

@@ -1,27 +1,50 @@
-// api/_utils/apisports.js
-export const APIS_KEY = process.env.APISPORTS_KEY;
-export const APIS_HOST = process.env.APISPORTS_HOST || "v3.football.api-sports.io";
-
-function baseHeaders() {
+// frontend/api/_utils/apisports.js
+export function apiSportsHeaders() {
+  const key = process.env.APISPORTS_KEY;
+  const host = process.env.APISPORTS_HOST || "v3.football.api-sports.io";
+  if (!key) throw new Error("APISPORTS_KEY no definido");
   return {
-    "x-apisports-key": APIS_KEY,
-    "x-rapidapi-key": APIS_KEY,       // por compatibilidad si tu plan usa RapidAPI
-    "x-rapidapi-host": APIS_HOST,     // idem
+    "x-apisports-key": key,
+    "x-rapidapi-key": key,   // por compatibilidad
+    "x-rapidapi-host": host, // por compatibilidad
   };
 }
 
-// Wrapper simple de fetch para APISports
-export async function apisGet(path, params = {}) {
-  if (!APIS_KEY) {
-    throw new Error("Falta APISPORTS_KEY en variables de entorno");
-  }
-  const usp = new URLSearchParams(params);
-  const url = `https://${APIS_HOST}${path}?${usp.toString()}`;
-  const res = await fetch(url, { headers: baseHeaders(), cache: "no-store" });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`APISports ${res.status}: ${txt || res.statusText}`);
-  }
-  const json = await res.json();
-  return json;
+export function apiSportsBase() {
+  const host = process.env.APISPORTS_HOST || "v3.football.api-sports.io";
+  return `https://${host}`;
 }
+
+// util: YYYY-MM-DD inclusive list
+export function listDays(from, to) {
+  const out = [];
+  let d = new Date(from);
+  const end = new Date(to);
+  while (d <= end) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    out.push(`${y}-${m}-${day}`);
+    d.setDate(d.getDate() + 1);
+  }
+  return out;
+}
+
+export const COUNTRY_ALIAS = {
+  francia: "France",
+  inglaterra: "England",
+  españa: "Spain",
+  espana: "Spain",
+  portugal: "Portugal",
+  italia: "Italy",
+  alemania: "Germany",
+  noruega: "Norway",
+  chile: "Chile",
+  argentina: "Argentina",
+  brasil: "Brazil",
+  mexico: "Mexico",
+  eeuu: "USA",
+  estadosunidos: "USA",
+};
+export const norm = (s) => String(s || "").toLowerCase().trim().replace(/\s+/g, "");
+export const mapCountry = (q) => COUNTRY_ALIAS[norm(q)] || null;
