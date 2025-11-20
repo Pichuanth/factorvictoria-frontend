@@ -52,8 +52,8 @@ function listDays(fromStr, toStr) {
 function safeLower(x) {
   return String(x || "").toLowerCase();
 }
+
 function getKickoff(item) {
-  // intentamos varias fuentes de fecha y normalizamos a Date UTC
   const ts =
     item?.timestamp ??
     item?.fixture?.timestamp ??
@@ -62,7 +62,7 @@ function getKickoff(item) {
     null;
 
   if (!ts || !Number.isFinite(ts)) return null;
-  return new Date(ts * 1000); // API-Football entrega timestamp UTC en segundos
+  return new Date(ts * 1000);
 }
 
 /** Mapea membresía → target cuota */
@@ -158,106 +158,8 @@ function popularityScore(item) {
   return 40; // por defecto
 }
 
-/* --------------------- Partidos importantes --------------------- */
+/* --------------------- CTA upgrade --------------------- */
 
-const IMPORTANT_LEAGUES = [
-  "Chile - Liga de Primera",
-  "Chile - Copa Chile",
-  "Chile - Liga de Ascenso",
-
-  "Champions League",
-  "Europa League",
-  "Conference League",
-  "Copa Libertadores",
-  "Copa Sudamericana",
-
-  "Premier League",
-  "LaLiga",
-  "Liga de Primera",
-  "Bundesliga",
-  "Serie A",
-  "Ligue 1",
-  "Primeira Liga",
-  "Eredivisie",
-  "Brasil - Serie A",
-  "Argentina - Liga Profesional",
-];
-
-const BIG_TEAMS = [
-  // Chile
-  "Colo Colo",
-  "Universidad de Chile",
-  "Universidad Católica",
-  "Santiago Wanderers",
-  "Cobreloa",
-
-  // Brasil
-  "Flamengo",
-  "Palmeiras",
-  "Gremio",
-  "Santos",
-  "Vasco da Gama",
-  "Fluminense",
-
-  // Argentina
-  "River Plate",
-  "Boca Juniors",
-  "Racing Club",
-  "Independiente",
-
-  // Europa top
-  "Real Madrid",
-  "Barcelona",
-  "Atlético Madrid",
-  "Manchester City",
-  "Manchester United",
-  "Liverpool",
-  "Chelsea",
-  "Arsenal",
-  "Bayern Munich",
-  "Borussia Dortmund",
-  "PSG",
-  "Juventus",
-  "Inter",
-  "Milan",
-];
-
-/**
- * Devuelve true si el partido es "importante/popular"
- */
-function isImportantFixture(item) {
-  const leagueName = safeLower(item?.league?.name);
-  const leagueCountry = safeLower(item?.league?.country || "");
-  const leagueFull = `${leagueCountry} - ${leagueName}`;
-
-  const home = safeLower(item?.teams?.home);
-  const away = safeLower(item?.teams?.away);
-
-  // 1) Coincidencia con lista dura de competiciones importantes
-  for (const name of IMPORTANT_LEAGUES) {
-    const n = safeLower(name);
-    if (leagueName.includes(n) || leagueFull.includes(n)) {
-      return true;
-    }
-  }
-
-  // 2) Coincidencia con equipos grandes
-  for (const team of BIG_TEAMS) {
-    const t = safeLower(team);
-    if (home.includes(t) || away.includes(t)) {
-      return true;
-    }
-  }
-
-  // 3) Score de popularidad (Champions, Libertadores, ligas top, etc.)
-  if (popularityScore(item) >= 80) {
-    return true;
-  }
-
-  return false;
-}
-
-/* CTA upgrade para planes básicos */
 function UpgradeCTA({ text = "Mejorar membresía" }) {
   return (
     <Link
@@ -331,7 +233,6 @@ export default function Comparator() {
       const isNum = /^\d+$/.test(qTrim);
       const days = listDays(from, to);
 
-      // Armamos URLs por día:
       const countryEN = !isNum && qTrim ? normalizeCountryQuery(qTrim) : null;
 
       const urls = [];
@@ -350,75 +251,53 @@ export default function Comparator() {
         }
       }
 
-      // Descargas en paralelo con tolerancia a fallas
       let items = [];
+
       try {
-        const batches = await Promise.all(
-          urls.map((u) => fetchJSON(u).catch(() => ({ items: [] })))
-        );
-        for (const fx of batches) if (Array.isArray(fx?.items)) items.push(...fx.items);
-      } catch {
-        // fallback demo si algo extremo falla
-        items = makeDemoFixtures(from, to, 12);
-        setWarn("La API dio error. Mostrando demo para que puedas seguir probando.");
+        const batches = await Promise.all(urls.map((u) => fetchJSON(u)));
+        for (const fx of batches) {
+          if (Array.isArray(fx?.items)) items.push(...fx.items);
+        }
+      } catch (e) {
+        console.error("Error consultando /api/fixtures:", e);
       }
 
-      // Dedup por fixtureId (básico)
+      // Si la API no devolvió nada, usamos DEMO (sobre todo útil en local)
+      if (!items.length) {
+        items = makeDemoFixtures(from, to, 12);
+        setWarn(
+          "La API no devolvió partidos. Mostrando DEMO para que puedas probar el comparador (revisa /api/fixtures en Vercel)."
+        );
+      }
+
+      // Dedup por fixtureId
       const seen = new Set();
       items = items.filter((it) => {
-        const id =
-          it?.fixtureId ??
-          it?.id ??
-          `${it?.teams?.home || "?"}-${it?.teams?.away || "?"}-${it?.date || ""}`;
-        const key = String(id);
-        if (seen.has(key)) return false;
-        seen.add(key);
+        const id = it.fixtureId ?? it.fixture?.id ?? it.id;
+        if (!id) return true;
+        if (seen.has(id)) return false;
+        seen.add(id);
         return true;
       });
 
-      // Guardar copia cruda para fallback si filtramos demasiado
-      const originalItems = [...items];
+      // Filtro FUTURO estricto
+      const now = new Date();
+      const nowMinus5 = new Date(now.getTime() - 5 * 60 * 1000);
+      items = items.filter((it) => {
+        const ko = getKickoff(it);
+        if (!ko) return false;
+        return ko >= nowMinus5;
+      });
 
-      // Filtro por texto (equipo / liga) solo si el usuario escribe algo
-      if (qTrim && !isNum) {
+      // Filtro por texto (equipo / liga) si q es texto ≥3 chars
+      if (qTrim && !isNum && qTrim.length >= 3) {
         const txt = safeLower(qTrim);
-        if (txt.length >= 3) {
-          items = items.filter((it) => {
-            const h = safeLower(it?.teams?.home);
-            const a = safeLower(it?.teams?.away);
-            const leagueName = safeLower(it?.league?.name);
-            return h.includes(txt) || a.includes(txt) || leagueName.includes(txt);
-          });
-        }
-      }
-
-      // 🔥 Filtro de "partidos importantes" cuando NO hay texto ni id de liga
-      if (!qTrim && !isNum) {
-        const important = items.filter((it) => isImportantFixture(it));
-
-        if (important.length >= 6) {
-          // Suficientes partidos importantes → usamos solo esos
-          items = important;
-        } else if (important.length > 0) {
-          // Mezcla: importantes primero y luego el resto
-          const importantIds = new Set(
-            important.map((it) =>
-              String(it.fixtureId ?? it.id ?? `${it?.teams?.home}-${it?.teams?.away}`)
-            )
-          );
-          const others = items.filter(
-            (it) =>
-              !importantIds.has(
-                String(it.fixtureId ?? it.id ?? `${it?.teams?.home}-${it?.teams?.away}`)
-              )
-          );
-          items = [...important, ...others];
-        }
-      }
-
-      // Si después de todo no queda nada, usamos de nuevo los originales (sin filtros)
-      if (!items.length && originalItems.length) {
-        items = originalItems;
+        items = items.filter((it) => {
+          const h = safeLower(it?.teams?.home);
+          const a = safeLower(it?.teams?.away);
+          const leagueName = safeLower(it?.league?.name);
+          return h.includes(txt) || a.includes(txt) || leagueName.includes(txt);
+        });
       }
 
       // Orden: popularidad y luego kickoff
@@ -432,8 +311,16 @@ export default function Comparator() {
 
       if (!items.length) {
         setWarn(
-          "No hay suficientes eventos para alcanzar tu cuota objetivo. Amplía el rango de fechas o cambia liga/país."
+          "No hay partidos futuros suficientes para este rango o filtro. Prueba con más días o sin filtrar por país/equipo."
         );
+        setData({
+          gift: null,
+          parlay: { selections: [], totalOdd: 1 },
+          refs: [],
+          gaps: [],
+          meta: { fixturesUsed: 0 },
+        });
+        return;
       }
 
       // ---- odds (reales cuando existan; si no, sintéticas)
@@ -442,12 +329,12 @@ export default function Comparator() {
         const ko = getKickoff(it);
         const dateStr = ko ? ` · ${ko.toLocaleString()}` : "";
         const label = `${it.teams?.home || "Equipo A"} vs ${it.teams?.away || "Equipo B"}${
-          String(it.fixtureId).startsWith("demo-") ? " (demo)" : ""
+          String(it.fixtureId || "").startsWith("demo-") ? " (demo)" : ""
         }${dateStr}`;
 
         let odds = [];
         try {
-          if (!String(it.fixtureId).startsWith("demo-")) {
+          if (!String(it.fixtureId || "").startsWith("demo-")) {
             const od = await fetchJSON(
               `/api/odds?fixture=${encodeURIComponent(it.fixtureId)}&market=1x2`
             );
@@ -470,10 +357,11 @@ export default function Comparator() {
             }
             odds = flat.filter((x) => x.odd > 1.01);
           }
-        } catch {
+        } catch (e) {
+          console.error("Error consultando /api/odds:", e);
           odds = [];
         }
-        if (!odds.length) odds = synthOdds(it.fixtureId);
+        if (!odds.length) odds = synthOdds(it.fixtureId || label);
         withOdds.push({ label, odds, id: it.fixtureId });
       }
 
@@ -489,16 +377,16 @@ export default function Comparator() {
 
       // Parlay
       const parlay = buildParlay(target, withOdds, 10);
-      if (parlay.totalOdd < target * 0.6 && !warn) {
+      if (parlay.totalOdd < target * 0.8 && !warn) {
         setWarn(
           "No hay suficientes eventos fuertes para llegar exactamente a tu cuota objetivo, pero te mostramos lo mejor disponible."
         );
       }
 
-      // Demos premium (de momento aún no hay datos reales para árbitros/gaps)
+      // Demos premium (placeholder)
       const refereesDemo = withOdds.slice(0, 5).map((f, i) => ({
         match: f.label,
-        referee: `Árbitro clave ${i + 1}`,
+        referee: `Árbitro Demo ${i + 1}`,
         avgCards: (5.5 - i * 0.4).toFixed(1),
       }));
       const marketGapDemo = withOdds.slice(0, 4).map((f, i) => ({
@@ -516,6 +404,7 @@ export default function Comparator() {
         meta: { fixturesUsed: withOdds.length },
       });
     } catch (e) {
+      console.error(e);
       setErr(String(e.message || e));
     } finally {
       setLoading(false);
@@ -623,6 +512,7 @@ export default function Comparator() {
               {data.refs.map((r, i) => (
                 <li key={i}>
                   <span className="font-semibold">{r.referee}</span> — {r.match} · media {r.avgCards} tarjetas
+                  <span className="text-xs text-slate-400 ml-2">(demo)</span>
                 </li>
               ))}
             </ul>
@@ -653,6 +543,7 @@ export default function Comparator() {
                 <li key={i}>
                   <span className="font-semibold">{g.match}</span> — {g.market} · nuestra x{g.ourOdd} vs casas x
                   {g.bookAvg}
+                  <span className="text-xs text-slate-400 ml-2">(demo)</span>
                 </li>
               ))}
             </ul>
