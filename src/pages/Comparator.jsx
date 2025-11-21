@@ -79,7 +79,19 @@ function targetFromPlan(planRaw) {
 async function fetchJSON(path) {
   const res = await fetch(path, { cache: "no-store" });
   if (!res.ok) throw new Error(`HTTP ${res.status} – ${res.statusText}`);
-  return res.json();
+
+  const data = await res.json();
+
+  // Debug: ver cuántos fixtures/ítems devuelve cada llamada
+  const count = Array.isArray(data?.items)
+    ? data.items.length
+    : Array.isArray(data)
+    ? data.length
+    : null;
+
+  console.log("[fetchJSON]", path, "→", count ?? data);
+
+  return data;
 }
 
 /* Odds sintéticas si no hay reales */
@@ -130,7 +142,7 @@ function buildParlay(target, fixturesWithOdds, maxLegs = 10) {
   return { selections, totalOdd: Number(product.toFixed(2)) };
 }
 
-/* Demo de fixtures cuando la API falla o no hay resultados */
+/* Demo de fixtures cuando la API falla o no hay resultados (ya no se usa para picks) */
 function makeDemoFixtures(from, to, count = 10) {
   const out = [];
   for (let i = 1; i <= count; i++) {
@@ -262,13 +274,11 @@ export default function Comparator() {
         console.error("Error consultando /api/fixtures:", e);
       }
 
-      // Si la API no devolvió nada, usamos DEMO (sobre todo útil en local)
-      if (!items.length) {
-        items = makeDemoFixtures(from, to, 12);
-        setWarn(
-          "La API no devolvió partidos. Mostrando DEMO para que puedas probar el comparador (revisa /api/fixtures en Vercel)."
-        );
-      }
+      console.log("[onGenerate] items después de API", items.length, {
+        from,
+        to,
+        q: qTrim,
+      });
 
       // Dedup por fixtureId
       const seen = new Set();
@@ -309,9 +319,10 @@ export default function Comparator() {
         return ta - tb;
       });
 
+      // Si después de todo no hay partidos, avisamos y no generamos nada
       if (!items.length) {
         setWarn(
-          "No hay partidos futuros suficientes para este rango o filtro. Prueba con más días o sin filtrar por país/equipo."
+          "No hay partidos futuros reales suficientes para este rango o filtro. Prueba con más días o sin filtrar por país/equipo."
         );
         setData({
           gift: null,
