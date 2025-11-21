@@ -1,165 +1,106 @@
-// frontend/api/fixtures.js
-import { apiSportsBase, apiSportsHeaders, listDays, mapCountry } from "./_utils/apisports";
+// api/fixtures.js
+// Función serverless para traer partidos desde API-FOOTBALL (API-SPORTS)
 
-export const config = {
-  runtime: "nodejs", // evita Edge para poder usar fetch estándar y Date locales
-};
+const fetch = (...args) =>
+  import("node-fetch").then(({ default: fetch }) => fetch(...args));
 
-const ok = (data, extra = {}) => new Response(
-  JSON.stringify({ ok: true, items: data, ...extra }),
-  {
-    status: 200,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      "cache-control": "no-store",
-    },
-  }
-);
+const API_HOST = process.env.APISPORTS_HOST || "v3.football.api-sports.io";
+const API_KEY = process.env.APISPORTS_KEY;
 
-const bad = (status, msg) =>
-  new Response(JSON.stringify({ ok: false, error: msg }), {
-    status,
-    headers: { "content-type": "application/json; charset=utf-8" },
-  });
-
-function toUnix(d) {
-  return Math.floor(new Date(d).getTime() / 1000);
-}
-
-function isFutureFixture(fx, nowTs) {
-  // APISports: fixture.status.short === NS/TBD/… o timestamp futuro
-  const ts = fx?.fixture?.timestamp ?? (fx?.fixture?.date ? toUnix(fx.fixture.date) : null);
-  const short = fx?.fixture?.status?.short || "";
-  if (["NS", "TBD"].includes(short)) return true;
-  if (typeof ts === "number" && ts > nowTs) return true;
-  return false;
-}
-
-function flatten(fx) {
+// Mapea un fixture de API-FOOTBALL al formato que usa el frontend
+function mapFixture(fx) {
   return {
-    fixtureId: fx?.fixture?.id ?? fx?.id ?? null,
-    teams: {
-      home: fx?.teams?.home?.name || fx?.home?.name || "Home",
-      away: fx?.teams?.away?.name || fx?.away?.name || "Away",
-    },
+    fixtureId: fx?.fixture?.id,
+    timestamp: fx?.fixture?.timestamp,
+    date: fx?.fixture?.date,
     league: {
-      name: fx?.league?.name || fx?.competition?.name || "",
-      country: fx?.league?.country || fx?.competition?.area?.name || "",
+      id: fx?.league?.id,
+      name: fx?.league?.name,
+      country: fx?.league?.country,
     },
-    fixture: {
-      id: fx?.fixture?.id ?? null,
-      date: fx?.fixture?.date ?? null,
-      timestamp: fx?.fixture?.timestamp ?? null,
-      status: fx?.fixture?.status?.short || "",
+    teams: {
+      home: fx?.teams?.home?.name,
+      away: fx?.teams?.away?.name,
     },
   };
 }
 
-export default async function handler(req) {
+module.exports = async (req, res) => {
   try {
-    const url = new URL(req.url);
-    const from = url.searchParams.get("from") || url.searchParams.get("date");
-    const to = url.searchParams.get("to") || from;
-    const q = (url.searchParams.get("q") || "").trim();
-    const league = url.searchParams.get("league"); // numérico como string
-    const futureOnly = url.searchParams.get("futureOnly") === "1";
-    const countryParam = url.searchParams.get("country"); // ya en inglés
-    const base = apiSportsBase();
-    const headers = apiSportsHeaders();
-
-    if (!from) return bad(400, "Debe enviar ?date=YYYY-MM-DD o ?from=YYYY-MM-DD");
-
-    // armar lista de días
-    const days = listDays(from, to);
-    const nowTs = Math.floor(Date.now() / 1000);
-
-    const queries = [];
-    for (const d of days) {
-      // 1) consulta amplia por día (captura Champions/Qualifiers/amistos)
-      const u1 = new URL(`${base}/fixtures`);
-      u1.searchParams.set("date", d);
-      // solamente partidos no iniciados (reduce ruido de pasados en zona horaria)
-      u1.searchParams.set("status", "NS"); // APISports permite múltiple pero NS es clave
-      queries.push(u1.toString());
-
-      // 2) si hay league id numérica
-      if (league && /^\d+$/.test(league)) {
-        const u2 = new URL(`${base}/fixtures`);
-        u2.searchParams.set("date", d);
-        u2.searchParams.set("league", league);
-        u2.searchParams.set("status", "NS");
-        queries.push(u2.toString());
-      }
-
-      // 3) si q parece país → filtrar también por country
-      const mapped = countryParam || mapCountry(q);
-      if (mapped) {
-        const u3 = new URL(`${base}/fixtures`);
-        u3.searchParams.set("date", d);
-        u3.searchParams.set("country", mapped);
-        u3.searchParams.set("status", "NS");
-        queries.push(u3.toString());
-      }
+    if (!API_KEY) {
+      console.error("Falta APISPORTS_KEY en las variables de entorno");
+      return res
+        .status(500)
+        .json({ error: "Config del servidor incompleta (API key)" });
     }
 
-    // descargar en paralelo y tolerar errores
-    const results = await Promise.all(
-      queries.map(async (u) => {
-        try {
-          const r = await fetch(u, { headers, cache: "no-store" });
-          if (!r.ok) return [];
-          const j = await r.json();
-          return Array.isArray(j?.response) ? j.response : [];
-        } catch {
-          return [];
-        }
-      })
-    );
+    const { date, from, to, country, league, status } = req.query;
 
-    // unir, dedupe por fixtureId
-    const raw = results.flat();
-    const seen = new Set();
-    let items = [];
-    for (const fx of raw) {
-      const id = fx?.fixture?.id ?? fx?.id;
-      if (!id || seen.has(id)) continue;
-      seen.add(id);
-      if (futureOnly && !isFutureFixture(fx, nowTs)) continue;
-      items.push(fx);
+    const params = new URLSearchParams();
+
+    // Soportar tanto ?date=YYYY-MM-DD como ?from=&to=
+    if (date) {
+      params.set("date", date);
+    } else if (from && to) {
+      params.set("from", from);
+      params.set("to", to);
+    } else {
+      // Por defecto: hoy (por si alguien llama sin fecha)
+      const today = new Date();
+      const pad = (n) => String(n).padStart(2, "0");
+      const d = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(
+        today.getDate()
+      )}`;
+      params.set("date", d);
     }
 
-    // si q es texto no-numérico: además filtrar por equipo/liga que contenga q
-    if (q && !/^\d+$/.test(q)) {
-      const needle = q.toLowerCase();
-      items = items.filter((fx) => {
-        const h = (fx?.teams?.home?.name || "").toLowerCase();
-        const a = (fx?.teams?.away?.name || "").toLowerCase();
-        const l = (fx?.league?.name || "").toLowerCase();
-        return h.includes(needle) || a.includes(needle) || l.includes(needle);
+    if (status) params.set("status", status); // ej: NS (no started)
+    if (country) params.set("country", country); // ej: Chile, France…
+    if (league) params.set("league", league); // ej: id de liga
+
+    const url = `https://${API_HOST}/fixtures?${params.toString()}`;
+
+    console.log("[/api/fixtures] Llamando a API-FOOTBALL:", url);
+
+    const apiRes = await fetch(url, {
+      headers: {
+        "x-apisports-key": API_KEY,
+      },
+    });
+
+    if (!apiRes.ok) {
+      const text = await apiRes.text();
+      console.error(
+        "Error respuesta API-FOOTBALL:",
+        apiRes.status,
+        apiRes.statusText,
+        text
+      );
+      return res.status(502).json({
+        error: "Error al consultar proveedor de datos",
+        status: apiRes.status,
+        statusText: apiRes.statusText,
       });
     }
 
-    // ordenar: competiciones populares primero, luego por hora
-    const pop = (fx) => {
-      const l = (fx?.league?.name || "").toLowerCase();
-      if (/world cup|eliminator|qualifier|amistos|friendly/.test(l)) return 100;
-      if (/champions league|euro|libertadores|sudamericana/.test(l)) return 95;
-      if (/premier league|la liga|serie a|bundesliga|ligue 1/.test(l)) return 90;
-      return 40;
-    };
-    items.sort((A, B) => {
-      const d = pop(B) - pop(A);
-      if (d) return d;
-      const ta = A?.fixture?.timestamp ?? 9e15;
-      const tb = B?.fixture?.timestamp ?? 9e15;
-      return ta - tb;
+    const body = await apiRes.json();
+
+    const response = Array.isArray(body?.response) ? body.response : [];
+    const items = response.map(mapFixture);
+
+    console.log(
+      "[/api/fixtures] Partidos devueltos:",
+      items.length,
+      "params:",
+      Object.fromEntries(params)
+    );
+
+    return res.status(200).json({ items });
+  } catch (err) {
+    console.error("[/api/fixtures] EXCEPCIÓN:", err);
+    return res.status(500).json({
+      error: "Error interno en la función fixtures",
+      message: err.message || String(err),
     });
-
-    // dejar forma plana para el frontend
-    const flat = items.map(flatten);
-
-    return ok(flat, { count: flat.length });
-  } catch (e) {
-    return bad(500, `fixtures:error ${e.message || e}`);
   }
-}
+};
