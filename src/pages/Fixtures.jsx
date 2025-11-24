@@ -12,6 +12,21 @@ function toYYYYMMDD(d) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+/**
+ * Normaliza texto de país a lo que entiende la API (country=)
+ */
+function normalizeCountryForApi(q) {
+  const txt = String(q || "").trim().toLowerCase();
+
+  if (txt === "chile") return "Chile";
+  if (txt === "argentina") return "Argentina";
+  if (txt === "españa" || txt === "espana") return "Spain";
+  if (txt === "inglaterra") return "England";
+  if (txt === "francia") return "France";
+
+  return null;
+}
+
 /* ---------- control de uso gratis (localStorage) ---------- */
 
 const FREE_KEY_DATE = "fv_free_matches_date";
@@ -58,6 +73,7 @@ function hasReachedFreeLimit() {
 export default function Fixtures() {
   const { isLoggedIn, user } = useAuth();
   const today = useMemo(() => new Date(), []);
+
   const [date, setDate] = useState(toYYYYMMDD(today));
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
@@ -72,7 +88,7 @@ export default function Fixtures() {
     setErr("");
     setLimitMsg("");
 
-    // Si no está logueado, aplicamos límite de uso gratis
+    // Límite de uso gratis para visitantes
     if (!isLoggedIn && hasReachedFreeLimit()) {
       setLimitMsg(
         "Has alcanzado tu límite diario de búsquedas gratis. Crea tu cuenta y activa tu membresía para seguir explorando todos los partidos y usar el comparador profesional."
@@ -85,12 +101,22 @@ export default function Fixtures() {
       setLoading(true);
       setRows([]);
 
+      const qTrim = (q || "").trim();
+
       const params = new URLSearchParams();
-      params.set("date", date);
+      // Usamos from/to aunque sea un solo día para que sea consistente con el backend
+      params.set("from", date);
+      params.set("to", date);
       params.set("status", "NS"); // solo futuros / no iniciados
 
-      const qTrim = q.trim();
-      if (qTrim) params.set("q", qTrim);
+      // Si el texto es un país conocido, filtramos por country
+      const countryEN = normalizeCountryForApi(qTrim);
+      if (countryEN) {
+        params.set("country", countryEN);
+      } else if (qTrim) {
+        // si no, usamos q libre (liga / equipo / país escrito distinto)
+        params.set("q", qTrim);
+      }
 
       const res = await fetch(`/api/fixtures?${params.toString()}`);
       if (!res.ok) {
@@ -101,7 +127,6 @@ export default function Fixtures() {
       const items = Array.isArray(data?.items) ? data.items : [];
       setRows(items);
 
-      // sólo contamos como uso si no está logueado
       if (!isLoggedIn) {
         incrementFreeUsage();
       }
@@ -136,12 +161,13 @@ export default function Fixtures() {
           </p>
         ) : (
           <p className="text-slate-300 text-sm md:text-base">
-            Modo visitante: puedes ver partidos de{" "}
-            <span className="font-semibold">
-              Chile, Argentina, España, Inglaterra y Francia
-            </span>{" "}
+            Modo visitante: puedes ver partidos de Chile, Argentina, España, Inglaterra y Francia
             con búsquedas limitadas por día. Para desbloquear uso ilimitado y el comparador
-            profesional, crea tu cuenta y activa una membresía.
+            profesional, crea tu cuenta y{" "}
+            <Link to="/" className="underline font-semibold">
+              activa una membresía
+            </Link>
+            .
           </p>
         )}
       </section>
@@ -241,7 +267,7 @@ export default function Fixtures() {
                 <th className="py-2 pr-4 text-left">Visita</th>
                 <th className="py-2 pr-4 text-left">Liga</th>
                 <th className="py-2 pr-4 text-left">País</th>
-                <th className="py-2 pr-4 text-left hidden md:table-cell">Estadio</th>
+                <th className="py-2 pr-4 text-right">Cuota</th>
               </tr>
             </thead>
             <tbody>
@@ -272,11 +298,6 @@ export default function Fixtures() {
                   const away = fx.teams?.away?.name || fx.teams?.away || "—";
                   const league = fx.league?.name || "—";
                   const country = fx.league?.country || fx.country || "—";
-                  const stadium =
-                    fx.fixture?.venue?.name ||
-                    fx.venue?.name ||
-                    fx.stadium ||
-                    "—";
 
                   return (
                     <tr
@@ -288,10 +309,19 @@ export default function Fixtures() {
                       <td className="py-2 pr-4 text-slate-100">{away}</td>
                       <td className="py-2 pr-4 text-slate-200">{league}</td>
                       <td className="py-2 pr-4 text-slate-200">{country}</td>
-                      <td className="py-2 pr-4 text-slate-400 hidden md:table-cell">
-                        <span className="truncate inline-block max-w-[180px] align-middle">
-                          {stadium}
-                        </span>
+                      <td className="py-2 pr-4 text-right">
+                        {isLoggedIn ? (
+                          <Link
+                            to="/app"
+                            className="text-xs underline font-semibold text-amber-300"
+                          >
+                            Generar
+                          </Link>
+                        ) : (
+                          <Link to="/" className="text-xs underline text-slate-300">
+                            Ver planes
+                          </Link>
+                        )}
                       </td>
                     </tr>
                   );
