@@ -1,165 +1,317 @@
 // src/pages/Fixtures.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useState, useMemo } from "react";
+import { Link } from "react-router-dom";
+import { useAuth } from "../lib/auth";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "";
-const IS_PROD = import.meta.env.PROD;
+const GOLD = "#E6C464";
 
-const FLAG = (country = "") => {
-  const map = {
-    ar: "🇦🇷", cl: "🇨🇱", br: "🇧🇷", uy: "🇺🇾", py: "🇵🇾",
-    pe: "🇵🇪", co: "🇨🇴", mx: "🇲🇽", es: "🇪🇸", pt: "🇵🇹",
-    de: "🇩🇪", it: "🇮🇹", fr: "🇫🇷", gb: "🇬🇧", us: "🇺🇸",
-  };
-  return map[country?.toLowerCase()] || "🏳️";
-};
+/* ---------- helpers de fechas ---------- */
+
+function toYYYYMMDD(d) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/* ---------- control de uso gratis (localStorage) ---------- */
+
+const FREE_KEY_DATE = "fv_free_matches_date";
+const FREE_KEY_COUNT = "fv_free_matches_count";
+const FREE_LIMIT_PER_DAY = 2; // 2 búsquedas gratis
+
+function getTodayStr() {
+  return toYYYYMMDD(new Date());
+}
+
+function readFreeUsage() {
+  if (typeof window === "undefined") return { date: null, count: 0 };
+  try {
+    const date = localStorage.getItem(FREE_KEY_DATE);
+    const raw = localStorage.getItem(FREE_KEY_COUNT);
+    const count = raw ? Number(raw) || 0 : 0;
+    return { date, count };
+  } catch {
+    return { date: null, count: 0 };
+  }
+}
+
+function incrementFreeUsage() {
+  if (typeof window === "undefined") return;
+  try {
+    const today = getTodayStr();
+    const { date, count } = readFreeUsage();
+    const newCount = date === today ? count + 1 : 1;
+    localStorage.setItem(FREE_KEY_DATE, today);
+    localStorage.setItem(FREE_KEY_COUNT, String(newCount));
+  } catch {
+    // ignorar errores de localStorage
+  }
+}
+
+function hasReachedFreeLimit() {
+  const today = getTodayStr();
+  const { date, count } = readFreeUsage();
+  return date === today && count >= FREE_LIMIT_PER_DAY;
+}
+
+/* ---------- componente ---------- */
 
 export default function Fixtures() {
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const { isLoggedIn, user } = useAuth();
+  const today = useMemo(() => new Date(), []);
+  const [date, setDate] = useState(toYYYYMMDD(today));
   const [q, setQ] = useState("");
-  const [adminToken, setAdminToken] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+  const [rows, setRows] = useState([]);
+  const [limitMsg, setLimitMsg] = useState("");
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const url = `${API_BASE}/api/fixtures?date=${encodeURIComponent(date)}`;
-        const r = await fetch(url);
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const data = await r.json();
-        setRows(Array.isArray(data.fixtures) ? data.fixtures : []);
-      } catch (e) {
-        console.error(e);
-        setRows([]);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [date]);
+  const quickCountries = ["Chile", "Argentina", "España", "Inglaterra", "Francia"];
 
-  const handleSync = async () => {
+  async function handleSearch(e) {
+    e?.preventDefault?.();
+    setErr("");
+    setLimitMsg("");
+
+    // Si no está logueado, aplicamos límite de uso gratis
+    if (!isLoggedIn && hasReachedFreeLimit()) {
+      setLimitMsg(
+        "Has alcanzado tu límite diario de búsquedas gratis. Crea tu cuenta y activa tu membresía para seguir explorando todos los partidos y usar el comparador profesional."
+      );
+      setRows([]);
+      return;
+    }
+
     try {
-      if (!adminToken) { alert("Ingresa X-ADMIN-TOKEN"); return; }
       setLoading(true);
-      const r = await fetch(`${API_BASE}/admin/sync?date=${encodeURIComponent(date)}`, {
-        method: "POST",
-        headers: { "X-ADMIN-TOKEN": adminToken },
-      });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      alert("Sincronizado OK");
+      setRows([]);
+
+      const params = new URLSearchParams();
+      params.set("date", date);
+      params.set("status", "NS"); // solo futuros / no iniciados
+
+      const qTrim = q.trim();
+      if (qTrim) params.set("q", qTrim);
+
+      const res = await fetch(`/api/fixtures?${params.toString()}`);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status} – ${res.statusText}`);
+      }
+      const data = await res.json();
+
+      const items = Array.isArray(data?.items) ? data.items : [];
+      setRows(items);
+
+      // sólo contamos como uso si no está logueado
+      if (!isLoggedIn) {
+        incrementFreeUsage();
+      }
     } catch (e) {
       console.error(e);
-      alert("Error al sincronizar");
+      setErr(String(e.message || e));
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const filtered = useMemo(() => {
-    const txt = q.trim().toLowerCase();
-    if (!txt) return rows;
-    return rows.filter(r =>
-      [r.home, r.away, r.league, r.country].some(v => String(v).toLowerCase().includes(txt))
-    );
-  }, [q, rows]);
+  function handleQuickCountry(country) {
+    setQ(country);
+  }
+
+  const planLabel = useMemo(() => {
+    const raw = user?.planId || user?.plan?.id || user?.plan || user?.membership || "";
+    return String(raw || "").toUpperCase();
+  }, [user]);
 
   return (
-    <div className="bg-slate-900 min-h-screen">
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <h1 className="text-2xl md:text-3xl font-bold text-white mb-6">Partidos</h1>
+    <div className="max-w-5xl mx-auto px-4 pb-20">
+      {/* Cabecera */}
+      <section className="mt-6 rounded-2xl bg-white/5 border border-white/10 p-4 md:p-6">
+        <h1 className="text-xl md:text-2xl font-bold mb-2">Partidos</h1>
 
-        {/* ADMIN (solo en dev) */}
-        {!IS_PROD && (
-          <div className="rounded-3xl border border-slate-700/40 p-4 md:p-6 bg-slate-900/40 mb-6">
-            <h3 className="text-white font-semibold mb-2">ADMIN</h3>
-            <p className="text-xs text-slate-300 mb-2">TOKEN INTERNO (NO PUBLICAR EN PRODUCCIÓN)</p>
+        {isLoggedIn ? (
+          <p className="text-slate-300 text-sm md:text-base">
+            Estás usando Factor Victoria con tu membresía{" "}
+            <span className="font-semibold">{planLabel || "ACTIVA"}</span>. Filtra por fecha, país,
+            liga o equipo y combina esta información con el comparador para crear tus parlays.
+          </p>
+        ) : (
+          <p className="text-slate-300 text-sm md:text-base">
+            Modo visitante: puedes ver partidos de{" "}
+            <span className="font-semibold">
+              Chile, Argentina, España, Inglaterra y Francia
+            </span>{" "}
+            con búsquedas limitadas por día. Para desbloquear uso ilimitado y el comparador
+            profesional, crea tu cuenta y activa una membresía.
+          </p>
+        )}
+      </section>
 
+      {/* Filtros */}
+      <section className="mt-4 rounded-2xl bg-white/5 border border-white/10 p-4 md:p-6">
+        <form
+          onSubmit={handleSearch}
+          className="flex flex-col md:flex-row gap-3 items-stretch md:items-end"
+        >
+          <div className="flex-1">
+            <label className="block text-xs text-slate-400 mb-1">Fecha</label>
             <input
-              type="password"
-              value={adminToken}
-              onChange={(e) => setAdminToken(e.target.value)}
-              placeholder="X-ADMIN-TOKEN"
-              className="w-full rounded-2xl bg-white/95 text-slate-900 px-4 py-3 mb-3"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
             />
+          </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <input
-                type="date"
-                className="rounded-xl px-3 py-2 bg-[#E6C464] text-slate-900"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-              />
-              <button
-                onClick={handleSync}
-                className="rounded-xl px-4 py-2 bg-[#E6C464] text-slate-900 font-semibold"
-              >
-                Sincronizar día a BD
-              </button>
-            </div>
+          <div className="flex-[2]">
+            <label className="block text-xs text-slate-400 mb-1">
+              Buscar (equipo / liga / país)
+            </label>
+            <input
+              placeholder="Ej: Chile, La Liga, Colo Colo, Premier League..."
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
+            />
+          </div>
+
+          <div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-2xl font-semibold px-4 py-2 mt-4 md:mt-0"
+              style={{ backgroundColor: GOLD, color: "#0f172a" }}
+            >
+              {loading ? "Buscando..." : "Buscar"}
+            </button>
+          </div>
+        </form>
+
+        {/* Botones rápidos de países */}
+        <div className="mt-3 flex flex-wrap gap-2">
+          {quickCountries.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => handleQuickCountry(c)}
+              className="text-xs md:text-sm rounded-full px-3 py-1 border border-white/15 bg-white/5 hover:bg-white/10 transition"
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+
+        {/* Mensajes de error / límite / info */}
+        {err && <div className="text-red-400 mt-3 text-sm">Error: {err}</div>}
+
+        {!err && limitMsg && (
+          <div className="mt-3 text-amber-300 text-sm">
+            {limitMsg}{" "}
+            <Link to="/" className="underline font-semibold">
+              Ver planes
+            </Link>
           </div>
         )}
 
-        {/* Filtros públicos */}
-        <div className="border border-white/10 rounded-2xl p-4 mb-4 bg-white/5 flex flex-col gap-3">
-          {/* FECHA: marfil */}
-          <input
-            type="date"
-            className="rounded-xl px-3 py-2 bg-[#FFFFF0] text-slate-900"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
+        {!err && !limitMsg && !loading && !rows.length && (
+          <div className="mt-3 text-slate-400 text-sm">
+            Sin datos aún. Elige una fecha y pulsa <span className="font-semibold">Buscar</span>.
+          </div>
+        )}
+      </section>
 
-          {/* BUSCADOR: marfil */}
-          <input
-            className="rounded-xl px-3 py-2 bg-[#FFFFF0] text-slate-900 placeholder-slate-700"
-            placeholder="Buscar (equipo / liga / país)"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-
-          {/* Botón Buscar: dorado (se mantiene) */}
-          <button
-            onClick={() => {/* el filtrado ya es reactivo; botón como confirmación UX */}}
-            className="rounded-xl px-4 py-2 bg-[#E6C464] text-slate-900 font-semibold self-start"
-          >
-            Buscar
-          </button>
-
-          <div className="text-sm text-white/70">{filtered.length} partidos</div>
+      {/* Tabla de partidos */}
+      <section className="mt-4 rounded-2xl bg-white/5 border border-white/10 p-4 md:p-6">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm md:text-base font-semibold text-slate-100">
+            {rows.length} partidos
+          </h2>
+          {rows.length > 0 && (
+            <p className="text-xs text-slate-400">
+              Horas en tu zona horaria local. Solo partidos futuros / no iniciados.
+            </p>
+          )}
         </div>
 
-        <div className="overflow-x-auto rounded-2xl border border-white/10">
-          <table className="min-w-full text-sm text-white/90">
-            <thead className="bg-[#E6C464] text-slate-900">
-              <tr className="text-left">
-                <th className="px-3 py-2">Hora</th>
-                <th className="px-3 py-2">Local</th>
-                <th className="px-3 py-2">Visita</th>
-                <th className="px-3 py-2">Liga</th>
-                <th className="px-3 py-2">País</th>
-                <th className="px-3 py-2">Estadio</th>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm text-slate-100">
+            <thead className="text-xs uppercase text-slate-400 border-b border-white/10">
+              <tr>
+                <th className="py-2 pr-4 text-left">Hora</th>
+                <th className="py-2 pr-4 text-left">Local</th>
+                <th className="py-2 pr-4 text-left">Visita</th>
+                <th className="py-2 pr-4 text-left">Liga</th>
+                <th className="py-2 pr-4 text-left">País</th>
+                <th className="py-2 pr-4 text-left hidden md:table-cell">Estadio</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/10 bg-white/5">
-              {loading && <tr><td colSpan={6} className="px-3 py-4">Cargando…</td></tr>}
-              {!loading && filtered.length === 0 && (
-                <tr><td colSpan={6} className="px-3 py-4">Sin datos</td></tr>
-              )}
-              {filtered.map((m, i) => (
-                <tr key={i}>
-                  <td className="px-3 py-2 whitespace-nowrap">{m.time || "-"}</td>
-                  <td className="px-3 py-2">{m.home}</td>
-                  <td className="px-3 py-2">{m.away}</td>
-                  <td className="px-3 py-2">{m.league}</td>
-                  <td className="px-3 py-2">{FLAG(m.country)} {m.country?.toUpperCase()}</td>
-                  <td className="px-3 py-2">{m.stadium || "-"}</td>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-4 text-slate-500 text-center text-sm">
+                    Sin datos
+                  </td>
                 </tr>
-              ))}
+              ) : (
+                rows.map((fx) => {
+                  const id =
+                    fx.fixtureId ??
+                    fx.fixture?.id ??
+                    `${fx.league?.id || ""}-${fx.teams?.home}-${fx.teams?.away}-${fx.date}`;
+                  const ts =
+                    fx.timestamp ??
+                    fx.fixture?.timestamp ??
+                    (fx.date ? Math.floor(Date.parse(fx.date) / 1000) : null) ??
+                    (fx.fixture?.date ? Math.floor(Date.parse(fx.fixture.date) / 1000) : null);
+
+                  const dateTime = ts ? new Date(ts * 1000) : null;
+                  const timeStr = dateTime
+                    ? dateTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                    : "-";
+
+                  const home = fx.teams?.home?.name || fx.teams?.home || "—";
+                  const away = fx.teams?.away?.name || fx.teams?.away || "—";
+                  const league = fx.league?.name || "—";
+                  const country = fx.league?.country || fx.country || "—";
+                  const stadium =
+                    fx.fixture?.venue?.name ||
+                    fx.venue?.name ||
+                    fx.stadium ||
+                    "—";
+
+                  return (
+                    <tr
+                      key={id}
+                      className="border-b border-white/5 hover:bg-white/5 transition-colors"
+                    >
+                      <td className="py-2 pr-4 whitespace-nowrap text-slate-200">{timeStr}</td>
+                      <td className="py-2 pr-4 text-slate-100">{home}</td>
+                      <td className="py-2 pr-4 text-slate-100">{away}</td>
+                      <td className="py-2 pr-4 text-slate-200">{league}</td>
+                      <td className="py-2 pr-4 text-slate-200">{country}</td>
+                      <td className="py-2 pr-4 text-slate-400 hidden md:table-cell">
+                        <span className="truncate inline-block max-w-[180px] align-middle">
+                          {stadium}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
-      </div>
+
+        {/* CTA hacia comparador */}
+        <div className="mt-4 text-xs md:text-sm text-slate-300">
+          ¿Quieres transformar estos partidos en parlays x10, x20 o x50?
+          <span className="ml-1">
+            <Link to="/app" className="underline font-semibold">
+              Abre el Comparador
+            </Link>{" "}
+            y genera combinadas basadas en estos encuentros.
+          </span>
+        </div>
+      </section>
     </div>
   );
 }
