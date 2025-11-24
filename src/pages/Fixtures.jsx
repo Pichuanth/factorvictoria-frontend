@@ -1,6 +1,6 @@
 // src/pages/Fixtures.jsx
-import React, { useState, useMemo, useEffect } from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useMemo } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 
 const GOLD = "#E6C464";
@@ -12,16 +12,19 @@ function toYYYYMMDD(d) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/* ---------- normalizar país para la API ---------- */
-
-function normalizeCountryForApi(q) {
+/**
+ * Normaliza un texto a país para comparar con los datos de API-FOOTBALL.
+ * Devuelve el país en inglés en minúsculas (como viene en league.country),
+ * o null si no es un país conocido.
+ */
+function normalizeCountryForFilter(q) {
   const txt = String(q || "").trim().toLowerCase();
 
-  if (txt === "chile") return "Chile";
-  if (txt === "argentina") return "Argentina";
-  if (txt === "españa" || txt === "espana") return "Spain";
-  if (txt === "inglaterra" || txt === "ingl.") return "England";
-  if (txt === "francia") return "France";
+  if (txt === "chile") return "chile";
+  if (txt === "argentina") return "argentina";
+  if (txt === "españa" || txt === "espana") return "spain";
+  if (txt === "inglaterra") return "england";
+  if (txt === "francia") return "france";
 
   return null;
 }
@@ -31,8 +34,6 @@ function normalizeCountryForApi(q) {
 const FREE_KEY_DATE = "fv_free_matches_date";
 const FREE_KEY_COUNT = "fv_free_matches_count";
 const FREE_LIMIT_PER_DAY = 2; // 2 búsquedas gratis
-
-const LAST_SEARCH_KEY = "fv_last_fixtures_search";
 
 function getTodayStr() {
   return toYYYYMMDD(new Date());
@@ -73,6 +74,8 @@ function hasReachedFreeLimit() {
 
 export default function Fixtures() {
   const { isLoggedIn, user } = useAuth();
+  const navigate = useNavigate();
+
   const today = useMemo(() => new Date(), []);
   const [date, setDate] = useState(toYYYYMMDD(today));
   const [q, setQ] = useState("");
@@ -83,37 +86,12 @@ export default function Fixtures() {
 
   const quickCountries = ["Chile", "Argentina", "España", "Inglaterra", "Francia"];
 
-  // Para saber si el usuario tiene alguna membresía
-  const planLabel = useMemo(() => {
-    const raw = user?.planId || user?.plan?.id || user?.plan || user?.membership || "";
-    return String(raw || "").toUpperCase();
-  }, [user]);
-
-  const hasMembership = useMemo(() => {
-    return Boolean(user?.planId || user?.plan || user?.membership);
-  }, [user]);
-
-  // Cargar última búsqueda al entrar a la pestaña Partidos
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = localStorage.getItem(LAST_SEARCH_KEY);
-      if (!raw) return;
-      const saved = JSON.parse(raw);
-      if (saved.date) setDate(saved.date);
-      if (typeof saved.q === "string") setQ(saved.q);
-      if (Array.isArray(saved.rows)) setRows(saved.rows);
-    } catch {
-      // ignorar errores
-    }
-  }, []);
-
   async function handleSearch(e) {
     e?.preventDefault?.();
     setErr("");
     setLimitMsg("");
 
-    // Si no está logueado, aplicamos límite de uso gratis
+    // Límite de uso gratis para visitantes
     if (!isLoggedIn && hasReachedFreeLimit()) {
       setLimitMsg(
         "Has alcanzado tu límite diario de búsquedas gratis. Crea tu cuenta y activa tu membresía para seguir explorando todos los partidos y usar el comparador profesional."
@@ -126,40 +104,49 @@ export default function Fixtures() {
       setLoading(true);
       setRows([]);
 
-      const qTrim = (q || "").trim();
+      // 1) Traemos TODOS los partidos futuros de ese día
       const params = new URLSearchParams();
-      // Para Partidos usamos un solo día
-      params.set("date", date);
+      params.set("from", date);
+      params.set("to", date);
       params.set("status", "NS"); // solo futuros / no iniciados
-
-      // ¿Es un país conocido?
-      const countryEN = normalizeCountryForApi(qTrim);
-
-      if (countryEN) {
-        params.set("country", countryEN);
-      } else if (qTrim) {
-        // texto libre: liga / equipo
-        params.set("q", qTrim);
-      }
 
       const res = await fetch(`/api/fixtures?${params.toString()}`);
       if (!res.ok) {
         throw new Error(`HTTP ${res.status} – ${res.statusText}`);
       }
       const data = await res.json();
+      let items = Array.isArray(data?.items) ? data.items : [];
 
-      const items = Array.isArray(data?.items) ? data.items : [];
-      setRows(items);
+      // 2) Aplicamos filtro en el FRONT
+      const qTrim = String(q || "").trim().toLowerCase();
+      const countryFilter = normalizeCountryForFilter(qTrim);
 
-      // guardamos última búsqueda (para que no se borren al volver)
-      if (typeof window !== "undefined") {
-        localStorage.setItem(
-          LAST_SEARCH_KEY,
-          JSON.stringify({ date, q, rows: items })
-        );
+      if (countryFilter) {
+        // Filtro por país
+        items = items.filter((fx) => {
+          const c = String(fx.league?.country || fx.country || "").toLowerCase();
+          return c.includes(countryFilter);
+        });
+      } else if (qTrim) {
+        // Filtro por equipo o liga
+        items = items.filter((fx) => {
+          const home = String(
+            fx.teams?.home?.name || fx.teams?.home || ""
+          ).toLowerCase();
+          const away = String(
+            fx.teams?.away?.name || fx.teams?.away || ""
+          ).toLowerCase();
+          const league = String(fx.league?.name || "").toLowerCase();
+          return (
+            home.includes(qTrim) ||
+            away.includes(qTrim) ||
+            league.includes(qTrim)
+          );
+        });
       }
 
-      // sólo contamos como uso si no está logueado
+      setRows(items);
+
       if (!isLoggedIn) {
         incrementFreeUsage();
       }
@@ -175,6 +162,24 @@ export default function Fixtures() {
     setQ(country);
   }
 
+  function handleGenerateFromFixture(fx) {
+    // Si NO está logueado, lo mandamos a los planes
+    if (!isLoggedIn) {
+      navigate("/");
+      return;
+    }
+
+    // Por ahora solo lo llevamos al Comparador.
+    // Más adelante podemos pasarle un ID de fixture por querystring.
+    navigate("/app");
+  }
+
+  const planLabel = useMemo(() => {
+    const raw =
+      user?.planId || user?.plan?.id || user?.plan || user?.membership || "";
+    return String(raw || "").toUpperCase();
+  }, [user]);
+
   return (
     <div className="max-w-5xl mx-auto px-4 pb-20">
       {/* Cabecera */}
@@ -184,15 +189,16 @@ export default function Fixtures() {
         {isLoggedIn ? (
           <p className="text-slate-300 text-sm md:text-base">
             Estás usando Factor Victoria con tu membresía{" "}
-            <span className="font-semibold">{planLabel || "ACTIVA"}</span>. Filtra por
-            fecha, país, liga o equipo y combina esta información con el comparador
-            para crear tus parlays.
+            <span className="font-semibold">{planLabel || "VIGENTE"}</span>.
+            Filtra por fecha, país, liga o equipo y combina esta información con
+            el comparador para crear tus parlays.
           </p>
         ) : (
           <p className="text-slate-300 text-sm md:text-base">
-            Modo visitante: puedes ver partidos de Chile, Argentina, España, Inglaterra
-            y Francia con búsquedas limitadas por día. Para desbloquear uso ilimitado y
-            el comparador profesional, crea tu cuenta y{" "}
+            Modo visitante: puedes ver partidos de Chile, Argentina, España,
+            Inglaterra y Francia con búsquedas limitadas por día. Para
+            desbloquear uso ilimitado y el comparador profesional, crea tu
+            cuenta y{" "}
             <Link to="/" className="underline font-semibold">
               activa una membresía
             </Link>
@@ -256,11 +262,7 @@ export default function Fixtures() {
         </div>
 
         {/* Mensajes de error / límite / info */}
-        {err && (
-          <div className="text-red-400 mt-3 text-sm">
-            Error: {err}
-          </div>
-        )}
+        {err && <div className="text-red-400 mt-3 text-sm">Error: {err}</div>}
 
         {!err && limitMsg && (
           <div className="mt-3 text-amber-300 text-sm">
@@ -287,7 +289,8 @@ export default function Fixtures() {
           </h2>
           {rows.length > 0 && (
             <p className="text-xs text-slate-400">
-              Horas en tu zona horaria local. Solo partidos futuros / no iniciados.
+              Horas en tu zona horaria local. Solo partidos futuros / no
+              iniciados.
             </p>
           )}
         </div>
@@ -307,7 +310,10 @@ export default function Fixtures() {
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-4 text-slate-500 text-center text-sm">
+                  <td
+                    colSpan={6}
+                    className="py-4 text-slate-500 text-center text-sm"
+                  >
                     Sin datos
                   </td>
                 </tr>
@@ -321,7 +327,9 @@ export default function Fixtures() {
                     fx.timestamp ??
                     fx.fixture?.timestamp ??
                     (fx.date ? Math.floor(Date.parse(fx.date) / 1000) : null) ??
-                    (fx.fixture?.date ? Math.floor(Date.parse(fx.fixture.date) / 1000) : null);
+                    (fx.fixture?.date
+                      ? Math.floor(Date.parse(fx.fixture.date) / 1000)
+                      : null);
 
                   const dateTime = ts ? new Date(ts * 1000) : null;
                   const timeStr = dateTime
@@ -331,8 +339,10 @@ export default function Fixtures() {
                       })
                     : "-";
 
-                  const home = fx.teams?.home?.name || fx.teams?.home || "—";
-                  const away = fx.teams?.away?.name || fx.teams?.away || "—";
+                  const home =
+                    fx.teams?.home?.name || fx.teams?.home || "—";
+                  const away =
+                    fx.teams?.away?.name || fx.teams?.away || "—";
                   const league = fx.league?.name || "—";
                   const country = fx.league?.country || fx.country || "—";
 
@@ -349,19 +359,20 @@ export default function Fixtures() {
                       <td className="py-2 pr-4 text-slate-200">{league}</td>
                       <td className="py-2 pr-4 text-slate-200">{country}</td>
                       <td className="py-2 pr-4 text-slate-200">
-                        {hasMembership ? (
-                          <Link
-                            to="/app"
-                            className="underline text-xs font-semibold"
+                        {isLoggedIn ? (
+                          <button
+                            type="button"
+                            onClick={() => handleGenerateFromFixture(fx)}
+                            className="text-xs underline font-semibold"
                           >
                             Generar
-                          </Link>
+                          </button>
                         ) : (
                           <Link
                             to="/"
-                            className="underline text-xs text-slate-300"
+                            className="text-xs underline font-semibold"
                           >
-                            Ver planes
+                            Comprar plan
                           </Link>
                         )}
                       </td>
