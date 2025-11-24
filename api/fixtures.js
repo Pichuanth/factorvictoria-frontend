@@ -1,99 +1,104 @@
 // api/fixtures.js
-// Serverless function para Vercel (Node.js)
+// Serverless function para obtener partidos desde API-SPORTS (v3)
 
-const APISPORTS_HOST = process.env.APISPORTS_HOST || "v3.football.api-sports.io";
-const APISPORTS_KEY = process.env.APISPORTS_KEY || "";
+const API_HOST = process.env.APISPORTS_HOST || "v3.football.api-sports.io";
+const API_KEY = process.env.APISPORTS_KEY;
 
-// Pequeño helper para responder JSON
-function sendJson(res, status, body) {
-  res.statusCode = status;
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
-  res.end(JSON.stringify(body));
+/**
+ * Normaliza una fecha tipo "2025-11-21" a YYYY-MM-DD
+ */
+function normalizeDate(input) {
+  if (!input) return null;
+  const d = new Date(input);
+  if (Number.isNaN(d.getTime())) return null;
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-module.exports = async (req, res) => {
+/**
+ * Handler principal
+ */
+export default async function handler(req, res) {
   try {
-    const { method, query } = req;
-
-    if (method !== "GET") {
-      return sendJson(res, 405, { error: "Method not allowed" });
+    if (!API_KEY) {
+      console.error("Falta APISPORTS_KEY en las env vars de Vercel");
+      return res.status(500).json({ error: "Missing APISPORTS_KEY" });
     }
 
-    if (!APISPORTS_KEY) {
-      console.error("[/api/fixtures] Falta APISPORTS_KEY en variables de entorno");
-      return sendJson(res, 200, { items: [] });
+    const { date, status, country, league } = req.query;
+
+    // De momento soportamos solo "date" (lo que usa el comparador)
+    const normDate = normalizeDate(date);
+    if (!normDate) {
+      return res.status(400).json({ error: "Parámetro 'date' inválido o faltante" });
     }
 
-    // Soportar date=YYYY-MM-DD o from/to
-    const { date, from, to, country, league, status } = query;
-
+    // Construimos query hacia API-SPORTS
     const params = new URLSearchParams();
-    params.set("timezone", "America/Santiago");
-
-    if (from && to) {
-      params.set("from", String(from));
-      params.set("to", String(to));
-    } else if (date) {
-      params.set("date", String(date));
-    } else {
-      // Por defecto: hoy
-      const today = new Date();
-      const pad = (n) => String(n).padStart(2, "0");
-      const d = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(
-        today.getDate()
-      )}`;
-      params.set("date", d);
-    }
-
+    params.set("date", normDate);
+    if (status) params.set("status", String(status));
     if (country) params.set("country", String(country));
     if (league) params.set("league", String(league));
-    if (status) params.set("status", String(status));
-    else params.set("status", "NS"); // sólo partidos no iniciados por defecto
 
-    const url = `https://${APISPORTS_HOST}/fixtures?${params.toString()}`;
+    const url = `https://${API_HOST}/fixtures?${params.toString()}`;
 
-    console.log("[/api/fixtures] Llamando a API-FOOTBALL:", url);
+    console.log("[/api/fixtures] Llamando a API-SPORTS:", url);
 
     const apiRes = await fetch(url, {
+      method: "GET",
       headers: {
-        "x-apisports-key": APISPORTS_KEY,
+        "x-apisports-key": API_KEY,
+        "x-rapidapi-key": API_KEY,
+        "x-rapidapi-host": API_HOST,
       },
     });
 
-    const json = await apiRes.json();
+    const body = await apiRes.json().catch(() => ({}));
 
-    // Loguear errores de la API si vienen
-    if (!apiRes.ok || (json && json.errors && Object.keys(json.errors).length)) {
-      console.error("[/api/fixtures] Error desde API-FOOTBALL:", {
+    if (!apiRes.ok) {
+      console.error(
+        "[/api/fixtures] Error de API-SPORTS:",
+        apiRes.status,
+        apiRes.statusText,
+        JSON.stringify(body).slice(0, 500)
+      );
+      return res.status(apiRes.status).json({
+        error: "API_SPORTS_ERROR",
         status: apiRes.status,
-        statusText: apiRes.statusText,
-        errors: json && json.errors,
+        info: body,
       });
-      // No reventamos: devolvemos lista vacía
-      return sendJson(res, 200, { items: [] });
     }
 
-    const response = Array.isArray(json?.response) ? json.response : [];
+    const responseArray = Array.isArray(body?.response) ? body.response : [];
 
-    const items = response.map((r) => ({
-      fixtureId: r?.fixture?.id,
-      teams: r?.teams || {},
-      league: r?.league || {},
-      timestamp: r?.fixture?.timestamp || null,
-      fixture: r?.fixture || null,
+    // Normalizamos al formato que espera el comparador
+    const items = responseArray.map((fx) => ({
+      fixtureId: fx?.fixture?.id,
+      teams: {
+        home: fx?.teams?.home?.name || "",
+        away: fx?.teams?.away?.name || "",
+      },
+      league: {
+        name: fx?.league?.name || "",
+        country: fx?.league?.country || "",
+      },
+      timestamp: fx?.fixture?.timestamp || null,
+      date: fx?.fixture?.date || null,
     }));
 
     console.log(
-      "[/api/fixtures] OK – partidos recibidos:",
+      "[/api/fixtures] Devueltos",
       items.length,
-      "params:",
-      Object.fromEntries(params)
+      "partidos para fecha",
+      normDate
     );
 
-    return sendJson(res, 200, { items });
+    return res.status(200).json({ items });
   } catch (err) {
-    console.error("[/api/fixtures] EXCEPCIÓN:", err);
-    // Para no romper el comparador, devolvemos lista vacía
-    return sendJson(res, 200, { items: [] });
+    console.error("[/api/fixtures] Excepción no controlada:", err);
+    return res.status(500).json({
+      error: "INTERNAL_ERROR",
+      message: err?.message || String(err),
+    });
   }
-};
+}
