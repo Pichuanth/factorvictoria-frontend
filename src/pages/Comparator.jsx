@@ -12,7 +12,7 @@ function toYYYYMMDD(d) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-// Alias ES -> EN para country de API-SPORTS
+// Alias ES -> EN para country de API-FOOTBALL
 const COUNTRY_ALIAS = {
   chile: "Chile",
   argentina: "Argentina",
@@ -37,8 +37,10 @@ export default function Comparator() {
   const [from, setFrom] = useState(toYYYYMMDD(today));
   const [to, setTo] = useState(toYYYYMMDD(today));
   const [q, setQ] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  const [info, setInfo] = useState("");
   const [fixtures, setFixtures] = useState([]);
 
   // Prefill desde /fixture -> "Generar" (date & q en la URL)
@@ -59,13 +61,32 @@ export default function Comparator() {
     return String(raw || "").toUpperCase();
   }, [user]);
 
+  const quickCountries = ["Chile", "Argentina", "España", "Inglaterra", "Francia"];
+
+  // Botón rápido de país
+  function handleQuickCountry(countryEs) {
+    setQ(countryEs);
+  }
+
+  // Generar partidos para el comparador
   async function handleGenerate(e) {
     e?.preventDefault?.();
+
     setErr("");
-    setFixtures([]);
-    setLoading(true);
+    setInfo("");
+
+    // Bloqueo duro para visitantes
+    if (!isLoggedIn) {
+      setErr(
+        "Necesitas iniciar sesión y tener una membresía activa para usar el comparador. Usa la pestaña Partidos mientras tanto."
+      );
+      return;
+    }
 
     try {
+      setLoading(true);
+      setFixtures([]);
+
       const params = new URLSearchParams();
       params.set("from", from);
       params.set("to", to);
@@ -91,7 +112,7 @@ export default function Comparator() {
       const items = Array.isArray(data?.items) ? data.items : [];
 
       if (!items.length) {
-        setErr(
+        setInfo(
           "No hay partidos futuros reales suficientes para este rango o filtro. Prueba con más días o sin filtrar por país/equipo."
         );
         setFixtures([]);
@@ -99,6 +120,7 @@ export default function Comparator() {
       }
 
       setFixtures(items);
+      setInfo("");
     } catch (e) {
       console.error(e);
       setErr(String(e.message || e));
@@ -106,13 +128,6 @@ export default function Comparator() {
       setLoading(false);
     }
   }
-
-  // Botón rápido de país
-  function handleQuickCountry(countryEs) {
-    setQ(countryEs);
-  }
-
-  const quickCountries = ["Chile", "Argentina", "España", "Inglaterra", "Francia"];
 
   return (
     <div className="max-w-5xl mx-auto px-4 pb-20">
@@ -178,8 +193,8 @@ export default function Comparator() {
           <div>
             <button
               type="submit"
-              disabled={loading}
-              className="w-full rounded-2xl font-semibold px-4 py-2 mt-4 md:mt-0"
+              disabled={!isLoggedIn || loading}
+              className="w-full rounded-2xl font-semibold px-4 py-2 mt-4 md:mt-0 disabled:opacity-60 disabled:cursor-not-allowed"
               style={{ backgroundColor: GOLD, color: "#0f172a" }}
             >
               {loading ? "Generando..." : "Generar"}
@@ -203,7 +218,7 @@ export default function Comparator() {
 
         {/* Mensajes */}
         {err && (
-          <div className="mt-3 text-sm text-amber-300">
+          <div className="mt-3 text-sm text-red-400">
             {err}
             {!isLoggedIn && (
               <>
@@ -216,7 +231,13 @@ export default function Comparator() {
           </div>
         )}
 
-        {!err && !loading && fixtures.length > 0 && (
+        {!err && info && (
+          <div className="mt-3 text-sm text-amber-300">
+            {info}
+          </div>
+        )}
+
+        {!err && !info && !loading && fixtures.length > 0 && (
           <div className="mt-3 text-xs text-slate-400">
             Se encontraron{" "}
             <span className="font-semibold text-slate-100">{fixtures.length}</span> partidos futuros
