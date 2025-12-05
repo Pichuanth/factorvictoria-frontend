@@ -12,7 +12,7 @@ function toYYYYMMDD(d) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-// Alias ES -> EN para country de API-FOOTBALL
+// Alias ES -> EN para country de API-SPORTS
 const COUNTRY_ALIAS = {
   chile: "Chile",
   argentina: "Argentina",
@@ -37,16 +37,15 @@ export default function Comparator() {
   const [from, setFrom] = useState(toYYYYMMDD(today));
   const [to, setTo] = useState(toYYYYMMDD(today));
   const [q, setQ] = useState("");
-
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
-  const [info, setInfo] = useState("");
   const [fixtures, setFixtures] = useState([]);
 
   // Prefill desde /fixture -> "Generar" (date & q en la URL)
   useEffect(() => {
     const urlDate = searchParams.get("date");
     const urlQ = searchParams.get("q");
+
     if (urlDate) {
       setFrom(urlDate);
       setTo(urlDate);
@@ -63,19 +62,13 @@ export default function Comparator() {
 
   const quickCountries = ["Chile", "Argentina", "España", "Inglaterra", "Francia"];
 
-  // Botón rápido de país
-  function handleQuickCountry(countryEs) {
-    setQ(countryEs);
-  }
-
-  // Generar partidos para el comparador
   async function handleGenerate(e) {
     e?.preventDefault?.();
 
     setErr("");
-    setInfo("");
+    setFixtures([]);
 
-    // Bloqueo duro para visitantes
+    // Bloqueo duro para visitantes (por seguridad extra)
     if (!isLoggedIn) {
       setErr(
         "Necesitas iniciar sesión y tener una membresía activa para usar el comparador. Usa la pestaña Partidos mientras tanto."
@@ -85,7 +78,6 @@ export default function Comparator() {
 
     try {
       setLoading(true);
-      setFixtures([]);
 
       const params = new URLSearchParams();
       params.set("from", from);
@@ -109,10 +101,16 @@ export default function Comparator() {
       }
 
       const data = await res.json();
-      const items = Array.isArray(data?.items) ? data.items : [];
+
+      // IMPORTANTE: tu API a veces devuelve { items: [...] } y otras veces un array directo
+      const items = Array.isArray(data?.items)
+        ? data.items
+        : Array.isArray(data)
+        ? data
+        : [];
 
       if (!items.length) {
-        setInfo(
+        setErr(
           "No hay partidos futuros reales suficientes para este rango o filtro. Prueba con más días o sin filtrar por país/equipo."
         );
         setFixtures([]);
@@ -120,7 +118,6 @@ export default function Comparator() {
       }
 
       setFixtures(items);
-      setInfo("");
     } catch (e) {
       console.error(e);
       setErr(String(e.message || e));
@@ -128,6 +125,13 @@ export default function Comparator() {
       setLoading(false);
     }
   }
+
+  // Botón rápido de país
+  function handleQuickCountry(countryEs) {
+    setQ(countryEs);
+  }
+
+  /* --------------------- render --------------------- */
 
   return (
     <div className="max-w-5xl mx-auto px-4 pb-20">
@@ -152,155 +156,165 @@ export default function Comparator() {
         )}
       </section>
 
-      {/* Filtros */}
-      <section className="mt-4 rounded-2xl bg-white/5 border border-white/10 p-4 md:p-6">
-        <form
-          onSubmit={handleGenerate}
-          className="flex flex-col md:flex-row md:items-end gap-3 items-stretch"
-        >
-          <div className="flex-1">
-            <label className="block text-xs text-slate-400 mb-1">Desde</label>
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
-            />
-          </div>
-
-          <div className="flex-1">
-            <label className="block text-xs text-slate-400 mb-1">Hasta</label>
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
-            />
-          </div>
-
-          <div className="flex-[2]">
-            <label className="block text-xs text-slate-400 mb-1">
-              Filtro (país / liga / equipo)
-            </label>
-            <input
-              placeholder="Ej: Chile, La Liga, Colo Colo, Premier League..."
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
-            />
-          </div>
-
-          <div>
-            <button
-              type="submit"
-              disabled={!isLoggedIn || loading}
-              className="w-full rounded-2xl font-semibold px-4 py-2 mt-4 md:mt-0 disabled:opacity-60 disabled:cursor-not-allowed"
+      {/* SI NO ESTÁ LOGUEADO: solo mostramos el mensaje de bloqueo y CTA */}
+      {!isLoggedIn && (
+        <section className="mt-4 rounded-2xl bg-white/5 border border-white/10 p-4 md:p-6">
+          <p className="text-sm text-amber-200">
+            Esta herramienta está disponible solo para miembros activos. Crea tu cuenta y activa una
+            membresía para generar cuotas x10, x20 y x100 basadas en nuestros algoritmos.
+          </p>
+          <div className="mt-3">
+            <Link
+              to="/"
+              className="inline-flex items-center rounded-2xl px-4 py-2 font-semibold"
               style={{ backgroundColor: GOLD, color: "#0f172a" }}
             >
-              {loading ? "Generando..." : "Generar"}
-            </button>
+              Ver planes y activar membresía
+            </Link>
           </div>
-        </form>
+        </section>
+      )}
 
-        {/* Países rápidos */}
-        <div className="mt-3 flex flex-wrap gap-2">
-          {quickCountries.map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => handleQuickCountry(c)}
-              className="text-xs md:text-sm rounded-full px-3 py-1 border border-white/15 bg-white/5 hover:bg-white/10 transition"
+      {/* SI ESTÁ LOGUEADO: mostramos filtros + tarjetas */}
+      {isLoggedIn && (
+        <>
+          {/* Filtros */}
+          <section className="mt-4 rounded-2xl bg-white/5 border border-white/10 p-4 md:p-6">
+            <form
+              onSubmit={handleGenerate}
+              className="flex flex-col md:flex-row md:items-end gap-3 items-stretch"
             >
-              {c}
-            </button>
-          ))}
-        </div>
+              <div className="flex-1">
+                <label className="block text-xs text-slate-400 mb-1">Desde</label>
+                <input
+                  type="date"
+                  value={from}
+                  onChange={(e) => setFrom(e.target.value)}
+                  className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
+                />
+              </div>
 
-        {/* Mensajes */}
-        {err && (
-          <div className="mt-3 text-sm text-red-400">
-            {err}
-            {!isLoggedIn && (
-              <>
-                {" "}
-                <Link to="/" className="underline font-semibold">
-                  Ver planes
-                </Link>
-              </>
+              <div className="flex-1">
+                <label className="block text-xs text-slate-400 mb-1">Hasta</label>
+                <input
+                  type="date"
+                  value={to}
+                  onChange={(e) => setTo(e.target.value)}
+                  className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
+                />
+              </div>
+
+              <div className="flex-[2]">
+                <label className="block text-xs text-slate-400 mb-1">
+                  Filtro (país / liga / equipo)
+                </label>
+                <input
+                  placeholder="Ej: Chile, La Liga, Colo Colo, Premier League..."
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
+                />
+              </div>
+
+              <div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full rounded-2xl font-semibold px-4 py-2 mt-4 md:mt-0 disabled:opacity-60 disabled:cursor-not-allowed"
+                  style={{ backgroundColor: GOLD, color: "#0f172a" }}
+                >
+                  {loading ? "Generando..." : "Generar"}
+                </button>
+              </div>
+            </form>
+
+            {/* Países rápidos */}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {quickCountries.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => handleQuickCountry(c)}
+                  className="text-xs md:text-sm rounded-full px-3 py-1 border border-white/15 bg-white/5 hover:bg-white/10 transition"
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+
+            {/* Mensajes */}
+            {err && (
+              <div className="mt-3 text-sm text-amber-300">
+                {err}
+              </div>
             )}
-          </div>
-        )}
 
-        {!err && info && (
-          <div className="mt-3 text-sm text-amber-300">
-            {info}
-          </div>
-        )}
+            {!err && !loading && fixtures.length > 0 && (
+              <div className="mt-3 text-xs text-slate-400">
+                Se encontraron{" "}
+                <span className="font-semibold text-slate-100">{fixtures.length}</span> partidos
+                futuros para este rango de fechas.
+              </div>
+            )}
+          </section>
 
-        {!err && !info && !loading && fixtures.length > 0 && (
-          <div className="mt-3 text-xs text-slate-400">
-            Se encontraron{" "}
-            <span className="font-semibold text-slate-100">{fixtures.length}</span> partidos futuros
-            para este rango de fechas.
-          </div>
-        )}
-      </section>
+          {/* Tarjetas de resultados (de momento, info / “próximamente”) */}
+          <section className="mt-4 space-y-4">
+            {/* Cuota segura (regalo) */}
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
+              <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-200 mb-2">
+                Cuota segura (Regalo)
+                <span className="ml-2 text-[11px] text-yellow-100/90">x1.5–x3 · 90–95% acierto</span>
+              </div>
+              <p className="text-slate-200 text-sm">
+                Próximamente: resultados basados en tus filtros para usar como “regalo” diario a tu
+                comunidad.
+              </p>
+            </div>
 
-      {/* Tarjetas de resultados (de momento, info / “próximamente”) */}
-      <section className="mt-4 space-y-4">
-        {/* Cuota segura (regalo) */}
-        <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
-          <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-200 mb-2">
-            Cuota segura (Regalo)
-            <span className="ml-2 text-[11px] text-yellow-100/90">x1.5–x3 · 90–95% acierto</span>
-          </div>
-          <p className="text-slate-200 text-sm">
-            Próximamente: resultados basados en tus filtros para usar como “regalo” diario a tu
-            comunidad.
-          </p>
-        </div>
+            {/* Cuota generada x100 */}
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
+              <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-200 mb-2">
+                Cuota generada
+                <span className="ml-2 text-[11px] text-emerald-100/90">x100</span>
+              </div>
+              {fixtures.length === 0 ? (
+                <p className="text-slate-300 text-sm">
+                  Aún no hay picks para este rango o filtro. Genera primero partidos con el botón de
+                  arriba.
+                </p>
+              ) : (
+                <p className="text-slate-200 text-sm">
+                  Próximamente: combinaremos partidos de este rango para buscar una cuota objetivo
+                  cercana a x100, según tu plan.
+                </p>
+              )}
+            </div>
 
-        {/* Cuota generada x100 */}
-        <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
-          <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-200 mb-2">
-            Cuota generada
-            <span className="ml-2 text-[11px] text-emerald-100/90">x100</span>
-          </div>
-          {fixtures.length === 0 ? (
-            <p className="text-slate-300 text-sm">
-              Aún no hay picks para este rango o filtro. Genera primero partidos con el botón de
-              arriba.
-            </p>
-          ) : (
-            <p className="text-slate-200 text-sm">
-              Próximamente: combinaremos partidos de este rango para buscar una cuota objetivo
-              cercana a x100, según tu plan.
-            </p>
-          )}
-        </div>
+            {/* Árbitros más tarjeteros */}
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
+              <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-500/20 text-red-200 mb-2">
+                Árbitros más tarjeteros
+              </div>
+              <p className="text-slate-200 text-sm">
+                Genera para ver recomendaciones sobre partidos con árbitros propensos a sacar
+                tarjetas (ideal para over tarjetas).
+              </p>
+            </div>
 
-        {/* Árbitros más tarjeteros */}
-        <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
-          <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-500/20 text-red-200 mb-2">
-            Árbitros más tarjeteros
-          </div>
-          <p className="text-slate-200 text-sm">
-            Genera para ver recomendaciones sobre partidos con árbitros propensos a sacar tarjetas
-            (ideal para over tarjetas).
-          </p>
-        </div>
-
-        {/* Cuota desfase del mercado */}
-        <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
-          <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-sky-500/20 text-sky-200 mb-2">
-            Cuota desfase del mercado
-          </div>
-          <p className="text-slate-200 text-sm">
-            Próximamente: Factor Victoria te mostrará posibles errores de mercado con valor esperado
-            positivo según tus filtros.
-          </p>
-        </div>
-      </section>
+            {/* Cuota desfase del mercado */}
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
+              <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-sky-500/20 text-sky-200 mb-2">
+                Cuota desfase del mercado
+              </div>
+              <p className="text-slate-200 text-sm">
+                Próximamente: Factor Victoria te mostrará posibles errores de mercado con valor
+                esperado positivo según tus filtros.
+              </p>
+            </div>
+          </section>
+        </>
+      )}
     </div>
   );
 }
