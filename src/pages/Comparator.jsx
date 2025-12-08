@@ -27,7 +27,7 @@ function normalizeCountryQuery(q) {
   return COUNTRY_ALIAS[key] || null;
 }
 
-// Emoji banderas simples (no es perfecto pero se ve pro)
+// Emoji banderas simples
 const COUNTRY_FLAG = {
   Chile: "🇨🇱",
   Argentina: "🇦🇷",
@@ -42,7 +42,7 @@ const COUNTRY_FLAG = {
   USA: "🇺🇸",
 };
 
-// Prioridad de ligas importantes (para ordenar tipo Flashscore)
+// Ligas importantes (para ordenar tipo Flashscore)
 const IMPORTANT_LEAGUES = [
   "UEFA Champions League",
   "Champions League",
@@ -62,25 +62,22 @@ function getLeaguePriority(leagueName = "", country = "") {
   const name = String(leagueName || "").toLowerCase();
   const countryLower = String(country || "").toLowerCase();
 
-  // 0–9: súper importantes
   for (let i = 0; i < IMPORTANT_LEAGUES.length; i++) {
     if (name.includes(IMPORTANT_LEAGUES[i].toLowerCase())) {
       return i; // cuanto más chico, más arriba
     }
   }
 
-  // 10–19: ligas grandes por país
   if (["england", "spain", "italy", "germany", "france"].includes(countryLower))
     return 12;
 
   if (["chile", "argentina", "brazil", "portugal", "mexico"].includes(countryLower))
     return 14;
 
-  // 20+: resto
   return 25;
 }
 
-// Funciones defensivas para leer campos sin romperse si cambia el backend
+// Helpers defensivos
 function getFixtureId(f) {
   return (
     f.id ||
@@ -134,7 +131,6 @@ function getAwayName(f) {
 }
 
 function getKickoffTime(f) {
-  // hora tipo "18:00"
   if (f.time) return f.time;
   if (f.kickoffTime) return f.kickoffTime;
   if (typeof f.date === "string" && f.date.includes("T")) {
@@ -147,7 +143,17 @@ function getKickoffTime(f) {
       return "--:--";
     }
   }
-  return f.hour || "--:--";
+  if (f.fixture?.date) {
+    try {
+      const d = new Date(f.fixture.date);
+      const hh = String(d.getHours()).padStart(2, "0");
+      const mm = String(d.getMinutes()).padStart(2, "0");
+      return `${hh}:${mm}`;
+    } catch {
+      return "--:--";
+    }
+  }
+  return f.hour || f.hora || "--:--";
 }
 
 /* --------------------- componente --------------------- */
@@ -180,7 +186,8 @@ export default function Comparator() {
   }, [searchParams]);
 
   const planLabel = useMemo(() => {
-    const raw = user?.planId || user?.plan?.id || user?.plan || user?.membership || "";
+    const raw =
+      user?.planId || user?.plan?.id || user?.plan || user?.membership || "";
     return String(raw || "").toUpperCase();
   }, [user]);
 
@@ -193,7 +200,6 @@ export default function Comparator() {
     setSelectedIds([]);
     setLoading(true);
 
-    // Bloqueo duro para visitantes (puede ajustarse a demo limitada si quieres)
     if (!isLoggedIn) {
       setLoading(false);
       setErr(
@@ -212,10 +218,8 @@ export default function Comparator() {
       const countryEN = normalizeCountryQuery(qTrim);
 
       if (countryEN) {
-        // filtro por país (Chile, Argentina, etc.)
         params.set("country", countryEN);
       } else if (qTrim) {
-        // texto libre: liga, equipo, etc.
         params.set("q", qTrim);
       }
 
@@ -235,7 +239,6 @@ export default function Comparator() {
         return;
       }
 
-      // Ordenar tipo Flashscore: primero ligas importantes, luego por hora
       const sorted = [...items].sort((a, b) => {
         const prioA = getLeaguePriority(getLeagueName(a), getCountryName(a));
         const prioB = getLeaguePriority(getLeagueName(b), getCountryName(b));
@@ -258,14 +261,12 @@ export default function Comparator() {
     }
   }
 
-  // Botón rápido de país
   function handleQuickCountry(countryEs) {
     setQ(countryEs);
   }
 
   const quickCountries = ["Chile", "Argentina", "España", "Inglaterra", "Francia"];
 
-  // Selección de partidos para la futura cuota x100
   function toggleFixtureSelection(id) {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -382,140 +383,118 @@ export default function Comparator() {
         )}
       </section>
 
-      {/* Lista compacta de partidos (estilo Novibet / Flashscore) */}
-<section
-  className="mt-4 rounded-2xl border border-slate-800/80 bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-950 shadow-[0_18px_40px_rgba(15,23,42,0.85)]"
->
-  {/* Cabecera de la lista */}
-  <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/80 text-[11px] md:text-xs text-slate-300 tracking-wide">
-    <span className="uppercase">
-      Partidos futuros encontrados:{" "}
-      <span className="font-semibold text-slate-50">{fixtures.length}</span>
-    </span>
-    <span className="uppercase text-right">
-      Toca un partido para añadirlo / quitarlo de tu combinada.
-    </span>
-  </div>
+      {/* Lista compacta de partidos */}
+      <section className="mt-4 rounded-2xl border border-slate-800/80 bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-950 shadow-[0_18px_40px_rgba(15,23,42,0.85)]">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/80 text-[11px] md:text-xs text-slate-300 tracking-wide">
+          <span className="uppercase">
+            Partidos futuros encontrados:{" "}
+            <span className="font-semibold text-slate-50">
+              {fixtures.length}
+            </span>
+          </span>
+          <span className="uppercase text-right">
+            Toca un partido para añadirlo / quitarlo de tu combinada.
+          </span>
+        </div>
 
-  {/* Si no hay partidos */}
-  {fixtures.length === 0 ? (
-    <div className="px-4 py-6 text-sm text-slate-300">
-      Por ahora no hay partidos futuros para este rango o filtro. Prueba con más
-      días o sin filtrar por país/equipo.
-    </div>
-  ) : (
-    <ul className="divide-y divide-slate-800/80">
-      {fixtures.map((fx) => {
-        // Usamos el helper para un id estable
-        const id = getFixtureId(fx);
-        const isSelected = selectedIds.includes(id);
+        {fixtures.length === 0 ? (
+          <div className="px-4 py-6 text-sm text-slate-300">
+            Por ahora no hay partidos futuros para este rango o filtro. Prueba con más
+            días o sin filtrar por país/equipo.
+          </div>
+        ) : (
+          <ul className="divide-y divide-slate-800/80">
+            {fixtures.map((fx) => {
+              const id = getFixtureId(fx);
+              const isSelected = selectedIds.includes(id);
 
-        const league =
-          fx.league?.name ??
-          fx.liga ??
-          fx.leagueName ??
-          "";
+              const league =
+                fx.league?.name ?? fx.liga ?? fx.leagueName ?? getLeagueName(fx);
 
-        const country =
-          fx.league?.country ??
-          fx.country ??
-          fx.pais ??
-          "";
+              const rawCountry =
+                fx.league?.country ?? fx.country ?? fx.pais ?? getCountryName(fx);
 
-        const flag =
-          fx.league?.flag ??
-          fx.flag ??
-          fx.countryFlag ??
-          "";
+              const country = rawCountry || "World";
 
-        const home =
-          fx.teams?.home?.name ??
-          fx.homeTeam ??
-          fx.local ??
-          "";
+              const flagFromApi =
+                fx.league?.flag ?? fx.flag ?? fx.countryFlag ?? "";
 
-        const away =
-          fx.teams?.away?.name ??
-          fx.awayTeam ??
-          fx.visitante ??
-          "";
+              const flagEmoji = COUNTRY_FLAG[country] || "";
+              const flag = flagFromApi || flagEmoji;
 
-        // Hora (si ya tienes un campo listo, puedes sustituir esto)
-        let time = "";
-        if (fx.fixture?.date) {
-          time = fx.fixture.date.slice(11, 16); // "HH:MM"
-        } else if (fx.hora) {
-          time = fx.hora;
-        }
+              const home =
+                fx.teams?.home?.name ?? fx.homeTeam ?? fx.local ?? getHomeName(fx);
 
-        return (
-          <li
-            key={id}
-            onClick={() => toggleFixtureSelection(id)}
-            className={[
-              "px-4 py-3 flex items-center gap-3 cursor-pointer transition-colors",
-              isSelected ? "bg-slate-900/90" : "hover:bg-slate-900/70",
-            ].join(" ")}
-          >
-            {/* Columna hora */}
-            <div className="w-14 text-[11px] md:text-xs font-semibold text-slate-100">
-              {time}
-            </div>
+              const away =
+                fx.teams?.away?.name ??
+                fx.awayTeam ??
+                fx.visitante ??
+                getAwayName(fx);
 
-            {/* Columna centro: país/competición + equipos */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1 text-xs md:text-sm text-slate-200">
-                {flag && (
-                  <span className="mr-1 text-lg leading-none">
-                    {/* Si el flag es emoji se ve bien; si es URL se podría cambiar a <img> más adelante */}
-                    {flag}
-                  </span>
-                )}
-                {country && (
-                  <span className="font-medium truncate">{country}</span>
-                )}
-                {league && (
-                  <span className="text-[11px] md:text-xs text-slate-400 truncate">
-                    {" "}
-                    · {league}
-                  </span>
-                )}
-              </div>
+              const time = getKickoffTime(fx);
 
-              <div className="mt-0.5 text-xs md:text-sm text-slate-100 truncate">
-                <span className="font-semibold truncate">{home}</span>
-                <span className="mx-1 text-slate-400">vs</span>
-                <span className="font-semibold truncate">{away}</span>
-              </div>
-            </div>
+              return (
+                <li
+                  key={id}
+                  onClick={() => toggleFixtureSelection(id)}
+                  className={[
+                    "px-4 py-3 flex flex-col md:flex-row md:items-center gap-1 md:gap-3 cursor-pointer transition-colors",
+                    isSelected ? "bg-slate-900/90" : "hover:bg-slate-900/70",
+                  ].join(" ")}
+                >
+                  {/* Fila 1: hora + país + liga */}
+                  <div className="flex items-center gap-2 text-[11px] md:text-xs text-slate-300">
+                    <span className="font-semibold text-slate-100">{time}</span>
+                    {flag && (
+                      <span className="text-lg leading-none">
+                        {flag}
+                      </span>
+                    )}
+                    <span className="font-medium">
+                      {country}
+                    </span>
+                    {league && (
+                      <span className="text-[11px] text-slate-400">
+                        · {league}
+                      </span>
+                    )}
+                  </div>
 
-            {/* Columna derecha: placeholder de cuotas en celeste */}
-            <div className="w-[40%] md:w-[32%] text-right text-[11px] md:text-xs leading-snug">
-              <span className="block text-cyan-300 font-semibold">
-                Próximamente: cuotas 1X2 y valor esperado.
-              </span>
-              <span className="hidden md:block text-[11px] text-slate-400">
-                Aquí verás las cuotas sugeridas para este partido.
-              </span>
-            </div>
+                  {/* Fila 2: equipos */}
+                  <div className="text-xs md:text-sm text-slate-100">
+                    <span className="font-semibold">{home}</span>
+                    <span className="mx-1 text-slate-400">vs</span>
+                    <span className="font-semibold">{away}</span>
+                  </div>
 
-            {/* Bolita de selección: se pinta cuando está seleccionado */}
-            <div className="w-6 flex justify-end">
-              <span
-                className={[
-                  "inline-block w-3.5 h-3.5 rounded-full border",
-                  isSelected
-                    ? "border-emerald-400 bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.9)]"
-                    : "border-slate-500/80 bg-slate-950/90",
-                ].join(" ")}
-              />
-            </div>
-          </li>
-        );
-      })}
-    </ul>
-  )}
-</section>
+                  {/* Fila 3: cuotas + bolita */}
+                  <div className="mt-1 flex items-center justify-between gap-3">
+                    <div className="flex-1 text-right text-[11px] md:text-xs leading-snug">
+                      <span className="block text-cyan-300 font-semibold">
+                        Próximamente: cuotas 1X2 y valor esperado.
+                      </span>
+                      <span className="hidden md:block text-[11px] text-slate-400">
+                        Aquí verás las cuotas sugeridas para este partido.
+                      </span>
+                    </div>
+
+                    <div className="w-6 flex justify-end">
+                      <span
+                        className={[
+                          "inline-block w-3.5 h-3.5 rounded-full border",
+                          isSelected
+                            ? "border-emerald-400 bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.9)]"
+                            : "border-slate-500/80 bg-slate-950/90",
+                        ].join(" ")}
+                      />
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       {/* Tarjetas de resultados / productos del comparador */}
       <section className="mt-4 space-y-4">
