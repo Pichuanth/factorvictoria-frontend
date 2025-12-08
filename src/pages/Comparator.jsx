@@ -5,7 +5,7 @@ import { useAuth } from "../lib/auth";
 
 const GOLD = "#E6C464";
 
-/* -------------------- helpers -------------------- */
+/* --------------------- helpers --------------------- */
 
 function toYYYYMMDD(d) {
   const pad = (n) => String(n).padStart(2, "0");
@@ -27,7 +27,130 @@ function normalizeCountryQuery(q) {
   return COUNTRY_ALIAS[key] || null;
 }
 
-/* -------------------- componente -------------------- */
+// Emoji banderas simples (no es perfecto pero se ve pro)
+const COUNTRY_FLAG = {
+  Chile: "🇨🇱",
+  Argentina: "🇦🇷",
+  Spain: "🇪🇸",
+  England: "🏴",
+  France: "🇫🇷",
+  Brazil: "🇧🇷",
+  Germany: "🇩🇪",
+  Italy: "🇮🇹",
+  Portugal: "🇵🇹",
+  Mexico: "🇲🇽",
+  USA: "🇺🇸",
+};
+
+// Prioridad de ligas importantes (para ordenar tipo Flashscore)
+const IMPORTANT_LEAGUES = [
+  "UEFA Champions League",
+  "Champions League",
+  "Europa League",
+  "CONMEBOL Libertadores",
+  "Copa Libertadores",
+  "Premier League",
+  "La Liga",
+  "Serie A",
+  "Bundesliga",
+  "Ligue 1",
+  "Copa del Rey",
+  "CONMEBOL Sudamericana",
+];
+
+function getLeaguePriority(leagueName = "", country = "") {
+  const name = String(leagueName || "").toLowerCase();
+  const countryLower = String(country || "").toLowerCase();
+
+  // 0–9: súper importantes
+  for (let i = 0; i < IMPORTANT_LEAGUES.length; i++) {
+    if (name.includes(IMPORTANT_LEAGUES[i].toLowerCase())) {
+      return i; // cuanto más chico, más arriba
+    }
+  }
+
+  // 10–19: ligas grandes por país
+  if (["england", "spain", "italy", "germany", "france"].includes(countryLower))
+    return 12;
+
+  if (["chile", "argentina", "brazil", "portugal", "mexico"].includes(countryLower))
+    return 14;
+
+  // 20+: resto
+  return 25;
+}
+
+// Funciones defensivas para leer campos sin romperse si cambia el backend
+function getFixtureId(f) {
+  return (
+    f.id ||
+    f.fixtureId ||
+    f.fixture_id ||
+    f.fixture?.id ||
+    `${f.league?.id || ""}-${f.timestamp || f.date}`
+  );
+}
+
+function getLeagueName(f) {
+  return (
+    f.league?.name ||
+    f.leagueName ||
+    f.league_name ||
+    f.competition ||
+    "Liga desconocida"
+  );
+}
+
+function getCountryName(f) {
+  return (
+    f.league?.country ||
+    f.country ||
+    f.country_name ||
+    f.location ||
+    "World"
+  );
+}
+
+function getHomeName(f) {
+  return (
+    f.homeTeam ||
+    f.home_name ||
+    f.localTeam ||
+    f.team_home ||
+    f.teams?.home?.name ||
+    "Local"
+  );
+}
+
+function getAwayName(f) {
+  return (
+    f.awayTeam ||
+    f.away_name ||
+    f.visitTeam ||
+    f.team_away ||
+    f.teams?.away?.name ||
+    "Visita"
+  );
+}
+
+function getKickoffTime(f) {
+  // hora tipo "18:00"
+  if (f.time) return f.time;
+  if (f.kickoffTime) return f.kickoffTime;
+  if (typeof f.date === "string" && f.date.includes("T")) {
+    try {
+      const d = new Date(f.date);
+      const hh = String(d.getHours()).padStart(2, "0");
+      const mm = String(d.getMinutes()).padStart(2, "0");
+      return `${hh}:${mm}`;
+    } catch {
+      return "--:--";
+    }
+  }
+  return f.hour || "--:--";
+}
+
+/* --------------------- componente --------------------- */
 
 export default function Comparator() {
   const { isLoggedIn, user } = useAuth();
@@ -41,8 +164,9 @@ export default function Comparator() {
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
   const [fixtures, setFixtures] = useState([]);
+  const [selectedIds, setSelectedIds] = useState([]);
 
-  // Prefill cuando vienes desde /fixture?date=YYYY-MM-DD&q=algo
+  // Prefill desde /fixture -> "Generar" (date & q en la URL)
   useEffect(() => {
     const urlDate = searchParams.get("date");
     const urlQ = searchParams.get("q");
@@ -56,19 +180,22 @@ export default function Comparator() {
   }, [searchParams]);
 
   const planLabel = useMemo(() => {
-    const raw =
-      user?.planId || user?.plan?.id || user?.plan || user?.membership || "";
+    const raw = user?.planId || user?.plan?.id || user?.plan || user?.membership || "";
     return String(raw || "").toUpperCase();
   }, [user]);
 
   async function handleGenerate(e) {
     e?.preventDefault?.();
+
     setErr("");
     setInfo("");
     setFixtures([]);
+    setSelectedIds([]);
+    setLoading(true);
 
-    // Bloqueo duro para visitantes
+    // Bloqueo duro para visitantes (puede ajustarse a demo limitada si quieres)
     if (!isLoggedIn) {
+      setLoading(false);
       setErr(
         "Necesitas iniciar sesión y tener una membresía activa para usar el comparador. Usa la pestaña Partidos mientras tanto."
       );
@@ -76,20 +203,20 @@ export default function Comparator() {
     }
 
     try {
-      setLoading(true);
-
       const params = new URLSearchParams();
       params.set("from", from);
       params.set("to", to);
-      // De momento NO filtramos por status para asegurar que lleguen partidos
+      params.set("status", "NS"); // solo partidos futuros / no iniciados
 
       const qTrim = String(q || "").trim();
       const countryEN = normalizeCountryQuery(qTrim);
 
       if (countryEN) {
-        params.set("country", countryEN); // Chile, Argentina, etc.
+        // filtro por país (Chile, Argentina, etc.)
+        params.set("country", countryEN);
       } else if (qTrim) {
-        params.set("q", qTrim); // texto libre: liga, equipo, etc.
+        // texto libre: liga, equipo, etc.
+        params.set("q", qTrim);
       }
 
       const res = await fetch(`/api/fixtures?${params.toString()}`);
@@ -101,16 +228,27 @@ export default function Comparator() {
       const items = Array.isArray(data?.items) ? data.items : [];
 
       if (!items.length) {
-        setInfo(
-          "Por ahora no hay partidos futuros para este rango o filtro. Prueba con más días o sin filtrar por país/equipo."
+        setErr(
+          "Por ahora no hay partidos futuros reales suficientes para este rango o filtro. Prueba con más días o sin filtrar por país/equipo."
         );
         setFixtures([]);
         return;
       }
 
-      setFixtures(items);
+      // Ordenar tipo Flashscore: primero ligas importantes, luego por hora
+      const sorted = [...items].sort((a, b) => {
+        const prioA = getLeaguePriority(getLeagueName(a), getCountryName(a));
+        const prioB = getLeaguePriority(getLeagueName(b), getCountryName(b));
+        if (prioA !== prioB) return prioA - prioB;
+
+        const tA = getKickoffTime(a) || "";
+        const tB = getKickoffTime(b) || "";
+        return tA.localeCompare(tB);
+      });
+
+      setFixtures(sorted);
       setInfo(
-        `Se encontraron ${items.length} partidos futuros para este rango de fechas. Próximamente podrás generar parlays automáticos con esta base.`
+        `Se encontraron ${sorted.length} partidos futuros para este rango de fechas. Puedes seleccionar partidos para armar tus parlays.`
       );
     } catch (e) {
       console.error(e);
@@ -126,6 +264,15 @@ export default function Comparator() {
   }
 
   const quickCountries = ["Chile", "Argentina", "España", "Inglaterra", "Francia"];
+
+  // Selección de partidos para la futura cuota x100
+  function toggleFixtureSelection(id) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
+
+  const selectedCount = selectedIds.length;
 
   return (
     <div className="max-w-5xl mx-auto px-4 pb-20">
@@ -235,9 +382,95 @@ export default function Comparator() {
         )}
       </section>
 
-      {/* Tarjetas de resultados (por ahora informativas) */}
+      {/* LISTA DE PARTIDOS – estilo compacto tipo Flashscore */}
+      {fixtures.length > 0 && (
+        <section className="mt-4 rounded-2xl bg-white/5 border border-white/10">
+          <div className="border-b border-white/10 px-4 py-3 flex items-center justify-between text-xs text-slate-300">
+            <span>
+              Partidos futuros encontrados:{" "}
+              <span className="font-semibold text-slate-100">
+                {fixtures.length}
+              </span>
+            </span>
+            <span className="hidden md:inline">
+              Toca un partido para añadirlo / quitarlo de tu combinada.
+            </span>
+          </div>
+
+          <div className="divide-y divide-white/10">
+            {fixtures.map((f) => {
+              const id = getFixtureId(f);
+              const league = getLeagueName(f);
+              const country = getCountryName(f);
+              const flag = COUNTRY_FLAG[country] || "🌍";
+              const home = getHomeName(f);
+              const away = getAwayName(f);
+              const time = getKickoffTime(f);
+              const isSelected = selectedIds.includes(id);
+
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => toggleFixtureSelection(id)}
+                  className={`w-full px-4 py-2 text-left text-sm flex items-center gap-3 hover:bg-white/5 transition ${
+                    isSelected ? "bg-emerald-500/10" : ""
+                  }`}
+                >
+                  {/* Hora */}
+                  <div className="w-14 flex-shrink-0 text-xs font-mono text-slate-200">
+                    {time}
+                  </div>
+
+                  {/* País + liga */}
+                  <div className="w-40 flex-shrink-0 text-[11px] text-slate-300 leading-tight">
+                    <div className="flex items-center gap-1">
+                      <span>{flag}</span>
+                      <span className="truncate">{country}</span>
+                    </div>
+                    <div className="truncate opacity-80">{league}</div>
+                  </div>
+
+                  {/* Equipos */}
+                  <div className="flex-1 flex flex-col md:flex-row md:items-center md:justify-between gap-1">
+                    <div className="flex flex-col md:flex-row md:items-center gap-1">
+                      <span className="font-semibold text-slate-100 truncate">
+                        {home}
+                      </span>
+                      <span className="text-[11px] text-slate-400 md:mx-1">
+                        vs
+                      </span>
+                      <span className="font-semibold text-slate-100 truncate">
+                        {away}
+                      </span>
+                    </div>
+
+                    {/* Placeholder de cuota (cuando tengas odds, lo rellenamos aquí) */}
+                    <div className="text-[11px] text-slate-400 md:text-right">
+                      Próximamente: se mostrarán cuotas y valor esperado.
+                    </div>
+                  </div>
+
+                  {/* Checkbox visual de seleccionado */}
+                  <div className="w-6 flex-shrink-0 flex items-center justify-center">
+                    <div
+                      className={`w-3 h-3 rounded-full border ${
+                        isSelected
+                          ? "bg-emerald-400 border-emerald-400"
+                          : "border-slate-500"
+                      }`}
+                    />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Tarjetas de resultados / productos del comparador */}
       <section className="mt-4 space-y-4">
-        {/* Cuota segura (Regalo) */}
+        {/* Cuota segura (regalo) */}
         <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
           <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-200 mb-2">
             Cuota segura (Regalo)
@@ -246,8 +479,8 @@ export default function Comparator() {
             </span>
           </div>
           <p className="text-slate-200 text-sm">
-            Próximamente: resultados basados en tus filtros para usar como “regalo”
-            diario a tu comunidad.
+            Próximamente: resultados basados en tus filtros para usar como
+            “regalo” diario a tu comunidad (alta probabilidad, cuota baja).
           </p>
         </div>
 
@@ -257,15 +490,24 @@ export default function Comparator() {
             Cuota generada
             <span className="ml-2 text-[11px] text-emerald-100/90">x100</span>
           </div>
+
           {fixtures.length === 0 ? (
             <p className="text-slate-300 text-sm">
-              Aún no hay picks para este rango o filtro. Genera primero partidos con
-              el botón de arriba.
+              Aún no hay picks para este rango o filtro. Genera primero partidos
+              con el botón de arriba.
+            </p>
+          ) : selectedCount === 0 ? (
+            <p className="text-slate-300 text-sm">
+              Selecciona varios partidos de la lista superior para empezar a
+              construir tu combinada objetivo x100.
             </p>
           ) : (
             <p className="text-slate-200 text-sm">
-              Próximamente: combinaremos partidos de este rango para buscar una cuota
-              objetivo cercana a x100, según tu plan.
+              Has seleccionado{" "}
+              <span className="font-semibold">{selectedCount}</span>{" "}
+              partidos. Próximamente, Factor Victoria combinará estos partidos y
+              sus cuotas para acercarse automáticamente a una cuota objetivo
+              cercana a x100.
             </p>
           )}
         </div>
@@ -276,8 +518,8 @@ export default function Comparator() {
             Árbitros más tarjeteros
           </div>
           <p className="text-slate-200 text-sm">
-            Genera para ver recomendaciones sobre partidos con árbitros propensos a
-            sacar tarjetas (ideal para over tarjetas).
+            Genera para ver recomendaciones sobre partidos con árbitros
+            propensos a sacar tarjetas (ideal para over tarjetas).
           </p>
         </div>
 
@@ -287,8 +529,8 @@ export default function Comparator() {
             Cuota desfase del mercado
           </div>
           <p className="text-slate-200 text-sm">
-            Próximamente: Factor Victoria te mostrará posibles errores de mercado con
-            valor esperado positivo según tus filtros.
+            Próximamente: Factor Victoria te mostrará posibles errores de
+            mercado con valor esperado positivo según tus filtros.
           </p>
         </div>
       </section>
