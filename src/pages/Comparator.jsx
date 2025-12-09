@@ -27,7 +27,7 @@ function normalizeCountryQuery(q) {
   return COUNTRY_ALIAS[key] || null;
 }
 
-// Emojis de banderas (por si los necesitamos después)
+// Emojis de banderas
 const COUNTRY_FLAG = {
   Chile: "🇨🇱",
   Argentina: "🇦🇷",
@@ -40,6 +40,7 @@ const COUNTRY_FLAG = {
   Portugal: "🇵🇹",
   Mexico: "🇲🇽",
   USA: "🇺🇸",
+  World: "🌍",
 };
 
 // Ligas importantes (para ordenar tipo Flashscore)
@@ -151,9 +152,69 @@ function getMaxBoostFromPlan(planLabel) {
   const p = String(planLabel || "").toUpperCase();
 
   if (p.includes("VITA")) return 100; // VITALICIO
-  if (p.includes("ANU")) return 50;   // ANUAL
-  if (p.includes("TRI") || p.includes("3")) return 20; // TRIMESTRAL, 3M
-  return 10; // MENSUAL / por defecto
+  if (p.includes("ANU")) return 50; // ANUAL
+  if (p.includes("TRI") || p.includes("3")) return 20; // TRIMESTRAL / 3M
+
+  // BASIC / MENSUAL / por defecto
+  return 10;
+}
+
+/* --------------- helpers de cuotas “fake” --------------- */
+
+// Cuota base "fake" (1.2–3.8) en función del id del partido
+function fakeBaseOddForFixture(fx) {
+  const id = getFixtureId(fx);
+  const key = String(id || getHomeName(fx) + getAwayName(fx));
+
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    hash = (hash + key.charCodeAt(i) * (i + 7)) % 1000;
+  }
+
+  const base = 1.2 + (hash % 26) / 10; // 1.2 – 3.8
+  return Number(base.toFixed(2));
+}
+
+// Construye una combinada de ejemplo que se acerque al máximo de tu plan
+function buildComboSuggestion(fixturesPool, maxBoost) {
+  if (!Array.isArray(fixturesPool) || fixturesPool.length === 0) return null;
+
+  const picks = [];
+  let product = 1;
+
+  for (const fx of fixturesPool) {
+    const odd = fakeBaseOddForFixture(fx);
+
+    // Si al multiplicar se pasa MUCHO del objetivo, saltamos este partido
+    if (product * odd > maxBoost * 1.35) {
+      continue;
+    }
+
+    product *= odd;
+    picks.push({
+      id: getFixtureId(fx),
+      label: `${getHomeName(fx)} vs ${getAwayName(fx)}`,
+      odd,
+    });
+
+    // No queremos combinadas eternas
+    if (picks.length >= 12) break;
+
+    // Si ya llegamos cerca del objetivo de tu plan, paramos
+    if (product >= maxBoost * 0.8) break;
+  }
+
+  if (!picks.length) return null;
+
+  const finalOdd = Number(product.toFixed(2));
+  const impliedProb = Number(((1 / finalOdd) * 100).toFixed(1)); // súper simplificado
+
+  return {
+    games: picks.length,
+    finalOdd,
+    target: maxBoost,
+    impliedProb,
+  };
 }
 
 /* --------------------- componente --------------------- */
@@ -172,7 +233,7 @@ export default function Comparator() {
   const [fixtures, setFixtures] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
 
-  // Estado para los resultados de combinadas
+  // Estado para resultados de combinadas (demo)
   const [parlayResult, setParlayResult] = useState(null);
   const [parlayError, setParlayError] = useState("");
 
@@ -278,7 +339,7 @@ export default function Comparator() {
 
   // Selección de partidos
   function toggleFixtureSelection(id) {
-    setParlayResult(null); // si cambias la selección, “reseteamos” el resultado
+    setParlayResult(null); // si cambias la selección, reseteamos el resultado demo
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
@@ -286,7 +347,7 @@ export default function Comparator() {
 
   const selectedCount = selectedIds.length;
 
-  // 🔹 Combinada máxima automática (usa la base completa de partidos)
+  // Combinada máxima automática (usa la base completa de partidos)
   function handleAutoParlay() {
     setParlayError("");
     setParlayResult(null);
@@ -296,7 +357,7 @@ export default function Comparator() {
       return;
     }
 
-    // Solo ejemplo visual: cuántos partidos usaría la app
+    // Demo simple: cuántos partidos se usarían
     const used = Math.min(fixtures.length, maxBoost >= 50 ? 6 : 4);
 
     setParlayResult({
@@ -308,7 +369,7 @@ export default function Comparator() {
     });
   }
 
-  // 🔹 Combinada con partidos seleccionados por el usuario
+  // Combinada con partidos seleccionados
   function handleSelectedParlay() {
     setParlayError("");
     setParlayResult(null);
@@ -330,8 +391,8 @@ export default function Comparator() {
       return;
     }
 
-    // Pequeña simulación de la cuota objetivo en función de cuántos partidos eligió
-    const approxBase = 1.35; // pensar en cuotas medias 1.30–1.40
+    // Pequeña simulación de cuota objetivo según cantidad de partidos
+    const approxBase = 1.35; // cuotas medias ~1.30–1.40
     const approxMultiplier = Math.min(
       maxBoost,
       Number((approxBase ** selectedCount).toFixed(1))
@@ -478,88 +539,85 @@ export default function Comparator() {
           </div>
         ) : (
           <ul className="divide-y divide-slate-800/80">
-{fixtures.map((fx) => {
-  // Id estable + seleccionado
-  const id = getFixtureId(fx);
-  const isSelected = selectedIds.includes(id);
+            {fixtures.map((fx) => {
+              const id = getFixtureId(fx);
+              const isSelected = selectedIds.includes(id);
 
-  // Datos “limpios” usando helpers
-  const league = getLeagueName(fx);
-  const countryName = getCountryName(fx);
-  const flagEmoji =
-    COUNTRY_FLAG[countryName] ||
-    (countryName === "World" ? "🌍" : "🏳️");
-  const home = getHomeName(fx);
-  const away = getAwayName(fx);
-  const time = getKickoffTime(fx);
+              const league = getLeagueName(fx);
+              const countryName = getCountryName(fx);
+              const flagEmoji =
+                COUNTRY_FLAG[countryName] || COUNTRY_FLAG.World || "🏳️";
+              const home = getHomeName(fx);
+              const away = getAwayName(fx);
+              const time = getKickoffTime(fx);
 
-  return (
-    <li
-      key={id}
-      onClick={() => toggleFixtureSelection(id)}
-      className={[
-        "px-4 py-3 flex items-center gap-3 cursor-pointer transition-colors",
-        isSelected ? "bg-slate-900/90" : "hover:bg-slate-900/70",
-      ].join(" ")}
-    >
-      {/* Columna hora */}
-      <div className="w-14 text-[11px] md:text-xs font-semibold text-slate-100">
-        {time || "--:--"}
-      </div>
+              return (
+                <li
+                  key={id}
+                  onClick={() => toggleFixtureSelection(id)}
+                  className={[
+                    "px-4 py-3 flex items-center gap-3 cursor-pointer transition-colors",
+                    isSelected ? "bg-slate-900/90" : "hover:bg-slate-900/70",
+                  ].join(" ")}
+                >
+                  {/* Hora */}
+                  <div className="w-14 text-[11px] md:text-xs font-semibold text-slate-100">
+                    {time || "--:--"}
+                  </div>
 
-      {/* Columna centro: país/competición + equipos */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1 text-xs md:text-sm text-slate-200">
-          <span className="mr-1 text-lg leading-none">
-            {flagEmoji}
-          </span>
-          <span className="font-medium truncate">
-            {countryName}
-          </span>
-          {league && (
-            <span className="text-[11px] md:text-xs text-slate-400 truncate">
-              {" "}
-              · {league}
-            </span>
-          )}
-        </div>
+                  {/* País / liga + equipos */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1 text-xs md:text-sm text-slate-200">
+                      <span className="mr-1 text-lg leading-none">
+                        {flagEmoji}
+                      </span>
+                      <span className="font-medium truncate">
+                        {countryName}
+                      </span>
+                      {league && (
+                        <span className="text-[11px] md:text-xs text-slate-400 truncate">
+                          {" "}
+                          · {league}
+                        </span>
+                      )}
+                    </div>
 
-        <div className="mt-0.5 text-xs md:text-sm text-slate-100 truncate">
-          <span className="font-semibold truncate">{home}</span>
-          <span className="mx-1 text-slate-400">vs</span>
-          <span className="font-semibold truncate">{away}</span>
-        </div>
-      </div>
+                    <div className="mt-0.5 text-xs md:text-sm text-slate-100 truncate">
+                      <span className="font-semibold truncate">{home}</span>
+                      <span className="mx-1 text-slate-400">vs</span>
+                      <span className="font-semibold truncate">{away}</span>
+                    </div>
+                  </div>
 
-      {/* Columna derecha: placeholder de cuotas en celeste */}
-      <div className="w-[40%] md:w-[32%] text-right text-[11px] md:text-xs leading-snug">
-        <span className="block text-cyan-300 font-semibold">
-          Próximamente: cuotas 1X2 y valor esperado.
-        </span>
-        <span className="hidden md:block text-[11px] text-slate-400">
-          Aquí verás las cuotas sugeridas para este partido.
-        </span>
-      </div>
+                  {/* Placeholder cuotas */}
+                  <div className="w-[40%] md:w-[32%] text-right text-[11px] md:text-xs leading-snug">
+                    <span className="block text-cyan-300 font-semibold">
+                      Próximamente: cuotas 1X2 y valor esperado.
+                    </span>
+                    <span className="hidden md:block text-[11px] text-slate-400">
+                      Aquí verás las cuotas sugeridas para este partido.
+                    </span>
+                  </div>
 
-      {/* Bolita de selección */}
-      <div className="w-6 flex justify-end">
-        <span
-          className={[
-            "inline-block w-3.5 h-3.5 rounded-full border",
-            isSelected
-              ? "border-emerald-400 bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.9)]"
-              : "border-slate-500/80 bg-slate-950/90",
-          ].join(" ")}
-        />
-      </div>
-    </li>
-  );
-})}
+                  {/* Bolita selección */}
+                  <div className="w-6 flex justify-end">
+                    <span
+                      className={[
+                        "inline-block w-3.5 h-3.5 rounded-full border",
+                        isSelected
+                          ? "border-emerald-400 bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.9)]"
+                          : "border-slate-500/80 bg-slate-950/90",
+                      ].join(" ")}
+                    />
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
 
-      {/* Tarjetas de resultados / productos del comparador */}
+      {/* Tarjetas de resultados */}
       <section className="mt-4 space-y-4">
         {/* Cuota segura (regalo) */}
         <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
@@ -584,7 +642,6 @@ export default function Comparator() {
             </span>
           </div>
 
-          {/* Texto base según estado */}
           {fixtures.length === 0 ? (
             <p className="text-slate-300 text-sm mb-3">
               Genera primero partidos con el botón de arriba para construir tus
@@ -599,7 +656,6 @@ export default function Comparator() {
             </p>
           )}
 
-          {/* Botones de acción */}
           <div className="flex flex-col sm:flex-row gap-2 mb-2">
             <button
               type="button"
@@ -620,12 +676,10 @@ export default function Comparator() {
             </button>
           </div>
 
-          {/* Mensajes de error de combinadas */}
           {parlayError && (
             <p className="text-xs text-amber-300 mt-1">{parlayError}</p>
           )}
 
-          {/* Resultado simulado */}
           {parlayResult && (
             <div className="mt-3 text-sm text-slate-200">
               <p className="font-semibold mb-1">{parlayResult.text}</p>
