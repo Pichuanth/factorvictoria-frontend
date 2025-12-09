@@ -27,7 +27,7 @@ function normalizeCountryQuery(q) {
   return COUNTRY_ALIAS[key] || null;
 }
 
-// Emoji banderas simples
+// Emoji banderas simples (fallback cuando no viene flag URL)
 const COUNTRY_FLAG = {
   Chile: "🇨🇱",
   Argentina: "🇦🇷",
@@ -77,7 +77,7 @@ function getLeaguePriority(leagueName = "", country = "") {
   return 25;
 }
 
-// Helpers defensivos
+// Helpers defensivos para leer campos del backend
 function getFixtureId(f) {
   return (
     f.id ||
@@ -133,6 +133,7 @@ function getAwayName(f) {
 function getKickoffTime(f) {
   if (f.time) return f.time;
   if (f.kickoffTime) return f.kickoffTime;
+
   if (typeof f.date === "string" && f.date.includes("T")) {
     try {
       const d = new Date(f.date);
@@ -153,7 +154,24 @@ function getKickoffTime(f) {
       return "--:--";
     }
   }
+
   return f.hour || f.hora || "--:--";
+}
+
+// Detectar tipo de membresía a partir del label
+function getMembershipTier(planLabel) {
+  const t = String(planLabel || "").toUpperCase();
+
+  if (!t || t.includes("DEMO") || t.includes("FREE")) return "DEMO";
+  if (t.includes("VITAL")) return "VITALICIO";
+  if (t.includes("ANUAL") || t.includes("ANNUAL") || t.includes("YEAR"))
+    return "ANUAL";
+  if (t.includes("TRIM") || t.includes("3M")) return "TRIMESTRAL";
+  if (t.includes("MES") || t.includes("MENSUAL") || t.includes("MONTH"))
+    return "MENSUAL";
+
+  // fallback: al menos mensual
+  return "MENSUAL";
 }
 
 /* --------------------- componente --------------------- */
@@ -190,6 +208,26 @@ export default function Comparator() {
       user?.planId || user?.plan?.id || user?.plan || user?.membership || "";
     return String(raw || "").toUpperCase();
   }, [user]);
+
+  const tier = useMemo(() => getMembershipTier(planLabel), [planLabel]);
+
+  // Reglas por membresía
+  const canUseRegalo = tier !== "DEMO";
+  const canUsePotenciadas = tier !== "DEMO";
+
+  const maxPotenciadaLabel =
+    tier === "VITALICIO"
+      ? "x100"
+      : tier === "ANUAL"
+      ? "x50"
+      : tier === "TRIMESTRAL"
+      ? "x20"
+      : tier === "MENSUAL"
+      ? "x10"
+      : "x10";
+
+  const hasDesfase = tier === "ANUAL" || tier === "VITALICIO";
+  const hasArbitros = tier === "VITALICIO";
 
   async function handleGenerate(e) {
     e?.preventDefault?.();
@@ -239,6 +277,7 @@ export default function Comparator() {
         return;
       }
 
+      // Orden tipo Flashscore
       const sorted = [...items].sort((a, b) => {
         const prioA = getLeaguePriority(getLeagueName(a), getCountryName(a));
         const prioB = getLeaguePriority(getLeagueName(b), getCountryName(b));
@@ -261,12 +300,14 @@ export default function Comparator() {
     }
   }
 
+  // Botón rápido de país
   function handleQuickCountry(countryEs) {
     setQ(countryEs);
   }
 
   const quickCountries = ["Chile", "Argentina", "España", "Inglaterra", "Francia"];
 
+  // Selección de partidos para futuras cuotas
   function toggleFixtureSelection(id) {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -383,8 +424,9 @@ export default function Comparator() {
         )}
       </section>
 
-      {/* Lista compacta de partidos */}
+      {/* Lista compacta de partidos (estilo Novibet / Flashscore) */}
       <section className="mt-4 rounded-2xl border border-slate-800/80 bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-950 shadow-[0_18px_40px_rgba(15,23,42,0.85)]">
+        {/* Cabecera */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/80 text-[11px] md:text-xs text-slate-300 tracking-wide">
           <span className="uppercase">
             Partidos futuros encontrados:{" "}
@@ -392,15 +434,15 @@ export default function Comparator() {
               {fixtures.length}
             </span>
           </span>
-          <span className="uppercase text-right">
+          <span className="uppercase text-right hidden sm:block">
             Toca un partido para añadirlo / quitarlo de tu combinada.
           </span>
         </div>
 
         {fixtures.length === 0 ? (
           <div className="px-4 py-6 text-sm text-slate-300">
-            Por ahora no hay partidos futuros para este rango o filtro. Prueba con más
-            días o sin filtrar por país/equipo.
+            Por ahora no hay partidos futuros para este rango o filtro. Prueba
+            con más días o sin filtrar por país/equipo.
           </div>
         ) : (
           <ul className="divide-y divide-slate-800/80">
@@ -408,86 +450,93 @@ export default function Comparator() {
               const id = getFixtureId(fx);
               const isSelected = selectedIds.includes(id);
 
-              const league =
-                fx.league?.name ?? fx.liga ?? fx.leagueName ?? getLeagueName(fx);
-
-              const rawCountry =
-                fx.league?.country ?? fx.country ?? fx.pais ?? getCountryName(fx);
-
-              const country = rawCountry || "World";
-
-              const flagFromApi =
-                fx.league?.flag ?? fx.flag ?? fx.countryFlag ?? "";
-
-              const flagEmoji = COUNTRY_FLAG[country] || "";
-              const flag = flagFromApi || flagEmoji;
-
-              const home =
-                fx.teams?.home?.name ?? fx.homeTeam ?? fx.local ?? getHomeName(fx);
-
-              const away =
-                fx.teams?.away?.name ??
-                fx.awayTeam ??
-                fx.visitante ??
-                getAwayName(fx);
-
+              const leagueName = getLeagueName(fx);
+              const countryName = getCountryName(fx);
+              const home = getHomeName(fx);
+              const away = getAwayName(fx);
               const time = getKickoffTime(fx);
+
+              const flagUrl = fx.league?.flag || fx.flag || fx.countryFlag;
+              const flagEmoji = COUNTRY_FLAG[countryName] || "";
 
               return (
                 <li
                   key={id}
                   onClick={() => toggleFixtureSelection(id)}
                   className={[
-                    "px-4 py-3 flex flex-col md:flex-row md:items-center gap-1 md:gap-3 cursor-pointer transition-colors",
+                    "px-4 py-3 flex items-center gap-3 cursor-pointer transition-colors",
                     isSelected ? "bg-slate-900/90" : "hover:bg-slate-900/70",
                   ].join(" ")}
                 >
-                  {/* Fila 1: hora + país + liga */}
-                  <div className="flex items-center gap-2 text-[11px] md:text-xs text-slate-300">
-                    <span className="font-semibold text-slate-100">{time}</span>
-                    {flag && (
-                      <span className="text-lg leading-none">
-                        {flag}
+                  {/* Hora */}
+                  <div className="w-12 text-[11px] md:text-xs font-semibold text-slate-100 flex-shrink-0">
+                    {time}
+                  </div>
+
+                  {/* Centro: país / liga / equipos */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 text-xs md:text-sm text-slate-200">
+                      {(flagUrl || flagEmoji) && (
+                        <span className="mr-1 flex-shrink-0">
+                          {flagUrl ? (
+                            <img
+                              src={flagUrl}
+                              alt={countryName}
+                              className="w-4 h-4 rounded-full object-cover border border-slate-700"
+                            />
+                          ) : (
+                            <span className="text-lg leading-none">
+                              {flagEmoji}
+                            </span>
+                          )}
+                        </span>
+                      )}
+
+                      {countryName && (
+                        <span className="font-medium truncate max-w-[80px] sm:max-w-none">
+                          {countryName}
+                        </span>
+                      )}
+
+                      {leagueName && (
+                        <span className="hidden sm:inline text-[11px] md:text-xs text-slate-400 truncate">
+                          {" · "}
+                          {leagueName}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-0.5 text-xs md:text-sm text-slate-100">
+                      <span className="font-semibold truncate inline-block max-w-[45%]">
+                        {home}
                       </span>
-                    )}
-                    <span className="font-medium">
-                      {country}
+                      <span className="mx-1 text-slate-400">vs</span>
+                      <span className="font-semibold truncate inline-block max-w-[45%] text-right">
+                        {away}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Derecha: placeholder cuotas */}
+                  <div className="w-[42%] sm:w-[34%] md:w-[32%] text-right text-[11px] md:text-xs leading-snug">
+                    <span className="block text-cyan-300 font-semibold">
+                      Próximamente: cuotas 1X2 y valor esperado.
                     </span>
-                    {league && (
-                      <span className="text-[11px] text-slate-400">
-                        · {league}
-                      </span>
-                    )}
+                    <span className="hidden md:block text-[11px] text-slate-400">
+                      Aquí verás las cuotas sugeridas para este partido.
+                    </span>
                   </div>
 
-                  {/* Fila 2: equipos */}
-                  <div className="text-xs md:text-sm text-slate-100">
-                    <span className="font-semibold">{home}</span>
-                    <span className="mx-1 text-slate-400">vs</span>
-                    <span className="font-semibold">{away}</span>
-                  </div>
-
-                  {/* Fila 3: cuotas + bolita */}
-                  <div className="mt-1 flex items-center justify-between gap-3">
-                    <div className="flex-1 text-right text-[11px] md:text-xs leading-snug">
-                      <span className="block text-cyan-300 font-semibold">
-                        Próximamente: cuotas 1X2 y valor esperado.
-                      </span>
-                      <span className="hidden md:block text-[11px] text-slate-400">
-                        Aquí verás las cuotas sugeridas para este partido.
-                      </span>
-                    </div>
-
-                    <div className="w-6 flex justify-end">
-                      <span
-                        className={[
-                          "inline-block w-3.5 h-3.5 rounded-full border",
-                          isSelected
-                            ? "border-emerald-400 bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.9)]"
-                            : "border-slate-500/80 bg-slate-950/90",
-                        ].join(" ")}
-                      />
-                    </div>
+                  {/* Bolita selección */}
+                  <div className="w-6 flex justify-end flex-shrink-0">
+                    <span
+                      className={[
+                        "inline-block w-3.5 h-3.5 rounded-full border",
+                        isSelected
+                          ? "border-emerald-400 bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.9)]"
+                          : "border-slate-500/80 bg-slate-950/90",
+                      ].join(" ")}
+                    />
                   </div>
                 </li>
               );
@@ -506,28 +555,57 @@ export default function Comparator() {
               x1.5–x3 · 90–95% acierto
             </span>
           </div>
-          <p className="text-slate-200 text-sm">
-            Próximamente: resultados basados en tus filtros para usar como
-            “regalo” diario a tu comunidad (alta probabilidad, cuota baja).
-          </p>
+
+          {!canUseRegalo ? (
+            <p className="text-slate-400 text-sm">
+              Disponible desde el plan <span className="font-semibold">Mensual</span>.
+              {" "}
+              <Link to="/" className="underline font-semibold">
+                Sube tu membresía
+              </Link>{" "}
+              para desbloquear este tipo de cuota de regalo.
+            </p>
+          ) : (
+            <p className="text-slate-200 text-sm">
+              Próximamente: resultados basados en tus filtros para usar como
+              “regalo” diario a tu comunidad (alta probabilidad, cuota baja).
+            </p>
+          )}
         </div>
 
-        {/* Cuota generada x100 */}
+        {/* Cuotas potenciadas */}
         <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
           <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-200 mb-2">
-            Cuota generada
-            <span className="ml-2 text-[11px] text-emerald-100/90">x100</span>
+            Cuotas potenciadas
+            <span className="ml-2 text-[11px] text-emerald-100/90">
+              hasta {maxPotenciadaLabel}
+            </span>
           </div>
 
-          {fixtures.length === 0 ? (
+          {!canUsePotenciadas ? (
+            <p className="text-slate-400 text-sm">
+              Las cuotas potenciadas están disponibles desde el plan{" "}
+              <span className="font-semibold">Mensual</span> (x10),{" "}
+              <span className="font-semibold">Trimestral</span> (x20),
+              <span className="font-semibold"> Anual</span> (x50) y{" "}
+              <span className="font-semibold">Vitalicio</span> (x100).
+              {" "}
+              <Link to="/" className="underline font-semibold">
+                Revisa los planes
+              </Link>
+              .
+            </p>
+          ) : fixtures.length === 0 ? (
             <p className="text-slate-300 text-sm">
               Aún no hay picks para este rango o filtro. Genera primero partidos
               con el botón de arriba.
             </p>
           ) : selectedCount === 0 ? (
             <p className="text-slate-300 text-sm">
-              Selecciona varios partidos de la lista superior para empezar a
-              construir tu combinada objetivo x100.
+              Tu membresía permite combinadas hasta{" "}
+              <span className="font-semibold">{maxPotenciadaLabel}</span>. Selecciona
+              varios partidos de la lista superior para empezar a construir tus
+              cuotas potenciadas.
             </p>
           ) : (
             <p className="text-slate-200 text-sm">
@@ -535,7 +613,7 @@ export default function Comparator() {
               <span className="font-semibold">{selectedCount}</span>{" "}
               partidos. Próximamente, Factor Victoria combinará estos partidos y
               sus cuotas para acercarse automáticamente a una cuota objetivo
-              cercana a x100.
+              acorde a tu plan (por ejemplo {maxPotenciadaLabel}).
             </p>
           )}
         </div>
@@ -545,10 +623,24 @@ export default function Comparator() {
           <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-500/20 text-red-200 mb-2">
             Árbitros más tarjeteros
           </div>
-          <p className="text-slate-200 text-sm">
-            Genera para ver recomendaciones sobre partidos con árbitros
-            propensos a sacar tarjetas (ideal para over tarjetas).
-          </p>
+
+          {!hasArbitros ? (
+            <p className="text-slate-400 text-sm">
+              Este módulo se desbloquea con la membresía{" "}
+              <span className="font-semibold">Vitalicia</span>: partidos con
+              árbitros muy propensos a sacar tarjetas (ideal over tarjetas).
+              {" "}
+              <Link to="/" className="underline font-semibold">
+                Ver beneficios Vitalicio
+              </Link>
+              .
+            </p>
+          ) : (
+            <p className="text-slate-200 text-sm">
+              Genera para ver recomendaciones sobre partidos con árbitros
+              propensos a sacar tarjetas (ideal para over tarjetas).
+            </p>
+          )}
         </div>
 
         {/* Cuota desfase del mercado */}
@@ -556,10 +648,25 @@ export default function Comparator() {
           <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-sky-500/20 text-sky-200 mb-2">
             Cuota desfase del mercado
           </div>
-          <p className="text-slate-200 text-sm">
-            Próximamente: Factor Victoria te mostrará posibles errores de
-            mercado con valor esperado positivo según tus filtros.
-          </p>
+
+          {!hasDesfase ? (
+            <p className="text-slate-400 text-sm">
+              Disponible desde el plan{" "}
+              <span className="font-semibold">Anual</span> y{" "}
+              <span className="font-semibold">Vitalicio</span>. Detecta posibles
+              errores de mercado con valor esperado positivo según tus filtros.
+              {" "}
+              <Link to="/" className="underline font-semibold">
+                Mejora tu plan
+              </Link>
+              .
+            </p>
+          ) : (
+            <p className="text-slate-200 text-sm">
+              Próximamente: Factor Victoria te mostrará posibles errores de
+              mercado con valor esperado positivo según tus filtros.
+            </p>
+          )}
         </div>
       </section>
     </div>
