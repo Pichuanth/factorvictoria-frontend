@@ -478,102 +478,83 @@ export default function Comparator() {
           </div>
         ) : (
           <ul className="divide-y divide-slate-800/80">
-            {fixtures.map((fx) => {
-              const id = getFixtureId(fx);
-              const isSelected = selectedIds.includes(id);
+{fixtures.map((fx) => {
+  // Id estable + seleccionado
+  const id = getFixtureId(fx);
+  const isSelected = selectedIds.includes(id);
 
-              const league =
-                fx.league?.name ?? fx.liga ?? fx.leagueName ?? "";
+  // Datos “limpios” usando helpers
+  const league = getLeagueName(fx);
+  const countryName = getCountryName(fx);
+  const flagEmoji =
+    COUNTRY_FLAG[countryName] ||
+    (countryName === "World" ? "🌍" : "🏳️");
+  const home = getHomeName(fx);
+  const away = getAwayName(fx);
+  const time = getKickoffTime(fx);
 
-              const country =
-                fx.league?.country ?? fx.country ?? fx.pais ?? "";
+  return (
+    <li
+      key={id}
+      onClick={() => toggleFixtureSelection(id)}
+      className={[
+        "px-4 py-3 flex items-center gap-3 cursor-pointer transition-colors",
+        isSelected ? "bg-slate-900/90" : "hover:bg-slate-900/70",
+      ].join(" ")}
+    >
+      {/* Columna hora */}
+      <div className="w-14 text-[11px] md:text-xs font-semibold text-slate-100">
+        {time || "--:--"}
+      </div>
 
-              const flag =
-                fx.league?.flag ?? fx.flag ?? fx.countryFlag ?? "";
+      {/* Columna centro: país/competición + equipos */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1 text-xs md:text-sm text-slate-200">
+          <span className="mr-1 text-lg leading-none">
+            {flagEmoji}
+          </span>
+          <span className="font-medium truncate">
+            {countryName}
+          </span>
+          {league && (
+            <span className="text-[11px] md:text-xs text-slate-400 truncate">
+              {" "}
+              · {league}
+            </span>
+          )}
+        </div>
 
-              const home =
-                fx.teams?.home?.name ?? fx.homeTeam ?? fx.local ?? "";
+        <div className="mt-0.5 text-xs md:text-sm text-slate-100 truncate">
+          <span className="font-semibold truncate">{home}</span>
+          <span className="mx-1 text-slate-400">vs</span>
+          <span className="font-semibold truncate">{away}</span>
+        </div>
+      </div>
 
-              const away =
-                fx.teams?.away?.name ?? fx.awayTeam ?? fx.visitante ?? "";
+      {/* Columna derecha: placeholder de cuotas en celeste */}
+      <div className="w-[40%] md:w-[32%] text-right text-[11px] md:text-xs leading-snug">
+        <span className="block text-cyan-300 font-semibold">
+          Próximamente: cuotas 1X2 y valor esperado.
+        </span>
+        <span className="hidden md:block text-[11px] text-slate-400">
+          Aquí verás las cuotas sugeridas para este partido.
+        </span>
+      </div>
 
-              let time = "";
-              if (fx.fixture?.date) {
-                time = fx.fixture.date.slice(11, 16);
-              } else if (fx.hora) {
-                time = fx.hora;
-              }
-
-              return (
-                <li
-                  key={id}
-                  onClick={() => toggleFixtureSelection(id)}
-                  className={[
-                    "px-4 py-3 flex items-center gap-3 cursor-pointer transition-colors",
-                    isSelected ? "bg-slate-900/90" : "hover:bg-slate-900/70",
-                  ].join(" ")}
-                >
-                  {/* Hora */}
-                  <div className="w-14 text-[11px] md:text-xs font-semibold text-slate-100">
-                    {time}
-                  </div>
-
-                  {/* País / liga / equipos */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1 text-xs md:text-sm text-slate-200">
-                      {flag && (
-                        <span className="mr-1 text-lg leading-none">
-                          {flag}
-                        </span>
-                      )}
-                      {country && (
-                        <span className="font-medium truncate">
-                          {country}
-                        </span>
-                      )}
-                      {league && (
-                        <span className="text-[11px] md:text-xs text-slate-400 truncate">
-                          {" "}
-                          · {league}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="mt-0.5 text-xs md:text-sm text-slate-100 truncate">
-                      <span className="font-semibold truncate">
-                        {home || "Local"}
-                      </span>
-                      <span className="mx-1 text-slate-400">vs</span>
-                      <span className="font-semibold truncate">
-                        {away || "Visita"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Placeholder de cuotas */}
-                  <div className="w-[40%] md:w-[32%] text-right text-[11px] md:text-xs leading-snug">
-                    <span className="block text-cyan-300 font-semibold">
-                      Próximamente: cuotas 1X2 y valor esperado.
-                    </span>
-                    <span className="hidden md:block text-[11px] text-slate-400">
-                      Aquí verás las cuotas sugeridas para este partido.
-                    </span>
-                  </div>
-
-                  {/* Bolita selección */}
-                  <div className="w-6 flex justify-end">
-                    <span
-                      className={[
-                        "inline-block w-3.5 h-3.5 rounded-full border",
-                        isSelected
-                          ? "border-emerald-400 bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.9)]"
-                          : "border-slate-500/80 bg-slate-950/90",
-                      ].join(" ")}
-                    />
-                  </div>
-                </li>
-              );
-            })}
+      {/* Bolita de selección */}
+      <div className="w-6 flex justify-end">
+        <span
+          className={[
+            "inline-block w-3.5 h-3.5 rounded-full border",
+            isSelected
+              ? "border-emerald-400 bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.9)]"
+              : "border-slate-500/80 bg-slate-950/90",
+          ].join(" ")}
+        />
+      </div>
+    </li>
+  );
+})}
           </ul>
         )}
       </section>
