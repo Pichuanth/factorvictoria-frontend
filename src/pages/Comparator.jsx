@@ -40,7 +40,6 @@ const COUNTRY_FLAG = {
   Portugal: "🇵🇹",
   Mexico: "🇲🇽",
   USA: "🇺🇸",
-  World: "🌍",
 };
 
 // Ligas importantes (para ordenar tipo Flashscore)
@@ -144,22 +143,61 @@ function getKickoffTime(f) {
       return "--:--";
     }
   }
+  if (f.fixture?.date) {
+    try {
+      const d = new Date(f.fixture.date);
+      const hh = String(d.getHours()).padStart(2, "0");
+      const mm = String(d.getMinutes()).padStart(2, "0");
+      return `${hh}:${mm}`;
+    } catch {
+      return "--:--";
+    }
+  }
   return f.hour || "--:--";
 }
 
-// Máxima cuota objetivo por plan (10 / 20 / 50 / 100)
-function getMaxBoostFromPlan(planLabel) {
-  const p = String(planLabel || "").toUpperCase();
+// Potencia por plan (10 / 20 / 50 / 100)
+function getPlanPower(planLabelRaw) {
+  const label = String(planLabelRaw || "").toUpperCase();
 
-  if (p.includes("VITA")) return 100; // VITALICIO
-  if (p.includes("ANU")) return 50; // ANUAL
-  if (p.includes("TRI") || p.includes("3")) return 20; // TRIMESTRAL / 3M
+  // Vitalicio – máxima
+  if (label.includes("VITAL")) {
+    return { maxBoost: 100, badgeText: "hasta x100" };
+  }
 
-  // BASIC / MENSUAL / por defecto
-  return 10;
+  // Anual
+  if (
+    label.includes("ANUAL") ||
+    label.includes("ANNUAL") ||
+    label.includes("YEAR")
+  ) {
+    return { maxBoost: 50, badgeText: "hasta x50" };
+  }
+
+  // Trimestral / PRO intermedio
+  if (
+    label.includes("TRIM") ||
+    label.includes("3M") ||
+    label.includes("PRO-100") ||
+    label.includes("PRO_100") ||
+    label.includes("PRO20")
+  ) {
+    return { maxBoost: 20, badgeText: "hasta x20" };
+  }
+
+  // Mensual / Basic
+  if (
+    label.includes("BASIC") ||
+    label.includes("MENSUAL") ||
+    label.includes("MONTH") ||
+    label.includes("PRO-10")
+  ) {
+    return { maxBoost: 10, badgeText: "hasta x10" };
+  }
+
+  // Por defecto
+  return { maxBoost: 10, badgeText: "hasta x10" };
 }
-
-/* --------------- helpers de cuotas “fake” --------------- */
 
 // Cuota base "fake" (1.2–3.8) en función del id del partido
 function fakeBaseOddForFixture(fx) {
@@ -186,9 +224,7 @@ function buildComboSuggestion(fixturesPool, maxBoost) {
     const odd = fakeBaseOddForFixture(fx);
 
     // Si al multiplicar se pasa MUCHO del objetivo, saltamos este partido
-    if (product * odd > maxBoost * 1.35) {
-      continue;
-    }
+    if (product * odd > maxBoost * 1.35) continue;
 
     product *= odd;
     picks.push({
@@ -200,7 +236,7 @@ function buildComboSuggestion(fixturesPool, maxBoost) {
     // No queremos combinadas eternas
     if (picks.length >= 12) break;
 
-    // Si ya llegamos cerca del objetivo de tu plan, paramos
+    // Si ya llegamos cerca del objetivo del plan, paramos
     if (product >= maxBoost * 0.8) break;
   }
 
@@ -233,11 +269,11 @@ export default function Comparator() {
   const [fixtures, setFixtures] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
 
-  // Estado para resultados de combinadas (demo)
+  // Estado para los resultados de combinadas
   const [parlayResult, setParlayResult] = useState(null);
   const [parlayError, setParlayError] = useState("");
 
-  // Prefill desde /fixture -> "Generar" (date & q en la URL)
+  // Prefill desde /fixture -> "Generar"
   useEffect(() => {
     const urlDate = searchParams.get("date");
     const urlQ = searchParams.get("q");
@@ -256,7 +292,7 @@ export default function Comparator() {
     return String(raw || "").toUpperCase();
   }, [user]);
 
-  const maxBoost = getMaxBoostFromPlan(planLabel);
+  const { maxBoost, badgeText } = getPlanPower(planLabel);
 
   async function handleGenerate(e) {
     e?.preventDefault?.();
@@ -339,7 +375,7 @@ export default function Comparator() {
 
   // Selección de partidos
   function toggleFixtureSelection(id) {
-    setParlayResult(null); // si cambias la selección, reseteamos el resultado demo
+    setParlayResult(null); // si cambias la selección, “reseteamos” el resultado
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
@@ -347,7 +383,7 @@ export default function Comparator() {
 
   const selectedCount = selectedIds.length;
 
-  // Combinada máxima automática (usa la base completa de partidos)
+  // Combinada máxima automática (usa toda la base)
   function handleAutoParlay() {
     setParlayError("");
     setParlayResult(null);
@@ -357,15 +393,19 @@ export default function Comparator() {
       return;
     }
 
-    // Demo simple: cuántos partidos se usarían
-    const used = Math.min(fixtures.length, maxBoost >= 50 ? 6 : 4);
+    const suggestion = buildComboSuggestion(fixtures, maxBoost);
+    if (!suggestion) {
+      setParlayError(
+        "Por ahora no se pudo armar una combinada razonable con los partidos disponibles."
+      );
+      return;
+    }
 
     setParlayResult({
       mode: "auto",
-      usedMatches: used,
-      text: `Ejemplo: combinada automática con ${used} partidos buscando una cuota cercana a x${maxBoost}.`,
-      subtext:
-        "Cuando integremos cuotas reales, aquí verás qué partidos se eligieron y la cuota final sugerida según tu membresía.",
+      ...suggestion,
+      text: `Ejemplo: combinada automática con ${suggestion.games} partidos, cuota aproximada x${suggestion.finalOdd}.`,
+      subtext: `Objetivo de tu plan: hasta x${suggestion.target}. Probabilidad estimada (muy simplificada): ~${suggestion.impliedProb}%. Cuando integremos cuotas reales, aquí verás exactamente qué partidos se eligieron.`,
     });
   }
 
@@ -391,17 +431,22 @@ export default function Comparator() {
       return;
     }
 
-    // Pequeña simulación de cuota objetivo según cantidad de partidos
-    const approxBase = 1.35; // cuotas medias ~1.30–1.40
-    const approxMultiplier = Math.min(
-      maxBoost,
-      Number((approxBase ** selectedCount).toFixed(1))
+    const selectedFixtures = fixtures.filter((fx) =>
+      selectedIds.includes(getFixtureId(fx))
     );
+
+    const suggestion = buildComboSuggestion(selectedFixtures, maxBoost);
+    if (!suggestion) {
+      setParlayError(
+        "Con esta selección no se pudo construir una combinada razonable. Prueba con más partidos o mezcla ligas diferentes."
+      );
+      return;
+    }
 
     setParlayResult({
       mode: "selected",
-      usedMatches: selectedCount,
-      text: `Ejemplo: combinada con tus ${selectedCount} partidos seleccionados apuntando a una cuota cercana a x${approxMultiplier}.`,
+      ...suggestion,
+      text: `Ejemplo: combinada con tus ${suggestion.games} partidos seleccionados, cuota aproximada x${suggestion.finalOdd}.`,
       subtext:
         "En la versión completa, aquí verás exactamente qué picks se usan, la cuota final y el % de acierto esperado según tu plan.",
     });
@@ -546,7 +591,8 @@ export default function Comparator() {
               const league = getLeagueName(fx);
               const countryName = getCountryName(fx);
               const flagEmoji =
-                COUNTRY_FLAG[countryName] || COUNTRY_FLAG.World || "🏳️";
+                COUNTRY_FLAG[countryName] ||
+                (countryName === "World" ? "🌍" : "🏳️");
               const home = getHomeName(fx);
               const away = getAwayName(fx);
               const time = getKickoffTime(fx);
@@ -560,12 +606,12 @@ export default function Comparator() {
                     isSelected ? "bg-slate-900/90" : "hover:bg-slate-900/70",
                   ].join(" ")}
                 >
-                  {/* Hora */}
+                  {/* Columna hora */}
                   <div className="w-14 text-[11px] md:text-xs font-semibold text-slate-100">
                     {time || "--:--"}
                   </div>
 
-                  {/* País / liga + equipos */}
+                  {/* Columna centro */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1 text-xs md:text-sm text-slate-200">
                       <span className="mr-1 text-lg leading-none">
@@ -589,7 +635,7 @@ export default function Comparator() {
                     </div>
                   </div>
 
-                  {/* Placeholder cuotas */}
+                  {/* Columna derecha: placeholder cuotas */}
                   <div className="w-[40%] md:w-[32%] text-right text-[11px] md:text-xs leading-snug">
                     <span className="block text-cyan-300 font-semibold">
                       Próximamente: cuotas 1X2 y valor esperado.
@@ -617,7 +663,7 @@ export default function Comparator() {
         )}
       </section>
 
-      {/* Tarjetas de resultados */}
+      {/* Tarjetas de resultados / productos del comparador */}
       <section className="mt-4 space-y-4">
         {/* Cuota segura (regalo) */}
         <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
@@ -638,7 +684,7 @@ export default function Comparator() {
           <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-200 mb-2">
             Cuotas potenciadas
             <span className="ml-2 text-[11px] text-emerald-100/90">
-              hasta x{maxBoost}
+              {badgeText}
             </span>
           </div>
 
@@ -656,6 +702,7 @@ export default function Comparator() {
             </p>
           )}
 
+          {/* Botones de acción */}
           <div className="flex flex-col sm:flex-row gap-2 mb-2">
             <button
               type="button"
@@ -676,10 +723,12 @@ export default function Comparator() {
             </button>
           </div>
 
+          {/* Mensajes de error de combinadas */}
           {parlayError && (
             <p className="text-xs text-amber-300 mt-1">{parlayError}</p>
           )}
 
+          {/* Resultado simulado */}
           {parlayResult && (
             <div className="mt-3 text-sm text-slate-200">
               <p className="font-semibold mb-1">{parlayResult.text}</p>
@@ -689,8 +738,8 @@ export default function Comparator() {
 
           {!parlayResult && !parlayError && fixtures.length > 0 && (
             <p className="text-xs text-slate-400 mt-1">
-              Mientras tanto, estas combinadas son un ejemplo visual. Más
-              adelante se calcularán con las cuotas reales de los partidos.
+              De momento estas combinadas son un ejemplo visual. Más adelante se
+              calcularán con las cuotas reales de los partidos.
             </p>
           )}
         </div>

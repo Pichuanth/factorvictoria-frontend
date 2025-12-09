@@ -1,6 +1,12 @@
 {
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/(.*)", "destination": "/" }
+  "crons": [
+    {
+      "path": "/api/admin-fixtures-sync?token=fv_cron_92jd81s",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/admin-fixtures-sync?token=fv_cron_92jd81s",
+      "schedule": "0 13 * * *"
+    }
   ]
 }
