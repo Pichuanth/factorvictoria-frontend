@@ -133,9 +133,13 @@ function getAwayName(f) {
 function getKickoffTime(f) {
   if (f.time) return f.time;
   if (f.kickoffTime) return f.kickoffTime;
-  if (typeof f.date === "string" && f.date.includes("T")) {
+
+  // Soportar tanto "date" directo como "fixture.date" (API-FOOTBALL crudo)
+  const rawDate = f.date || f.fixture?.date;
+
+  if (typeof rawDate === "string" && rawDate.includes("T")) {
     try {
-      const d = new Date(f.date);
+      const d = new Date(rawDate);
       const hh = String(d.getHours()).padStart(2, "0");
       const mm = String(d.getMinutes()).padStart(2, "0");
       return `${hh}:${mm}`;
@@ -143,16 +147,7 @@ function getKickoffTime(f) {
       return "--:--";
     }
   }
-  if (f.fixture?.date) {
-    try {
-      const d = new Date(f.fixture.date);
-      const hh = String(d.getHours()).padStart(2, "0");
-      const mm = String(d.getMinutes()).padStart(2, "0");
-      return `${hh}:${mm}`;
-    } catch {
-      return "--:--";
-    }
-  }
+
   return f.hour || "--:--";
 }
 
