@@ -310,9 +310,9 @@ export default function Comparator() {
 
     try {
       const params = new URLSearchParams();
-      params.set("from", from);
-      params.set("to", to);
-      params.set("status", "NS"); // solo futuros
+params.set("from", from);
+params.set("to", to);
+// params.set("status", "NS"); // 🔴 la quitamos por ahora
 
       const qTrim = String(q || "").trim();
       const countryEN = normalizeCountryQuery(qTrim);
