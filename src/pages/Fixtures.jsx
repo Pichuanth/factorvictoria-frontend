@@ -5,7 +5,8 @@ import { useAuth } from "../lib/auth";
 
 const GOLD = "#E6C464";
 
-/* ---------- helpers de fechas ---------- */
+/* ---------- helpers de fechas / API ---------- */
+const API_BASE = import.meta.env.VITE_API_BASE || "";
 
 function toYYYYMMDD(d) {
   const pad = (n) => String(n).padStart(2, "0");
@@ -104,7 +105,7 @@ export default function Fixtures() {
       params.set("date", date);
       params.set("status", "NS"); // solo futuros / no iniciados
 
-      const res = await fetch(`/api/fixtures?${params.toString()}`);
+      const res = await fetch(`${API_BASE}/api/fixtures?${params.toString()}`);
       if (!res.ok) {
         throw new Error(`HTTP ${res.status} – ${res.statusText}`);
       }
@@ -179,7 +180,8 @@ export default function Fixtures() {
   }
 
   const planLabel = useMemo(() => {
-    const raw = user?.planId || user?.plan?.id || user?.plan || user?.membership || "";
+    const raw =
+      user?.planId || user?.plan?.id || user?.plan || user?.membership || "";
     return String(raw || "").toUpperCase();
   }, [user]);
 

@@ -6,7 +6,7 @@ import { useAuth } from "../lib/auth";
 const GOLD = "#E6C464";
 
 /* --------------------- helpers --------------------- */
-
+const API_BASE = import.meta.env.VITE_API_BASE || "";
 function toYYYYMMDD(d) {
   const pad = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -134,12 +134,9 @@ function getKickoffTime(f) {
   if (f.time) return f.time;
   if (f.kickoffTime) return f.kickoffTime;
 
-  // Soportar tanto "date" directo como "fixture.date" (API-FOOTBALL crudo)
-  const rawDate = f.date || f.fixture?.date;
-
-  if (typeof rawDate === "string" && rawDate.includes("T")) {
+  if (typeof f.date === "string" && f.date.includes("T")) {
     try {
-      const d = new Date(rawDate);
+      const d = new Date(f.date);
       const hh = String(d.getHours()).padStart(2, "0");
       const mm = String(d.getMinutes()).padStart(2, "0");
       return `${hh}:${mm}`;
@@ -151,47 +148,14 @@ function getKickoffTime(f) {
   return f.hour || "--:--";
 }
 
-// Potencia por plan (10 / 20 / 50 / 100)
-function getPlanPower(planLabelRaw) {
-  const label = String(planLabelRaw || "").toUpperCase();
+// Máxima cuota objetivo por plan (10 / 20 / 50 / 100)
+function getMaxBoostFromPlan(planLabel) {
+  const p = String(planLabel || "").toUpperCase();
 
-  // Vitalicio – máxima
-  if (label.includes("VITAL")) {
-    return { maxBoost: 100, badgeText: "hasta x100" };
-  }
-
-  // Anual
-  if (
-    label.includes("ANUAL") ||
-    label.includes("ANNUAL") ||
-    label.includes("YEAR")
-  ) {
-    return { maxBoost: 50, badgeText: "hasta x50" };
-  }
-
-  // Trimestral / PRO intermedio
-  if (
-    label.includes("TRIM") ||
-    label.includes("3M") ||
-    label.includes("PRO-100") ||
-    label.includes("PRO_100") ||
-    label.includes("PRO20")
-  ) {
-    return { maxBoost: 20, badgeText: "hasta x20" };
-  }
-
-  // Mensual / Basic
-  if (
-    label.includes("BASIC") ||
-    label.includes("MENSUAL") ||
-    label.includes("MONTH") ||
-    label.includes("PRO-10")
-  ) {
-    return { maxBoost: 10, badgeText: "hasta x10" };
-  }
-
-  // Por defecto
-  return { maxBoost: 10, badgeText: "hasta x10" };
+  if (p.includes("VITA")) return 100; // VITALICIO
+  if (p.includes("ANU")) return 50; // ANUAL
+  if (p.includes("TRI") || p.includes("3")) return 20; // TRIMESTRAL, 3M
+  return 10; // MENSUAL / por defecto
 }
 
 // Cuota base "fake" (1.2–3.8) en función del id del partido
@@ -219,7 +183,9 @@ function buildComboSuggestion(fixturesPool, maxBoost) {
     const odd = fakeBaseOddForFixture(fx);
 
     // Si al multiplicar se pasa MUCHO del objetivo, saltamos este partido
-    if (product * odd > maxBoost * 1.35) continue;
+    if (product * odd > maxBoost * 1.35) {
+      continue;
+    }
 
     product *= odd;
     picks.push({
@@ -231,7 +197,7 @@ function buildComboSuggestion(fixturesPool, maxBoost) {
     // No queremos combinadas eternas
     if (picks.length >= 12) break;
 
-    // Si ya llegamos cerca del objetivo del plan, paramos
+    // Si ya llegamos cerca del objetivo de tu plan, paramos
     if (product >= maxBoost * 0.8) break;
   }
 
@@ -268,7 +234,7 @@ export default function Comparator() {
   const [parlayResult, setParlayResult] = useState(null);
   const [parlayError, setParlayError] = useState("");
 
-  // Prefill desde /fixture -> "Generar"
+  // Prefill desde /fixture -> "Generar" (date & q en la URL)
   useEffect(() => {
     const urlDate = searchParams.get("date");
     const urlQ = searchParams.get("q");
@@ -287,7 +253,7 @@ export default function Comparator() {
     return String(raw || "").toUpperCase();
   }, [user]);
 
-  const { maxBoost, badgeText } = getPlanPower(planLabel);
+  const maxBoost = getMaxBoostFromPlan(planLabel);
 
   async function handleGenerate(e) {
     e?.preventDefault?.();
@@ -310,9 +276,9 @@ export default function Comparator() {
 
     try {
       const params = new URLSearchParams();
-params.set("from", from);
-params.set("to", to);
-// params.set("status", "NS"); // 🔴 la quitamos por ahora
+      params.set("from", from);
+      params.set("to", to);
+      // params.set("status", "NS"); // si quieres solo futuros, luego lo reactivamos
 
       const qTrim = String(q || "").trim();
       const countryEN = normalizeCountryQuery(qTrim);
@@ -323,7 +289,7 @@ params.set("to", to);
         params.set("q", qTrim);
       }
 
-      const res = await fetch(`/api/fixtures?${params.toString()}`);
+      const res = await fetch(`${API_BASE}/api/fixtures?${params.toString()}`);
       if (!res.ok) {
         throw new Error(`HTTP ${res.status} – ${res.statusText || ""}`);
       }
@@ -351,7 +317,7 @@ params.set("to", to);
 
       setFixtures(sorted);
       setInfo(
-        `Se encontraron ${sorted.length} partidos futuros para este rango de fechas. Puedes seleccionar partidos para armar tus parlays.`
+        `Se encontraron ${sorted.length} partidos para este rango de fechas. Puedes seleccionar partidos para armar tus parlays.`
       );
     } catch (e) {
       console.error(e);
@@ -378,7 +344,7 @@ params.set("to", to);
 
   const selectedCount = selectedIds.length;
 
-  // Combinada máxima automática (usa toda la base)
+  // Combinada máxima automática (usa todos los partidos cargados)
   function handleAutoParlay() {
     setParlayError("");
     setParlayResult(null);
@@ -391,7 +357,7 @@ params.set("to", to);
     const suggestion = buildComboSuggestion(fixtures, maxBoost);
     if (!suggestion) {
       setParlayError(
-        "Por ahora no se pudo armar una combinada razonable con los partidos disponibles."
+        "Por ahora no pudimos armar una combinada razonable con los partidos cargados. Prueba con otro rango de fechas."
       );
       return;
     }
@@ -399,12 +365,10 @@ params.set("to", to);
     setParlayResult({
       mode: "auto",
       ...suggestion,
-      text: `Ejemplo: combinada automática con ${suggestion.games} partidos, cuota aproximada x${suggestion.finalOdd}.`,
-      subtext: `Objetivo de tu plan: hasta x${suggestion.target}. Probabilidad estimada (muy simplificada): ~${suggestion.impliedProb}%. Cuando integremos cuotas reales, aquí verás exactamente qué partidos se eligieron.`,
     });
   }
 
-  // Combinada con partidos seleccionados
+  // Combinada con partidos seleccionados por el usuario
   function handleSelectedParlay() {
     setParlayError("");
     setParlayResult(null);
@@ -414,26 +378,26 @@ params.set("to", to);
       return;
     }
 
-    if (selectedCount === 0) {
+    if (selectedCount < 2) {
       setParlayError("Selecciona al menos 2 partidos de la lista superior.");
       return;
     }
 
-    if (selectedCount === 1) {
+    const pool = fixtures.filter((fx) =>
+      selectedIds.includes(getFixtureId(fx))
+    );
+
+    if (pool.length < 2) {
       setParlayError(
-        "Con 1 solo partido la combinada será similar a un pick simple. Selecciona 2 o más para potenciar la cuota."
+        "Hubo un problema al leer tu selección. Vuelve a elegir 2 o más partidos."
       );
       return;
     }
 
-    const selectedFixtures = fixtures.filter((fx) =>
-      selectedIds.includes(getFixtureId(fx))
-    );
-
-    const suggestion = buildComboSuggestion(selectedFixtures, maxBoost);
+    const suggestion = buildComboSuggestion(pool, maxBoost);
     if (!suggestion) {
       setParlayError(
-        "Con esta selección no se pudo construir una combinada razonable. Prueba con más partidos o mezcla ligas diferentes."
+        "Con esta combinación no pudimos llegar a una cuota interesante. Prueba agregando más partidos."
       );
       return;
     }
@@ -441,9 +405,6 @@ params.set("to", to);
     setParlayResult({
       mode: "selected",
       ...suggestion,
-      text: `Ejemplo: combinada con tus ${suggestion.games} partidos seleccionados, cuota aproximada x${suggestion.finalOdd}.`,
-      subtext:
-        "En la versión completa, aquí verás exactamente qué picks se usan, la cuota final y el % de acierto esperado según tu plan.",
     });
   }
 
@@ -561,7 +522,7 @@ params.set("to", to);
         {/* Cabecera de la lista */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/80 text-[11px] md:text-xs text-slate-300 tracking-wide">
           <span className="uppercase">
-            Partidos futuros encontrados:{" "}
+            Partidos encontrados:{" "}
             <span className="font-semibold text-slate-50">
               {fixtures.length}
             </span>
@@ -574,7 +535,7 @@ params.set("to", to);
         {/* Si no hay partidos */}
         {fixtures.length === 0 ? (
           <div className="px-4 py-6 text-sm text-slate-300">
-            Por ahora no hay partidos futuros para este rango o filtro. Prueba
+            Por ahora no hay partidos para este rango o filtro. Prueba
             con más días o sin filtrar por país/equipo.
           </div>
         ) : (
@@ -601,12 +562,12 @@ params.set("to", to);
                     isSelected ? "bg-slate-900/90" : "hover:bg-slate-900/70",
                   ].join(" ")}
                 >
-                  {/* Columna hora */}
+                  {/* Hora */}
                   <div className="w-14 text-[11px] md:text-xs font-semibold text-slate-100">
                     {time || "--:--"}
                   </div>
 
-                  {/* Columna centro */}
+                  {/* País / competición + equipos */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1 text-xs md:text-sm text-slate-200">
                       <span className="mr-1 text-lg leading-none">
@@ -630,7 +591,7 @@ params.set("to", to);
                     </div>
                   </div>
 
-                  {/* Columna derecha: placeholder cuotas */}
+                  {/* Placeholder de cuotas */}
                   <div className="w-[40%] md:w-[32%] text-right text-[11px] md:text-xs leading-snug">
                     <span className="block text-cyan-300 font-semibold">
                       Próximamente: cuotas 1X2 y valor esperado.
@@ -640,7 +601,7 @@ params.set("to", to);
                     </span>
                   </div>
 
-                  {/* Bolita selección */}
+                  {/* Bolita de selección */}
                   <div className="w-6 flex justify-end">
                     <span
                       className={[
@@ -679,7 +640,7 @@ params.set("to", to);
           <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-200 mb-2">
             Cuotas potenciadas
             <span className="ml-2 text-[11px] text-emerald-100/90">
-              {badgeText}
+              hasta x{maxBoost}
             </span>
           </div>
 
@@ -726,15 +687,23 @@ params.set("to", to);
           {/* Resultado simulado */}
           {parlayResult && (
             <div className="mt-3 text-sm text-slate-200">
-              <p className="font-semibold mb-1">{parlayResult.text}</p>
-              <p className="text-xs text-slate-400">{parlayResult.subtext}</p>
+              <p className="font-semibold mb-1">
+                {parlayResult.mode === "auto"
+                  ? `Ejemplo de combinada automática: ${parlayResult.games} partidos, cuota x${parlayResult.finalOdd}`
+                  : `Ejemplo con tus partidos seleccionados: ${parlayResult.games} partidos, cuota x${parlayResult.finalOdd}`}
+              </p>
+              <p className="text-xs text-slate-400">
+                Probabilidad implícita aproximada: {parlayResult.impliedProb}%.
+                Modelo simplificado solo para mostrar el potencial de tu plan
+                (objetivo x{parlayResult.target}).
+              </p>
             </div>
           )}
 
           {!parlayResult && !parlayError && fixtures.length > 0 && (
             <p className="text-xs text-slate-400 mt-1">
-              De momento estas combinadas son un ejemplo visual. Más adelante se
-              calcularán con las cuotas reales de los partidos.
+              Mientras tanto, estas combinadas son un ejemplo visual. Más
+              adelante se calcularán con las cuotas reales de los partidos.
             </p>
           )}
         </div>
