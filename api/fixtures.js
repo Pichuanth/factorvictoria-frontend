@@ -1,91 +1,112 @@
 // api/fixtures.js
-// Devuelve partidos futuros usando API-FOOTBALL.
-// Si algo falla, responde 200 con items: [] para que el frontend no muestre HTTP 500.
+import fetch from "node-fetch";
+
+const API_KEY = process.env.APISPORTS_KEY;
+const API_HOST = process.env.APISPORTS_HOST || "v3.football.api-sports.io";
+const TIMEZONE = "America/Santiago";
 
 export default async function handler(req, res) {
   try {
-    if (req.method !== "GET") {
-      res.setHeader("Allow", "GET");
-      return res.status(405).json({ error: "Method not allowed" });
+    if (!API_KEY) {
+      return res
+        .status(500)
+        .json({ error: "Falta configurar APISPORTS_KEY en las variables de entorno." });
     }
 
     const { from, to, status, country, q } = req.query || {};
 
-    const apiKey = process.env.APISPORTS_KEY;
-    const apiHost = process.env.APISPORTS_HOST;
+    const params = new URLSearchParams();
 
-    // Si faltan credenciales, no rompemos: devolvemos vacío
-    if (!apiKey || !apiHost) {
-      console.error(
-        "[fixtures] Falta APISPORTS_KEY o APISPORTS_HOST en las variables de entorno"
-      );
-      return res.status(200).json({ items: [] });
-    }
+    // rango de fechas (from / to) tal como los envía el frontend: YYYY-MM-DD
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
 
-    const url = new URL(`https://${apiHost}/v3/fixtures`);
+    // status opcional (por ejemplo "NS" para futuros). Si no viene, que traiga todo.
+    if (status) params.set("status", status);
 
-    // Rango de fechas
-    if (from) url.searchParams.set("from", from);
-    if (to) url.searchParams.set("to", to);
+    // siempre usamos la misma zona horaria para que los horarios cuadren con Chile
+    params.set("timezone", TIMEZONE);
 
-    // Solo futuros si viene status
-    if (status) url.searchParams.set("status", status);
-
-    // Filtro por país si viene normalizado desde el frontend
+    // filtros de país / búsqueda
     if (country) {
-      url.searchParams.set("country", country);
+      params.set("country", country);
     }
-
-    // Búsqueda genérica: lo mandamos como "search"
     if (q) {
-      url.searchParams.set("search", q);
+      // si más adelante queremos diferenciar por liga / equipo, se puede refinar;
+      // de momento usamos "search" que es flexible
+      params.set("search", q);
     }
 
-    const apiRes = await fetch(url.toString(), {
+    const url = `https://${API_HOST}/fixtures?${params.toString()}`;
+
+    const apiRes = await fetch(url, {
       headers: {
-        "x-apisports-key": apiKey,
+        "x-apisports-key": API_KEY,
+        "x-rapidapi-key": API_KEY,
+        "x-rapidapi-host": API_HOST,
       },
     });
 
+    const json = await apiRes.json();
+
     if (!apiRes.ok) {
-      const body = await apiRes.text();
-      console.error(
-        "[fixtures] Error API-FOOTBALL:",
-        apiRes.status,
-        body.slice(0, 300)
-      );
-      // Muy importante: NO devolvemos 500, devolvemos vacío
-      return res.status(200).json({ items: [] });
+      console.error("API-FOOTBALL error", apiRes.status, json);
+      return res.status(500).json({
+        error: "API_FOOTBALL_ERROR",
+        status: apiRes.status,
+        details: json?.errors || json?.message || null,
+      });
     }
 
-    const data = await apiRes.json();
-    const list = Array.isArray(data?.response) ? data.response : [];
+    const response = Array.isArray(json.response) ? json.response : [];
 
-    // Normalizamos un poco para que el Comparador entienda los datos
-    const items = list.map((row) => {
-      const fx = row.fixture || {};
-      const league = row.league || {};
-      const teams = row.teams || {};
+    // Normalizamos un poco el objeto que devuelve API-FOOTBALL
+    const items = response.map((it) => {
+      const f = it.fixture || {};
+      const lg = it.league || {};
+      const teams = it.teams || {};
+      const goals = it.goals || {};
 
       return {
-        id: fx.id,
-        date: fx.date, // ISO, el Comparador lo convierte a hora local
-        hour: null, // por si acaso
+        id: f.id,
+        date: f.date, // ISO string; el comparador saca la hora de aquí
+        timestamp: f.timestamp,
+        status: f.status?.short,
         league: {
-          id: league.id,
-          name: league.name,
-          country: league.country,
+          id: lg.id,
+          name: lg.name,
+          country: lg.country,
+          round: lg.round,
         },
-        country: league.country,
-        homeTeam: teams.home?.name,
-        awayTeam: teams.away?.name,
+        country: lg.country,
+        teams: {
+          home: teams.home
+            ? {
+                id: teams.home.id,
+                name: teams.home.name,
+                logo: teams.home.logo,
+              }
+            : null,
+          away: teams.away
+            ? {
+                id: teams.away.id,
+                name: teams.away.name,
+                logo: teams.away.logo,
+              }
+            : null,
+        },
+        goals: {
+          home: goals.home,
+          away: goals.away,
+        },
       };
     });
 
+    // cache de 60s en edge para que no reviente la cuota del API
+    res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=30");
     return res.status(200).json({ items });
   } catch (err) {
-    console.error("[fixtures] Error inesperado:", err);
-    // Nunca 500 hacia el frontend: respondemos vacío
-    return res.status(200).json({ items: [] });
+    console.error("Error en /api/fixtures", err);
+    return res.status(500).json({ error: "INTERNAL_ERROR" });
   }
 }
