@@ -13,28 +13,25 @@ export default async function handler(req, res) {
         .json({ error: "Falta configurar APISPORTS_KEY en las variables de entorno." });
     }
 
-    const { from, to, status, country, q } = req.query || {};
+    const { date, from, to, status, country, q } = req.query || {};
 
     const params = new URLSearchParams();
-
-    // rango de fechas (from / to) tal como los envía el frontend: YYYY-MM-DD
-    if (from) params.set("from", from);
-    if (to) params.set("to", to);
-
-    // status opcional (por ejemplo "NS" para futuros). Si no viene, que traiga todo.
-    if (status) params.set("status", status);
-
-    // siempre usamos la misma zona horaria para que los horarios cuadren con Chile
     params.set("timezone", TIMEZONE);
 
-    // filtros de país / búsqueda
-    if (country) {
-      params.set("country", country);
-    }
-    if (q) {
-      // si más adelante queremos diferenciar por liga / equipo, se puede refinar;
-      // de momento usamos "search" que es flexible
-      params.set("search", q);
+    // status opcional (NS, FT, etc.)
+    if (status) params.set("status", status);
+
+    // LÓGICA DE FECHAS:
+    // 1) Si viene "date", usamos esa fecha.
+    // 2) Si from y to son iguales, también usamos "date".
+    // 3) Si from/to son distintos, usamos el rango from/to.
+    if (date) {
+      params.set("date", date);
+    } else if (from && to && from === to) {
+      params.set("date", from);
+    } else {
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
     }
 
     const url = `https://${API_HOST}/fixtures?${params.toString()}`;
@@ -60,8 +57,8 @@ export default async function handler(req, res) {
 
     const response = Array.isArray(json.response) ? json.response : [];
 
-    // Normalizamos un poco el objeto que devuelve API-FOOTBALL
-    const items = response.map((it) => {
+    // Normalizamos los datos básicos del partido
+    let items = response.map((it) => {
       const f = it.fixture || {};
       const lg = it.league || {};
       const teams = it.teams || {};
@@ -69,7 +66,7 @@ export default async function handler(req, res) {
 
       return {
         id: f.id,
-        date: f.date, // ISO string; el comparador saca la hora de aquí
+        date: f.date,
         timestamp: f.timestamp,
         status: f.status?.short,
         league: {
@@ -102,7 +99,34 @@ export default async function handler(req, res) {
       };
     });
 
-    // cache de 60s en edge para que no reviente la cuota del API
+    // FILTRO POR PAÍS (se hace en nuestro código, no en la API)
+    if (country) {
+      const cNorm = String(country).toLowerCase();
+      items = items.filter((it) =>
+        String(it.league?.country || it.country || "")
+          .toLowerCase()
+          .includes(cNorm)
+      );
+    }
+
+    // FILTRO POR TEXTO (liga/equipo)
+    if (q) {
+      const qNorm = String(q).toLowerCase();
+      items = items.filter((it) => {
+        const texto = [
+          it.league?.name,
+          it.league?.country,
+          it.teams?.home?.name,
+          it.teams?.away?.name,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return texto.includes(qNorm);
+      });
+    }
+
+    // Cache cortita para no reventar la cuota del API
     res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=30");
     return res.status(200).json({ items });
   } catch (err) {
