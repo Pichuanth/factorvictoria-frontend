@@ -1,4 +1,25 @@
 {
+  "version": 2,
+  "builds": [
+    {
+      "src": "src/**/*",
+      "use": "@vercel/static-build"
+    },
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1.js"
+    },
+    {
+      "src": "/.*",
+      "dest": "/index.html"
+    }
+  ],
   "crons": [
     {
       "path": "/api/admin-fixtures-sync?token=fv_cron_92jd81s",
