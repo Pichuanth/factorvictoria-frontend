@@ -584,10 +584,15 @@ export default function Comparator() {
                       )}
                     </div>
 
-                    <div className="mt-0.5 text-xs md:text-sm text-slate-100 truncate">
-                      <span className="font-semibold truncate">{home}</span>
-                      <span className="mx-1 text-slate-400">vs</span>
-                      <span className="font-semibold truncate">{away}</span>
+                    {/* AQUÍ EL CAMBIO PARA QUE SE VEAN LOS DOS EQUIPOS EN MÓVIL */}
+                    <div className="mt-0.5 text-xs md:text-sm text-slate-100">
+                      <div className="font-semibold leading-snug whitespace-normal break-words">
+                        {home}
+                      </div>
+                      <div className="text-[11px] text-slate-400">vs</div>
+                      <div className="font-semibold leading-snug whitespace-normal break-words">
+                        {away}
+                      </div>
                     </div>
                   </div>
 
