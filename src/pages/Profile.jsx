@@ -5,220 +5,164 @@ import { useAuth } from "../lib/auth";
 
 const GOLD = "#E6C464";
 
-/* ---------- helpers ---------- */
+// Rutas de los PDF (luego las cambiarás por las URLs reales donde los subas)
+const PLAN_DOCS = {
+  MENSUAL: "/docs/factor_victoria_plan_mensual.pdf",
+  TRIMESTRAL: "/docs/factor_victoria_plan_trimestral.pdf",
+  ANUAL: "/docs/factor_victoria_plan_anual.pdf",
+  VITALICIO: "/docs/factor_victoria_plan_vitalicio.pdf",
+};
 
-function getPlanLabelFromUser(user) {
-  const raw =
-    user?.planId ||
-    user?.plan?.id ||
-    user?.plan ||
-    user?.membership ||
-    "";
+function normalizePlanKey(raw) {
+  const t = String(raw || "").toLowerCase();
 
-  return String(raw || "").toUpperCase();
+  if (t.includes("vita")) return "VITALICIO";
+  if (t.includes("anu")) return "ANUAL";
+  if (t.includes("tri") || t.includes("3")) return "TRIMESTRAL";
+  if (t.includes("men") || t.includes("1")) return "MENSUAL";
+
+  return "MENSUAL"; // por defecto
 }
 
-function getPlanMeta(planLabel) {
-  const p = String(planLabel || "").toUpperCase();
-
-  if (p.includes("VITA")) {
-    return {
-      name: "Vitalicio",
-      maxBoost: 100,
-      pdfFile: "factor_victoria_plan_vitalicio.pdf",
-    };
-  }
-
-  if (p.includes("ANU")) {
-    return {
-      name: "Anual",
-      maxBoost: 50,
-      pdfFile: "factor_victoria_plan_anual.pdf",
-    };
-  }
-
-  if (p.includes("TRI") || p.includes("3")) {
-    return {
-      name: "Trimestral",
-      maxBoost: 20,
-      pdfFile: "factor_victoria_plan_trimestral.pdf",
-    };
-  }
-
-  // Por defecto: mensual
-  return {
-    name: "Mensual",
-    maxBoost: 10,
-    pdfFile: "factor_victoria_plan_mensual.pdf",
-  };
-}
+const PLAN_LABEL = {
+  MENSUAL: "Plan Mensual",
+  TRIMESTRAL: "Plan Trimestral",
+  ANUAL: "Plan Anual",
+  VITALICIO: "Plan Vitalicio",
+};
 
 export default function Profile() {
   const { user } = useAuth();
 
-  const planLabel = useMemo(
-    () => getPlanLabelFromUser(user),
-    [user]
-  );
-
-  const planMeta = useMemo(
-    () => getPlanMeta(planLabel),
-    [planLabel]
-  );
-
-  // Ruta donde luego pondrás los PDF (por ejemplo en /public/docs/...)
-  const pdfHref = `/docs/${planMeta.pdfFile}`;
-
-  const email =
-    user?.email ||
-    user?.mail ||
-    user?.username ||
-    "sin correo registrado";
-
-  const displayName =
+  const email = user?.email || "sin-correo@ejemplo.com";
+  const name =
     user?.name ||
     user?.fullName ||
-    user?.displayName ||
-    "Cuenta Factor Victoria";
+    user?.nickname ||
+    email.split("@")[0] ||
+    "Usuario Factor Victoria";
+
+  const rawPlan =
+    user?.planId || user?.plan?.id || user?.plan || user?.membership || "MENSUAL";
+
+  const planKey = normalizePlanKey(rawPlan);
+  const planLabel = PLAN_LABEL[planKey] || "Plan Mensual";
+  const planDoc = PLAN_DOCS[planKey];
+
+  // Aquí podrías calcular fecha de renovación si la tuvieras en user
+  const renewalText =
+    planKey === "VITALICIO"
+      ? "Sin renovación: acceso vitalicio."
+      : "Renovación automática según tu ciclo de pago.";
 
   return (
     <div className="max-w-5xl mx-auto px-4 pb-20">
-      {/* Cabecera */}
-      <section className="mt-6 rounded-2xl bg-white/5 border border-white/10 p-4 md:p-6">
-        <h1 className="text-xl md:text-2xl font-bold mb-2">
-          Mi perfil
-        </h1>
+      {/* Título */}
+      <section className="mt-6 mb-4">
+        <h1 className="text-xl md:text-2xl font-bold mb-2">Mi perfil</h1>
         <p className="text-slate-300 text-sm md:text-base">
-          Revisa los datos de tu cuenta, tu membresía actual y
-          descarga el PDF con el detalle de tu plan Factor Victoria.
+          Aquí verás los datos básicos de tu cuenta, tu membresía activa y los
+          documentos de bienvenida asociados a tu plan.
         </p>
       </section>
 
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
-        {/* Datos de la cuenta */}
-        <section className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
-          <h2 className="text-sm md:text-base font-semibold mb-3">
-            Datos de la cuenta
-          </h2>
-
-          <dl className="space-y-2 text-sm text-slate-200">
-            <div>
-              <dt className="text-xs uppercase text-slate-400">
-                Nombre
-              </dt>
-              <dd className="font-medium">{displayName}</dd>
-            </div>
-
-            <div>
-              <dt className="text-xs uppercase text-slate-400">
-                Correo
-              </dt>
-              <dd className="font-medium break-all">{email}</dd>
-            </div>
-
-            <div>
-              <dt className="text-xs uppercase text-slate-400">
-                Identificador interno
-              </dt>
-              <dd className="text-xs text-slate-400">
-                {user?.id || user?._id || "pendiente de sincronizar"}
-              </dd>
-            </div>
-          </dl>
-
-          <p className="mt-4 text-[11px] text-slate-400">
-            Si necesitas actualizar estos datos (correo o nombre),
-            contáctanos por el canal oficial de soporte de Factor
-            Victoria.
-          </p>
-        </section>
-
-        {/* Información de la membresía */}
-        <section className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
-          <h2 className="text-sm md:text-base font-semibold mb-3">
-            Mi membresía
-          </h2>
-
-          <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold mb-3"
-            style={{ backgroundColor: "rgba(230,196,100,0.12)", color: GOLD }}
-          >
-            Plan {planMeta.name.toUpperCase()}
-            <span className="ml-2 text-[11px] text-slate-100">
-              (máx. combinadas x{planMeta.maxBoost})
-            </span>
-          </div>
-
-          <ul className="text-sm text-slate-200 space-y-1">
-            <li>
-              • Acceso al comparador profesional con filtros por
-              país, liga y equipo.
-            </li>
-            <li>
-              • Combinadas simuladas hasta{" "}
-              <span className="font-semibold">
-                x{planMeta.maxBoost}
-              </span>{" "}
-              según tu plan.
-            </li>
-            <li>
-              • Acceso al módulo de Partidos con horarios en tu
-              zona horaria.
-            </li>
-            <li>
-              • Soporte prioritario para dudas sobre el uso de la
-              plataforma.
-            </li>
-          </ul>
-
-          <p className="mt-4 text-[11px] text-slate-400">
-            Más adelante podrás ver aquí también la fecha de
-            contratación, próxima renovación y facturas asociadas a
-            tu plan.
-          </p>
-        </section>
-      </div>
-
-      {/* Descarga de PDF del plan */}
-      <section className="mt-4 rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
+      {/* Datos de cuenta */}
+      <section className="mt-2 rounded-2xl bg-white/5 border border-white/10 p-4 md:p-6">
         <h2 className="text-sm md:text-base font-semibold mb-3">
-          Documentos de mi membresía
+          Datos de la cuenta
         </h2>
 
-        <p className="text-sm text-slate-200 mb-3">
-          Aquí podrás descargar el resumen oficial de tu plan
-          Factor Victoria en formato PDF. Te recomendamos guardarlo
-          para tener siempre claro qué incluye tu membresía.
+        <dl className="space-y-2 text-sm text-slate-200">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1">
+            <dt className="text-slate-400">Nombre</dt>
+            <dd className="font-medium">{name}</dd>
+          </div>
+
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1">
+            <dt className="text-slate-400">Correo</dt>
+            <dd className="font-medium">{email}</dd>
+          </div>
+        </dl>
+
+        <p className="mt-4 text-xs text-slate-400">
+          Si necesitas cambiar el correo o datos de facturación, contáctanos por
+          WhatsApp o correo indicando tu plan y correo actual.
+        </p>
+      </section>
+
+      {/* Información de membresía */}
+      <section className="mt-4 rounded-2xl bg-white/5 border border-white/10 p-4 md:p-6">
+        <h2 className="text-sm md:text-base font-semibold mb-3">
+          Tu membresía
+        </h2>
+
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <p className="text-slate-300 text-sm">
+              Plan actual:{" "}
+              <span className="font-semibold" style={{ color: GOLD }}>
+                {planLabel}
+              </span>
+            </p>
+            <p className="text-xs text-slate-400 mt-1">
+              {renewalText}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-200 border border-emerald-400/40">
+              Acceso al comparador profesional
+            </span>
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-semibold bg-sky-500/15 text-sky-200 border border-sky-400/40">
+              Filtros avanzados de partidos
+            </span>
+          </div>
+        </div>
+
+        <p className="mt-4 text-xs text-slate-400">
+          En la versión completa también verás aquí tu historial de pagos y
+          cambios de plan.
+        </p>
+      </section>
+
+      {/* Documentos del plan */}
+      <section className="mt-4 rounded-2xl bg-white/5 border border-white/10 p-4 md:p-6">
+        <h2 className="text-sm md:text-base font-semibold mb-3">
+          Documentos de tu plan
+        </h2>
+
+        <p className="text-slate-300 text-sm mb-3">
+          Cada plan tiene un documento en PDF con las condiciones, beneficios y
+          ejemplos de uso de Factor Victoria.
         </p>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <a
-            href={pdfHref}
+            href={planDoc}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center px-4 py-2 rounded-xl text-xs md:text-sm font-semibold border border-white/15 bg-white/10 hover:bg-white/20 transition"
-            style={{ color: "#0f172a", backgroundColor: GOLD }}
+            className="inline-flex items-center justify-center px-4 py-2 rounded-xl text-xs md:text-sm font-semibold border border-slate-300/60 bg-slate-900/40 hover:bg-slate-800 transition"
           >
-            Descargar PDF de mi plan ({planMeta.name})
+            Descargar guía de tu plan (PDF)
           </a>
 
           <Link
             to="/app"
-            className="inline-flex items-center justify-center px-4 py-2 rounded-xl text-xs md:text-sm font-semibold border border-slate-600/60 text-slate-100 bg-slate-900/40 hover:bg-slate-800 transition"
+            className="inline-flex items-center justify-center px-4 py-2 rounded-xl text-xs md:text-sm font-semibold border border-transparent"
+            style={{ backgroundColor: GOLD, color: "#0f172a" }}
           >
             Volver al comparador
           </Link>
         </div>
 
-        <p className="mt-3 text-[11px] text-slate-400">
-          Para que el enlace funcione, coloca los archivos PDF
-          <code className="mx-1 text-[10px] bg-slate-900 px-1 py-0.5 rounded">
-            factor_victoria_plan_*.pdf
-          </code>
-          dentro de la carpeta{" "}
-          <code className="text-[10px] bg-slate-900 px-1 py-0.5 rounded">
-            public/docs
+        <p className="mt-3 text-xs text-slate-400">
+          Nota: si el PDF aún no se descarga es porque falta subir el archivo
+          definitivo. Cuando tengas las URLs reales (por ejemplo, desde
+          Shopify, tu servidor o S3), sólo debes reemplazar las rutas en{" "}
+          <code className="text-[11px] bg-slate-900 px-1 py-0.5 rounded">
+            PLAN_DOCS
           </code>{" "}
-          de tu proyecto.
+          al inicio de este archivo.
         </p>
       </section>
     </div>
