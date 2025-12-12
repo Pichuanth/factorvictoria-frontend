@@ -11,7 +11,7 @@ import {
 import Comparator from "./pages/Comparator";
 import Fixtures from "./pages/Fixtures";
 import Profile from "./pages/Profile";
-import { useAuth } from "./lib/auth";
+import { useAuth, AuthProvider } from "./lib/auth";
 
 const GOLD = "#E6C464";
 
@@ -155,6 +155,11 @@ function AppInner() {
   );
 }
 
+/* ---------- Export raíz envuelta en AuthProvider ---------- */
 export default function App() {
-  return <AppInner />;
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
+  );
 }
