@@ -7,13 +7,39 @@ import {
   Link,
   useLocation,
 } from "react-router-dom";
-import Landing from "./pages/Landing";
+
 import Comparator from "./pages/Comparator";
 import Fixtures from "./pages/Fixtures";
 import Profile from "./pages/Profile";
 import { useAuth } from "./lib/auth";
 
 const GOLD = "#E6C464";
+
+/* ---------- Landing simple (pública) ---------- */
+function Landing() {
+  return (
+    <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
+      <div className="max-w-xl mx-auto text-center px-4">
+        <h1 className="text-3xl md:text-4xl font-bold mb-4">
+          Factor <span style={{ color: GOLD }}>Victoria</span>
+        </h1>
+        <p className="text-slate-300 text-sm md:text-base mb-6">
+          Plataforma de análisis y combinadas para apuestas deportivas.
+          Inicia sesión con tu cuenta y usa el comparador profesional
+          y el módulo de partidos.
+        </p>
+
+        <Link
+          to="/app"
+          className="inline-flex items-center justify-center px-6 py-2.5 rounded-full text-sm font-semibold"
+          style={{ backgroundColor: GOLD, color: "#0f172a" }}
+        >
+          Entrar al comparador
+        </Link>
+      </div>
+    </div>
+  );
+}
 
 /* ---------- Ruta protegida ---------- */
 function PrivateRoute({ children }) {
@@ -50,7 +76,6 @@ function AppInner() {
   const { isLoggedIn, logout } = useAuth();
   const location = useLocation();
 
-  // Mostrar barra de navegación solo en la parte "interna"
   const inAppArea =
     location.pathname === "/app" ||
     location.pathname === "/fixture" ||
@@ -66,10 +91,7 @@ function AppInner() {
               to="/app"
               className="text-sm md:text-base font-semibold tracking-tight"
             >
-              Factor{" "}
-              <span style={{ color: GOLD }}>
-                Victoria
-              </span>
+              Factor <span style={{ color: GOLD }}>Victoria</span>
             </Link>
 
             <div className="flex items-center gap-2">
@@ -95,7 +117,7 @@ function AppInner() {
           {/* Landing / página pública */}
           <Route path="/" element={<Landing />} />
 
-          {/* Comparador (app principal) */}
+          {/* Comparador */}
           <Route
             path="/app"
             element={
@@ -105,7 +127,7 @@ function AppInner() {
             }
           />
 
-          {/* Listado de partidos */}
+          {/* Partidos */}
           <Route
             path="/fixture"
             element={
@@ -115,7 +137,7 @@ function AppInner() {
             }
           />
 
-          {/* Perfil del usuario */}
+          {/* Perfil */}
           <Route
             path="/perfil"
             element={
