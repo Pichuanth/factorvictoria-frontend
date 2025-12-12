@@ -1,81 +1,138 @@
 // src/App.jsx
 import React from "react";
-import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
+import {
+  Routes,
+  Route,
+  Navigate,
+  Link,
+  useLocation,
+} from "react-router-dom";
+import Landing from "./pages/Landing";
+import Comparator from "./pages/Comparator";
+import Fixtures from "./pages/Fixtures";
+import Profile from "./pages/Profile";
+import { useAuth } from "./lib/auth";
 
-import Home from "./pages/Home.jsx";
-import Comparator from "./pages/Comparator.jsx";
-import Fixtures from "./pages/Fixtures.jsx";
-import Login from "./pages/Login.jsx";
+const GOLD = "#E6C464";
 
-import { AuthProvider, useAuth } from "./lib/auth";
+/* ---------- Ruta protegida ---------- */
+function PrivateRoute({ children }) {
+  const { isLoggedIn } = useAuth();
+  if (!isLoggedIn) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
 
-/* ---------- Tabs del header ---------- */
-function NavItem({ to, children }) {
-  const { pathname } = useLocation();
-  const active = pathname === to;
-
-  const base = "px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-sm font-semibold transition";
-  const on   = "bg-[#E6C464] text-slate-900";
-  const off  = "bg-slate-800 text-white hover:bg-slate-700";
+/* ---------- Botón del menú superior ---------- */
+function NavButton({ to, children }) {
+  const location = useLocation();
+  const active = location.pathname === to;
 
   return (
-    <Link to={to} className={`${base} ${active ? on : off}`}>
+    <Link
+      to={to}
+      className={[
+        "px-3 md:px-4 py-1.5 md:py-2 rounded-full text-xs md:text-sm font-semibold border transition",
+        active
+          ? "bg-[var(--gold, #E6C464)] text-slate-900 border-transparent"
+          : "bg-slate-900/40 text-slate-100 border-slate-600/50 hover:bg-slate-800",
+      ].join(" ")}
+      style={active ? { backgroundColor: GOLD } : undefined}
+    >
       {children}
     </Link>
   );
 }
 
-/* ---------- Header ---------- */
-function Header() {
+/* ---------- Layout principal ---------- */
+function AppInner() {
   const { isLoggedIn, logout } = useAuth();
+  const location = useLocation();
+
+  // Mostrar barra de navegación solo en la parte "interna"
+  const inAppArea =
+    location.pathname === "/app" ||
+    location.pathname === "/fixture" ||
+    location.pathname === "/perfil";
 
   return (
-    <header className="bg-[#FFFFF0]">
-      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-2">
-        <nav className="ml-auto flex items-center gap-2">
-          <NavItem to="/">Inicio</NavItem>
-          <NavItem to="/app">Comparador</NavItem>
-          <NavItem to="/fixture">Partidos</NavItem>
-
-          {!isLoggedIn ? (
+    <div className="min-h-screen bg-slate-950 text-white">
+      {/* Barra superior para el área interna */}
+      {isLoggedIn && inAppArea && (
+        <header className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/90 backdrop-blur">
+          <nav className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
             <Link
-              to="/login"
-              className="text-sm md:text-base font-semibold text-slate-900 hover:underline whitespace-nowrap"
+              to="/app"
+              className="text-sm md:text-base font-semibold tracking-tight"
             >
-              Iniciar sesión
+              Factor{" "}
+              <span style={{ color: GOLD }}>
+                Victoria
+              </span>
             </Link>
-          ) : (
-            <button
-              onClick={logout}
-              className="text-sm md:text-base font-semibold text-slate-900 underline whitespace-nowrap"
-            >
-              Cerrar sesión
-            </button>
-          )}
-        </nav>
-      </div>
-    </header>
+
+            <div className="flex items-center gap-2">
+              <NavButton to="/app">Inicio</NavButton>
+              <NavButton to="/fixture">Partidos</NavButton>
+              <NavButton to="/perfil">Perfil</NavButton>
+
+              <button
+                type="button"
+                onClick={logout}
+                className="ml-1 px-3 md:px-4 py-1.5 md:py-2 rounded-full text-xs md:text-sm font-semibold border border-slate-600/60 text-slate-200 bg-slate-900/40 hover:bg-slate-800 transition"
+              >
+                Cerrar sesión
+              </button>
+            </div>
+          </nav>
+        </header>
+      )}
+
+      {/* Contenido de las rutas */}
+      <main className="pb-10">
+        <Routes>
+          {/* Landing / página pública */}
+          <Route path="/" element={<Landing />} />
+
+          {/* Comparador (app principal) */}
+          <Route
+            path="/app"
+            element={
+              <PrivateRoute>
+                <Comparator />
+              </PrivateRoute>
+            }
+          />
+
+          {/* Listado de partidos */}
+          <Route
+            path="/fixture"
+            element={
+              <PrivateRoute>
+                <Fixtures />
+              </PrivateRoute>
+            }
+          />
+
+          {/* Perfil del usuario */}
+          <Route
+            path="/perfil"
+            element={
+              <PrivateRoute>
+                <Profile />
+              </PrivateRoute>
+            }
+          />
+
+          {/* Cualquier otra ruta -> a inicio */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
+    </div>
   );
 }
 
-/* ---------- App ---------- */
 export default function App() {
-  return (
-    <AuthProvider>
-      <BrowserRouter>
-        {/* CONTENEDOR OSCURO GLOBAL */}
-        <div className="min-h-screen bg-[#0b1220] text-slate-100 antialiased">
-          <Header />
-          <main className="min-h-[calc(100vh-64px)]">
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/app" element={<Comparator />} />
-              <Route path="/fixture" element={<Fixtures />} />
-              <Route path="/login" element={<Login />} />
-            </Routes>
-          </main>
-        </div>
-      </BrowserRouter>
-    </AuthProvider>
-  );
+  return <AppInner />;
 }
