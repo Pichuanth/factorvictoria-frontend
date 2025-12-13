@@ -11,7 +11,6 @@ import { useAuth } from "./lib/auth";
 const GOLD = "#E6C464";
 
 /* -------------------- Landing (Inicio) -------------------- */
-/* Esta versión NO depende de ./pages/Landing (evita el error 500) */
 function Home() {
   const plans = [
     {
@@ -19,7 +18,7 @@ function Home() {
       price: "$19.990",
       sub: "Mensual",
       bullets: [
-        "Ebook para principiantes",
+        "Guia para principiantes",
         "Picks análisis básicos diarios",
         "Simulador de ganancias incluido",
         "Cuotas x1.5 de regalo",
@@ -33,6 +32,7 @@ function Home() {
       price: "$44.990",
       sub: "+1 Mes de Regalo 🎁",
       bullets: [
+        "4 meses modo profesional",
         "Guía de estrategia y gestión de banca",
         "1 Estrategia VIP incluida",
         "Cuotas x1.5 a x3 de regalo",
@@ -69,7 +69,7 @@ function Home() {
       bullets: [
         "Guía de estrategia PRO",
         "Alertas claves de partidos al correo",
-        "2 Estrategias VIP incluidas",
+        "3 Estrategias VIP incluidas",
         "Cuotas x1.5 a x3 de regalo",
         "Corrección del mercado VIP",
         "Picks análisis PRO",
@@ -107,9 +107,12 @@ function Home() {
         <section className="rounded-3xl border border-white/10 bg-gradient-to-b from-slate-900/60 to-slate-950/40 p-6 md:p-10">
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center font-bold">
-                FV
-              </div>
+              {/* Logo pequeño en el hero (usa /public/logo-fv.png) */}
+              <img
+                src="/logo-fv.png"
+                alt="Factor Victoria"
+                className="w-10 h-10 rounded-2xl object-contain border border-white/10 bg-white/5 p-1"
+              />
               <div className="text-sm text-slate-300">
                 Paga con Flow o Mercado Pago · hasta 6 cuotas
               </div>
@@ -122,10 +125,11 @@ function Home() {
             </h1>
 
             <p className="text-slate-300 max-w-2xl">
-              Estadísticas, pronósticos y simulador de ganancias para apostar
-              con criterio.
+              Estadísticas, pronósticos y simulador de ganancias para apostar con
+              criterio.
             </p>
 
+            {/* Solo “Ver planes” (se eliminó “Ir al comparador”) */}
             <div className="flex flex-wrap gap-2">
               <a
                 href="#planes"
@@ -134,12 +138,6 @@ function Home() {
               >
                 Ver planes
               </a>
-              <Link
-                to="/app"
-                className="inline-flex items-center justify-center px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition"
-              >
-                Ir al comparador
-              </Link>
             </div>
           </div>
         </section>
@@ -191,10 +189,7 @@ function Home() {
                   type="button"
                   className="mt-5 w-fit px-5 py-2.5 rounded-full text-sm font-semibold"
                   style={{ backgroundColor: GOLD, color: "#0f172a" }}
-                  onClick={() => {
-                    // placeholder: en el futuro aquí va Flow/checkout
-                    alert("Checkout próximamente (Flow).");
-                  }}
+                  onClick={() => alert("Checkout próximamente (Flow).")}
                 >
                   Comprar
                 </button>
@@ -240,7 +235,7 @@ function Home() {
           </div>
         </section>
 
-        {/* Imagen + footer */}
+        {/* Imagen + footer (usa /public/hero-players.png) */}
         <section className="mt-10 rounded-3xl border border-white/10 overflow-hidden bg-white/5">
           <div className="p-5 md:p-7">
             <h3 className="text-lg md:text-xl font-bold">
@@ -251,11 +246,15 @@ function Home() {
               para detectar cuotas con valor.
             </p>
           </div>
-          <div className="h-56 md:h-72 bg-gradient-to-r from-slate-900 to-slate-950 flex items-center justify-center">
-            <div className="text-slate-400 text-sm">
-              (Imagen hero aquí — mantiene tu look profesional)
-            </div>
+
+          <div className="h-56 md:h-72 bg-slate-950 overflow-hidden">
+            <img
+              src="/hero-players.png"
+              alt="Factor Victoria"
+              className="w-full h-full object-cover"
+            />
           </div>
+
           <div className="p-4 text-center text-xs text-slate-500">
             © {new Date().getFullYear()} Factor Victoria
           </div>
@@ -281,7 +280,7 @@ function NavButton({ to, children }) {
     <Link
       to={to}
       className={[
-        "px-3 md:px-4 py-1.5 md:py-2 rounded-full text-xs md:text-sm font-semibold border transition",
+        "flex-none px-3 md:px-4 py-1.5 md:py-2 rounded-full text-xs md:text-sm font-semibold border transition",
         active
           ? "text-slate-900 border-transparent"
           : "bg-slate-900/40 text-slate-100 border-slate-600/50 hover:bg-slate-800",
@@ -295,48 +294,41 @@ function NavButton({ to, children }) {
 
 function AppInner() {
   const { isLoggedIn, logout } = useAuth();
-  const location = useLocation();
-
-  // Mostrar nav en todas las páginas (como en tus capturas)
-  const showNav = true;
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
-      {showNav && (
-        <header className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/90 backdrop-blur">
-          <nav className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-            <Link to="/" className="text-sm md:text-base font-semibold">
-              Factor <span style={{ color: GOLD }}>Victoria</span>
-            </Link>
+      <header className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/90 backdrop-blur">
+        <nav className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+          <Link to="/" className="text-sm md:text-base font-semibold flex-none">
+            Factor <span style={{ color: GOLD }}>Victoria</span>
+          </Link>
 
-            <div className="flex items-center gap-2">
-              <NavButton to="/">Inicio</NavButton>
-              <NavButton to="/app">Comparador</NavButton>
-              <NavButton to="/fixture">Partidos</NavButton>
-              {isLoggedIn && <NavButton to="/perfil">Perfil</NavButton>}
+          {/* Scroll horizontal en móvil */}
+          <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap touch-pan-x [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <NavButton to="/">Inicio</NavButton>
+            <NavButton to="/app">Comparador</NavButton>
+            <NavButton to="/fixture">Partidos</NavButton>
+            {isLoggedIn && <NavButton to="/perfil">Perfil</NavButton>}
 
-              {isLoggedIn ? (
-                <button
-                  type="button"
-                  onClick={logout}
-                  className="ml-1 px-3 md:px-4 py-1.5 md:py-2 rounded-full text-xs md:text-sm font-semibold border border-slate-600/60 text-slate-200 bg-slate-900/40 hover:bg-slate-800 transition"
-                >
-                  Cerrar sesión
-                </button>
-              ) : (
-                <NavButton to="/login">Iniciar sesión</NavButton>
-              )}
-            </div>
-          </nav>
-        </header>
-      )}
+            {isLoggedIn ? (
+              <button
+                type="button"
+                onClick={logout}
+                className="flex-none ml-1 px-3 md:px-4 py-1.5 md:py-2 rounded-full text-xs md:text-sm font-semibold border border-slate-600/60 text-slate-200 bg-slate-900/40 hover:bg-slate-800 transition"
+              >
+                Cerrar sesión
+              </button>
+            ) : (
+              <NavButton to="/login">Iniciar sesión</NavButton>
+            )}
+          </div>
+        </nav>
+      </header>
 
       <main className="pb-10">
         <Routes>
-          {/* Inicio / Landing con planes */}
           <Route path="/" element={<Home />} />
 
-          {/* Área interna */}
           <Route
             path="/app"
             element={
@@ -364,13 +356,8 @@ function AppInner() {
             }
           />
 
-          {/* IMPORTANTE: no rompo tu login existente.
-              Si ya tienes /login creado en otro lado (App anterior),
-              debe existir aquí también.
-              Si no tienes componente, al menos no colapsa el build. */}
           <Route path="/login" element={<Login />} />
 
-          {/* fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
