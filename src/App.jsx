@@ -111,7 +111,7 @@ function Home() {
               <img
                 src="/logo-fv.png"
                 alt="Factor Victoria"
-                className="w-10 h-10 rounded-2xl object-contain border border-white/10 bg-white/5 p-1"
+                className="h-12 md:h-14 w-auto"
               />
               <div className="text-sm text-slate-300">
                 Paga con Flow o Mercado Pago · hasta 6 cuotas
