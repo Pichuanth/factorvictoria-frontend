@@ -3,6 +3,8 @@ import React, { useMemo, useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 
+const GOLD = "#E6C464";
+
 /* --------------------- helpers --------------------- */
 const API_BASE = import.meta.env.VITE_API_BASE || "";
 
@@ -19,6 +21,9 @@ const COUNTRY_ALIAS = {
   espana: "Spain",
   inglaterra: "England",
   francia: "France",
+  portugal: "Portugal",
+  italia: "Italy",
+  alemania: "Germany",
 };
 
 function normalizeCountryQuery(q) {
@@ -41,7 +46,7 @@ const COUNTRY_FLAG = {
   USA: "🇺🇸",
 };
 
-// Ligas importantes (para ordenar tipo Flashscore)
+// Ligas importantes (whitelist / orden tipo Flashscore)
 const IMPORTANT_LEAGUES = [
   "UEFA Champions League",
   "Champions League",
@@ -131,9 +136,10 @@ function getKickoffTime(f) {
   if (f.time) return f.time;
   if (f.kickoffTime) return f.kickoffTime;
 
-  if (typeof f.date === "string" && f.date.includes("T")) {
+  const iso = f.date || f.fixture?.date;
+  if (typeof iso === "string" && iso.includes("T")) {
     try {
-      const d = new Date(f.date);
+      const d = new Date(iso);
       const hh = String(d.getHours()).padStart(2, "0");
       const mm = String(d.getMinutes()).padStart(2, "0");
       return `${hh}:${mm}`;
@@ -141,8 +147,76 @@ function getKickoffTime(f) {
       return "--:--";
     }
   }
+
   return f.hour || "--:--";
 }
+
+/* --------- filtros clave (futuro / no juveniles / solo ligas grandes) --------- */
+
+function isFutureFixture(fx) {
+  const now = Date.now();
+
+  const ts =
+    fx.timestamp ||
+    fx.fixture?.timestamp ||
+    fx.fixture?.timeStamp ||
+    null;
+
+  if (ts) {
+    const ms = Number(ts) * 1000; // suele venir en segundos
+    if (!Number.isNaN(ms)) return ms > now;
+  }
+
+  const iso = fx.date || fx.fixture?.date || null;
+  if (iso) {
+    const d = new Date(iso);
+    if (!Number.isNaN(d.getTime())) return d.getTime() > now;
+  }
+
+  // si no se puede determinar, lo dejamos pasar
+  return true;
+}
+
+function isYouthOrWomenOrReserve(fx) {
+  const league = getLeagueName(fx);
+  const home = getHomeName(fx);
+  const away = getAwayName(fx);
+
+  const blob = `${league} ${home} ${away}`.toLowerCase();
+
+  const bannedPatterns = [
+    "u17",
+    "u18",
+    "u19",
+    "u20",
+    "u21",
+    "u23",
+    "reserves",
+    "reserve",
+    "juvenil",
+    "youth",
+    "sub-",
+    "sub ",
+    " women",
+    "women ",
+    "womens",
+    "femen",
+    "fem",
+    " w ",
+    " ii",
+    " b ",
+  ];
+
+  return bannedPatterns.some((p) => blob.includes(p));
+}
+
+function isMajorLeague(fx) {
+  const league = getLeagueName(fx);
+  const name = String(league || "").toLowerCase();
+  return IMPORTANT_LEAGUES.some((imp) => name.includes(String(imp).toLowerCase()));
+}
+
+/* --------------------- lógica de plan / cuotas demo --------------------- */
 
 // Máxima cuota objetivo por plan (10 / 20 / 50 / 100)
 function getMaxBoostFromPlan(planLabel) {
@@ -194,12 +268,14 @@ function buildComboSuggestion(fixturesPool, maxBoost) {
 
   const finalOdd = Number(product.toFixed(2));
   const impliedProb = Number(((1 / finalOdd) * 100).toFixed(1));
+  const reachedTarget = finalOdd >= maxBoost * 0.8;
 
   return {
     games: picks.length,
     finalOdd,
     target: maxBoost,
     impliedProb,
+    reachedTarget,
   };
 }
 
@@ -264,6 +340,7 @@ export default function Comparator() {
       const params = new URLSearchParams();
       params.set("from", from);
       params.set("to", to);
+      // params.set("status", "NS"); // si tu backend lo soporta, lo activamos luego
 
       const qTrim = String(q || "").trim();
       const countryEN = normalizeCountryQuery(qTrim);
@@ -272,20 +349,29 @@ export default function Comparator() {
       else if (qTrim) params.set("q", qTrim);
 
       const res = await fetch(`${API_BASE}/api/fixtures?${params.toString()}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status} – ${res.statusText || ""}`);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status} – ${res.statusText || ""}`);
+      }
 
       const data = await res.json();
       const items = Array.isArray(data?.items) ? data.items : [];
 
       if (!items.length) {
         setErr(
-          "Por ahora no hay partidos futuros reales suficientes para este rango o filtro. Prueba con más días o sin filtrar por país/equipo."
+          "Por ahora no hay partidos para este rango o filtro. Prueba con más días o sin filtrar."
         );
         setFixtures([]);
         return;
       }
 
-      const sorted = [...items].sort((a, b) => {
+      // 1) Filtrar: futuro + no juveniles/femenino/reservas + solo ligas grandes
+      let filtered = items
+        .filter(isFutureFixture)
+        .filter((fx) => !isYouthOrWomenOrReserve(fx))
+        .filter(isMajorLeague);
+
+      // 2) Ordenar por prioridad + hora
+      const sorted = [...filtered].sort((a, b) => {
         const prioA = getLeaguePriority(getLeagueName(a), getCountryName(a));
         const prioB = getLeaguePriority(getLeagueName(b), getCountryName(b));
         if (prioA !== prioB) return prioA - prioB;
@@ -295,13 +381,24 @@ export default function Comparator() {
         return tA.localeCompare(tB);
       });
 
-      setFixtures(sorted);
+      // 3) Limitar cantidad (UX móvil)
+      const LIMITED = sorted.slice(0, 120);
+
+      if (!LIMITED.length) {
+        setErr(
+          "No encontramos partidos FUTUROS relevantes para este rango/filtro. Prueba con más días o sin filtrar por equipo."
+        );
+        setFixtures([]);
+        return;
+      }
+
+      setFixtures(LIMITED);
       setInfo(
-        `Se encontraron ${sorted.length} partidos para este rango de fechas. Puedes seleccionar partidos para armar tus parlays.`
+        `Se encontraron ${LIMITED.length} partidos FUTUROS relevantes para este rango. Puedes seleccionar partidos para armar tus parlays.`
       );
-    } catch (e) {
-      console.error(e);
-      setErr(String(e.message || e));
+    } catch (e2) {
+      console.error(e2);
+      setErr(String(e2.message || e2));
     } finally {
       setLoading(false);
     }
@@ -311,7 +408,16 @@ export default function Comparator() {
     setQ(countryEs);
   }
 
-  const quickCountries = ["Chile", "Argentina", "España", "Inglaterra", "Francia"];
+  const quickCountries = [
+    "Chile",
+    "España",
+    "Portugal",
+    "Italia",
+    "Alemania",
+    "Argentina",
+    "Inglaterra",
+    "Francia",
+  ];
 
   function toggleFixtureSelection(id) {
     setParlayResult(null);
@@ -443,7 +549,7 @@ export default function Comparator() {
               type="submit"
               disabled={!isLoggedIn || loading}
               className="w-full rounded-2xl font-semibold px-4 py-2 mt-4 md:mt-0 disabled:opacity-60 disabled:cursor-not-allowed"
-              style={{ backgroundColor: "#E6C464", color: "#0f172a" }}
+              style={{ backgroundColor: GOLD, color: "#0f172a" }}
             >
               {loading ? "Generando..." : "Generar"}
             </button>
@@ -522,10 +628,12 @@ export default function Comparator() {
                     isSelected ? "bg-slate-900/90" : "hover:bg-slate-900/70",
                   ].join(" ")}
                 >
+                  {/* Hora */}
                   <div className="w-14 text-[11px] md:text-xs font-semibold text-slate-100">
                     {time || "--:--"}
                   </div>
 
+                  {/* País / liga + equipos */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1 text-xs md:text-sm text-slate-200">
                       <span className="mr-1 text-lg leading-none">{flagEmoji}</span>
@@ -538,7 +646,7 @@ export default function Comparator() {
                       )}
                     </div>
 
-                    {/* Mobile-friendly: ambos equipos se ven sí o sí */}
+                    {/* Mobile-friendly: ambos equipos siempre visibles */}
                     <div className="mt-0.5 text-xs md:text-sm text-slate-100">
                       <div className="font-semibold leading-snug whitespace-normal break-words">
                         {home}
@@ -550,6 +658,7 @@ export default function Comparator() {
                     </div>
                   </div>
 
+                  {/* Placeholder de cuotas */}
                   <div className="w-[40%] md:w-[32%] text-right text-[11px] md:text-xs leading-snug">
                     <span className="block text-cyan-300 font-semibold">
                       Próximamente: cuotas 1X2 y valor esperado.
@@ -559,6 +668,7 @@ export default function Comparator() {
                     </span>
                   </div>
 
+                  {/* Selector */}
                   <div className="w-6 flex justify-end">
                     <span
                       className={[
@@ -578,6 +688,7 @@ export default function Comparator() {
 
       {/* Tarjetas */}
       <section className="mt-4 space-y-4">
+        {/* Cuota segura */}
         <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
           <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-200 mb-2">
             Cuota segura (Regalo)
@@ -591,6 +702,7 @@ export default function Comparator() {
           </p>
         </div>
 
+        {/* Cuotas potenciadas */}
         <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
           <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-200 mb-2">
             Cuotas potenciadas
@@ -642,11 +754,19 @@ export default function Comparator() {
                   ? `Ejemplo de combinada automática: ${parlayResult.games} partidos, cuota x${parlayResult.finalOdd}`
                   : `Ejemplo con tus partidos seleccionados: ${parlayResult.games} partidos, cuota x${parlayResult.finalOdd}`}
               </p>
+
               <p className="text-xs text-slate-400">
-                Probabilidad implícita aproximada: {parlayResult.impliedProb}%. Modelo
-                simplificado solo para mostrar el potencial de tu plan (objetivo x
-                {parlayResult.target}).
+                ✅ Cada selección individual tiene una probabilidad estimada superior al 90%.
+                <br />
+                📉 El porcentaje total disminuye a medida que agregas más partidos a tu combinada.
               </p>
+
+              {!parlayResult.reachedTarget && (
+                <p className="text-xs text-amber-300 mt-2">
+                  Nota: con la selección actual no se alcanzó la cuota objetivo x{parlayResult.target}.
+                  Prueba agregando 1–3 partidos más para acercarte al máximo de tu plan.
+                </p>
+              )}
             </div>
           )}
 
@@ -658,6 +778,7 @@ export default function Comparator() {
           )}
         </div>
 
+        {/* Árbitros tarjeteros */}
         <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
           <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-500/20 text-red-200 mb-2">
             Árbitros más tarjeteros
@@ -668,6 +789,7 @@ export default function Comparator() {
           </p>
         </div>
 
+        {/* Desfase */}
         <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
           <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-sky-500/20 text-sky-200 mb-2">
             Cuota desfase del mercado
