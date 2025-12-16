@@ -1,12 +1,12 @@
 // src/pages/Comparator.jsx
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 
 const GOLD = "#E6C464";
+const API_BASE = import.meta.env.VITE_API_BASE || "";
 
 /* --------------------- helpers --------------------- */
-const API_BASE = import.meta.env.VITE_API_BASE || "";
 
 function toYYYYMMDD(d) {
   const pad = (n) => String(n).padStart(2, "0");
@@ -46,7 +46,6 @@ const COUNTRY_FLAG = {
   USA: "🇺🇸",
 };
 
-// Ligas importantes (whitelist / orden tipo Flashscore)
 const IMPORTANT_LEAGUES = [
   "UEFA Champions League",
   "Champions League",
@@ -70,23 +69,20 @@ function getLeaguePriority(leagueName = "", country = "") {
     if (name.includes(IMPORTANT_LEAGUES[i].toLowerCase())) return i;
   }
 
-  if (["england", "spain", "italy", "germany", "france"].includes(countryLower))
-    return 12;
-
-  if (["chile", "argentina", "brazil", "portugal", "mexico"].includes(countryLower))
-    return 14;
+  if (["england", "spain", "italy", "germany", "france"].includes(countryLower)) return 12;
+  if (["chile", "argentina", "brazil", "portugal", "mexico"].includes(countryLower)) return 14;
 
   return 25;
 }
 
-// Id estable de fixture
 function getFixtureId(f) {
   return (
     f.id ||
     f.fixtureId ||
     f.fixture_id ||
     f.fixture?.id ||
-    `${f.league?.id || ""}-${f.timestamp || f.date}`
+    f.fixture?.fixture_id ||
+    `${f.league?.id || ""}-${f.timestamp || f.date || f.fixture?.date || ""}`
   );
 }
 
@@ -147,23 +143,24 @@ function getKickoffTime(f) {
       return "--:--";
     }
   }
-
   return f.hour || "--:--";
 }
 
-/* --------- filtros clave (futuro / no juveniles / solo ligas grandes) --------- */
+function getMaxBoostFromPlan(planLabel) {
+  const p = String(planLabel || "").toUpperCase();
+  if (p.includes("VITA")) return 100;
+  if (p.includes("ANU")) return 50;
+  if (p.includes("TRI") || p.includes("3")) return 20;
+  return 10;
+}
 
+/** FUTUROS */
 function isFutureFixture(fx) {
   const now = Date.now();
 
-  const ts =
-    fx.timestamp ||
-    fx.fixture?.timestamp ||
-    fx.fixture?.timeStamp ||
-    null;
-
+  const ts = fx.timestamp || fx.fixture?.timestamp || null;
   if (ts) {
-    const ms = Number(ts) * 1000; // suele venir en segundos
+    const ms = Number(ts) * 1000;
     if (!Number.isNaN(ms)) return ms > now;
   }
 
@@ -173,110 +170,110 @@ function isFutureFixture(fx) {
     if (!Number.isNaN(d.getTime())) return d.getTime() > now;
   }
 
-  // si no se puede determinar, lo dejamos pasar
   return true;
 }
 
+/** Filtra juveniles / reservas / femenino */
 function isYouthOrWomenOrReserve(fx) {
-  const league = getLeagueName(fx);
-  const home = getHomeName(fx);
-  const away = getAwayName(fx);
+  const blob = `${getLeagueName(fx)} ${getHomeName(fx)} ${getAwayName(fx)}`.toLowerCase();
 
-  const blob = `${league} ${home} ${away}`.toLowerCase();
-
-  const bannedPatterns = [
-    "u17",
-    "u18",
-    "u19",
-    "u20",
-    "u21",
-    "u23",
-    "reserves",
-    "reserve",
-    "juvenil",
-    "youth",
-    "sub-",
-    "sub ",
-    " women",
-    "women ",
-    "womens",
-    "femen",
-    "fem",
-    " w ",
-    " ii",
-    " b ",
+  const banned = [
+    "u17", "u18", "u19", "u20", "u21", "u23",
+    "reserves", "reserve", "youth", "juvenil",
+    "sub-", "sub ",
+    " women", "womens", "femen", " fem", " w ",
+    " ii", " b ",
   ];
 
-  return bannedPatterns.some((p) => blob.includes(p));
+  return banned.some((p) => blob.includes(p));
 }
 
+/** Solo ligas “top” */
 function isMajorLeague(fx) {
-  const league = getLeagueName(fx);
-  const name = String(league || "").toLowerCase();
+  const name = String(getLeagueName(fx) || "").toLowerCase();
   return IMPORTANT_LEAGUES.some((imp) => name.includes(String(imp).toLowerCase()));
 }
 
-/* --------------------- lógica de plan / cuotas demo --------------------- */
+/* --------------------- Odds parsing --------------------- */
 
-// Máxima cuota objetivo por plan (10 / 20 / 50 / 100)
-function getMaxBoostFromPlan(planLabel) {
-  const p = String(planLabel || "").toUpperCase();
-  if (p.includes("VITA")) return 100; // VITALICIO
-  if (p.includes("ANU")) return 50; // ANUAL
-  if (p.includes("TRI") || p.includes("3")) return 20; // TRIMESTRAL, 3M
-  return 10; // MENSUAL / por defecto
+function findMarket(markets = [], keyHints = []) {
+  const m = Array.isArray(markets) ? markets : [];
+  const hints = keyHints.map((x) => String(x).toLowerCase());
+  return m.find((mk) => {
+    const k = String(mk?.key || mk?.name || "").toLowerCase();
+    return hints.some((h) => k.includes(h));
+  }) || null;
 }
 
-// Cuota base "fake" (1.2–3.8) en función del id del partido
-function fakeBaseOddForFixture(fx) {
-  const id = getFixtureId(fx);
-  const key = String(id || getHomeName(fx) + getAwayName(fx));
-
-  let hash = 0;
-  for (let i = 0; i < key.length; i++) {
-    hash = (hash + key.charCodeAt(i) * (i + 7)) % 1000;
-  }
-
-  const base = 1.2 + (hash % 26) / 10; // 1.2 – 3.8
-  return Number(base.toFixed(2));
+function normalizeOddValueLabel(v) {
+  return String(v || "").toLowerCase().trim();
 }
 
-// Construye una combinada de ejemplo que se acerque al máximo de tu plan
-function buildComboSuggestion(fixturesPool, maxBoost) {
-  if (!Array.isArray(fixturesPool) || fixturesPool.length === 0) return null;
+function extract1X2(markets, homeName, awayName) {
+  const market =
+    findMarket(markets, ["1x2", "match winner", "winner", "fulltime result"]) ||
+    null;
 
-  const picks = [];
-  let product = 1;
+  if (!market?.values?.length) return null;
 
-  for (const fx of fixturesPool) {
-    const odd = fakeBaseOddForFixture(fx);
+  const vals = market.values;
+  const homeKey = normalizeOddValueLabel(homeName);
+  const awayKey = normalizeOddValueLabel(awayName);
 
-    if (product * odd > maxBoost * 1.35) continue;
+  let home = null, draw = null, away = null;
 
-    product *= odd;
-    picks.push({
-      id: getFixtureId(fx),
-      label: `${getHomeName(fx)} vs ${getAwayName(fx)}`,
-      odd,
-    });
+  for (const it of vals) {
+    const label = normalizeOddValueLabel(it?.value);
+    const odd = Number(it?.odd);
+    if (!odd || Number.isNaN(odd)) continue;
 
-    if (picks.length >= 12) break;
-    if (product >= maxBoost * 0.8) break;
+    if (label === "draw" || label === "x" || label.includes("empate")) draw = odd;
+    else if (label.includes(homeKey) || label === "home" || label === "1" || label.includes("local")) home = odd;
+    else if (label.includes(awayKey) || label === "away" || label === "2" || label.includes("visita")) away = odd;
   }
 
-  if (!picks.length) return null;
+  // fallback por si API viene con "Home/Draw/Away" literal
+  if (home == null) {
+    const it = vals.find((x) => normalizeOddValueLabel(x?.value) === "home");
+    if (it) home = Number(it.odd);
+  }
+  if (away == null) {
+    const it = vals.find((x) => normalizeOddValueLabel(x?.value) === "away");
+    if (it) away = Number(it.odd);
+  }
+  if (draw == null) {
+    const it = vals.find((x) => normalizeOddValueLabel(x?.value) === "draw");
+    if (it) draw = Number(it.odd);
+  }
 
-  const finalOdd = Number(product.toFixed(2));
-  const impliedProb = Number(((1 / finalOdd) * 100).toFixed(1));
-  const reachedTarget = finalOdd >= maxBoost * 0.8;
+  if (home == null && draw == null && away == null) return null;
+  return { home, draw, away };
+}
 
-  return {
-    games: picks.length,
-    finalOdd,
-    target: maxBoost,
-    impliedProb,
-    reachedTarget,
-  };
+function extractOU25(markets) {
+  const market =
+    findMarket(markets, ["over/under", "goals over/under", "total goals"]) ||
+    null;
+
+  if (!market?.values?.length) return null;
+
+  let over = null, under = null;
+
+  for (const it of market.values) {
+    const label = normalizeOddValueLabel(it?.value);
+    const odd = Number(it?.odd);
+    if (!odd || Number.isNaN(odd)) continue;
+
+    // buscamos 2.5
+    const is25 = label.includes("2.5");
+    if (!is25) continue;
+
+    if (label.includes("over")) over = odd;
+    if (label.includes("under")) under = odd;
+  }
+
+  if (over == null && under == null) return null;
+  return { over, under };
 }
 
 /* --------------------- componente --------------------- */
@@ -298,7 +295,9 @@ export default function Comparator() {
   const [parlayResult, setParlayResult] = useState(null);
   const [parlayError, setParlayError] = useState("");
 
-  // Prefill desde /fixture -> (date & q en la URL)
+  // odds cache: { [fixtureId]: { markets, fetchedAt } }
+  const [oddsByFixture, setOddsByFixture] = useState({});
+
   useEffect(() => {
     const urlDate = searchParams.get("date");
     const urlQ = searchParams.get("q");
@@ -310,103 +309,11 @@ export default function Comparator() {
   }, [searchParams]);
 
   const planLabel = useMemo(() => {
-    const raw =
-      user?.planId || user?.plan?.id || user?.plan || user?.membership || "";
+    const raw = user?.planId || user?.plan?.id || user?.plan || user?.membership || "";
     return String(raw || "").toUpperCase();
   }, [user]);
 
   const maxBoost = getMaxBoostFromPlan(planLabel);
-
-  async function handleGenerate(e) {
-    e?.preventDefault?.();
-
-    setErr("");
-    setInfo("");
-    setFixtures([]);
-    setSelectedIds([]);
-    setParlayResult(null);
-    setParlayError("");
-    setLoading(true);
-
-    if (!isLoggedIn) {
-      setLoading(false);
-      setErr(
-        "Necesitas iniciar sesión y tener una membresía activa para usar el comparador. Usa la pestaña Partidos mientras tanto."
-      );
-      return;
-    }
-
-    try {
-      const params = new URLSearchParams();
-      params.set("from", from);
-      params.set("to", to);
-      // params.set("status", "NS"); // si tu backend lo soporta, lo activamos luego
-
-      const qTrim = String(q || "").trim();
-      const countryEN = normalizeCountryQuery(qTrim);
-
-      if (countryEN) params.set("country", countryEN);
-      else if (qTrim) params.set("q", qTrim);
-
-      const res = await fetch(`${API_BASE}/api/fixtures?${params.toString()}`);
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status} – ${res.statusText || ""}`);
-      }
-
-      const data = await res.json();
-      const items = Array.isArray(data?.items) ? data.items : [];
-
-      if (!items.length) {
-        setErr(
-          "Por ahora no hay partidos para este rango o filtro. Prueba con más días o sin filtrar."
-        );
-        setFixtures([]);
-        return;
-      }
-
-      // 1) Filtrar: futuro + no juveniles/femenino/reservas + solo ligas grandes
-      let filtered = items
-        .filter(isFutureFixture)
-        .filter((fx) => !isYouthOrWomenOrReserve(fx))
-        .filter(isMajorLeague);
-
-      // 2) Ordenar por prioridad + hora
-      const sorted = [...filtered].sort((a, b) => {
-        const prioA = getLeaguePriority(getLeagueName(a), getCountryName(a));
-        const prioB = getLeaguePriority(getLeagueName(b), getCountryName(b));
-        if (prioA !== prioB) return prioA - prioB;
-
-        const tA = getKickoffTime(a) || "";
-        const tB = getKickoffTime(b) || "";
-        return tA.localeCompare(tB);
-      });
-
-      // 3) Limitar cantidad (UX móvil)
-      const LIMITED = sorted.slice(0, 120);
-
-      if (!LIMITED.length) {
-        setErr(
-          "No encontramos partidos FUTUROS relevantes para este rango/filtro. Prueba con más días o sin filtrar por equipo."
-        );
-        setFixtures([]);
-        return;
-      }
-
-      setFixtures(LIMITED);
-      setInfo(
-        `Se encontraron ${LIMITED.length} partidos FUTUROS relevantes para este rango. Puedes seleccionar partidos para armar tus parlays.`
-      );
-    } catch (e2) {
-      console.error(e2);
-      setErr(String(e2.message || e2));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function handleQuickCountry(countryEs) {
-    setQ(countryEs);
-  }
 
   const quickCountries = [
     "Chile",
@@ -419,16 +326,146 @@ export default function Comparator() {
     "Francia",
   ];
 
+  const ensureOdds = useCallback(async (fixtureId) => {
+    if (!fixtureId) return;
+
+    // Si ya está, no recargamos
+    if (oddsByFixture[fixtureId]) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(fixtureId)}`);
+      if (!res.ok) return;
+
+      const data = await res.json();
+      const markets = Array.isArray(data?.markets) ? data.markets : [];
+
+      setOddsByFixture((prev) => ({
+        ...prev,
+        [fixtureId]: { markets, fetchedAt: Date.now() },
+      }));
+    } catch (e) {
+      // Silencioso: no queremos ensuciar UX si falla un partido
+      console.warn("odds error", e);
+    }
+  }, [API_BASE, oddsByFixture]);
+
+  async function handleGenerate(e) {
+    e?.preventDefault?.();
+
+    setErr("");
+    setInfo("");
+    setFixtures([]);
+    setSelectedIds([]);
+    setParlayResult(null);
+    setParlayError("");
+    setOddsByFixture({});
+    setLoading(true);
+
+    if (!isLoggedIn) {
+      setLoading(false);
+      setErr("Necesitas iniciar sesión y tener una membresía activa para usar el comparador. Usa la pestaña Partidos mientras tanto.");
+      return;
+    }
+
+    try {
+      const params = new URLSearchParams();
+      params.set("from", from);
+      params.set("to", to);
+
+      const qTrim = String(q || "").trim();
+      const countryEN = normalizeCountryQuery(qTrim);
+
+      if (countryEN) params.set("country", countryEN);
+      else if (qTrim) params.set("q", qTrim);
+
+      const res = await fetch(`${API_BASE}/api/fixtures?${params.toString()}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status} – ${res.statusText || ""}`);
+
+      const data = await res.json();
+      const items = Array.isArray(data?.items) ? data.items : [];
+
+      // Filtrar y limitar
+      let filtered = items
+        .filter(isFutureFixture)
+        .filter((fx) => !isYouthOrWomenOrReserve(fx))
+        .filter(isMajorLeague);
+
+      const sorted = [...filtered].sort((a, b) => {
+        const prioA = getLeaguePriority(getLeagueName(a), getCountryName(a));
+        const prioB = getLeaguePriority(getLeagueName(b), getCountryName(b));
+        if (prioA !== prioB) return prioA - prioB;
+
+        const tA = getKickoffTime(a) || "";
+        const tB = getKickoffTime(b) || "";
+        return tA.localeCompare(tB);
+      });
+
+      const LIMITED = sorted.slice(0, 120);
+
+      if (!LIMITED.length) {
+        setErr("No encontramos partidos FUTUROS relevantes para este rango/filtro. Prueba con más días o sin filtrar por equipo.");
+        setFixtures([]);
+        return;
+      }
+
+      setFixtures(LIMITED);
+      setInfo(`Se encontraron ${LIMITED.length} partidos FUTUROS relevantes para este rango. Puedes seleccionar partidos para armar tus parlays.`);
+    } catch (e2) {
+      console.error(e2);
+      setErr(String(e2.message || e2));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleQuickCountry(countryEs) {
+    setQ(countryEs);
+  }
+
   function toggleFixtureSelection(id) {
     setParlayResult(null);
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
   const selectedCount = selectedIds.length;
 
-  function handleAutoParlay() {
+  // Por ahora: combinadas siguen siendo “demo” de producto (luego las haremos 100% reales)
+  function fakeOddForFixture(fx) {
+    const id = getFixtureId(fx);
+    const key = String(id || getHomeName(fx) + getAwayName(fx));
+    let hash = 0;
+    for (let i = 0; i < key.length; i++) hash = (hash + key.charCodeAt(i) * (i + 7)) % 1000;
+    const base = 1.2 + (hash % 26) / 10;
+    return Number(base.toFixed(2));
+  }
+
+  function buildComboSuggestion(fixturesPool, maxBoost) {
+    if (!Array.isArray(fixturesPool) || fixturesPool.length === 0) return null;
+
+    const picks = [];
+    let product = 1;
+
+    for (const fx of fixturesPool) {
+      const odd = fakeOddForFixture(fx);
+      if (product * odd > maxBoost * 1.35) continue;
+
+      product *= odd;
+      picks.push({ id: getFixtureId(fx), label: `${getHomeName(fx)} vs ${getAwayName(fx)}`, odd });
+
+      if (picks.length >= 12) break;
+      if (product >= maxBoost * 0.8) break;
+    }
+
+    if (!picks.length) return null;
+
+    const finalOdd = Number(product.toFixed(2));
+    const impliedProb = Number(((1 / finalOdd) * 100).toFixed(1));
+    const reachedTarget = finalOdd >= maxBoost * 0.8;
+
+    return { games: picks.length, finalOdd, target: maxBoost, impliedProb, reachedTarget };
+  }
+
+  async function handleAutoParlay() {
     setParlayError("");
     setParlayResult(null);
 
@@ -437,18 +474,20 @@ export default function Comparator() {
       return;
     }
 
+    // (Opcional) precargar odds de los primeros 10 para que se vea “vivo”
+    const first10 = fixtures.slice(0, 10).map(getFixtureId).filter(Boolean);
+    first10.forEach((id) => ensureOdds(id));
+
     const suggestion = buildComboSuggestion(fixtures, maxBoost);
     if (!suggestion) {
-      setParlayError(
-        "Por ahora no pudimos armar una combinada razonable con los partidos cargados. Prueba con otro rango de fechas."
-      );
+      setParlayError("Por ahora no pudimos armar una combinada razonable con los partidos cargados. Prueba con otro rango de fechas.");
       return;
     }
 
     setParlayResult({ mode: "auto", ...suggestion });
   }
 
-  function handleSelectedParlay() {
+  async function handleSelectedParlay() {
     setParlayError("");
     setParlayResult(null);
 
@@ -464,17 +503,16 @@ export default function Comparator() {
 
     const pool = fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)));
     if (pool.length < 2) {
-      setParlayError(
-        "Hubo un problema al leer tu selección. Vuelve a elegir 2 o más partidos."
-      );
+      setParlayError("Hubo un problema al leer tu selección. Vuelve a elegir 2 o más partidos.");
       return;
     }
 
+    // precarga odds solo de los seleccionados
+    pool.map(getFixtureId).filter(Boolean).forEach((id) => ensureOdds(id));
+
     const suggestion = buildComboSuggestion(pool, maxBoost);
     if (!suggestion) {
-      setParlayError(
-        "Con esta combinación no pudimos llegar a una cuota interesante. Prueba agregando más partidos."
-      );
+      setParlayError("Con esta combinación no pudimos llegar a una cuota interesante. Prueba agregando más partidos.");
       return;
     }
 
@@ -490,17 +528,12 @@ export default function Comparator() {
         {isLoggedIn ? (
           <p className="text-slate-300 text-sm md:text-base">
             Estás usando Factor Victoria con tu membresía{" "}
-            <span className="font-semibold">{planLabel || "ACTIVA"}</span>. Elige
-            un rango de fechas y filtra por país, liga o equipo para generar tus
-            parlays.
+            <span className="font-semibold">{planLabel || "ACTIVA"}</span>. Elige un rango de fechas y filtra por país, liga o equipo para generar tus parlays.
           </p>
         ) : (
           <p className="text-slate-300 text-sm md:text-base">
-            Modo visitante: prueba el comparador con filtros reales pero con
-            funcionalidad limitada.{" "}
-            <Link to="/" className="underline font-semibold">
-              Activa una membresía
-            </Link>{" "}
+            Modo visitante: prueba el comparador con filtros reales pero con funcionalidad limitada.{" "}
+            <Link to="/" className="underline font-semibold">Activa una membresía</Link>{" "}
             para desbloquear todas las herramientas profesionales.
           </p>
         )}
@@ -508,10 +541,7 @@ export default function Comparator() {
 
       {/* Filtros */}
       <section className="mt-4 rounded-2xl bg-white/5 border border-white/10 p-4 md:p-6">
-        <form
-          onSubmit={handleGenerate}
-          className="flex flex-col md:flex-row md:items-end gap-3 items-stretch"
-        >
+        <form onSubmit={handleGenerate} className="flex flex-col md:flex-row md:items-end gap-3 items-stretch">
           <div className="flex-1">
             <label className="block text-xs text-slate-400 mb-1">Desde</label>
             <input
@@ -533,9 +563,7 @@ export default function Comparator() {
           </div>
 
           <div className="flex-[2]">
-            <label className="block text-xs text-slate-400 mb-1">
-              Filtro (país / liga / equipo)
-            </label>
+            <label className="block text-xs text-slate-400 mb-1">Filtro (país / liga / equipo)</label>
             <input
               placeholder="Ej: Chile, La Liga, Colo Colo, Premier League..."
               value={q}
@@ -577,9 +605,7 @@ export default function Comparator() {
             {!isLoggedIn && (
               <>
                 {" "}
-                <Link to="/" className="underline font-semibold">
-                  Ver planes
-                </Link>
+                <Link to="/" className="underline font-semibold">Ver planes</Link>
               </>
             )}
           </div>
@@ -602,8 +628,7 @@ export default function Comparator() {
 
         {fixtures.length === 0 ? (
           <div className="px-4 py-6 text-sm text-slate-300">
-            Por ahora no hay partidos para este rango o filtro. Prueba con más días
-            o sin filtrar por país/equipo.
+            Por ahora no hay partidos para este rango o filtro. Prueba con más días o sin filtrar por país/equipo.
           </div>
         ) : (
           <ul className="divide-y divide-slate-800/80">
@@ -613,16 +638,23 @@ export default function Comparator() {
 
               const league = getLeagueName(fx);
               const countryName = getCountryName(fx);
-              const flagEmoji =
-                COUNTRY_FLAG[countryName] || (countryName === "World" ? "🌍" : "🏳️");
+              const flagEmoji = COUNTRY_FLAG[countryName] || (countryName === "World" ? "🌍" : "🏳️");
               const home = getHomeName(fx);
               const away = getAwayName(fx);
               const time = getKickoffTime(fx);
 
+              const oddsPack = oddsByFixture[id] || null;
+              const markets = oddsPack?.markets || [];
+              const m1x2 = extract1X2(markets, home, away);
+              const mou = extractOU25(markets);
+
               return (
                 <li
                   key={id}
-                  onClick={() => toggleFixtureSelection(id)}
+                  onClick={() => {
+                    toggleFixtureSelection(id);
+                    ensureOdds(id); // carga cuotas al primer click
+                  }}
                   className={[
                     "px-4 py-3 flex items-center gap-3 cursor-pointer transition-colors",
                     isSelected ? "bg-slate-900/90" : "hover:bg-slate-900/70",
@@ -633,42 +665,54 @@ export default function Comparator() {
                     {time || "--:--"}
                   </div>
 
-                  {/* País / liga + equipos */}
+                  {/* País / competición + equipos */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1 text-xs md:text-sm text-slate-200">
                       <span className="mr-1 text-lg leading-none">{flagEmoji}</span>
                       <span className="font-medium truncate">{countryName}</span>
                       {league && (
                         <span className="text-[11px] md:text-xs text-slate-400 truncate">
-                          {" "}
-                          · {league}
+                          {" "}· {league}
                         </span>
                       )}
                     </div>
 
-                    {/* Mobile-friendly: ambos equipos siempre visibles */}
                     <div className="mt-0.5 text-xs md:text-sm text-slate-100">
-                      <div className="font-semibold leading-snug whitespace-normal break-words">
-                        {home}
-                      </div>
+                      <div className="font-semibold leading-snug whitespace-normal break-words">{home}</div>
                       <div className="text-[11px] text-slate-400">vs</div>
-                      <div className="font-semibold leading-snug whitespace-normal break-words">
-                        {away}
-                      </div>
+                      <div className="font-semibold leading-snug whitespace-normal break-words">{away}</div>
                     </div>
                   </div>
 
-                  {/* Placeholder de cuotas */}
+                  {/* Odds / Placeholder */}
                   <div className="w-[40%] md:w-[32%] text-right text-[11px] md:text-xs leading-snug">
-                    <span className="block text-cyan-300 font-semibold">
-                      Próximamente: cuotas 1X2 y valor esperado.
-                    </span>
+                    {m1x2 || mou ? (
+                      <div className="text-slate-200">
+                        {m1x2 && (
+                          <div className="text-cyan-200 font-semibold">
+                            1X2:{" "}
+                            <span className="text-slate-100">1</span> {m1x2.home ?? "--"}{" "}
+                            <span className="text-slate-100">X</span> {m1x2.draw ?? "--"}{" "}
+                            <span className="text-slate-100">2</span> {m1x2.away ?? "--"}
+                          </div>
+                        )}
+                        {mou && (
+                          <div className="text-emerald-200">
+                            O/U 2.5: O {mou.over ?? "--"} · U {mou.under ?? "--"}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="block text-cyan-300 font-semibold">
+                        Tocando el partido se cargan cuotas 1X2 y O/U 2.5.
+                      </span>
+                    )}
                     <span className="hidden md:block text-[11px] text-slate-400">
-                      Aquí verás las cuotas sugeridas para este partido.
+                      Cuotas provienen de API-Football (mercado).
                     </span>
                   </div>
 
-                  {/* Selector */}
+                  {/* Bolita de selección */}
                   <div className="w-6 flex justify-end">
                     <span
                       className={[
@@ -688,40 +732,29 @@ export default function Comparator() {
 
       {/* Tarjetas */}
       <section className="mt-4 space-y-4">
-        {/* Cuota segura */}
         <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
           <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-200 mb-2">
             Cuota segura (Regalo)
-            <span className="ml-2 text-[11px] text-yellow-100/90">
-              x1.5–x3 · 90–95% acierto
-            </span>
+            <span className="ml-2 text-[11px] text-yellow-100/90">x1.5–x3 · 90–95% acierto</span>
           </div>
           <p className="text-slate-200 text-sm">
-            Próximamente: resultados basados en tus filtros para usar como “regalo”
-            diario a tu comunidad (alta probabilidad, cuota baja).
+            Próximamente: resultados basados en tus filtros para usar como “regalo” diario a tu comunidad (alta probabilidad, cuota baja).
           </p>
         </div>
 
-        {/* Cuotas potenciadas */}
         <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
           <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-200 mb-2">
             Cuotas potenciadas
-            <span className="ml-2 text-[11px] text-emerald-100/90">
-              hasta x{maxBoost}
-            </span>
+            <span className="ml-2 text-[11px] text-emerald-100/90">hasta x{maxBoost}</span>
           </div>
 
           {fixtures.length === 0 ? (
             <p className="text-slate-300 text-sm mb-3">
-              Genera primero partidos con el botón de arriba para construir tus cuotas
-              potenciadas.
+              Genera primero partidos con el botón de arriba para construir tus cuotas potenciadas.
             </p>
           ) : (
             <p className="text-slate-300 text-sm mb-3">
-              Tu membresía permite combinadas hasta{" "}
-              <span className="font-semibold">x{maxBoost}</span>. Selecciona varios
-              partidos de la lista superior o deja que Factor Victoria arme una
-              combinada automática.
+              Tu membresía permite combinadas hasta <span className="font-semibold">x{maxBoost}</span>. Selecciona varios partidos de la lista superior o deja que Factor Victoria arme una combinada automática.
             </p>
           )}
 
@@ -762,9 +795,12 @@ export default function Comparator() {
               </p>
 
               {!parlayResult.reachedTarget && (
-                <p className="text-xs text-amber-300 mt-2">
-                  Nota: con la selección actual no se alcanzó la cuota objetivo x{parlayResult.target}.
-                  Prueba agregando 1–3 partidos más para acercarte al máximo de tu plan.
+                <p className="text-xs text-amber-200 mt-2">
+                  Nota: con esta selección no se alcanzó la cuota objetivo x{parlayResult.target}.
+                  <br />
+                  Factor Victoria priorizó una cuota máxima controlada y de alta precisión basada en tus elecciones.
+                  <br />
+                  Agrega 1–3 partidos más si deseas acercarte al potencial máximo de tu plan.
                 </p>
               )}
             </div>
@@ -772,31 +808,26 @@ export default function Comparator() {
 
           {!parlayResult && !parlayError && fixtures.length > 0 && (
             <p className="text-xs text-slate-400 mt-1">
-              Mientras tanto, estas combinadas son un ejemplo visual. Más adelante se
-              calcularán con las cuotas reales de los partidos.
+              Mientras tanto, estas combinadas son un ejemplo visual. Más adelante se calcularán con las cuotas reales de los partidos.
             </p>
           )}
         </div>
 
-        {/* Árbitros tarjeteros */}
         <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
           <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-500/20 text-red-200 mb-2">
             Árbitros más tarjeteros
           </div>
           <p className="text-slate-200 text-sm">
-            Genera para ver recomendaciones sobre partidos con árbitros propensos a
-            sacar tarjetas (ideal para over tarjetas).
+            Genera para ver recomendaciones sobre partidos con árbitros propensos a sacar tarjetas (ideal para over tarjetas).
           </p>
         </div>
 
-        {/* Desfase */}
         <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
           <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-sky-500/20 text-sky-200 mb-2">
             Cuota desfase del mercado
           </div>
           <p className="text-slate-200 text-sm">
-            Próximamente: Factor Victoria te mostrará posibles errores de mercado con
-            valor esperado positivo según tus filtros.
+            Próximamente: Factor Victoria te mostrará posibles errores de mercado con valor esperado positivo según tus filtros.
           </p>
         </div>
       </section>
