@@ -326,28 +326,33 @@ export default function Comparator() {
     "Francia",
   ];
 
-  const ensureOdds = useCallback(async (fixtureId) => {
-    if (!fixtureId) return;
+const ensureOdds = useCallback(async (fixtureId) => {
+  if (!fixtureId) return;
 
-    // Si ya está, no recargamos
-    if (oddsByFixture[fixtureId]) return;
+  // Si ya está, no recargamos
+  if (oddsByFixture[fixtureId]) return;
 
-    try {
-      const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(fixtureId)}`);
-      if (!res.ok) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(fixtureId)}`);
+    if (!res.ok) return;
 
-      const data = await res.json();
-      const markets = Array.isArray(data?.markets) ? data.markets : [];
+    const data = await res.json();
 
-      setOddsByFixture((prev) => ({
-        ...prev,
-        [fixtureId]: { markets, fetchedAt: Date.now() },
-      }));
-    } catch (e) {
-      // Silencioso: no queremos ensuciar UX si falla un partido
-      console.warn("odds error", e);
-    }
-  }, [API_BASE, oddsByFixture]);
+    // Backend devuelve: { found, markets: { "1X2": {...}, "OU_2_5": {...} } }
+    const pack = {
+      found: !!data?.found,
+      markets: data?.markets && typeof data.markets === "object" ? data.markets : {},
+      fetchedAt: Date.now(),
+    };
+
+    setOddsByFixture((prev) => ({
+      ...prev,
+      [fixtureId]: pack,
+    }));
+  } catch (e) {
+    console.warn("odds error", e);
+  }
+}, [API_BASE, oddsByFixture]);
 
   async function handleGenerate(e) {
     e?.preventDefault?.();
@@ -644,9 +649,9 @@ export default function Comparator() {
               const time = getKickoffTime(fx);
 
               const oddsPack = oddsByFixture[id] || null;
-              const markets = oddsPack?.markets || [];
-              const m1x2 = extract1X2(markets, home, away);
-              const mou = extractOU25(markets);
+const m1x2 = oddsPack?.markets?.["1X2"] || null;
+const mou = oddsPack?.markets?.["OU_2_5"] || null;
+const found = oddsPack?.found;
 
               return (
                 <li
@@ -687,26 +692,31 @@ export default function Comparator() {
                   {/* Odds / Placeholder */}
                   <div className="w-[40%] md:w-[32%] text-right text-[11px] md:text-xs leading-snug">
                     {m1x2 || mou ? (
-                      <div className="text-slate-200">
-                        {m1x2 && (
-                          <div className="text-cyan-200 font-semibold">
-                            1X2:{" "}
-                            <span className="text-slate-100">1</span> {m1x2.home ?? "--"}{" "}
-                            <span className="text-slate-100">X</span> {m1x2.draw ?? "--"}{" "}
-                            <span className="text-slate-100">2</span> {m1x2.away ?? "--"}
-                          </div>
-                        )}
-                        {mou && (
-                          <div className="text-emerald-200">
-                            O/U 2.5: O {mou.over ?? "--"} · U {mou.under ?? "--"}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="block text-cyan-300 font-semibold">
-                        Tocando el partido se cargan cuotas 1X2 y O/U 2.5.
-                      </span>
-                    )}
+  <div className="text-slate-200">
+    {m1x2 && (
+      <div className="text-cyan-200 font-semibold">
+        1X2:{" "}
+        <span className="text-slate-100">1</span> {m1x2.home ?? "--"}{" "}
+        <span className="text-slate-100">X</span> {m1x2.draw ?? "--"}{" "}
+        <span className="text-slate-100">2</span> {m1x2.away ?? "--"}
+      </div>
+    )}
+    {mou && (
+      <div className="text-emerald-200">
+        O/U 2.5: O {mou.over ?? "--"} · U {mou.under ?? "--"}
+      </div>
+    )}
+  </div>
+) : found === false ? (
+  <span className="block text-amber-300 font-semibold">
+    No hay cuotas disponibles para este partido (mercado).
+  </span>
+) : (
+  <span className="block text-cyan-300 font-semibold">
+    Tocando el partido se cargan cuotas 1X2 y O/U 2.5.
+  </span>
+)}
+
                     <span className="hidden md:block text-[11px] text-slate-400">
                       Cuotas provienen de API-Football (mercado).
                     </span>
