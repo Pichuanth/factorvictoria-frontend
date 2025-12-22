@@ -87,45 +87,19 @@ function getFixtureId(f) {
 }
 
 function getLeagueName(f) {
-  return (
-    f.league?.name ||
-    f.leagueName ||
-    f.league_name ||
-    f.competition ||
-    "Liga desconocida"
-  );
+  return f.league?.name || f.leagueName || f.league_name || f.competition || "Liga desconocida";
 }
 
 function getCountryName(f) {
-  return (
-    f.league?.country ||
-    f.country ||
-    f.country_name ||
-    f.location ||
-    "World"
-  );
+  return f.league?.country || f.country || f.country_name || f.location || "World";
 }
 
 function getHomeName(f) {
-  return (
-    f.homeTeam ||
-    f.home_name ||
-    f.localTeam ||
-    f.team_home ||
-    f.teams?.home?.name ||
-    "Local"
-  );
+  return f.homeTeam || f.home_name || f.localTeam || f.team_home || f.teams?.home?.name || "Local";
 }
 
 function getAwayName(f) {
-  return (
-    f.awayTeam ||
-    f.away_name ||
-    f.visitTeam ||
-    f.team_away ||
-    f.teams?.away?.name ||
-    "Visita"
-  );
+  return f.awayTeam || f.away_name || f.visitTeam || f.team_away || f.teams?.away?.name || "Visita";
 }
 
 function getKickoffTime(f) {
@@ -164,7 +138,7 @@ function isFutureFixture(fx) {
     if (!Number.isNaN(ms)) return ms > now;
   }
 
-  const iso = fx.date || fx.fixture?.date || null;
+  const iso = fx.date || fx.fixture?.date먣
   if (iso) {
     const d = new Date(iso);
     if (!Number.isNaN(d.getTime())) return d.getTime() > now;
@@ -194,88 +168,6 @@ function isMajorLeague(fx) {
   return IMPORTANT_LEAGUES.some((imp) => name.includes(String(imp).toLowerCase()));
 }
 
-/* --------------------- Odds parsing --------------------- */
-
-function findMarket(markets = [], keyHints = []) {
-  const m = Array.isArray(markets) ? markets : [];
-  const hints = keyHints.map((x) => String(x).toLowerCase());
-  return m.find((mk) => {
-    const k = String(mk?.key || mk?.name || "").toLowerCase();
-    return hints.some((h) => k.includes(h));
-  }) || null;
-}
-
-function normalizeOddValueLabel(v) {
-  return String(v || "").toLowerCase().trim();
-}
-
-function extract1X2(markets, homeName, awayName) {
-  const market =
-    findMarket(markets, ["1x2", "match winner", "winner", "fulltime result"]) ||
-    null;
-
-  if (!market?.values?.length) return null;
-
-  const vals = market.values;
-  const homeKey = normalizeOddValueLabel(homeName);
-  const awayKey = normalizeOddValueLabel(awayName);
-
-  let home = null, draw = null, away = null;
-
-  for (const it of vals) {
-    const label = normalizeOddValueLabel(it?.value);
-    const odd = Number(it?.odd);
-    if (!odd || Number.isNaN(odd)) continue;
-
-    if (label === "draw" || label === "x" || label.includes("empate")) draw = odd;
-    else if (label.includes(homeKey) || label === "home" || label === "1" || label.includes("local")) home = odd;
-    else if (label.includes(awayKey) || label === "away" || label === "2" || label.includes("visita")) away = odd;
-  }
-
-  // fallback por si API viene con "Home/Draw/Away" literal
-  if (home == null) {
-    const it = vals.find((x) => normalizeOddValueLabel(x?.value) === "home");
-    if (it) home = Number(it.odd);
-  }
-  if (away == null) {
-    const it = vals.find((x) => normalizeOddValueLabel(x?.value) === "away");
-    if (it) away = Number(it.odd);
-  }
-  if (draw == null) {
-    const it = vals.find((x) => normalizeOddValueLabel(x?.value) === "draw");
-    if (it) draw = Number(it.odd);
-  }
-
-  if (home == null && draw == null && away == null) return null;
-  return { home, draw, away };
-}
-
-function extractOU25(markets) {
-  const market =
-    findMarket(markets, ["over/under", "goals over/under", "total goals"]) ||
-    null;
-
-  if (!market?.values?.length) return null;
-
-  let over = null, under = null;
-
-  for (const it of market.values) {
-    const label = normalizeOddValueLabel(it?.value);
-    const odd = Number(it?.odd);
-    if (!odd || Number.isNaN(odd)) continue;
-
-    // buscamos 2.5
-    const is25 = label.includes("2.5");
-    if (!is25) continue;
-
-    if (label.includes("over")) over = odd;
-    if (label.includes("under")) under = odd;
-  }
-
-  if (over == null && under == null) return null;
-  return { over, under };
-}
-
 /* --------------------- componente --------------------- */
 
 export default function Comparator() {
@@ -295,7 +187,7 @@ export default function Comparator() {
   const [parlayResult, setParlayResult] = useState(null);
   const [parlayError, setParlayError] = useState("");
 
-  // odds cache: { [fixtureId]: { markets, fetchedAt } }
+  // odds cache: { [fixtureId]: { found, markets, fetchedAt } }
   const [oddsByFixture, setOddsByFixture] = useState({});
 
   useEffect(() => {
@@ -326,33 +218,31 @@ export default function Comparator() {
     "Francia",
   ];
 
-const ensureOdds = useCallback(async (fixtureId) => {
-  if (!fixtureId) return;
+  const ensureOdds = useCallback(async (fixtureId) => {
+    if (!fixtureId) return;
 
-  // Si ya está, no recargamos
-  if (oddsByFixture[fixtureId]) return;
+    // Si ya está, no recargamos
+    if (oddsByFixture[fixtureId]) return;
 
-  try {
-    const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(fixtureId)}`);
-    if (!res.ok) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(fixtureId)}`);
+      if (!res.ok) return;
 
-    const data = await res.json();
+      const data = await res.json();
 
-    // Backend devuelve: { found, markets: { "1X2": {...}, "OU_2_5": {...} } }
-    const pack = {
-      found: !!data?.found,
-      markets: data?.markets && typeof data.markets === "object" ? data.markets : {},
-      fetchedAt: Date.now(),
-    };
-
-    setOddsByFixture((prev) => ({
-      ...prev,
-      [fixtureId]: pack,
-    }));
-  } catch (e) {
-    console.warn("odds error", e);
-  }
-}, [API_BASE, oddsByFixture]);
+      // data.markets es OBJETO: { "1X2": {...}, "OU_2_5": {...} }
+      setOddsByFixture((prev) => ({
+        ...prev,
+        [fixtureId]: {
+          found: !!data?.found,
+          markets: data?.markets || {},
+          fetchedAt: Date.now(),
+        },
+      }));
+    } catch (e) {
+      console.warn("odds error", e);
+    }
+  }, [API_BASE, oddsByFixture]);
 
   async function handleGenerate(e) {
     e?.preventDefault?.();
@@ -389,7 +279,6 @@ const ensureOdds = useCallback(async (fixtureId) => {
       const data = await res.json();
       const items = Array.isArray(data?.items) ? data.items : [];
 
-      // Filtrar y limitar
       let filtered = items
         .filter(isFutureFixture)
         .filter((fx) => !isYouthOrWomenOrReserve(fx))
@@ -479,7 +368,7 @@ const ensureOdds = useCallback(async (fixtureId) => {
       return;
     }
 
-    // (Opcional) precargar odds de los primeros 10 para que se vea “vivo”
+    // precarga odds de los primeros 10 para que se vea “vivo”
     const first10 = fixtures.slice(0, 10).map(getFixtureId).filter(Boolean);
     first10.forEach((id) => ensureOdds(id));
 
@@ -649,9 +538,13 @@ const ensureOdds = useCallback(async (fixtureId) => {
               const time = getKickoffTime(fx);
 
               const oddsPack = oddsByFixture[id] || null;
-const m1x2 = oddsPack?.markets?.["1X2"] || null;
-const mou = oddsPack?.markets?.["OU_2_5"] || null;
-const found = oddsPack?.found;
+              const m1x2 = oddsPack?.markets?.["1X2"] || null;
+              const mou = oddsPack?.markets?.["OU_2_5"] || null;
+              const found = oddsPack?.found; // true/false/undefined
+
+              const hasOdds =
+                (m1x2 && (m1x2.home != null || m1x2.draw != null || m1x2.away != null)) ||
+                (mou && (mou.over != null || mou.under != null));
 
               return (
                 <li
@@ -691,31 +584,29 @@ const found = oddsPack?.found;
 
                   {/* Odds / Placeholder */}
                   <div className="w-[40%] md:w-[32%] text-right text-[11px] md:text-xs leading-snug">
-                    {m1x2 || mou ? (
-  <div className="text-slate-200">
-    {m1x2 && (
-      <div className="text-cyan-200 font-semibold">
-        1X2:{" "}
-        <span className="text-slate-100">1</span> {m1x2.home ?? "--"}{" "}
-        <span className="text-slate-100">X</span> {m1x2.draw ?? "--"}{" "}
-        <span className="text-slate-100">2</span> {m1x2.away ?? "--"}
-      </div>
-    )}
-    {mou && (
-      <div className="text-emerald-200">
-        O/U 2.5: O {mou.over ?? "--"} · U {mou.under ?? "--"}
-      </div>
-    )}
-  </div>
-) : found === false ? (
-  <span className="block text-amber-300 font-semibold">
-    No hay cuotas disponibles para este partido (mercado).
-  </span>
-) : (
-  <span className="block text-cyan-300 font-semibold">
-    Tocando el partido se cargan cuotas 1X2 y O/U 2.5.
-  </span>
-)}
+                    {hasOdds ? (
+                      <div className="text-slate-200">
+                        {m1x2 && (
+                          <div className="text-cyan-200 font-semibold">
+                            1X2:{" "}
+                            <span className="text-slate-100">1</span> {m1x2.home ?? "--"}{" "}
+                            <span className="text-slate-100">X</span> {m1x2.draw ?? "--"}{" "}
+                            <span className="text-slate-100">2</span> {m1x2.away ?? "--"}
+                          </div>
+                        )}
+                        {mou && (
+                          <div className="text-emerald-200">
+                            O/U 2.5: O {mou.over ?? "--"} · U {mou.under ?? "--"}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="block text-cyan-300 font-semibold">
+                        {found === false
+                          ? "Sin cuotas disponibles para este partido (API)."
+                          : "Tocando el partido se cargan cuotas 1X2 y O/U 2.5."}
+                      </span>
+                    )}
 
                     <span className="hidden md:block text-[11px] text-slate-400">
                       Cuotas provienen de API-Football (mercado).
