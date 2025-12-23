@@ -165,7 +165,29 @@ function isYouthOrWomenOrReserve(fx) {
 /** Solo ligas “top” */
 function isMajorLeague(fx) {
   const name = String(getLeagueName(fx) || "").toLowerCase();
-  return IMPORTANT_LEAGUES.some((imp) => name.includes(String(imp).toLowerCase()));
+  const country = String(getCountryName(fx) || "").toLowerCase();
+
+  // lista actual
+  const hit = IMPORTANT_LEAGUES.some((imp) => name.includes(String(imp).toLowerCase()));
+  if (hit) return true;
+
+  // fallback: primeras divisiones típicas (API-Football varía nombres)
+  const commonTop =
+    name.includes("primera") ||
+    name.includes("1st division") ||
+    name.includes("first division") ||
+    name.includes("liga professional") ||
+    name.includes("serie a") ||
+    name.includes("bundesliga") ||
+    name.includes("ligue 1") ||
+    name.includes("premier league") ||
+    name.includes("la liga");
+
+  if (commonTop && ["england","spain","italy","germany","france","chile","argentina","brazil","portugal","mexico"].includes(country)) {
+    return true;
+  }
+
+  return false;
 }
 
 /* --------------------- componente --------------------- */
@@ -277,30 +299,46 @@ export default function Comparator() {
       if (!res.ok) throw new Error(`HTTP ${res.status} – ${res.statusText || ""}`);
 
       const data = await res.json();
-      const items = Array.isArray(data?.items) ? data.items : [];
+     const items = Array.isArray(data?.items) ? data.items : [];
 
-      let filtered = items
-        .filter(isFutureFixture)
-        .filter((fx) => !isYouthOrWomenOrReserve(fx))
-        .filter(isMajorLeague);
+// Filtrar
+const future = items.filter(isFutureFixture);
+const noBanned = future.filter((fx) => !isYouthOrWomenOrReserve(fx));
+const majors = noBanned.filter(isMajorLeague);
 
-      const sorted = [...filtered].sort((a, b) => {
-        const prioA = getLeaguePriority(getLeagueName(a), getCountryName(a));
-        const prioB = getLeaguePriority(getLeagueName(b), getCountryName(b));
-        if (prioA !== prioB) return prioA - prioB;
+// Si quedó en 0 pero la API trajo cosas, mostramos “sin filtro de ligas top”
+let filtered = majors;
+let usedFallback = false;
 
-        const tA = getKickoffTime(a) || "";
-        const tB = getKickoffTime(b) || "";
-        return tA.localeCompare(tB);
-      });
+if (filtered.length === 0 && noBanned.length > 0) {
+  filtered = noBanned;       // quita solo el filtro de ligas top
+  usedFallback = true;
+}
 
-      const LIMITED = sorted.slice(0, 120);
+const sorted = [...filtered].sort((a, b) => {
+  const prioA = getLeaguePriority(getLeagueName(a), getCountryName(a));
+  const prioB = getLeaguePriority(getLeagueName(b), getCountryName(b));
+  if (prioA !== prioB) return prioA - prioB;
 
-      if (!LIMITED.length) {
-        setErr("No encontramos partidos FUTUROS relevantes para este rango/filtro. Prueba con más días o sin filtrar por equipo.");
-        setFixtures([]);
-        return;
-      }
+  const tA = getKickoffTime(a) || "";
+  const tB = getKickoffTime(b) || "";
+  return tA.localeCompare(tB);
+});
+
+const LIMITED = sorted.slice(0, 120);
+
+if (!LIMITED.length) {
+  setErr("No encontramos partidos FUTUROS para este rango. Prueba con más días (7 días) o sin filtros.");
+  setFixtures([]);
+  return;
+}
+
+setFixtures(LIMITED);
+
+setInfo(
+  `API: ${items.length} | futuros: ${future.length} | sin juveniles: ${noBanned.length} | ligas top: ${majors.length}` +
+  (usedFallback ? " | Mostrando sin filtro de ligas top." : "")
+);
 
       setFixtures(LIMITED);
       setInfo(`Se encontraron ${LIMITED.length} partidos FUTUROS relevantes para este rango. Puedes seleccionar partidos para armar tus parlays.`);
