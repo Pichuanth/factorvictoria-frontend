@@ -82,6 +82,7 @@ function getFixtureId(f) {
     f.fixture_id ||
     f.fixture?.id ||
     f.fixture?.fixture_id ||
+    f.fixture?.fixtureId ||
     `${f.league?.id || ""}-${f.timestamp || f.date || f.fixture?.date || ""}`
   );
 }
@@ -138,12 +139,13 @@ function isFutureFixture(fx) {
     if (!Number.isNaN(ms)) return ms > now;
   }
 
-  const iso = fx.date || fx.fixture?.date먣
+  const iso = fx.date || fx.fixture?.date || null; // ✅ arreglado
   if (iso) {
     const d = new Date(iso);
     if (!Number.isNaN(d.getTime())) return d.getTime() > now;
   }
 
+  // si no podemos determinar, lo consideramos futuro para no eliminar por error
   return true;
 }
 
@@ -162,16 +164,16 @@ function isYouthOrWomenOrReserve(fx) {
   return banned.some((p) => blob.includes(p));
 }
 
-/** Solo ligas “top” */
+/** Solo ligas “top” (con fallback flexible) */
 function isMajorLeague(fx) {
   const name = String(getLeagueName(fx) || "").toLowerCase();
   const country = String(getCountryName(fx) || "").toLowerCase();
 
-  // lista actual
+  // lista directa
   const hit = IMPORTANT_LEAGUES.some((imp) => name.includes(String(imp).toLowerCase()));
   if (hit) return true;
 
-  // fallback: primeras divisiones típicas (API-Football varía nombres)
+  // fallback: nombres típicos que varían
   const commonTop =
     name.includes("primera") ||
     name.includes("1st division") ||
@@ -183,7 +185,10 @@ function isMajorLeague(fx) {
     name.includes("premier league") ||
     name.includes("la liga");
 
-  if (commonTop && ["england","spain","italy","germany","france","chile","argentina","brazil","portugal","mexico"].includes(country)) {
+  if (
+    commonTop &&
+    ["england","spain","italy","germany","france","chile","argentina","brazil","portugal","mexico"].includes(country)
+  ) {
     return true;
   }
 
@@ -229,42 +234,35 @@ export default function Comparator() {
 
   const maxBoost = getMaxBoostFromPlan(planLabel);
 
-  const quickCountries = [
-    "Chile",
-    "España",
-    "Portugal",
-    "Italia",
-    "Alemania",
-    "Argentina",
-    "Inglaterra",
-    "Francia",
-  ];
+  const quickCountries = ["Chile", "España", "Portugal", "Italia", "Alemania", "Argentina", "Inglaterra", "Francia"];
 
-  const ensureOdds = useCallback(async (fixtureId) => {
-    if (!fixtureId) return;
+  const ensureOdds = useCallback(
+    async (fixtureId) => {
+      if (!fixtureId) return;
 
-    // Si ya está, no recargamos
-    if (oddsByFixture[fixtureId]) return;
+      // Si ya está en cache, no recargamos
+      if (oddsByFixture[fixtureId]) return;
 
-    try {
-      const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(fixtureId)}`);
-      if (!res.ok) return;
+      try {
+        const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(fixtureId)}`);
+        if (!res.ok) return;
 
-      const data = await res.json();
+        const data = await res.json();
 
-      // data.markets es OBJETO: { "1X2": {...}, "OU_2_5": {...} }
-      setOddsByFixture((prev) => ({
-        ...prev,
-        [fixtureId]: {
-          found: !!data?.found,
-          markets: data?.markets || {},
-          fetchedAt: Date.now(),
-        },
-      }));
-    } catch (e) {
-      console.warn("odds error", e);
-    }
-  }, [API_BASE, oddsByFixture]);
+        setOddsByFixture((prev) => ({
+          ...prev,
+          [fixtureId]: {
+            found: !!data?.found,
+            markets: data?.markets || {},
+            fetchedAt: Date.now(),
+          },
+        }));
+      } catch (e) {
+        console.warn("odds error", e);
+      }
+    },
+    [API_BASE, oddsByFixture]
+  );
 
   async function handleGenerate(e) {
     e?.preventDefault?.();
@@ -299,49 +297,48 @@ export default function Comparator() {
       if (!res.ok) throw new Error(`HTTP ${res.status} – ${res.statusText || ""}`);
 
       const data = await res.json();
-     const items = Array.isArray(data?.items) ? data.items : [];
 
-// Filtrar
-const future = items.filter(isFutureFixture);
-const noBanned = future.filter((fx) => !isYouthOrWomenOrReserve(fx));
-const majors = noBanned.filter(isMajorLeague);
+      // ✅ soporta backend: { items: [...] } o API-Football: { response: [...] }
+      const itemsRaw =
+        (Array.isArray(data?.items) && data.items) ||
+        (Array.isArray(data?.response) && data.response) ||
+        [];
 
-// Si quedó en 0 pero la API trajo cosas, mostramos “sin filtro de ligas top”
-let filtered = majors;
-let usedFallback = false;
+      // 1) filtro base: futuro + no juveniles/reservas/femenino
+      const base = itemsRaw.filter(isFutureFixture).filter((fx) => !isYouthOrWomenOrReserve(fx));
 
-if (filtered.length === 0 && noBanned.length > 0) {
-  filtered = noBanned;       // quita solo el filtro de ligas top
-  usedFallback = true;
-}
+      // 2) ligas top, con fallback si deja demasiado vacío
+      const majors = base.filter(isMajorLeague);
+      const filtered = majors.length >= 8 ? majors : base;
 
-const sorted = [...filtered].sort((a, b) => {
-  const prioA = getLeaguePriority(getLeagueName(a), getCountryName(a));
-  const prioB = getLeaguePriority(getLeagueName(b), getCountryName(b));
-  if (prioA !== prioB) return prioA - prioB;
+      // orden y límite
+      const sorted = [...filtered].sort((a, b) => {
+        const prioA = getLeaguePriority(getLeagueName(a), getCountryName(a));
+        const prioB = getLeaguePriority(getLeagueName(b), getCountryName(b));
+        if (prioA !== prioB) return prioA - prioB;
 
-  const tA = getKickoffTime(a) || "";
-  const tB = getKickoffTime(b) || "";
-  return tA.localeCompare(tB);
-});
+        const tA = getKickoffTime(a) || "";
+        const tB = getKickoffTime(b) || "";
+        return tA.localeCompare(tB);
+      });
 
-const LIMITED = sorted.slice(0, 120);
+      const LIMITED = sorted.slice(0, 120);
 
-if (!LIMITED.length) {
-  setErr("No encontramos partidos FUTUROS para este rango. Prueba con más días (7 días) o sin filtros.");
-  setFixtures([]);
-  return;
-}
-
-setFixtures(LIMITED);
-
-setInfo(
-  `API: ${items.length} | futuros: ${future.length} | sin juveniles: ${noBanned.length} | ligas top: ${majors.length}` +
-  (usedFallback ? " | Mostrando sin filtro de ligas top." : "")
-);
+      if (!LIMITED.length) {
+        setErr(
+          `No encontramos partidos para ese rango. API devolvió: ${itemsRaw.length} | ` +
+          `base: ${base.length} | ligas top: ${majors.length}. ` +
+          `Prueba con 7–14 días y sin filtro (q vacío).`
+        );
+        setFixtures([]);
+        return;
+      }
 
       setFixtures(LIMITED);
-      setInfo(`Se encontraron ${LIMITED.length} partidos FUTUROS relevantes para este rango. Puedes seleccionar partidos para armar tus parlays.`);
+      setInfo(
+        `API devolvió ${itemsRaw.length} partidos. Mostrando ${LIMITED.length} tras filtros ` +
+        `(base: ${base.length}, top: ${majors.length}${majors.length >= 8 ? "" : ", fallback base"}).`
+      );
     } catch (e2) {
       console.error(e2);
       setErr(String(e2.message || e2));
@@ -361,7 +358,7 @@ setInfo(
 
   const selectedCount = selectedIds.length;
 
-  // Por ahora: combinadas siguen siendo “demo” de producto (luego las haremos 100% reales)
+  // Demo de producto (luego lo haremos 100% real)
   function fakeOddForFixture(fx) {
     const id = getFixtureId(fx);
     const key = String(id || getHomeName(fx) + getAwayName(fx));
@@ -406,7 +403,6 @@ setInfo(
       return;
     }
 
-    // precarga odds de los primeros 10 para que se vea “vivo”
     const first10 = fixtures.slice(0, 10).map(getFixtureId).filter(Boolean);
     first10.forEach((id) => ensureOdds(id));
 
@@ -439,7 +435,6 @@ setInfo(
       return;
     }
 
-    // precarga odds solo de los seleccionados
     pool.map(getFixtureId).filter(Boolean).forEach((id) => ensureOdds(id));
 
     const suggestion = buildComboSuggestion(pool, maxBoost);
@@ -475,8 +470,10 @@ setInfo(
       <section className="mt-4 rounded-2xl bg-white/5 border border-white/10 p-4 md:p-6">
         <form onSubmit={handleGenerate} className="flex flex-col md:flex-row md:items-end gap-3 items-stretch">
           <div className="flex-1">
-            <label className="block text-xs text-slate-400 mb-1">Desde</label>
+            <label className="block text-xs text-slate-400 mb-1" htmlFor="fromDate">Desde</label>
             <input
+              id="fromDate"
+              name="fromDate"
               type="date"
               value={from}
               onChange={(e) => setFrom(e.target.value)}
@@ -485,8 +482,10 @@ setInfo(
           </div>
 
           <div className="flex-1">
-            <label className="block text-xs text-slate-400 mb-1">Hasta</label>
+            <label className="block text-xs text-slate-400 mb-1" htmlFor="toDate">Hasta</label>
             <input
+              id="toDate"
+              name="toDate"
               type="date"
               value={to}
               onChange={(e) => setTo(e.target.value)}
@@ -495,8 +494,10 @@ setInfo(
           </div>
 
           <div className="flex-[2]">
-            <label className="block text-xs text-slate-400 mb-1">Filtro (país / liga / equipo)</label>
+            <label className="block text-xs text-slate-400 mb-1" htmlFor="qFilter">Filtro (país / liga / equipo)</label>
             <input
+              id="qFilter"
+              name="qFilter"
               placeholder="Ej: Chile, La Liga, Colo Colo, Premier League..."
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -589,7 +590,7 @@ setInfo(
                   key={id}
                   onClick={() => {
                     toggleFixtureSelection(id);
-                    ensureOdds(id); // carga cuotas al primer click
+                    ensureOdds(id);
                   }}
                   className={[
                     "px-4 py-3 flex items-center gap-3 cursor-pointer transition-colors",
