@@ -15,10 +15,11 @@ function Home() {
   const plans = [
     {
       tag: "Mensual",
+      planName: "Plan Inicio",
       price: "$19.990",
       sub: "Mensual",
       bullets: [
-        "Guia para principiantes",
+        "Guía para principiantes",
         "Picks análisis básicos diarios",
         "Simulador de ganancias incluido",
         "Cuotas x1.5 de regalo",
@@ -29,10 +30,12 @@ function Home() {
     },
     {
       tag: "Trimestral",
+      planName: "Plan Goleador",
       price: "$44.990",
       sub: "+1 Mes de Regalo 🎁",
       bullets: [
-        "4 meses modo profesional",
+        "4 meses modo Profesional",
+        "Trofeo Goleador Edición Limitada",
         "Guía de estrategia y gestión de banca",
         "1 Estrategia VIP incluida",
         "Cuotas x1.5 a x3 de regalo",
@@ -46,9 +49,12 @@ function Home() {
     },
     {
       tag: "Anual",
+      planName: "Plan Campeón",
       price: "$99.990",
       sub: "Anual",
       bullets: [
+        "Trofeo Profesional Factor Victoria",
+        "Medalla Conmemorativa Oficial",
         "Guía de estrategia PRO",
         "2 Estrategias VIP incluidas",
         "Cuotas x1.5 a x3 de regalo",
@@ -64,9 +70,13 @@ function Home() {
     },
     {
       tag: "Vitalicio",
+      planName: "Plan Leyenda",
       price: "$249.990",
       sub: "Vitalicio",
       bullets: [
+        "Copa Leyenda Edición elite",
+        "Trofeo profesional Factor Victoria",
+        "Medalla oficial Leyenda",
         "Guía de estrategia PRO",
         "Alertas claves de partidos al correo",
         "3 Estrategias VIP incluidas",
@@ -163,18 +173,27 @@ function Home() {
                 ].join(" ")}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <div className="text-lg font-bold">{p.tag}</div>
-                  {p.badge ? (
-                    <span className="text-[11px] px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-200 border border-yellow-500/30">
-                      {p.badge}
-                    </span>
-                  ) : null}
-                </div>
+  <div className="flex items-center gap-2 text-lg font-bold">
+    {/* Tag en blanco */}
+    <span className="text-white">{p.tag}</span>
 
-                <div className="flex items-baseline gap-2 mb-1">
-                  <div className="text-3xl font-extrabold">{p.price}</div>
-                  <div className="text-xs text-slate-400">{p.sub}</div>
-                </div>
+    {/* Plan name en dorado (solo si existe) */}
+    {p.planName && (
+      <span
+        className="font-semibold"
+        style={{ color: GOLD }}
+      >
+        {p.planName}
+      </span>
+    )}
+  </div>
+
+  {p.badge ? (
+    <span className="text-[11px] px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-200 border border-yellow-500/30">
+      {p.badge}
+    </span>
+  ) : null}
+</div>
 
                 <ul className="mt-4 space-y-2 text-sm text-slate-200">
                   {p.bullets.map((b) => (

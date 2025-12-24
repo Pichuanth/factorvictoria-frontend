@@ -82,7 +82,6 @@ function getFixtureId(f) {
     f.fixture_id ||
     f.fixture?.id ||
     f.fixture?.fixture_id ||
-    f.fixture?.fixtureId ||
     `${f.league?.id || ""}-${f.timestamp || f.date || f.fixture?.date || ""}`
   );
 }
@@ -109,13 +108,11 @@ function getKickoffTime(f) {
 
   const iso = f.date || f.fixture?.date;
   if (typeof iso === "string" && iso.includes("T")) {
-    try {
-      const d = new Date(iso);
+    const d = new Date(iso);
+    if (!Number.isNaN(d.getTime())) {
       const hh = String(d.getHours()).padStart(2, "0");
       const mm = String(d.getMinutes()).padStart(2, "0");
       return `${hh}:${mm}`;
-    } catch {
-      return "--:--";
     }
   }
   return f.hour || "--:--";
@@ -139,13 +136,13 @@ function isFutureFixture(fx) {
     if (!Number.isNaN(ms)) return ms > now;
   }
 
-  const iso = fx.date || fx.fixture?.date || null; // ✅ arreglado
+  const iso = fx.date || fx.fixture?.date;
   if (iso) {
     const d = new Date(iso);
     if (!Number.isNaN(d.getTime())) return d.getTime() > now;
   }
 
-  // si no podemos determinar, lo consideramos futuro para no eliminar por error
+  // Si no hay fecha, no lo descartamos (fallback)
   return true;
 }
 
@@ -164,16 +161,14 @@ function isYouthOrWomenOrReserve(fx) {
   return banned.some((p) => blob.includes(p));
 }
 
-/** Solo ligas “top” (con fallback flexible) */
+/** Solo ligas “top” */
 function isMajorLeague(fx) {
   const name = String(getLeagueName(fx) || "").toLowerCase();
   const country = String(getCountryName(fx) || "").toLowerCase();
 
-  // lista directa
   const hit = IMPORTANT_LEAGUES.some((imp) => name.includes(String(imp).toLowerCase()));
   if (hit) return true;
 
-  // fallback: nombres típicos que varían
   const commonTop =
     name.includes("primera") ||
     name.includes("1st division") ||
@@ -205,6 +200,7 @@ export default function Comparator() {
   const [from, setFrom] = useState(toYYYYMMDD(today));
   const [to, setTo] = useState(toYYYYMMDD(today));
   const [q, setQ] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
@@ -234,35 +230,39 @@ export default function Comparator() {
 
   const maxBoost = getMaxBoostFromPlan(planLabel);
 
-  const quickCountries = ["Chile", "España", "Portugal", "Italia", "Alemania", "Argentina", "Inglaterra", "Francia"];
+  const quickCountries = [
+    "Chile",
+    "España",
+    "Portugal",
+    "Italia",
+    "Alemania",
+    "Argentina",
+    "Inglaterra",
+    "Francia",
+  ];
 
-  const ensureOdds = useCallback(
-    async (fixtureId) => {
-      if (!fixtureId) return;
+  const ensureOdds = useCallback(async (fixtureId) => {
+    if (!fixtureId) return;
+    if (oddsByFixture[fixtureId]) return;
 
-      // Si ya está en cache, no recargamos
-      if (oddsByFixture[fixtureId]) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(fixtureId)}`);
+      if (!res.ok) return;
 
-      try {
-        const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(fixtureId)}`);
-        if (!res.ok) return;
+      const data = await res.json();
 
-        const data = await res.json();
-
-        setOddsByFixture((prev) => ({
-          ...prev,
-          [fixtureId]: {
-            found: !!data?.found,
-            markets: data?.markets || {},
-            fetchedAt: Date.now(),
-          },
-        }));
-      } catch (e) {
-        console.warn("odds error", e);
-      }
-    },
-    [API_BASE, oddsByFixture]
-  );
+      setOddsByFixture((prev) => ({
+        ...prev,
+        [fixtureId]: {
+          found: !!data?.found,
+          markets: data?.markets || {},
+          fetchedAt: Date.now(),
+        },
+      }));
+    } catch (e) {
+      console.warn("odds error", e);
+    }
+  }, [oddsByFixture]);
 
   async function handleGenerate(e) {
     e?.preventDefault?.();
@@ -298,20 +298,21 @@ export default function Comparator() {
 
       const data = await res.json();
 
-      // ✅ soporta backend: { items: [...] } o API-Football: { response: [...] }
+      // backend puede devolver {items:[...]} o API-Football {response:[...]}
       const itemsRaw =
         (Array.isArray(data?.items) && data.items) ||
         (Array.isArray(data?.response) && data.response) ||
         [];
 
-      // 1) filtro base: futuro + no juveniles/reservas/femenino
-      const base = itemsRaw.filter(isFutureFixture).filter((fx) => !isYouthOrWomenOrReserve(fx));
+      // 1) base: futuros + sin juveniles/reserva/femenino
+      const base = itemsRaw
+        .filter(isFutureFixture)
+        .filter((fx) => !isYouthOrWomenOrReserve(fx));
 
-      // 2) ligas top, con fallback si deja demasiado vacío
-      const majors = base.filter(isMajorLeague);
-      const filtered = majors.length >= 8 ? majors : base;
+      // 2) ligas top (pero con fallback si queda muy poco)
+      const top = base.filter(isMajorLeague);
+      const filtered = top.length >= 8 ? top : base;
 
-      // orden y límite
       const sorted = [...filtered].sort((a, b) => {
         const prioA = getLeaguePriority(getLeagueName(a), getCountryName(a));
         const prioB = getLeaguePriority(getLeagueName(b), getCountryName(b));
@@ -326,8 +327,7 @@ export default function Comparator() {
 
       if (!LIMITED.length) {
         setErr(
-          `No encontramos partidos para ese rango. API devolvió: ${itemsRaw.length} | ` +
-          `base: ${base.length} | ligas top: ${majors.length}. ` +
+          `No encontramos partidos para ese rango. API devolvió: ${itemsRaw.length} | base: ${base.length} | ligas top: ${top.length}. ` +
           `Prueba con 7–14 días y sin filtro (q vacío).`
         );
         setFixtures([]);
@@ -336,8 +336,8 @@ export default function Comparator() {
 
       setFixtures(LIMITED);
       setInfo(
-        `API devolvió ${itemsRaw.length} partidos. Mostrando ${LIMITED.length} tras filtros ` +
-        `(base: ${base.length}, top: ${majors.length}${majors.length >= 8 ? "" : ", fallback base"}).`
+        `API: ${itemsRaw.length} | futuros+sin juveniles: ${base.length} | ligas top: ${top.length}` +
+        (top.length >= 8 ? "" : " | Mostrando sin filtro de ligas top.")
       );
     } catch (e2) {
       console.error(e2);
@@ -358,7 +358,7 @@ export default function Comparator() {
 
   const selectedCount = selectedIds.length;
 
-  // Demo de producto (luego lo haremos 100% real)
+  // demo odds (por ahora)
   function fakeOddForFixture(fx) {
     const id = getFixtureId(fx);
     const key = String(id || getHomeName(fx) + getAwayName(fx));
@@ -459,7 +459,7 @@ export default function Comparator() {
           </p>
         ) : (
           <p className="text-slate-300 text-sm md:text-base">
-            Modo visitante: prueba el comparador con filtros reales pero con funcionalidad limitada.{" "}
+            Modo visitante: explora partidos reales, pero las combinadas profesionales están reservadas para miembros. {" "}
             <Link to="/" className="underline font-semibold">Activa una membresía</Link>{" "}
             para desbloquear todas las herramientas profesionales.
           </p>
@@ -470,10 +470,8 @@ export default function Comparator() {
       <section className="mt-4 rounded-2xl bg-white/5 border border-white/10 p-4 md:p-6">
         <form onSubmit={handleGenerate} className="flex flex-col md:flex-row md:items-end gap-3 items-stretch">
           <div className="flex-1">
-            <label className="block text-xs text-slate-400 mb-1" htmlFor="fromDate">Desde</label>
+            <label className="block text-xs text-slate-400 mb-1">Desde</label>
             <input
-              id="fromDate"
-              name="fromDate"
               type="date"
               value={from}
               onChange={(e) => setFrom(e.target.value)}
@@ -482,10 +480,8 @@ export default function Comparator() {
           </div>
 
           <div className="flex-1">
-            <label className="block text-xs text-slate-400 mb-1" htmlFor="toDate">Hasta</label>
+            <label className="block text-xs text-slate-400 mb-1">Hasta</label>
             <input
-              id="toDate"
-              name="toDate"
               type="date"
               value={to}
               onChange={(e) => setTo(e.target.value)}
@@ -494,10 +490,8 @@ export default function Comparator() {
           </div>
 
           <div className="flex-[2]">
-            <label className="block text-xs text-slate-400 mb-1" htmlFor="qFilter">Filtro (país / liga / equipo)</label>
+            <label className="block text-xs text-slate-400 mb-1">Filtro (país / liga / equipo)</label>
             <input
-              id="qFilter"
-              name="qFilter"
               placeholder="Ej: Chile, La Liga, Colo Colo, Premier League..."
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -534,25 +528,20 @@ export default function Comparator() {
         {/* Mensajes */}
         {err && (
           <div className="mt-3 text-sm text-amber-300">
-            {err}
+            {err}{" "}
             {!isLoggedIn && (
-              <>
-                {" "}
-                <Link to="/" className="underline font-semibold">Ver planes</Link>
-              </>
+              <Link to="/" className="underline font-semibold">Ver planes</Link>
             )}
           </div>
         )}
-
         {!err && info && <div className="mt-3 text-xs text-slate-400">{info}</div>}
       </section>
 
-      {/* Lista compacta de partidos */}
+      {/* Lista compacta */}
       <section className="mt-4 rounded-2xl border border-slate-800/80 bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-950 shadow-[0_18px_40px_rgba(15,23,42,0.85)]">
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/80 text-[11px] md:text-xs text-slate-300 tracking-wide">
           <span className="uppercase">
-            Partidos encontrados:{" "}
-            <span className="font-semibold text-slate-50">{fixtures.length}</span>
+            Partidos encontrados: <span className="font-semibold text-slate-50">{fixtures.length}</span>
           </span>
           <span className="uppercase text-right">
             Toca un partido para añadirlo / quitarlo de tu combinada.
@@ -579,7 +568,7 @@ export default function Comparator() {
               const oddsPack = oddsByFixture[id] || null;
               const m1x2 = oddsPack?.markets?.["1X2"] || null;
               const mou = oddsPack?.markets?.["OU_2_5"] || null;
-              const found = oddsPack?.found; // true/false/undefined
+              const found = oddsPack?.found;
 
               const hasOdds =
                 (m1x2 && (m1x2.home != null || m1x2.draw != null || m1x2.away != null)) ||
@@ -597,12 +586,10 @@ export default function Comparator() {
                     isSelected ? "bg-slate-900/90" : "hover:bg-slate-900/70",
                   ].join(" ")}
                 >
-                  {/* Hora */}
                   <div className="w-14 text-[11px] md:text-xs font-semibold text-slate-100">
                     {time || "--:--"}
                   </div>
 
-                  {/* País / competición + equipos */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1 text-xs md:text-sm text-slate-200">
                       <span className="mr-1 text-lg leading-none">{flagEmoji}</span>
@@ -621,14 +608,12 @@ export default function Comparator() {
                     </div>
                   </div>
 
-                  {/* Odds / Placeholder */}
                   <div className="w-[40%] md:w-[32%] text-right text-[11px] md:text-xs leading-snug">
                     {hasOdds ? (
                       <div className="text-slate-200">
                         {m1x2 && (
                           <div className="text-cyan-200 font-semibold">
-                            1X2:{" "}
-                            <span className="text-slate-100">1</span> {m1x2.home ?? "--"}{" "}
+                            1X2: <span className="text-slate-100">1</span> {m1x2.home ?? "--"}{" "}
                             <span className="text-slate-100">X</span> {m1x2.draw ?? "--"}{" "}
                             <span className="text-slate-100">2</span> {m1x2.away ?? "--"}
                           </div>
@@ -641,18 +626,14 @@ export default function Comparator() {
                       </div>
                     ) : (
                       <span className="block text-cyan-300 font-semibold">
-                        {found === false
-                          ? "Sin cuotas disponibles para este partido (API)."
-                          : "Tocando el partido se cargan cuotas 1X2 y O/U 2.5."}
+                        {found === false ? "Sin cuotas disponibles para este partido (API)." : "Tocando el partido se cargan cuotas 1X2 y O/U 2.5."}
                       </span>
                     )}
-
                     <span className="hidden md:block text-[11px] text-slate-400">
                       Cuotas provienen de API-Football (mercado).
                     </span>
                   </div>
 
-                  {/* Bolita de selección */}
                   <div className="w-6 flex justify-end">
                     <span
                       className={[
@@ -684,8 +665,7 @@ export default function Comparator() {
 
         <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
           <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-200 mb-2">
-            Cuotas potenciadas
-            <span className="ml-2 text-[11px] text-emerald-100/90">hasta x{maxBoost}</span>
+            Cuotas potenciadas <span className="ml-2 text-[11px] text-emerald-100/90">hasta x{maxBoost}</span>
           </div>
 
           {fixtures.length === 0 ? (
@@ -694,7 +674,7 @@ export default function Comparator() {
             </p>
           ) : (
             <p className="text-slate-300 text-sm mb-3">
-              Tu membresía permite combinadas hasta <span className="font-semibold">x{maxBoost}</span>. Selecciona varios partidos de la lista superior o deja que Factor Victoria arme una combinada automática.
+              Tu membresía permite combinadas hasta <span className="font-semibold">x{maxBoost}</span>. Selecciona varios partidos o deja que Factor Victoria arme una combinada automática.
             </p>
           )}
 
@@ -733,16 +713,6 @@ export default function Comparator() {
                 <br />
                 📉 El porcentaje total disminuye a medida que agregas más partidos a tu combinada.
               </p>
-
-              {!parlayResult.reachedTarget && (
-                <p className="text-xs text-amber-200 mt-2">
-                  Nota: con esta selección no se alcanzó la cuota objetivo x{parlayResult.target}.
-                  <br />
-                  Factor Victoria priorizó una cuota máxima controlada y de alta precisión basada en tus elecciones.
-                  <br />
-                  Agrega 1–3 partidos más si deseas acercarte al potencial máximo de tu plan.
-                </p>
-              )}
             </div>
           )}
 
@@ -751,24 +721,6 @@ export default function Comparator() {
               Mientras tanto, estas combinadas son un ejemplo visual. Más adelante se calcularán con las cuotas reales de los partidos.
             </p>
           )}
-        </div>
-
-        <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
-          <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-500/20 text-red-200 mb-2">
-            Árbitros más tarjeteros
-          </div>
-          <p className="text-slate-200 text-sm">
-            Genera para ver recomendaciones sobre partidos con árbitros propensos a sacar tarjetas (ideal para over tarjetas).
-          </p>
-        </div>
-
-        <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
-          <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-sky-500/20 text-sky-200 mb-2">
-            Cuota desfase del mercado
-          </div>
-          <p className="text-slate-200 text-sm">
-            Próximamente: Factor Victoria te mostrará posibles errores de mercado con valor esperado positivo según tus filtros.
-          </p>
         </div>
       </section>
     </div>
