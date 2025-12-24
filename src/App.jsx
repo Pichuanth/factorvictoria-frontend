@@ -126,6 +126,14 @@ function Home() {
               <div className="text-sm text-slate-300">
                 Paga con Flow o Mercado Pago · hasta 6 cuotas
               </div>
+              <div className="mt-2">
+  <div className="text-2xl md:text-3xl font-extrabold">
+    {p.price}
+  </div>
+  <div className="text-xs text-slate-400">
+    {p.sub}
+  </div>
+</div>
             </div>
 
             <h1 className="text-3xl md:text-5xl font-extrabold leading-tight">
