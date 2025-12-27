@@ -30,10 +30,7 @@ const COUNTRY_ALIAS = {
 };
 
 function normalizeCountryQuery(q) {
-  const key = String(q || "")
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, "");
+  const key = String(q || "").toLowerCase().trim().replace(/\s+/g, "");
   return COUNTRY_ALIAS[key] || null;
 }
 
@@ -333,20 +330,27 @@ export default function Comparator() {
 
       const r = await fetch(`${API_BASE}/api/referees/cards?${params.toString()}`);
 
-      // si el endpoint aún no existe, lo mostramos como “en construcción” y no rompemos nada
+      // Si el endpoint aún no existe, mensaje claro y listo
       if (r.status === 404) {
         setRefData(null);
         setRefErr("Módulo en construcción: falta crear /api/referees/cards en el backend.");
         return;
       }
 
+      // Puede venir HTML/Texto si algo falla; igual lo protegemos
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j?.message || j?.error || `HTTP ${r.status}`);
 
       setRefData(j);
     } catch (e) {
+      // “Failed to fetch” suele ser: endpoint caído, CORS, DNS, etc.
+      const msg = String(e?.message || e);
       setRefData(null);
-      setRefErr(String(e?.message || e));
+      setRefErr(
+        msg.toLowerCase().includes("failed to fetch")
+          ? "No se pudo conectar al backend para cargar árbitros. Crea el endpoint /api/referees/cards y vuelve a intentar."
+          : msg
+      );
     } finally {
       setRefLoading(false);
     }
@@ -364,7 +368,7 @@ export default function Comparator() {
     setParlayError("");
     setLoading(true);
 
-    // también reseteamos módulo árbitros
+    // reset módulo árbitros
     setRefData(null);
     setRefErr("");
 
@@ -374,14 +378,14 @@ export default function Comparator() {
       return;
     }
 
+    const qTrim = String(q || "").trim();
+
     try {
       const params = new URLSearchParams();
       params.set("from", from);
       params.set("to", to);
 
-      const qTrim = String(q || "").trim();
       const countryEN = normalizeCountryQuery(qTrim);
-
       if (countryEN) params.set("country", countryEN);
       else if (qTrim) params.set("q", qTrim);
 
@@ -426,12 +430,10 @@ export default function Comparator() {
       setFixtures(LIMITED);
       setInfo(`API: ${itemsRaw.length} | base: ${base.length} | top: ${major.length} | mostrando: ${LIMITED.length}`);
 
-      // ---- cargar árbitros tarjeteros (solo si plan lo permite) ----
+      // cargar árbitros tarjeteros (solo si plan lo permite) — sin romper nada si falla
       if (features.referees) {
         const countryENForRefs = normalizeCountryQuery(qTrim);
         await loadReferees(from, to, countryENForRefs);
-      } else {
-        setRefData(null);
       }
     } catch (e2) {
       setErr(String(e2?.message || e2));
@@ -482,7 +484,7 @@ export default function Comparator() {
     const impliedProb = Number(((1 / finalOdd) * 100).toFixed(1));
     const reachedTarget = finalOdd >= maxBoostArg * 0.8;
 
-    return { games: picks.length, finalOdd, target: maxBoostArg, impliedProb, reachedTarget };
+    return { games: picks.length, finalOdd, target: maxBoostArg, impliedProb, reachedTarget, picks };
   }
 
   async function handleAutoParlay() {
@@ -784,7 +786,20 @@ export default function Comparator() {
                   ? `Ejemplo automático: ${parlayResult.games} partidos, cuota x${parlayResult.finalOdd}`
                   : `Ejemplo con tu selección: ${parlayResult.games} partidos, cuota x${parlayResult.finalOdd}`}
               </p>
-              <p className="text-xs text-slate-400">
+
+              {/* Explicación para principiantes */}
+              <details className="mt-2 rounded-xl border border-white/10 bg-white/5 p-3">
+                <summary className="cursor-pointer text-xs text-slate-200 font-semibold">
+                  ¿Qué significa 1X2 y O/U 2.5?
+                </summary>
+                <div className="mt-2 text-xs text-slate-300 space-y-1">
+                  <div><span className="font-semibold text-slate-100">1X2</span>: <span className="font-semibold">1</span> gana Local · <span className="font-semibold">X</span> Empate · <span className="font-semibold">2</span> gana Visita.</div>
+                  <div><span className="font-semibold text-slate-100">O/U 2.5</span>: <span className="font-semibold">O</span> = Over (más de 2.5 goles) · <span className="font-semibold">U</span> = Under (menos de 2.5 goles).</div>
+                  <div className="text-[11px] text-slate-400">Luego lo haremos más “humano”: selección sugerida + explicación de por qué.</div>
+                </div>
+              </details>
+
+              <p className="text-xs text-slate-400 mt-2">
                 Nota: hoy es un ejemplo visual. Luego se calculará con cuotas reales por mercado.
               </p>
             </div>
