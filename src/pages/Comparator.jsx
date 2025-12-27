@@ -263,8 +263,17 @@ export default function Comparator() {
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
 
+  // árbitros
+  const [refData, setRefData] = useState(null);
+  const [refLoading, setRefLoading] = useState(false);
+  const [refErr, setRefErr] = useState("");
+
   const [fixtures, setFixtures] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
+
+  // parlays
+  const [parlayResult, setParlayResult] = useState(null);
+  const [parlayError, setParlayError] = useState("");
 
   // odds cache: { [fixtureId]: { found, markets, fetchedAt } }
   const [oddsByFixture, setOddsByFixture] = useState({});
@@ -289,6 +298,33 @@ export default function Comparator() {
 
   const quickCountries = ["Chile","España","Portugal","Italia","Alemania","Argentina","Inglaterra","Francia"];
 
+  // ---- loadReferees: DEBE IR DENTRO DEL COMPONENTE ----
+  const loadReferees = useCallback(
+    async (fromVal, toVal, countryENOrNull) => {
+      try {
+        setRefErr("");
+        setRefLoading(true);
+
+        const params = new URLSearchParams();
+        params.set("from", fromVal);
+        params.set("to", toVal);
+        if (countryENOrNull) params.set("country", countryENOrNull);
+
+        const r = await fetch(`${API_BASE}/api/referees/cards?${params.toString()}`);
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j?.message || j?.error || `HTTP ${r.status}`);
+
+        setRefData(j);
+      } catch (e) {
+        setRefErr(String(e?.message || e));
+        setRefData(null);
+      } finally {
+        setRefLoading(false);
+      }
+    },
+    []
+  );
+
   const ensureOdds = useCallback(async (fixtureId) => {
     if (!fixtureId) return;
     if (oddsByFixture[fixtureId]) return;
@@ -307,7 +343,7 @@ export default function Comparator() {
         },
       }));
     } catch {
-      // silencio; no rompemos UI
+      // silencio
     }
   }, [oddsByFixture]);
 
@@ -319,7 +355,13 @@ export default function Comparator() {
     setFixtures([]);
     setSelectedIds([]);
     setOddsByFixture({});
+    setParlayResult(null);
+    setParlayError("");
     setLoading(true);
+
+    // limpiar árbitros al generar (si no tiene feature, lo dejamos nulo)
+    setRefErr("");
+    setRefData(null);
 
     if (!isLoggedIn) {
       setLoading(false);
@@ -377,11 +419,20 @@ export default function Comparator() {
           `Prueba con 7–14 días y sin filtro (q vacío).`
         );
         setFixtures([]);
+        setLoading(false);
         return;
       }
 
       setFixtures(LIMITED);
       setInfo(`API: ${itemsRaw.length} | base: ${base.length} | top: ${major.length} | mostrando: ${LIMITED.length}`);
+
+      // ✅ Cargar árbitros tarjeteros SOLO si el plan lo permite (DENTRO del try)
+      if (features.referees) {
+        await loadReferees(from, to, countryEN);
+      } else {
+        setRefData(null);
+      }
+
     } catch (e2) {
       setErr(String(e2?.message || e2));
     } finally {
@@ -409,7 +460,7 @@ export default function Comparator() {
     return Number(base.toFixed(2));
   }
 
-  function buildComboSuggestion(fixturesPool, maxBoost) {
+  function buildComboSuggestion(fixturesPool, boost) {
     if (!Array.isArray(fixturesPool) || fixturesPool.length === 0) return null;
 
     const picks = [];
@@ -417,26 +468,23 @@ export default function Comparator() {
 
     for (const fx of fixturesPool) {
       const odd = fakeOddForFixture(fx);
-      if (product * odd > maxBoost * 1.35) continue;
+      if (product * odd > boost * 1.35) continue;
 
       product *= odd;
       picks.push({ id: getFixtureId(fx), label: `${getHomeName(fx)} vs ${getAwayName(fx)}`, odd });
 
       if (picks.length >= 12) break;
-      if (product >= maxBoost * 0.8) break;
+      if (product >= boost * 0.8) break;
     }
 
     if (!picks.length) return null;
 
     const finalOdd = Number(product.toFixed(2));
     const impliedProb = Number(((1 / finalOdd) * 100).toFixed(1));
-    const reachedTarget = finalOdd >= maxBoost * 0.8;
+    const reachedTarget = finalOdd >= boost * 0.8;
 
-    return { games: picks.length, finalOdd, target: maxBoost, impliedProb, reachedTarget };
+    return { games: picks.length, finalOdd, target: boost, impliedProb, reachedTarget };
   }
-
-  const [parlayResult, setParlayResult] = useState(null);
-  const [parlayError, setParlayError] = useState("");
 
   async function handleAutoParlay() {
     setParlayError("");
@@ -483,15 +531,6 @@ export default function Comparator() {
 
     setParlayResult({ mode: "selected", ...suggestion });
   }
-
-  // Placeholder data (hasta que conectes endpoints reales)
-  const topReferees = [
-    { name: "Juan Soto", avgCards: 6.1 },
-    { name: "Matías Rojas", avgCards: 5.8 },
-    { name: "Pedro Díaz", avgCards: 5.6 },
-    { name: "Carlos Vera", avgCards: 5.5 },
-    { name: "Andrés Leiva", avgCards: 5.4 },
-  ];
 
   return (
     <div className="max-w-5xl mx-auto px-4 pb-20">
@@ -762,39 +801,57 @@ export default function Comparator() {
           lockText="Disponible desde el plan Anual."
         >
           <div className="text-sm text-slate-200">
-            <div className="text-xs text-slate-400 mb-2">Top árbitros (placeholder)</div>
-            <ul className="space-y-1">
-              {topReferees.slice(0, 5).map((r) => (
-                <li key={r.name} className="flex items-center justify-between text-xs">
-                  <span className="text-slate-200">{r.name}</span>
-                  <span className="text-amber-200 font-semibold">{r.avgCards} tarjetas / partido</span>
-                </li>
-              ))}
-            </ul>
+            {refLoading && <div className="text-xs text-slate-400">Cargando árbitros...</div>}
+            {refErr && <div className="text-xs text-amber-300">Error: {refErr}</div>}
 
-            <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-3">
-              <div className="text-xs text-slate-400">🔥 Partido recomendado por árbitro tarjetero</div>
-              <div className="mt-1 text-sm font-semibold text-slate-50">
-                Juan Soto <span className="text-amber-200">(prom. 6.1 tarjetas)</span>
-              </div>
-              <div className="mt-1 text-xs text-slate-300">
-                Si aún no hay partido asignado a este árbitro para tu rango, mostraremos: “Aún no se le ha asignado un partido”.
-              </div>
-            </div>
+            {!refLoading && !refErr && (
+              <>
+                <div className="text-xs text-slate-400 mb-2">Top árbitros</div>
+                <ul className="space-y-1">
+                  {(refData?.topReferees || []).slice(0, 10).map((r) => (
+                    <li key={r.name} className="flex items-center justify-between text-xs">
+                      <span className="text-slate-200">{r.name}</span>
+                      <span className="text-amber-200 font-semibold">
+                        {r.avgCards != null ? `${r.avgCards} tarjetas / partido` : "—"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-3">
+                  <div className="text-xs text-slate-400">🔥 Partido recomendado por árbitro tarjetero</div>
+
+                  {refData?.recommended ? (
+                    <>
+                      <div className="mt-1 text-sm font-semibold text-slate-50">
+                        {refData.recommended.referee?.name}{" "}
+                        {refData.recommended.referee?.avgCards != null && (
+                          <span className="text-amber-200">(prom. {refData.recommended.referee.avgCards} tarjetas)</span>
+                        )}
+                      </div>
+                      <div className="mt-2 text-xs text-slate-300">
+                        {refData.recommended.fixture?.teams?.home?.name} vs {refData.recommended.fixture?.teams?.away?.name}
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-1">
+                        {refData.recommended.fixture?.league?.country} · {refData.recommended.fixture?.league?.name}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="mt-1 text-xs text-slate-300">
+                      Aún no se le ha asignado un partido en este rango. Prueba ampliando fechas o quitando el filtro país.
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </FeatureCard>
 
-        <FeatureCard
-          title="Probabilidad alta de gol"
-          badge="BTTS · Over 1.5 · Over 2.5"
-          locked={false}
-        >
+        <FeatureCard title="Probabilidad alta de gol" badge="BTTS · Over 1.5 · Over 2.5" locked={false}>
           <p className="text-slate-200 text-sm">
             Recomendación de partidos con alta probabilidad de gol (modelo interno). Lo conectamos cuando definamos el scoring.
           </p>
-          <p className="text-xs text-slate-400 mt-2">
-            Sugerencia: mostrar “Top 5 del día” + “Top 1 recomendado”.
-          </p>
+          <p className="text-xs text-slate-400 mt-2">Sugerencia: mostrar “Top 5 del día” + “Top 1 recomendado”.</p>
         </FeatureCard>
 
         <FeatureCard
