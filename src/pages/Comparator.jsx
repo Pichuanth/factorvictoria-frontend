@@ -30,7 +30,10 @@ const COUNTRY_ALIAS = {
 };
 
 function normalizeCountryQuery(q) {
-  const key = String(q || "").toLowerCase().trim().replace(/\s+/g, "");
+  const key = String(q || "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "");
   return COUNTRY_ALIAS[key] || null;
 }
 
@@ -218,7 +221,9 @@ function FeatureCard({ title, badge, children, locked, lockText }) {
     <div className="relative rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5 overflow-hidden">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-sm md:text-base font-semibold text-slate-50">{title}</div>
+          {/* TITULO EN CELESTE */}
+          <div className="text-sm md:text-base font-semibold text-cyan-200">{title}</div>
+
           {badge && (
             <div className="mt-1 inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/5 border border-white/10 text-slate-200">
               {badge}
@@ -330,27 +335,29 @@ export default function Comparator() {
 
       const r = await fetch(`${API_BASE}/api/referees/cards?${params.toString()}`);
 
-      // Si el endpoint aún no existe, mensaje claro y listo
       if (r.status === 404) {
         setRefData(null);
-        setRefErr("Módulo en construcción: falta crear /api/referees/cards en el backend.");
+        setRefErr("Módulo en construcción: falta crear /api/referees/cards en el backend (Express app.js).");
         return;
       }
 
-      // Puede venir HTML/Texto si algo falla; igual lo protegemos
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j?.message || j?.error || `HTTP ${r.status}`);
 
       setRefData(j);
     } catch (e) {
-      // “Failed to fetch” suele ser: endpoint caído, CORS, DNS, etc.
       const msg = String(e?.message || e);
+
+      // “Failed to fetch” suele ser backend caído / URL base incorrecta / CORS / deploy
+      if (msg.toLowerCase().includes("failed to fetch")) {
+        setRefErr(
+          "No se pudo conectar al backend para cargar árbitros. Verifica que el backend tenga /api/referees/cards y que VITE_API_BASE apunte al backend correcto."
+        );
+      } else {
+        setRefErr(msg);
+      }
+
       setRefData(null);
-      setRefErr(
-        msg.toLowerCase().includes("failed to fetch")
-          ? "No se pudo conectar al backend para cargar árbitros. Crea el endpoint /api/referees/cards y vuelve a intentar."
-          : msg
-      );
     } finally {
       setRefLoading(false);
     }
@@ -368,7 +375,6 @@ export default function Comparator() {
     setParlayError("");
     setLoading(true);
 
-    // reset módulo árbitros
     setRefData(null);
     setRefErr("");
 
@@ -378,14 +384,14 @@ export default function Comparator() {
       return;
     }
 
-    const qTrim = String(q || "").trim();
-
     try {
       const params = new URLSearchParams();
       params.set("from", from);
       params.set("to", to);
 
+      const qTrim = String(q || "").trim();
       const countryEN = normalizeCountryQuery(qTrim);
+
       if (countryEN) params.set("country", countryEN);
       else if (qTrim) params.set("q", qTrim);
 
@@ -430,10 +436,11 @@ export default function Comparator() {
       setFixtures(LIMITED);
       setInfo(`API: ${itemsRaw.length} | base: ${base.length} | top: ${major.length} | mostrando: ${LIMITED.length}`);
 
-      // cargar árbitros tarjeteros (solo si plan lo permite) — sin romper nada si falla
       if (features.referees) {
         const countryENForRefs = normalizeCountryQuery(qTrim);
         await loadReferees(from, to, countryENForRefs);
+      } else {
+        setRefData(null);
       }
     } catch (e2) {
       setErr(String(e2?.message || e2));
@@ -484,7 +491,7 @@ export default function Comparator() {
     const impliedProb = Number(((1 / finalOdd) * 100).toFixed(1));
     const reachedTarget = finalOdd >= maxBoostArg * 0.8;
 
-    return { games: picks.length, finalOdd, target: maxBoostArg, impliedProb, reachedTarget, picks };
+    return { games: picks.length, finalOdd, target: maxBoostArg, impliedProb, reachedTarget };
   }
 
   async function handleAutoParlay() {
@@ -787,17 +794,16 @@ export default function Comparator() {
                   : `Ejemplo con tu selección: ${parlayResult.games} partidos, cuota x${parlayResult.finalOdd}`}
               </p>
 
-              {/* Explicación para principiantes */}
-              <details className="mt-2 rounded-xl border border-white/10 bg-white/5 p-3">
-                <summary className="cursor-pointer text-xs text-slate-200 font-semibold">
-                  ¿Qué significa 1X2 y O/U 2.5?
-                </summary>
-                <div className="mt-2 text-xs text-slate-300 space-y-1">
-                  <div><span className="font-semibold text-slate-100">1X2</span>: <span className="font-semibold">1</span> gana Local · <span className="font-semibold">X</span> Empate · <span className="font-semibold">2</span> gana Visita.</div>
-                  <div><span className="font-semibold text-slate-100">O/U 2.5</span>: <span className="font-semibold">O</span> = Over (más de 2.5 goles) · <span className="font-semibold">U</span> = Under (menos de 2.5 goles).</div>
-                  <div className="text-[11px] text-slate-400">Luego lo haremos más “humano”: selección sugerida + explicación de por qué.</div>
+              {/* Mini explicación para principiantes */}
+              <div className="mt-2 text-xs text-slate-300">
+                <div className="font-semibold text-slate-200">¿Qué significa 1X2 y O/U 2.5?</div>
+                <div className="mt-1">
+                  <span className="text-slate-200 font-semibold">1X2</span>: 1 gana Local · X empate · 2 gana Visita.
                 </div>
-              </details>
+                <div className="mt-1">
+                  <span className="text-slate-200 font-semibold">O/U 2.5</span>: O (Over) más de 2.5 goles · U (Under) menos de 2.5 goles.
+                </div>
+              </div>
 
               <p className="text-xs text-slate-400 mt-2">
                 Nota: hoy es un ejemplo visual. Luego se calculará con cuotas reales por mercado.
@@ -856,7 +862,7 @@ export default function Comparator() {
                     </>
                   ) : (
                     <div className="mt-1 text-xs text-slate-300">
-                      Aún no se le ha asignado un partido en este rango. Prueba ampliando fechas o quitando el filtro país.
+                      Aún no se encontró un partido futuro en este rango. Prueba ampliando fechas o quitando el filtro país.
                     </div>
                   )}
                 </div>
