@@ -4,7 +4,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 
 const GOLD = "#E6C464";
-const API_BASE = import.meta.env.VITE_API_BASE || "";
+const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(/\/$/, "");
 
 /* --------------------- helpers --------------------- */
 
@@ -24,14 +24,17 @@ const COUNTRY_ALIAS = {
   portugal: "Portugal",
   italia: "Italy",
   alemania: "Germany",
+  mexico: "Mexico",
+  eeuu: "USA",
+  estadosunidos: "USA",
 };
 
 function normalizeCountryQuery(q) {
-  const key = String(q || "").toLowerCase().trim();
+  const key = String(q || "").toLowerCase().trim().replace(/\s+/g, "");
   return COUNTRY_ALIAS[key] || null;
 }
 
-// Emojis de banderas
+// Emojis de banderas (fallback a 🏳️)
 const COUNTRY_FLAG = {
   Chile: "🇨🇱",
   Argentina: "🇦🇷",
@@ -52,13 +55,13 @@ const IMPORTANT_LEAGUES = [
   "Europa League",
   "CONMEBOL Libertadores",
   "Copa Libertadores",
+  "CONMEBOL Sudamericana",
   "Premier League",
   "La Liga",
   "Serie A",
   "Bundesliga",
   "Ligue 1",
   "Copa del Rey",
-  "CONMEBOL Sudamericana",
 ];
 
 function getLeaguePriority(leagueName = "", country = "") {
@@ -103,9 +106,6 @@ function getAwayName(f) {
 }
 
 function getKickoffTime(f) {
-  if (f.time) return f.time;
-  if (f.kickoffTime) return f.kickoffTime;
-
   const iso = f.date || f.fixture?.date;
   if (typeof iso === "string" && iso.includes("T")) {
     const d = new Date(iso);
@@ -115,15 +115,7 @@ function getKickoffTime(f) {
       return `${hh}:${mm}`;
     }
   }
-  return f.hour || "--:--";
-}
-
-function getMaxBoostFromPlan(planLabel) {
-  const p = String(planLabel || "").toUpperCase();
-  if (p.includes("VITA")) return 100;
-  if (p.includes("ANU")) return 50;
-  if (p.includes("TRI") || p.includes("3")) return 20;
-  return 10;
+  return f.time || f.hour || "--:--";
 }
 
 /** FUTUROS */
@@ -136,32 +128,30 @@ function isFutureFixture(fx) {
     if (!Number.isNaN(ms)) return ms > now;
   }
 
-  const iso = fx.date || fx.fixture?.date;
+  const iso = fx.date || fx.fixture?.date || null;
   if (iso) {
     const d = new Date(iso);
     if (!Number.isNaN(d.getTime())) return d.getTime() > now;
   }
 
-  // Si no hay fecha, no lo descartamos (fallback)
+  // si no hay fecha, no lo descartamos
   return true;
 }
 
 /** Filtra juveniles / reservas / femenino */
 function isYouthOrWomenOrReserve(fx) {
   const blob = `${getLeagueName(fx)} ${getHomeName(fx)} ${getAwayName(fx)}`.toLowerCase();
-
   const banned = [
-    "u17", "u18", "u19", "u20", "u21", "u23",
-    "reserves", "reserve", "youth", "juvenil",
-    "sub-", "sub ",
-    " women", "womens", "femen", " fem", " w ",
-    " ii", " b ",
+    "u17","u18","u19","u20","u21","u23",
+    "reserves","reserve","youth","juvenil",
+    "sub-","sub ",
+    " women","womens","femen"," fem"," w ",
+    " ii"," b ",
   ];
-
   return banned.some((p) => blob.includes(p));
 }
 
-/** Solo ligas “top” */
+/** Solo ligas “top” (con fallback automático si deja 0) */
 function isMajorLeague(fx) {
   const name = String(getLeagueName(fx) || "").toLowerCase();
   const country = String(getCountryName(fx) || "").toLowerCase();
@@ -190,6 +180,74 @@ function isMajorLeague(fx) {
   return false;
 }
 
+/* --------------------- Plan & Features --------------------- */
+
+function normalizePlanLabel(raw) {
+  const p = String(raw || "").toUpperCase();
+  if (p.includes("VITA")) return "VITALICIO";
+  if (p.includes("ANU")) return "ANUAL";
+  if (p.includes("TRI") || p.includes("3")) return "TRIMESTRAL";
+  if (p.includes("MES")) return "MENSUAL";
+  return "MENSUAL";
+}
+
+function getMaxBoostFromPlan(planLabel) {
+  if (planLabel === "VITALICIO") return 100;
+  if (planLabel === "ANUAL") return 50;
+  if (planLabel === "TRIMESTRAL") return 20;
+  return 10;
+}
+
+function getPlanFeatures(planLabel) {
+  const base = { giftPick: true, boosted: true };
+
+  if (planLabel === "MENSUAL") {
+    return { ...base, referees: false, marketValue: false, scorers: false, shooters: 0 };
+  }
+  if (planLabel === "TRIMESTRAL") {
+    return { ...base, referees: false, marketValue: false, scorers: false, shooters: 0 };
+  }
+  if (planLabel === "ANUAL") {
+    return { ...base, referees: true, marketValue: false, scorers: false, shooters: 5 };
+  }
+  // VITALICIO
+  return { ...base, referees: true, marketValue: true, scorers: true, shooters: 10 };
+}
+
+function FeatureCard({ title, badge, children, locked, lockText }) {
+  return (
+    <div className="relative rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5 overflow-hidden">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-sm md:text-base font-semibold text-slate-50">{title}</div>
+          {badge && (
+            <div className="mt-1 inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/5 border border-white/10 text-slate-200">
+              {badge}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-3">{children}</div>
+
+      {locked && (
+        <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-[2px] flex items-center justify-center p-4">
+          <div className="max-w-sm text-center">
+            <div className="text-sm font-semibold text-slate-50">Bloqueado por plan</div>
+            <div className="mt-1 text-xs text-slate-300">{lockText || "Disponible en planes superiores."}</div>
+            <Link
+              to="/"
+              className="inline-flex mt-3 items-center justify-center rounded-xl px-3 py-2 text-xs font-semibold border border-yellow-400/60 bg-yellow-500/10 text-yellow-200"
+            >
+              Ver planes
+            </Link>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* --------------------- componente --------------------- */
 
 export default function Comparator() {
@@ -204,11 +262,9 @@ export default function Comparator() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
+
   const [fixtures, setFixtures] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
-
-  const [parlayResult, setParlayResult] = useState(null);
-  const [parlayError, setParlayError] = useState("");
 
   // odds cache: { [fixtureId]: { found, markets, fetchedAt } }
   const [oddsByFixture, setOddsByFixture] = useState({});
@@ -224,22 +280,14 @@ export default function Comparator() {
   }, [searchParams]);
 
   const planLabel = useMemo(() => {
-    const raw = user?.planId || user?.plan?.id || user?.plan || user?.membership || "";
-    return String(raw || "").toUpperCase();
+    const raw = user?.planId || user?.plan?.id || user?.plan || user?.membership || "MENSUAL";
+    return normalizePlanLabel(raw);
   }, [user]);
 
   const maxBoost = getMaxBoostFromPlan(planLabel);
+  const features = useMemo(() => getPlanFeatures(planLabel), [planLabel]);
 
-  const quickCountries = [
-    "Chile",
-    "España",
-    "Portugal",
-    "Italia",
-    "Alemania",
-    "Argentina",
-    "Inglaterra",
-    "Francia",
-  ];
+  const quickCountries = ["Chile","España","Portugal","Italia","Alemania","Argentina","Inglaterra","Francia"];
 
   const ensureOdds = useCallback(async (fixtureId) => {
     if (!fixtureId) return;
@@ -248,7 +296,6 @@ export default function Comparator() {
     try {
       const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(fixtureId)}`);
       if (!res.ok) return;
-
       const data = await res.json();
 
       setOddsByFixture((prev) => ({
@@ -259,8 +306,8 @@ export default function Comparator() {
           fetchedAt: Date.now(),
         },
       }));
-    } catch (e) {
-      console.warn("odds error", e);
+    } catch {
+      // silencio; no rompemos UI
     }
   }, [oddsByFixture]);
 
@@ -271,8 +318,6 @@ export default function Comparator() {
     setInfo("");
     setFixtures([]);
     setSelectedIds([]);
-    setParlayResult(null);
-    setParlayError("");
     setOddsByFixture({});
     setLoading(true);
 
@@ -294,25 +339,26 @@ export default function Comparator() {
       else if (qTrim) params.set("q", qTrim);
 
       const res = await fetch(`${API_BASE}/api/fixtures?${params.toString()}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status} – ${res.statusText || ""}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const data = await res.json();
 
-      // backend puede devolver {items:[...]} o API-Football {response:[...]}
+      // Backend: { items: [...] } o { response: [...] }
       const itemsRaw =
         (Array.isArray(data?.items) && data.items) ||
         (Array.isArray(data?.response) && data.response) ||
         [];
 
-      // 1) base: futuros + sin juveniles/reserva/femenino
+      // 1) base: futuro + no juveniles/reserva
       const base = itemsRaw
         .filter(isFutureFixture)
         .filter((fx) => !isYouthOrWomenOrReserve(fx));
 
-      // 2) ligas top (pero con fallback si queda muy poco)
-      const top = base.filter(isMajorLeague);
-      const filtered = top.length >= 8 ? top : base;
+      // 2) “ligas top”, con fallback si deja muy poco
+      const major = base.filter(isMajorLeague);
+      const filtered = major.length >= 8 ? major : base;
 
+      // Orden + límite
       const sorted = [...filtered].sort((a, b) => {
         const prioA = getLeaguePriority(getLeagueName(a), getCountryName(a));
         const prioB = getLeaguePriority(getLeagueName(b), getCountryName(b));
@@ -323,11 +369,11 @@ export default function Comparator() {
         return tA.localeCompare(tB);
       });
 
-      const LIMITED = sorted.slice(0, 120);
+      const LIMITED = sorted.slice(0, 140);
 
       if (!LIMITED.length) {
         setErr(
-          `No encontramos partidos para ese rango. API devolvió: ${itemsRaw.length} | base: ${base.length} | ligas top: ${top.length}. ` +
+          `No encontramos partidos para ese rango. API devolvió: ${itemsRaw.length} | base: ${base.length} | ligas top: ${major.length}. ` +
           `Prueba con 7–14 días y sin filtro (q vacío).`
         );
         setFixtures([]);
@@ -335,13 +381,9 @@ export default function Comparator() {
       }
 
       setFixtures(LIMITED);
-      setInfo(
-        `API: ${itemsRaw.length} | futuros+sin juveniles: ${base.length} | ligas top: ${top.length}` +
-        (top.length >= 8 ? "" : " | Mostrando sin filtro de ligas top.")
-      );
+      setInfo(`API: ${itemsRaw.length} | base: ${base.length} | top: ${major.length} | mostrando: ${LIMITED.length}`);
     } catch (e2) {
-      console.error(e2);
-      setErr(String(e2.message || e2));
+      setErr(String(e2?.message || e2));
     } finally {
       setLoading(false);
     }
@@ -352,13 +394,12 @@ export default function Comparator() {
   }
 
   function toggleFixtureSelection(id) {
-    setParlayResult(null);
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
   const selectedCount = selectedIds.length;
 
-  // demo odds (por ahora)
+  // Demo de cuota combinada (hoy). Más adelante lo conectas a odds reales.
   function fakeOddForFixture(fx) {
     const id = getFixtureId(fx);
     const key = String(id || getHomeName(fx) + getAwayName(fx));
@@ -394,6 +435,9 @@ export default function Comparator() {
     return { games: picks.length, finalOdd, target: maxBoost, impliedProb, reachedTarget };
   }
 
+  const [parlayResult, setParlayResult] = useState(null);
+  const [parlayError, setParlayError] = useState("");
+
   async function handleAutoParlay() {
     setParlayError("");
     setParlayResult(null);
@@ -403,12 +447,11 @@ export default function Comparator() {
       return;
     }
 
-    const first10 = fixtures.slice(0, 10).map(getFixtureId).filter(Boolean);
-    first10.forEach((id) => ensureOdds(id));
+    fixtures.slice(0, 10).map(getFixtureId).filter(Boolean).forEach((id) => ensureOdds(id));
 
     const suggestion = buildComboSuggestion(fixtures, maxBoost);
     if (!suggestion) {
-      setParlayError("Por ahora no pudimos armar una combinada razonable con los partidos cargados. Prueba con otro rango de fechas.");
+      setParlayError("No pudimos armar una combinada razonable con los partidos cargados. Prueba con otro rango de fechas.");
       return;
     }
 
@@ -430,11 +473,6 @@ export default function Comparator() {
     }
 
     const pool = fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)));
-    if (pool.length < 2) {
-      setParlayError("Hubo un problema al leer tu selección. Vuelve a elegir 2 o más partidos.");
-      return;
-    }
-
     pool.map(getFixtureId).filter(Boolean).forEach((id) => ensureOdds(id));
 
     const suggestion = buildComboSuggestion(pool, maxBoost);
@@ -446,6 +484,15 @@ export default function Comparator() {
     setParlayResult({ mode: "selected", ...suggestion });
   }
 
+  // Placeholder data (hasta que conectes endpoints reales)
+  const topReferees = [
+    { name: "Juan Soto", avgCards: 6.1 },
+    { name: "Matías Rojas", avgCards: 5.8 },
+    { name: "Pedro Díaz", avgCards: 5.6 },
+    { name: "Carlos Vera", avgCards: 5.5 },
+    { name: "Andrés Leiva", avgCards: 5.4 },
+  ];
+
   return (
     <div className="max-w-5xl mx-auto px-4 pb-20">
       {/* Cabecera */}
@@ -455,13 +502,13 @@ export default function Comparator() {
         {isLoggedIn ? (
           <p className="text-slate-300 text-sm md:text-base">
             Estás usando Factor Victoria con tu membresía{" "}
-            <span className="font-semibold">{planLabel || "ACTIVA"}</span>. Elige un rango de fechas y filtra por país, liga o equipo para generar tus parlays.
+            <span className="font-semibold">{planLabel}</span>. Elige un rango de fechas y filtra por país, liga o equipo para generar tus parlays.
           </p>
         ) : (
           <p className="text-slate-300 text-sm md:text-base">
-            Modo visitante: explora partidos reales, pero las combinadas profesionales están reservadas para miembros. {" "}
+            Modo visitante: prueba la plataforma con información limitada.{" "}
             <Link to="/" className="underline font-semibold">Activa una membresía</Link>{" "}
-            para desbloquear todas las herramientas profesionales.
+            para desbloquear el comparador profesional.
           </p>
         )}
       </section>
@@ -529,23 +576,20 @@ export default function Comparator() {
         {err && (
           <div className="mt-3 text-sm text-amber-300">
             {err}{" "}
-            {!isLoggedIn && (
-              <Link to="/" className="underline font-semibold">Ver planes</Link>
-            )}
+            {!isLoggedIn && <Link to="/" className="underline font-semibold">Ver planes</Link>}
           </div>
         )}
         {!err && info && <div className="mt-3 text-xs text-slate-400">{info}</div>}
       </section>
 
-      {/* Lista compacta */}
+      {/* Lista de partidos */}
       <section className="mt-4 rounded-2xl border border-slate-800/80 bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-950 shadow-[0_18px_40px_rgba(15,23,42,0.85)]">
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/80 text-[11px] md:text-xs text-slate-300 tracking-wide">
           <span className="uppercase">
-            Partidos encontrados: <span className="font-semibold text-slate-50">{fixtures.length}</span>
+            Partidos encontrados:{" "}
+            <span className="font-semibold text-slate-50">{fixtures.length}</span>
           </span>
-          <span className="uppercase text-right">
-            Toca un partido para añadirlo / quitarlo de tu combinada.
-          </span>
+          <span className="uppercase text-right">Toca un partido para añadirlo / quitarlo de tu combinada.</span>
         </div>
 
         {fixtures.length === 0 ? (
@@ -580,15 +624,15 @@ export default function Comparator() {
                   onClick={() => {
                     toggleFixtureSelection(id);
                     ensureOdds(id);
+                    setParlayResult(null);
+                    setParlayError("");
                   }}
                   className={[
                     "px-4 py-3 flex items-center gap-3 cursor-pointer transition-colors",
                     isSelected ? "bg-slate-900/90" : "hover:bg-slate-900/70",
                   ].join(" ")}
                 >
-                  <div className="w-14 text-[11px] md:text-xs font-semibold text-slate-100">
-                    {time || "--:--"}
-                  </div>
+                  <div className="w-14 text-[11px] md:text-xs font-semibold text-slate-100">{time || "--:--"}</div>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1 text-xs md:text-sm text-slate-200">
@@ -626,12 +670,9 @@ export default function Comparator() {
                       </div>
                     ) : (
                       <span className="block text-cyan-300 font-semibold">
-                        {found === false ? "Sin cuotas disponibles para este partido (API)." : "Tocando el partido se cargan cuotas 1X2 y O/U 2.5."}
+                        {found === false ? "Sin cuotas disponibles para este partido (API)." : "Toca para cargar cuotas 1X2 y O/U 2.5."}
                       </span>
                     )}
-                    <span className="hidden md:block text-[11px] text-slate-400">
-                      Cuotas provienen de API-Football (mercado).
-                    </span>
                   </div>
 
                   <div className="w-6 flex justify-end">
@@ -651,34 +692,34 @@ export default function Comparator() {
         )}
       </section>
 
-      {/* Tarjetas */}
-      <section className="mt-4 space-y-4">
-        <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
-          <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-500/20 text-yellow-200 mb-2">
-            Cuota segura (Regalo)
-            <span className="ml-2 text-[11px] text-yellow-100/90">x1.5–x3 · 90–95% acierto</span>
-          </div>
+      {/* Módulos Premium (grid) */}
+      <section className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <FeatureCard
+          title="Cuota segura (Regalo)"
+          badge="x1.5–x3 · 90–95% acierto"
+          locked={!features.giftPick}
+          lockText="Disponible desde el plan Mensual."
+        >
           <p className="text-slate-200 text-sm">
-            Próximamente: resultados basados en tus filtros para usar como “regalo” diario a tu comunidad (alta probabilidad, cuota baja).
+            Próximamente: un “regalo” diario de alta probabilidad basado en tus filtros y calendario de partidos.
           </p>
-        </div>
+        </FeatureCard>
 
-        <div className="rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5">
-          <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-200 mb-2">
-            Cuotas potenciadas <span className="ml-2 text-[11px] text-emerald-100/90">hasta x{maxBoost}</span>
-          </div>
-
+        <FeatureCard
+          title="Cuotas potenciadas"
+          badge={`hasta x${maxBoost}`}
+          locked={!features.boosted}
+          lockText="Disponible desde el plan Mensual."
+        >
           {fixtures.length === 0 ? (
-            <p className="text-slate-300 text-sm mb-3">
-              Genera primero partidos con el botón de arriba para construir tus cuotas potenciadas.
-            </p>
+            <p className="text-slate-300 text-sm mb-3">Genera primero partidos para construir tus cuotas potenciadas.</p>
           ) : (
             <p className="text-slate-300 text-sm mb-3">
-              Tu membresía permite combinadas hasta <span className="font-semibold">x{maxBoost}</span>. Selecciona varios partidos o deja que Factor Victoria arme una combinada automática.
+              Tu plan permite combinadas hasta <span className="font-semibold">x{maxBoost}</span>. Selecciona partidos o genera una combinada automática.
             </p>
           )}
 
-          <div className="flex flex-col sm:flex-row gap-2 mb-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <button
               type="button"
               onClick={handleAutoParlay}
@@ -698,30 +739,96 @@ export default function Comparator() {
             </button>
           </div>
 
-          {parlayError && <p className="text-xs text-amber-300 mt-1">{parlayError}</p>}
+          {parlayError && <p className="text-xs text-amber-300 mt-2">{parlayError}</p>}
 
           {parlayResult && (
             <div className="mt-3 text-sm text-slate-200">
               <p className="font-semibold mb-1">
                 {parlayResult.mode === "auto"
-                  ? `Ejemplo de combinada automática: ${parlayResult.games} partidos, cuota x${parlayResult.finalOdd}`
-                  : `Ejemplo con tus partidos seleccionados: ${parlayResult.games} partidos, cuota x${parlayResult.finalOdd}`}
+                  ? `Ejemplo automático: ${parlayResult.games} partidos, cuota x${parlayResult.finalOdd}`
+                  : `Ejemplo con tu selección: ${parlayResult.games} partidos, cuota x${parlayResult.finalOdd}`}
               </p>
-
               <p className="text-xs text-slate-400">
-                ✅ Cada selección individual tiene una probabilidad estimada superior al 90%.
-                <br />
-                📉 El porcentaje total disminuye a medida que agregas más partidos a tu combinada.
+                Nota: hoy es un ejemplo visual. Luego se calculará con cuotas reales por mercado.
               </p>
             </div>
           )}
+        </FeatureCard>
 
-          {!parlayResult && !parlayError && fixtures.length > 0 && (
-            <p className="text-xs text-slate-400 mt-1">
-              Mientras tanto, estas combinadas son un ejemplo visual. Más adelante se calcularán con las cuotas reales de los partidos.
-            </p>
-          )}
-        </div>
+        <FeatureCard
+          title="Árbitros más tarjeteros"
+          badge="Over tarjetas · Historial"
+          locked={!features.referees}
+          lockText="Disponible desde el plan Anual."
+        >
+          <div className="text-sm text-slate-200">
+            <div className="text-xs text-slate-400 mb-2">Top árbitros (placeholder)</div>
+            <ul className="space-y-1">
+              {topReferees.slice(0, 5).map((r) => (
+                <li key={r.name} className="flex items-center justify-between text-xs">
+                  <span className="text-slate-200">{r.name}</span>
+                  <span className="text-amber-200 font-semibold">{r.avgCards} tarjetas / partido</span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-3">
+              <div className="text-xs text-slate-400">🔥 Partido recomendado por árbitro tarjetero</div>
+              <div className="mt-1 text-sm font-semibold text-slate-50">
+                Juan Soto <span className="text-amber-200">(prom. 6.1 tarjetas)</span>
+              </div>
+              <div className="mt-1 text-xs text-slate-300">
+                Si aún no hay partido asignado a este árbitro para tu rango, mostraremos: “Aún no se le ha asignado un partido”.
+              </div>
+            </div>
+          </div>
+        </FeatureCard>
+
+        <FeatureCard
+          title="Probabilidad alta de gol"
+          badge="BTTS · Over 1.5 · Over 2.5"
+          locked={false}
+        >
+          <p className="text-slate-200 text-sm">
+            Recomendación de partidos con alta probabilidad de gol (modelo interno). Lo conectamos cuando definamos el scoring.
+          </p>
+          <p className="text-xs text-slate-400 mt-2">
+            Sugerencia: mostrar “Top 5 del día” + “Top 1 recomendado”.
+          </p>
+        </FeatureCard>
+
+        <FeatureCard
+          title="Desfase del mercado (Value)"
+          badge="Cuotas con valor esperado"
+          locked={!features.marketValue}
+          lockText="Disponible en Vitalicio (VIP)."
+        >
+          <p className="text-slate-200 text-sm">
+            Señales de value cuando la cuota del mercado se separa del precio “justo” estimado por Factor Victoria.
+          </p>
+        </FeatureCard>
+
+        <FeatureCard
+          title="Jugadores más goleadores"
+          badge="Goleadores · Rachas"
+          locked={!features.scorers}
+          lockText="Disponible en Vitalicio."
+        >
+          <p className="text-slate-200 text-sm">
+            Top goleadores por liga/fecha y rachas recientes. Ideal para mercados “anota” / “tiros a puerta”.
+          </p>
+        </FeatureCard>
+
+        <FeatureCard
+          title="Remates al arco"
+          badge={features.shooters ? `Top ${features.shooters}` : "Top jugadores"}
+          locked={features.shooters === 0}
+          lockText="Top 5 en Anual · Top 10 en Vitalicio."
+        >
+          <p className="text-slate-200 text-sm">
+            Ranking de jugadores con más remates a puerta (por liga/fecha). Perfecto para props: “+1 tiro a puerta”.
+          </p>
+        </FeatureCard>
       </section>
     </div>
   );

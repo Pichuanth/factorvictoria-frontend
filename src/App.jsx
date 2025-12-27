@@ -15,6 +15,7 @@ function Home() {
   const plans = [
     {
       tag: "Mensual",
+      planName: "Plan Inicio",
       price: "$19.990",
       sub: "Mensual",
       bullets: [
@@ -75,7 +76,7 @@ function Home() {
       bullets: [
         "Copa Leyenda Edición elite",
         "Trofeo profesional Factor Victoria",
-        "Medalla oficial Leyenda",
+        "Medalla conmemorativa oficial",
         "Guía de estrategia PRO",
         "Alertas claves de partidos al correo",
         "3 Estrategias VIP incluidas",
