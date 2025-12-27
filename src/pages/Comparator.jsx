@@ -30,7 +30,10 @@ const COUNTRY_ALIAS = {
 };
 
 function normalizeCountryQuery(q) {
-  const key = String(q || "").toLowerCase().trim().replace(/\s+/g, "");
+  const key = String(q || "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "");
   return COUNTRY_ALIAS[key] || null;
 }
 
@@ -134,7 +137,6 @@ function isFutureFixture(fx) {
     if (!Number.isNaN(d.getTime())) return d.getTime() > now;
   }
 
-  // si no hay fecha, no lo descartamos
   return true;
 }
 
@@ -263,20 +265,19 @@ export default function Comparator() {
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
 
-  // árbitros
-  const [refData, setRefData] = useState(null);
-  const [refLoading, setRefLoading] = useState(false);
-  const [refErr, setRefErr] = useState("");
-
   const [fixtures, setFixtures] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
 
-  // parlays
   const [parlayResult, setParlayResult] = useState(null);
   const [parlayError, setParlayError] = useState("");
 
-  // odds cache: { [fixtureId]: { found, markets, fetchedAt } }
+  // odds cache
   const [oddsByFixture, setOddsByFixture] = useState({});
+
+  // referees module
+  const [refData, setRefData] = useState(null);
+  const [refLoading, setRefLoading] = useState(false);
+  const [refErr, setRefErr] = useState("");
 
   useEffect(() => {
     const urlDate = searchParams.get("date");
@@ -297,33 +298,6 @@ export default function Comparator() {
   const features = useMemo(() => getPlanFeatures(planLabel), [planLabel]);
 
   const quickCountries = ["Chile","España","Portugal","Italia","Alemania","Argentina","Inglaterra","Francia"];
-
-  // ---- loadReferees: DEBE IR DENTRO DEL COMPONENTE ----
-  const loadReferees = useCallback(
-    async (fromVal, toVal, countryENOrNull) => {
-      try {
-        setRefErr("");
-        setRefLoading(true);
-
-        const params = new URLSearchParams();
-        params.set("from", fromVal);
-        params.set("to", toVal);
-        if (countryENOrNull) params.set("country", countryENOrNull);
-
-        const r = await fetch(`${API_BASE}/api/referees/cards?${params.toString()}`);
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(j?.message || j?.error || `HTTP ${r.status}`);
-
-        setRefData(j);
-      } catch (e) {
-        setRefErr(String(e?.message || e));
-        setRefData(null);
-      } finally {
-        setRefLoading(false);
-      }
-    },
-    []
-  );
 
   const ensureOdds = useCallback(async (fixtureId) => {
     if (!fixtureId) return;
@@ -347,6 +321,37 @@ export default function Comparator() {
     }
   }, [oddsByFixture]);
 
+  const loadReferees = useCallback(async (fromArg, toArg, countryENOrNull) => {
+    try {
+      setRefErr("");
+      setRefLoading(true);
+
+      const params = new URLSearchParams();
+      params.set("from", fromArg);
+      params.set("to", toArg);
+      if (countryENOrNull) params.set("country", countryENOrNull);
+
+      const r = await fetch(`${API_BASE}/api/referees/cards?${params.toString()}`);
+
+      // si el endpoint aún no existe, lo mostramos como “en construcción” y no rompemos nada
+      if (r.status === 404) {
+        setRefData(null);
+        setRefErr("Módulo en construcción: falta crear /api/referees/cards en el backend.");
+        return;
+      }
+
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j?.message || j?.error || `HTTP ${r.status}`);
+
+      setRefData(j);
+    } catch (e) {
+      setRefData(null);
+      setRefErr(String(e?.message || e));
+    } finally {
+      setRefLoading(false);
+    }
+  }, []);
+
   async function handleGenerate(e) {
     e?.preventDefault?.();
 
@@ -359,9 +364,9 @@ export default function Comparator() {
     setParlayError("");
     setLoading(true);
 
-    // limpiar árbitros al generar (si no tiene feature, lo dejamos nulo)
-    setRefErr("");
+    // también reseteamos módulo árbitros
     setRefData(null);
+    setRefErr("");
 
     if (!isLoggedIn) {
       setLoading(false);
@@ -385,22 +390,18 @@ export default function Comparator() {
 
       const data = await res.json();
 
-      // Backend: { items: [...] } o { response: [...] }
       const itemsRaw =
         (Array.isArray(data?.items) && data.items) ||
         (Array.isArray(data?.response) && data.response) ||
         [];
 
-      // 1) base: futuro + no juveniles/reserva
       const base = itemsRaw
         .filter(isFutureFixture)
         .filter((fx) => !isYouthOrWomenOrReserve(fx));
 
-      // 2) “ligas top”, con fallback si deja muy poco
       const major = base.filter(isMajorLeague);
       const filtered = major.length >= 8 ? major : base;
 
-      // Orden + límite
       const sorted = [...filtered].sort((a, b) => {
         const prioA = getLeaguePriority(getLeagueName(a), getCountryName(a));
         const prioB = getLeaguePriority(getLeagueName(b), getCountryName(b));
@@ -419,20 +420,19 @@ export default function Comparator() {
           `Prueba con 7–14 días y sin filtro (q vacío).`
         );
         setFixtures([]);
-        setLoading(false);
         return;
       }
 
       setFixtures(LIMITED);
       setInfo(`API: ${itemsRaw.length} | base: ${base.length} | top: ${major.length} | mostrando: ${LIMITED.length}`);
 
-      // ✅ Cargar árbitros tarjeteros SOLO si el plan lo permite (DENTRO del try)
+      // ---- cargar árbitros tarjeteros (solo si plan lo permite) ----
       if (features.referees) {
-        await loadReferees(from, to, countryEN);
+        const countryENForRefs = normalizeCountryQuery(qTrim);
+        await loadReferees(from, to, countryENForRefs);
       } else {
         setRefData(null);
       }
-
     } catch (e2) {
       setErr(String(e2?.message || e2));
     } finally {
@@ -450,7 +450,6 @@ export default function Comparator() {
 
   const selectedCount = selectedIds.length;
 
-  // Demo de cuota combinada (hoy). Más adelante lo conectas a odds reales.
   function fakeOddForFixture(fx) {
     const id = getFixtureId(fx);
     const key = String(id || getHomeName(fx) + getAwayName(fx));
@@ -460,7 +459,7 @@ export default function Comparator() {
     return Number(base.toFixed(2));
   }
 
-  function buildComboSuggestion(fixturesPool, boost) {
+  function buildComboSuggestion(fixturesPool, maxBoostArg) {
     if (!Array.isArray(fixturesPool) || fixturesPool.length === 0) return null;
 
     const picks = [];
@@ -468,22 +467,22 @@ export default function Comparator() {
 
     for (const fx of fixturesPool) {
       const odd = fakeOddForFixture(fx);
-      if (product * odd > boost * 1.35) continue;
+      if (product * odd > maxBoostArg * 1.35) continue;
 
       product *= odd;
       picks.push({ id: getFixtureId(fx), label: `${getHomeName(fx)} vs ${getAwayName(fx)}`, odd });
 
       if (picks.length >= 12) break;
-      if (product >= boost * 0.8) break;
+      if (product >= maxBoostArg * 0.8) break;
     }
 
     if (!picks.length) return null;
 
     const finalOdd = Number(product.toFixed(2));
     const impliedProb = Number(((1 / finalOdd) * 100).toFixed(1));
-    const reachedTarget = finalOdd >= boost * 0.8;
+    const reachedTarget = finalOdd >= maxBoostArg * 0.8;
 
-    return { games: picks.length, finalOdd, target: boost, impliedProb, reachedTarget };
+    return { games: picks.length, finalOdd, target: maxBoostArg, impliedProb, reachedTarget };
   }
 
   async function handleAutoParlay() {
@@ -597,7 +596,6 @@ export default function Comparator() {
           </div>
         </form>
 
-        {/* Países rápidos */}
         <div className="mt-3 flex flex-wrap gap-2">
           {quickCountries.map((c) => (
             <button
@@ -611,7 +609,6 @@ export default function Comparator() {
           ))}
         </div>
 
-        {/* Mensajes */}
         {err && (
           <div className="mt-3 text-sm text-amber-300">
             {err}{" "}
@@ -802,13 +799,19 @@ export default function Comparator() {
         >
           <div className="text-sm text-slate-200">
             {refLoading && <div className="text-xs text-slate-400">Cargando árbitros...</div>}
-            {refErr && <div className="text-xs text-amber-300">Error: {refErr}</div>}
+            {refErr && <div className="text-xs text-amber-300">{refErr}</div>}
 
             {!refLoading && !refErr && (
+              <div className="text-xs text-slate-400">
+                Genera partidos para ver el top de árbitros y el “partido recomendado”.
+              </div>
+            )}
+
+            {!refLoading && !refErr && refData?.topReferees?.length > 0 && (
               <>
-                <div className="text-xs text-slate-400 mb-2">Top árbitros</div>
+                <div className="text-xs text-slate-400 mb-2 mt-2">Top árbitros</div>
                 <ul className="space-y-1">
-                  {(refData?.topReferees || []).slice(0, 10).map((r) => (
+                  {refData.topReferees.slice(0, 10).map((r) => (
                     <li key={r.name} className="flex items-center justify-between text-xs">
                       <span className="text-slate-200">{r.name}</span>
                       <span className="text-amber-200 font-semibold">
@@ -847,11 +850,17 @@ export default function Comparator() {
           </div>
         </FeatureCard>
 
-        <FeatureCard title="Probabilidad alta de gol" badge="BTTS · Over 1.5 · Over 2.5" locked={false}>
+        <FeatureCard
+          title="Probabilidad alta de gol"
+          badge="BTTS · Over 1.5 · Over 2.5"
+          locked={false}
+        >
           <p className="text-slate-200 text-sm">
             Recomendación de partidos con alta probabilidad de gol (modelo interno). Lo conectamos cuando definamos el scoring.
           </p>
-          <p className="text-xs text-slate-400 mt-2">Sugerencia: mostrar “Top 5 del día” + “Top 1 recomendado”.</p>
+          <p className="text-xs text-slate-400 mt-2">
+            Sugerencia: mostrar “Top 5 del día” + “Top 1 recomendado”.
+          </p>
         </FeatureCard>
 
         <FeatureCard
