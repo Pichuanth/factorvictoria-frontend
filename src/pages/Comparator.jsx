@@ -221,8 +221,10 @@ function FeatureCard({ title, badge, children, locked, lockText }) {
     <div className="relative rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5 overflow-hidden">
       <div className="flex items-start justify-between gap-3">
         <div>
-          {/* TITULO EN CELESTE */}
-          <div className="text-sm md:text-base font-semibold text-cyan-200">{title}</div>
+          {/* TITULO EN verde premium */}
+          <div className="text-sm md:text-base font-semibold text-emerald-500">
+  {title}
+</div>
 
           {badge && (
             <div className="mt-1 inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/5 border border-white/10 text-slate-200">
