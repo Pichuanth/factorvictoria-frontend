@@ -222,7 +222,10 @@ function FeatureCard({ title, badge, children, locked, lockText }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           {/* TITULO EN verde premium */}
-          <div className="text-sm md:text-base font-semibold text-emerald-500">
+          <div
+  className="text-sm md:text-base font-semibold"
+  style={{ color: "#10B981" }}
+>
   {title}
 </div>
 
