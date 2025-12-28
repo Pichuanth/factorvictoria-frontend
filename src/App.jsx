@@ -233,11 +233,20 @@ function Home() {
           </p>
 
           <input
-            value={stake}
-            onChange={(e) => setStake(e.target.value)}
-            placeholder="Monto a apostar (CLP)"
-            className="w-full md:max-w-md rounded-2xl bg-white/10 text-white px-4 py-3 border border-white/10"
-          />
+  value={stake ? `$${formatCLP(Number(stake))}` : ""}
+  onChange={(e) => {
+    // deja solo números
+    const digits = String(e.target.value || "").replace(/[^\d]/g, "");
+    setStake(digits);
+  }}
+  onBlur={() => {
+    // opcional: si queda vacío, lo limpiamos
+    if (!stake) setStake("");
+  }}
+  inputMode="numeric"
+  placeholder="Monto a apostar (CLP)"
+  className="w-full md:max-w-md rounded-2xl bg-white/10 text-white px-4 py-3 border border-white/10"
+/>
 
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
             {simCards.map((c) => {
