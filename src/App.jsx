@@ -139,7 +139,7 @@ function Home() {
               criterio.
             </p>
 
-            {/* Solo “Ver planes” (se eliminó “Ir al comparador”) */}
+            {/* Solo “Ver planes” */}
             <div className="flex flex-wrap gap-2">
               <a
                 href="#planes"
@@ -166,15 +166,32 @@ function Home() {
               <div
                 key={p.tag}
                 className={[
-                  "rounded-3xl border bg-white/5 p-5 md:p-6",
+                  "relative rounded-3xl border bg-white/5 p-5 md:p-6",
                   p.highlight
-                    ? "border-yellow-500/60 shadow-[0_0_0_2px_rgba(230,196,100,0.25)]"
+                    ? "border-yellow-500/60 shadow-[0_0_40px_rgba(234,179,8,0.12)]"
                     : "border-white/10",
                 ].join(" ")}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-lg font-bold">{p.tag}</div>
-                  {p.badge ? (
+                {/* Badge flotante (solo si es destacado) */}
+                {p.highlight && p.badge ? (
+                  <div className="absolute -top-3 right-4 rounded-full bg-yellow-500 px-3 py-1 text-[11px] font-bold text-black shadow">
+                    {p.badge}
+                  </div>
+                ) : null}
+
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  {/* Título + PlanName en dorado al lado */}
+                  <div className="flex items-center gap-2">
+                    <div className="text-lg font-bold">{p.tag}</div>
+
+                    {/* Plan label dorado (Plan Inicio / Goleador / Campeón / Leyenda) */}
+                    <span className="inline-flex items-center rounded-full border border-yellow-400/40 bg-yellow-500/10 px-2 py-0.5 text-[11px] font-semibold text-yellow-200">
+                      {p.planName}
+                    </span>
+                  </div>
+
+                  {/* Si no es destacado, puedes mantener un badge suave opcional (si lo agregas luego) */}
+                  {!p.highlight && p.badge ? (
                     <span className="text-[11px] px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-200 border border-yellow-500/30">
                       {p.badge}
                     </span>
@@ -210,9 +227,7 @@ function Home() {
 
         {/* Simulador */}
         <section className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-5 md:p-7">
-          <h3 className="text-lg md:text-xl font-bold mb-1">
-            Simula tus ganancias
-          </h3>
+          <h3 className="text-lg md:text-xl font-bold mb-1">Simula tus ganancias</h3>
           <p className="text-slate-300 text-sm mb-4">
             Ingresa tu monto y calcula cuánto podrías ganar según tu plan.
           </p>
@@ -236,6 +251,7 @@ function Home() {
                   <div className="text-xs text-slate-400 mt-1">
                     Apuesta: ${formatCLP(stakeNum)}
                   </div>
+                  {/* Mantengo tu verde (si quieres más premium y consistente: emerald-400 o #10B981 inline) */}
                   <div className="text-sm font-bold mt-2 text-emerald-300">
                     Ganancia: ${formatCLP(win)}
                   </div>
@@ -245,7 +261,7 @@ function Home() {
           </div>
         </section>
 
-        {/* Imagen + footer (usa /public/hero-players.png) */}
+        {/* Imagen + footer */}
         <section className="mt-10 rounded-3xl border border-white/10 overflow-hidden bg-white/5">
           <div className="p-5 md:p-7">
             <h3 className="text-lg md:text-xl font-bold">
@@ -257,11 +273,12 @@ function Home() {
             </p>
           </div>
 
-          <div className="h-56 md:h-72 bg-slate-950 overflow-hidden">
+          {/* Ajuste responsive PC/Móvil: alto + object-cover + object-center (o object-top si prefieres) */}
+          <div className="w-full h-[260px] md:h-[360px] lg:h-[420px] bg-slate-950 overflow-hidden">
             <img
               src="/hero-players.png"
               alt="Factor Victoria"
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover object-center"
             />
           </div>
 
@@ -313,7 +330,6 @@ function AppInner() {
             Factor <span style={{ color: GOLD }}>Victoria</span>
           </Link>
 
-          {/* Scroll horizontal en móvil */}
           <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap touch-pan-x [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <NavButton to="/">Inicio</NavButton>
             <NavButton to="/app">Comparador</NavButton>
