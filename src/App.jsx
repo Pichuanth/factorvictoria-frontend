@@ -241,7 +241,7 @@ function Home() {
     <div>
       <div className="text-sm md:text-base font-semibold">+12.000 usuarios activos</div>
       <div className="text-xs text-slate-300 mt-1">
-        Miles de usuarios confían en nuestros datos, simulador y picks para apostar con ventaja.¿Y tú, qué esperas para unirte a la comunidad?
+        Miles de usuarios confían en nuestros datos, simulador y picks para apostar con ventaja. ¿Y tú, qué esperas para unirte a la comunidad?
       </div>
     </div>
 
@@ -349,8 +349,9 @@ function Home() {
               Convierte información en ventaja
             </h3>
             <p className="text-slate-300 text-sm mt-1">
-              Nuestra IA analiza estadísticas, tendencias y señales del mercado
-              para detectar cuotas con valor.
+              Nuestra IA analiza estadísticas, tendencias y señales del mercado en tiempo real 
+              para detectar cuotas con verdadero valor. Olvídate de pagar por cuotas improvisadas en grupos sin estrategia ni análisis. 
+              En Factor Victoria apuestas con datos, planificación y visión ganadora. Apuesta como todo un campeón.
             </p>
           </div>
 
