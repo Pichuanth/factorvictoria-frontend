@@ -24,7 +24,6 @@ function Home() {
         "Simulador de ganancias incluido",
         "Cuotas x1.5 de regalo",
         "Cuotas potenciadas x10",
-        "100 cupos disponibles",
       ],
       highlight: false,
     },
@@ -168,7 +167,7 @@ function Home() {
           <div className="flex items-end justify-between gap-4 mb-4">
             <h2 className="text-xl md:text-2xl font-bold">Planes</h2>
             <div className="text-xs text-slate-400">
-              Los precios son referenciales (modo prueba).
+              Pronto mas cupos disponibles.
             </div>
           </div>
 
@@ -242,7 +241,7 @@ function Home() {
     <div>
       <div className="text-sm md:text-base font-semibold">+12.000 usuarios activos</div>
       <div className="text-xs text-slate-300 mt-1">
-        Picks y simulador para apostar con criterio.
+        Miles de usuarios confían en nuestros datos, simulador y picks para apostar con ventaja.¿Y tú, qué esperas para unirte a la comunidad?
       </div>
     </div>
 
