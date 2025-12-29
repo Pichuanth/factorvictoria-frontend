@@ -43,7 +43,6 @@ function Home() {
         "Simulador de ganancias incluido",
         "Alertas claves de partidos",
         "Cuotas potenciadas x20",
-        "50 cupos disponibles",
       ],
       highlight: false,
     },
@@ -63,7 +62,6 @@ function Home() {
         "Simulador de ganancias incluido",
         "Alertas claves de partidos",
         "Cuotas potenciadas x50",
-        "50 cupos disponibles",
       ],
       highlight: true,
       badge: "Más popular",
@@ -86,7 +84,6 @@ function Home() {
         "Simulador de ganancias incluido",
         "Informe mensual personalizado",
         "Cuotas potenciadas x100",
-        "Solo 20 cupos disponibles",
       ],
       highlight: false,
     },
@@ -245,7 +242,7 @@ function Home() {
     <div>
       <div className="text-sm md:text-base font-semibold">+12.000 usuarios activos</div>
       <div className="text-xs text-slate-300 mt-1">
-        Comunidad en crecimiento, picks y simulador para apostar con criterio.
+        Picks y simulador para apostar con criterio.
       </div>
     </div>
 
