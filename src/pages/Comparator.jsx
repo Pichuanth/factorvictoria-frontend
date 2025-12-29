@@ -275,6 +275,8 @@ export default function Comparator() {
   const [parlayResult, setParlayResult] = useState(null);
   const [parlayError, setParlayError] = useState("");
 
+  const [stake, setStake] = useState("");
+
   // odds cache
   const [oddsByFixture, setOddsByFixture] = useState({});
 
@@ -919,6 +921,60 @@ export default function Comparator() {
           </p>
         </FeatureCard>
       </section>
+      {/* ---------------- SIMULADOR DE GANANCIAS ---------------- */}
+<section className="mt-12 rounded-3xl border border-white/10 bg-white/5 p-5 md:p-7">
+  <h3 className="text-lg md:text-xl font-bold mb-1">
+    Simula tus ganancias
+  </h3>
+
+  <p className="text-slate-300 text-sm mb-4">
+    Ingresa tu monto y visualiza cuánto podrías ganar según tu plan.
+  </p>
+
+  {/* Input */}
+  <input
+    value={stake}
+    onChange={(e) =>
+      setStake(
+        e.target.value
+          .replace(/[^\d]/g, "")
+          .replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+      )
+    }
+    placeholder="Monto a apostar (CLP)"
+    className="w-full md:max-w-md rounded-2xl bg-white/10 text-white px-4 py-3 border border-white/10"
+  />
+
+  {/* Resultados */}
+  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+    {[
+      { label: "Mensual • x10", mult: 10 },
+      { label: "Trimestral • x20", mult: 20 },
+      { label: "Anual • x50", mult: 50 },
+      { label: "Vitalicio • x100", mult: 100 },
+    ].map((c) => {
+      const raw = Number(String(stake).replace(/[^\d]/g, "")) || 0;
+      const win = raw * c.mult;
+
+      return (
+        <div
+          key={c.label}
+          className="rounded-2xl border border-white/10 bg-slate-950/30 p-4"
+        >
+          <div className="text-sm font-semibold">{c.label}</div>
+
+          <div className="text-xs text-slate-400 mt-1">
+            Apuesta: ${raw.toLocaleString("es-CL")}
+          </div>
+
+          <div className="text-sm font-bold mt-2 text-emerald-300">
+            Ganancia: ${win.toLocaleString("es-CL")}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+</section>
     </div>
   );
 }
