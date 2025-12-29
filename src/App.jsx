@@ -92,8 +92,30 @@ function Home() {
     },
   ];
 
+  const [currency, setCurrency] = React.useState("CLP");
   const [stake, setStake] = React.useState("");
+
+  // stake guarda SOLO números (string). Ej: "10000"
   const stakeNum = Number(String(stake || "").replace(/[^\d]/g, "")) || 0;
+
+  const CURRENCIES = [
+    { code: "CLP", label: "Chile (CLP)", locale: "es-CL", symbol: "$" },
+    { code: "USD", label: "USA (USD)", locale: "en-US", symbol: "$" },
+    { code: "EUR", label: "España (EUR)", locale: "es-ES", symbol: "€" },
+    { code: "COP", label: "Colombia (COP)", locale: "es-CO", symbol: "$" },
+    { code: "PEN", label: "Perú (PEN)", locale: "es-PE", symbol: "S/" },
+  ];
+
+  function fmtMoney(n) {
+    const cur = CURRENCIES.find((c) => c.code === currency) || CURRENCIES[0];
+    return new Intl.NumberFormat(cur.locale, { maximumFractionDigits: 0 }).format(n);
+  }
+
+  function stakeDisplay() {
+    const cur = CURRENCIES.find((c) => c.code === currency) || CURRENCIES[0];
+    if (!stakeNum) return "";
+    return `${cur.symbol}${fmtMoney(stakeNum)}`;
+  }
 
   const simCards = [
     { label: "Mensual • x10", mult: 10 },
@@ -101,14 +123,6 @@ function Home() {
     { label: "Anual • x50", mult: 50 },
     { label: "Vitalicio • x100", mult: 100 },
   ];
-
-  function formatCLP(n) {
-    try {
-      return n.toLocaleString("es-CL");
-    } catch {
-      return String(n);
-    }
-  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
@@ -225,50 +239,112 @@ function Home() {
           </div>
         </section>
 
-        {/* Simulador */}
-        <section className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-5 md:p-7">
-          <h3 className="text-lg md:text-xl font-bold mb-1">Simula tus ganancias</h3>
-          <p className="text-slate-300 text-sm mb-4">
-            Ingresa tu monto y calcula cuánto podrías ganar según tu plan.
-          </p>
+        {/* Confianza / social proof (entre Planes y Simulador) */}
+<div className="mt-10 rounded-3xl border border-white/10 bg-white/5 px-5 py-4 md:px-7 md:py-5">
+  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+    <div>
+      <div className="text-sm md:text-base font-semibold">+12.000 usuarios activos</div>
+      <div className="text-xs text-slate-300 mt-1">
+        Comunidad en crecimiento, picks y simulador para apostar con criterio.
+      </div>
+    </div>
 
-          <input
-  value={stake ? `$${formatCLP(Number(stake))}` : ""}
-  onChange={(e) => {
-    // deja solo números
-    const digits = String(e.target.value || "").replace(/[^\d]/g, "");
-    setStake(digits);
-  }}
-  onBlur={() => {
-    // opcional: si queda vacío, lo limpiamos
-    if (!stake) setStake("");
-  }}
-  inputMode="numeric"
-  placeholder="Monto a apostar (CLP)"
-  className="w-full md:max-w-md rounded-2xl bg-white/10 text-white px-4 py-3 border border-white/10"
-/>
+    <div className="flex items-center gap-2">
+      <span className="inline-flex items-center px-3 py-1.5 rounded-full text-[12px] bg-emerald-500/10 text-emerald-200 border border-emerald-500/20">
+        Resultados en tiempo real
+      </span>
+      <span className="inline-flex items-center px-3 py-1.5 rounded-full text-[12px] bg-yellow-500/10 text-yellow-200 border border-yellow-500/20">
+        Planes premium
+      </span>
+    </div>
+  </div>
+</div>
 
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-            {simCards.map((c) => {
-              const win = stakeNum * c.mult;
-              return (
-                <div
-                  key={c.label}
-                  className="rounded-2xl border border-white/10 bg-slate-950/30 p-4"
-                >
-                  <div className="text-sm font-semibold">{c.label}</div>
-                  <div className="text-xs text-slate-400 mt-1">
-                    Apuesta: ${formatCLP(stakeNum)}
-                  </div>
-                  {/* Mantengo tu verde (si quieres más premium y consistente: emerald-400 o #10B981 inline) */}
-                  <div className="text-sm font-bold mt-2 text-emerald-300">
-                    Ganancia: ${formatCLP(win)}
-                  </div>
-                </div>
-              );
-            })}
+{/* Simulador */}
+<section className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-5 md:p-7">
+  <h3 className="text-lg md:text-xl font-bold mb-1">Simula tus ganancias</h3>
+  <p className="text-slate-300 text-sm mb-4">
+    Ingresa tu monto y calcula cuánto podrías ganar según tu plan.
+  </p>
+
+  {/* Input + selector moneda */}
+  <div className="flex flex-col gap-2 md:max-w-md">
+    <div className="text-xs text-slate-400">
+      Elige tu moneda local para simular ganancias
+    </div>
+
+    <div className="relative">
+      <input
+        value={stakeNum ? stakeDisplay() : ""}
+        onChange={(e) => {
+          const digits = String(e.target.value || "").replace(/[^\d]/g, "");
+          setStake(digits);
+        }}
+        inputMode="numeric"
+        placeholder="Monto a apostar (elige tu moneda)"
+        className="w-full rounded-2xl bg-white/10 text-white px-4 py-3 pr-28 border border-white/10"
+      />
+
+      <div className="absolute right-2 top-1/2 -translate-y-1/2">
+        <div className="relative">
+          <select
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value)}
+            className="appearance-none rounded-xl bg-slate-950/50 text-white text-sm px-3 py-2 pr-8 border border-white/10"
+          >
+            {CURRENCIES.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.code}
+              </option>
+            ))}
+          </select>
+
+          {/* Flecha desplegable */}
+          <svg
+            className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2"
+            width="16"
+            height="16"
+            viewBox="0 0 20 20"
+            fill="none"
+          >
+            <path
+              d="M6 8l4 4 4-4"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity="0.85"
+            />
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+    {simCards.map((c) => {
+      const win = stakeNum * c.mult;
+      const cur = CURRENCIES.find((x) => x.code === currency) || CURRENCIES[0];
+
+      return (
+        <div
+          key={c.label}
+          className="rounded-2xl border border-white/10 bg-slate-950/30 p-4"
+        >
+          <div className="text-sm font-semibold">{c.label}</div>
+
+          <div className="text-xs text-slate-400 mt-1">
+            Apuesta: {stakeNum ? `${cur.symbol}${fmtMoney(stakeNum)}` : `${cur.symbol}0`}
           </div>
-        </section>
+
+          <div className="text-sm font-bold mt-2 text-emerald-300">
+            Ganancia: {stakeNum ? `${cur.symbol}${fmtMoney(win)}` : `${cur.symbol}0`}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+</section>
 
         {/* Imagen + footer */}
         <section className="mt-10 rounded-3xl border border-white/10 overflow-hidden bg-white/5">
