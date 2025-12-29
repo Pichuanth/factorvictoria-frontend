@@ -933,17 +933,18 @@ export default function Comparator() {
 
   {/* Input */}
   <input
-    value={stake}
-    onChange={(e) =>
-      setStake(
-        e.target.value
-          .replace(/[^\d]/g, "")
-          .replace(/\B(?=(\d{3})+(?!\d))/g, ".")
-      )
-    }
-    placeholder="Monto a apostar (CLP)"
-    className="w-full md:max-w-md rounded-2xl bg-white/10 text-white px-4 py-3 border border-white/10"
-  />
+  value={
+    stake
+      ? `$${Number(stake.replace(/[^\d]/g, "")).toLocaleString("es-CL")}`
+      : ""
+  }
+  onChange={(e) => {
+    const raw = e.target.value.replace(/[^\d]/g, "");
+    setStake(raw);
+  }}
+  placeholder="Monto a apostar (CLP)"
+  className="w-full md:max-w-md rounded-2xl bg-white/10 text-white px-4 py-3 border border-white/10"
+/>
 
   {/* Resultados */}
   <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
