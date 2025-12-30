@@ -349,9 +349,9 @@ function Home() {
               Convierte información en ventaja
             </h3>
             <p className="text-slate-300 text-sm mt-1">
-              Nuestra IA analiza estadísticas, tendencias y señales del mercado en tiempo real 
-              para detectar cuotas con verdadero valor. Olvídate de pagar por cuotas improvisadas en grupos sin estrategia ni análisis. 
-              En Factor Victoria apuestas con datos, planificación y visión ganadora. Apuesta como todo un campeón.
+              Nuestra IA analiza estadísticas y señales del mercado en tiempo real para detectar cuotas con verdadero valor. 
+              Deja atrás las cuotas improvisadas en grupos sin estrategia ni analisis, apuesta con datos, planificación y visión ganadora.
+Apuesta como todo un campeón.
             </p>
           </div>
 
