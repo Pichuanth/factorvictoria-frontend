@@ -26,7 +26,7 @@ export default function Login() {
 
   return (
     <div className="min-h-[70vh] bg-slate-900 flex items-center">
-      <div className="w-full max-w-md md:max-w-sm mx-auto px-4 py-10">
+      <div className="w-full max-w-[22rem] sm:max-w-sm md:max-w-md mx-auto px-4 py-10">
         {/* Logo centrado grande */}
         <div className="flex flex-col items-center mb-6">
           <img
