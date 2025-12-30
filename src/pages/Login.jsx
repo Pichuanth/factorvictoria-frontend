@@ -32,7 +32,7 @@ export default function Login() {
           <img
             src="/logo-fv.png"
             alt="Factor Victoria"
-            className="h-22 md:h-24 w-auto scale-[1.12]"
+            className="h-20 md:h-22 w-auto scale-[1.12]"
           />
         </div>
 
