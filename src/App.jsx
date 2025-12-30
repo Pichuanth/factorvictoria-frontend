@@ -449,14 +449,7 @@ function AppInner() {
             }
           />
 
-          <Route
-            path="/fixture"
-            element={
-              <PrivateRoute>
-                <Fixtures />
-              </PrivateRoute>
-            }
-          />
+          <Route path="/fixture" element={<Fixtures />} />
 
           <Route
             path="/perfil"
