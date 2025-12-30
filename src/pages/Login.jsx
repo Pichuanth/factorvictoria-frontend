@@ -26,13 +26,13 @@ export default function Login() {
 
   return (
     <div className="min-h-[70vh] bg-slate-900 flex items-center">
-      <div className="max-w-md mx-auto w-full px-4 py-10">
+      <div className="w-full max-w-md md:max-w-sm mx-auto px-4 py-10">
         {/* Logo centrado grande */}
         <div className="flex flex-col items-center mb-6">
           <img
             src="/logo-fv.png"
             alt="Factor Victoria"
-            className="h-20 md:h-22 w-auto scale-[1.50]"
+            className="h-20 md:h-22 w-auto scale-[1.50] mb-6"
           />
         </div>
 
