@@ -354,7 +354,7 @@ function Home() {
             Deja atrás las decisiones improvisadas y los grupos sin estrategia,
             apuesta con datos, planificación y visión ganadora. 
             Factor Victoria no es una casa de apuestas, es una herramienta de decisión.
-            Te entregamos la información necesaria para que triunfes en tu casa de apuestas favorita.”
+            Te entregamos la información necesaria para que triunfes en tu casa de apuestas favorita.
             </p>
           </div>
 

@@ -186,7 +186,7 @@ export default function Fixtures() {
           </p>
         ) : (
           <p className="text-slate-300 text-sm md:text-base">
-            Modo visitante: puedes ver partidos de Chile, Argentina, España, Inglaterra y Francia
+            Modo visitante: puedes ver partidos de Chile, Argentina, España, Italia, Inglaterra y Francia
             con búsquedas limitadas por día. Para desbloquear uso ilimitado y el comparador
             profesional, crea tu cuenta y{" "}
             <Link to="/" className="underline font-semibold">
@@ -352,7 +352,7 @@ export default function Fixtures() {
 
         {/* CTA hacia comparador */}
         <div className="mt-4 text-xs md:text-sm text-slate-300">
-          ¿Quieres transformar estos partidos en parlays x10, x20 x50 o x100?
+          ¿Quieres transformar estos partidos en parlays x10 x20 x50 o x100?
           <span className="ml-1">
             <Link to="/app" className="underline font-semibold">
               Abre el Comparador
@@ -372,7 +372,7 @@ export default function Fixtures() {
             Deja atrás las decisiones improvisadas y los grupos sin estrategia,
             apuesta con datos, planificación y visión ganadora. 
             Factor Victoria no es una casa de apuestas, es una herramienta de decisión.
-            Te entregamos la información necesaria para que triunfes en tu casa de apuestas favorita.”
+            Te entregamos la información necesaria para que triunfes en tu casa de apuestas favorita.
           </p>
         </div>
 
