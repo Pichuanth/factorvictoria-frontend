@@ -72,7 +72,8 @@ function hasReachedFreeLimit() {
 export default function Fixtures() {
   const { isLoggedIn, user } = useAuth();
   const today = useMemo(() => new Date(), []);
-  const [date, setDate] = useState(toYYYYMMDD(today));
+  const [from, setFrom] = useState(toYYYYMMDD(today));
+  const [to, setTo] = useState(toYYYYMMDD(today));
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
@@ -101,7 +102,9 @@ export default function Fixtures() {
 
       // Solo pedimos por fecha + status (evita 400).
       const params = new URLSearchParams();
-      params.set("date", date);
+      params.set("from", from);
+      params.set("to", to);
+
       params.set("status", "NS"); // solo futuros / no iniciados
 
       const res = await fetch(`${API_BASE}/api/fixtures?${params.toString()}`);
@@ -201,26 +204,24 @@ export default function Fixtures() {
           className="flex flex-col md:flex-row gap-3 items-stretch md:items-end"
         >
           <div className="flex-1">
-            <label className="block text-xs text-slate-400 mb-1">Fecha</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
-            />
-          </div>
+  <label className="block text-xs text-slate-400 mb-1">Desde</label>
+  <input
+    type="date"
+    value={from}
+    onChange={(e) => setFrom(e.target.value)}
+    className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
+  />
+</div>
 
-          <div className="flex-[2]">
-            <label className="block text-xs text-slate-400 mb-1">
-              Buscar (equipo / liga / país)
-            </label>
-            <input
-              placeholder="Ej: Chile, La Liga, Colo Colo, Premier League..."
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
-            />
-          </div>
+<div className="flex-1">
+  <label className="block text-xs text-slate-400 mb-1">Hasta</label>
+  <input
+    type="date"
+    value={to}
+    onChange={(e) => setTo(e.target.value)}
+    className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
+  />
+</div>
 
           <div>
             <button

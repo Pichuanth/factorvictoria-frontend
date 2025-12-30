@@ -349,9 +349,12 @@ function Home() {
               Convierte información en ventaja
             </h3>
             <p className="text-slate-300 text-sm mt-1">
-              Nuestra IA analiza estadísticas y señales del mercado en tiempo real para detectar cuotas con verdadero valor. 
-              Deja atrás las cuotas improvisadas en grupos sin estrategia ni análisis, apuesta con datos, planificación y visión ganadora.
-Apuesta como todo un campeón.
+            Nuestra IA analiza estadísticas y señales del mercado en tiempo real para detectar cuotas
+            con verdadero valor. 
+            Deja atrás las decisiones improvisadas y los grupos sin estrategia,
+            apuesta con datos, planificación y visión ganadora. 
+            Factor Victoria no es una casa de apuestas, es una herramienta de decisión.
+            Te entregamos la información necesaria para que triunfes en tu casa de apuestas favorita.”
             </p>
           </div>
 
