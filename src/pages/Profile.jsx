@@ -125,7 +125,6 @@ function Chip({ children, style, className = "" }) {
 
 /**
  * Card con fondo (imagen) + overlays para legibilidad.
- * Úsalo con bg="/hero-fondo-casillas.png" o bg="/hero-profile-hud.png"
  */
 function HudCard({
   bg,
@@ -133,21 +132,22 @@ function HudCard({
   className = "",
   style = {},
   overlay = true,
-  overlayVariant = "casillas", // "casillas" | "player"
+  overlayVariant = "dark", // "dark" | "soft"
+  imgPosition = "center",  // controla el encuadre del fondo
 }) {
   const overlayLayers =
-    overlayVariant === "player"
+    overlayVariant === "soft"
       ? [
-          // más oscuro porque la imagen del jugador tiene más detalle/luz
-          "linear-gradient(90deg, rgba(2,6,23,0.92) 0%, rgba(2,6,23,0.68) 52%, rgba(2,6,23,0.40) 78%, rgba(2,6,23,0.25) 100%)",
-          "radial-gradient(circle at 20% 45%, rgba(16,185,129,0.20), rgba(2,6,23,0) 58%)",
-          "radial-gradient(circle at 82% 50%, rgba(230,196,100,0.18), rgba(2,6,23,0) 58%)",
+          // suave: deja ver más el fondo
+          "linear-gradient(180deg, rgba(2,6,23,0.78) 0%, rgba(2,6,23,0.58) 38%, rgba(2,6,23,0.80) 100%)",
+          "radial-gradient(circle at 18% 30%, rgba(16,185,129,0.14), rgba(2,6,23,0) 60%)",
+          "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.12), rgba(2,6,23,0) 60%)",
         ]
       : [
-          // casillas: más suave, para que se note el verde/esmeralda
-          "linear-gradient(180deg, rgba(2,6,23,0.88) 0%, rgba(2,6,23,0.62) 38%, rgba(2,6,23,0.86) 100%)",
-          "radial-gradient(circle at 18% 30%, rgba(16,185,129,0.18), rgba(2,6,23,0) 60%)",
-          "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.14), rgba(2,6,23,0) 60%)",
+          // dark: más legibilidad
+          "linear-gradient(90deg, rgba(2,6,23,0.90) 0%, rgba(2,6,23,0.68) 52%, rgba(2,6,23,0.42) 78%, rgba(2,6,23,0.28) 100%)",
+          "radial-gradient(circle at 20% 45%, rgba(16,185,129,0.18), rgba(2,6,23,0) 58%)",
+          "radial-gradient(circle at 82% 50%, rgba(230,196,100,0.16), rgba(2,6,23,0) 58%)",
         ];
 
   return (
@@ -165,6 +165,7 @@ function HudCard({
           alt=""
           aria-hidden="true"
           className="absolute inset-0 h-full w-full object-cover"
+          style={{ objectPosition: imgPosition }}
         />
       ) : null}
 
@@ -252,9 +253,8 @@ export default function Profile() {
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  // Ruta donde tienes tus planes (según tu captura: /#planes)
+  // Ruta donde tienes tus planes
   const PLANS_URL = "/#planes";
-
   function goToPlans(targetPlan) {
     window.location.href = PLANS_URL + (targetPlan ? `&plan=${encodeURIComponent(targetPlan)}` : "");
   }
@@ -293,13 +293,14 @@ export default function Profile() {
     );
   }
 
-  // Fondos
-  const BG_CASILLAS = "/hero-fondo-casillas.png"; // tu nueva imagen
-  const BG_JUGADOR = "/hero-profile-hud.png"; // tu imagen del jugador (la de antes)
+  // Fondos (en /public)
+  const BG_PROFILE = "/hero-fotoperfil.png";
+  const BG_STATUS = "/hero-copa.png";
+  const BG_DOCS = "/hero-profile-hud.png";
 
   return (
     <div className="relative max-w-5xl mx-auto px-4 pb-20">
-      {/* ------------------- Fondo general HUD (suave) ------------------- */}
+      {/* Fondo general suave */}
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div
           className="absolute -top-44 left-1/2 -translate-x-1/2 h-[640px] w-[640px] rounded-full blur-3xl opacity-20"
@@ -325,12 +326,13 @@ export default function Profile() {
         />
       </div>
 
-      {/* ------------------- Header perfil (con casillas) ------------------- */}
+      {/* ------------------- Mi perfil (fondo hero-fotoperfil.png) ------------------- */}
       <HudCard
-        bg={BG_CASILLAS}
-        overlayVariant="casillas"
+        bg={BG_PROFILE}
+        overlayVariant="dark"
         className="mt-6"
         style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 46px ${theme.glow}` }}
+        imgPosition="center"
       >
         <div className="p-5 md:p-7">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -380,14 +382,17 @@ export default function Profile() {
         </div>
       </HudCard>
 
-      {/* ------------------- Grid: Identidad + Panel derecho ------------------- */}
+      {/* ------------------- Grid ------------------- */}
       <section className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Identidad (con casillas) */}
+        {/* Identidad (sin fondo especial, mantiene look) */}
         <HudCard
-          bg={BG_CASILLAS}
-          overlayVariant="casillas"
+          bg={null}
+          overlay={false}
           className="lg:col-span-1"
-          style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 40px ${theme.glow}` }}
+          style={{
+            borderColor: "rgba(255,255,255,0.10)",
+            boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 40px ${theme.glow}`,
+          }}
         >
           <div className="p-5 md:p-6">
             <div className="flex items-start justify-between gap-3">
@@ -396,7 +401,6 @@ export default function Profile() {
             </div>
 
             <div className="mt-4 flex items-center gap-4">
-              {/* Avatar */}
               <div className="relative">
                 <div
                   className="h-20 w-20 rounded-full overflow-hidden border border-white/10 bg-slate-950/40 flex items-center justify-center"
@@ -413,7 +417,6 @@ export default function Profile() {
                   )}
                 </div>
 
-                {/* Anillo HUD */}
                 <div
                   className="pointer-events-none absolute -inset-2 rounded-full opacity-70 border"
                   style={{
@@ -430,7 +433,6 @@ export default function Profile() {
               </div>
             </div>
 
-            {/* Acciones avatar */}
             <div className="mt-4 flex flex-wrap gap-2">
               <button
                 type="button"
@@ -459,7 +461,7 @@ export default function Profile() {
               />
             </div>
 
-            <div className="mt-4 text-xs text-slate-300 leading-relaxed">
+            <div className="mt-4 text-xs text-slate-400 leading-relaxed">
               Tip: usa una foto clara para que tu cuenta se sienta más personal.
             </div>
           </div>
@@ -467,11 +469,12 @@ export default function Profile() {
 
         {/* Panel derecho */}
         <div className="lg:col-span-2 grid grid-cols-1 gap-4">
-          {/* Estado membresía (con casillas) */}
+          {/* Estado membresía (fondo hero-copa.png) */}
           <HudCard
-            bg={BG_CASILLAS}
-            overlayVariant="casillas"
+            bg={BG_STATUS}
+            overlayVariant="dark"
             style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px ${theme.glow}` }}
+            imgPosition="center"
           >
             <div className="p-5 md:p-6">
               <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
@@ -549,17 +552,17 @@ export default function Profile() {
             </div>
           </HudCard>
 
-          {/* Gestionar plan (con casillas) */}
+          {/* Gestionar plan (sin fondo especial, como lo tienes) */}
           <HudCard
-            bg={BG_CASILLAS}
-            overlayVariant="casillas"
+            bg={null}
+            overlay={false}
             style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 40px ${theme.glow}` }}
           >
             <div className="p-5 md:p-6">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-sm font-semibold">Gestionar plan</div>
-                  <div className="text-xs text-slate-300 mt-1">
+                  <div className="text-xs text-slate-400 mt-1">
                     Maneja tus preferencias.
                   </div>
                 </div>
@@ -617,23 +620,23 @@ export default function Profile() {
                 ) : null}
               </div>
 
-              <div className="mt-3 text-xs text-slate-300">
+              <div className="mt-3 text-xs text-slate-400">
                 Sube o baja tu membresía directamente, sin esperar soporte.
               </div>
             </div>
           </HudCard>
 
-          {/* Beneficios (con casillas) */}
+          {/* Beneficios */}
           <HudCard
-            bg={BG_CASILLAS}
-            overlayVariant="casillas"
+            bg={null}
+            overlay={false}
             style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 36px ${theme.glow}` }}
           >
             <div className="p-5 md:p-6">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-sm font-semibold">Beneficios incluidos</div>
-                  <div className="text-xs text-slate-300 mt-1">
+                  <div className="text-xs text-slate-400 mt-1">
                     Ventajas disponibles con tu membresía.
                   </div>
                 </div>
@@ -663,17 +666,17 @@ export default function Profile() {
             </div>
           </HudCard>
 
-          {/* Documentos (con jugador, como querías) */}
+          {/* Documentos (fondo jugador) — arreglado para que NO se corte la cabeza */}
           <HudCard
-            bg={BG_JUGADOR}
-            overlayVariant="player"
+            bg={BG_DOCS}
+            overlayVariant="dark"
+            className="min-h-[240px] md:min-h-[260px]"
             style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px ${theme.glow}` }}
+            imgPosition="50% 18%"
           >
             <div className="p-5 md:p-6">
               <div className="text-sm font-semibold">Documentos de tu membresía</div>
-              <p className="text-xs text-slate-300 mt-1">
-                Proximamente.
-              </p>
+              <p className="text-xs text-slate-300 mt-1">Próximamente.</p>
 
               <button
                 type="button"
@@ -687,7 +690,6 @@ export default function Profile() {
         </div>
       </section>
 
-      {/* Footer mini */}
       <div className="mt-8 text-center text-xs text-slate-500">
         © {new Date().getFullYear()} Factor Victoria
       </div>
