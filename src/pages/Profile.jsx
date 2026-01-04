@@ -549,6 +549,66 @@ export default function Profile() {
               </div>
             </div>
           </div>
+{/* Hero Futurista (entre Estado de membresía y Gestionar plan) */}
+<div
+  className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-950/20"
+  style={{ boxShadow: `0 0 50px ${theme.glow}` }}
+>
+  {/* Imagen */}
+  <img
+    src="/hero-profile-hud.png"
+    alt="Factor Victoria HUD"
+    className="h-[220px] md:h-[260px] w-full object-cover brightness-[0.92] contrast-[1.08] saturate-[1.05]"
+    loading="lazy"
+  />
+
+  {/* Overlay para que se vea premium y legible */}
+  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/35 to-transparent" />
+  <div className="absolute inset-0 bg-gradient-to-r from-slate-950/55 via-transparent to-slate-950/25" />
+
+  {/* HUD lines suaves */}
+  <div
+    className="pointer-events-none absolute left-6 top-6 h-px w-40 opacity-25"
+    style={{ background: `linear-gradient(90deg, transparent, ${theme.accent}, transparent)` }}
+  />
+  <div
+    className="pointer-events-none absolute right-6 top-10 h-px w-52 opacity-20"
+    style={{ background: "linear-gradient(90deg, transparent, rgba(16,185,129,0.9), transparent)" }}
+  />
+
+  {/* Texto */}
+  <div className="absolute bottom-5 left-5 right-5">
+    <div
+      className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[12px] border"
+      style={{
+        background: theme.badgeBg,
+        borderColor: theme.badgeBorder,
+        color: theme.badgeText,
+      }}
+    >
+      Modo análisis • <span className="font-semibold">HUD</span>
+    </div>
+
+    <div className="mt-2 flex items-end justify-between gap-3">
+      <div className="min-w-0">
+        <div className="text-base md:text-lg font-extrabold tracking-tight">
+          Tu ventaja está en los datos
+        </div>
+        <div className="text-xs md:text-sm text-slate-300 mt-1 max-w-[52ch]">
+          Visualiza tendencias, toma mejores decisiones y construye tus combinadas con criterio.
+        </div>
+      </div>
+
+      <div className="hidden md:flex items-center gap-2">
+        <span
+          className="h-2 w-2 rounded-full"
+          style={{ backgroundColor: theme.accent, boxShadow: `0 0 18px ${theme.glow}` }}
+        />
+        <span className="text-xs text-slate-300">Activo</span>
+      </div>
+    </div>
+  </div>
+</div>
 
           {/* Gestionar plan (reemplaza “escríbenos…”) */}
           <div
