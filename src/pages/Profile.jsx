@@ -124,7 +124,7 @@ function Chip({ children, style, className = "" }) {
 }
 
 /**
- * Card con fondo (imagen) + overlays para legibilidad.
+ * Card con fondo + overlays para legibilidad
  */
 function HudCard({
   bg,
@@ -133,18 +133,16 @@ function HudCard({
   style = {},
   overlay = true,
   overlayVariant = "dark", // "dark" | "soft"
-  imgPosition = "center",  // controla el encuadre del fondo
+  imgPosition = "center",
 }) {
   const overlayLayers =
     overlayVariant === "soft"
       ? [
-          // suave: deja ver más el fondo
-          "linear-gradient(180deg, rgba(2,6,23,0.78) 0%, rgba(2,6,23,0.58) 38%, rgba(2,6,23,0.80) 100%)",
-          "radial-gradient(circle at 18% 30%, rgba(16,185,129,0.14), rgba(2,6,23,0) 60%)",
+          "linear-gradient(180deg, rgba(2,6,23,0.82) 0%, rgba(2,6,23,0.60) 38%, rgba(2,6,23,0.84) 100%)",
+          "radial-gradient(circle at 18% 30%, rgba(16,185,129,0.16), rgba(2,6,23,0) 60%)",
           "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.12), rgba(2,6,23,0) 60%)",
         ]
       : [
-          // dark: más legibilidad
           "linear-gradient(90deg, rgba(2,6,23,0.90) 0%, rgba(2,6,23,0.68) 52%, rgba(2,6,23,0.42) 78%, rgba(2,6,23,0.28) 100%)",
           "radial-gradient(circle at 20% 45%, rgba(16,185,129,0.18), rgba(2,6,23,0) 58%)",
           "radial-gradient(circle at 82% 50%, rgba(230,196,100,0.16), rgba(2,6,23,0) 58%)",
@@ -153,12 +151,8 @@ function HudCard({
   return (
     <div
       className={`relative overflow-hidden rounded-3xl border bg-white/5 ${className}`}
-      style={{
-        borderColor: "rgba(255,255,255,0.10)",
-        ...style,
-      }}
+      style={{ borderColor: "rgba(255,255,255,0.10)", ...style }}
     >
-      {/* Fondo */}
       {bg ? (
         <img
           src={bg}
@@ -169,7 +163,6 @@ function HudCard({
         />
       ) : null}
 
-      {/* Overlays */}
       {overlay ? (
         <>
           <div className="absolute inset-0" style={{ background: overlayLayers[0] }} />
@@ -178,7 +171,6 @@ function HudCard({
         </>
       ) : null}
 
-      {/* Contenido */}
       <div className="relative">{children}</div>
     </div>
   );
@@ -253,7 +245,6 @@ export default function Profile() {
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  // Ruta donde tienes tus planes
   const PLANS_URL = "/#planes";
   function goToPlans(targetPlan) {
     window.location.href = PLANS_URL + (targetPlan ? `&plan=${encodeURIComponent(targetPlan)}` : "");
@@ -294,8 +285,9 @@ export default function Profile() {
   }
 
   // Fondos (en /public)
-  const BG_PROFILE = "/hero-fotoperfil.png";
-  const BG_STATUS = "/hero-copa.png";
+  const BG_PROFILE = "/hero-fondo-casillas.png";
+  const BG_STATUS = "/hero-fondo-casillas.png";
+  const BG_CASILLAS = "/hero-fondo-casillas.png";
   const BG_DOCS = "/hero-profile-hud.png";
 
   return (
@@ -326,7 +318,7 @@ export default function Profile() {
         />
       </div>
 
-      {/* ------------------- Mi perfil (fondo hero-fotoperfil.png) ------------------- */}
+      {/* Mi perfil */}
       <HudCard
         bg={BG_PROFILE}
         overlayVariant="dark"
@@ -382,22 +374,20 @@ export default function Profile() {
         </div>
       </HudCard>
 
-      {/* ------------------- Grid ------------------- */}
+      {/* Grid */}
       <section className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Identidad (sin fondo especial, mantiene look) */}
+        {/* Identidad (vuelve hero-fondo-casillas.png) */}
         <HudCard
-          bg={null}
-          overlay={false}
+          bg={BG_CASILLAS}
+          overlayVariant="soft"
           className="lg:col-span-1"
-          style={{
-            borderColor: "rgba(255,255,255,0.10)",
-            boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 40px ${theme.glow}`,
-          }}
+          style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 40px ${theme.glow}` }}
+          imgPosition="center"
         >
           <div className="p-5 md:p-6">
             <div className="flex items-start justify-between gap-3">
               <div className="text-sm font-semibold">Identidad</div>
-              <div className="text-xs text-slate-400">Personaliza tu cuenta</div>
+              <div className="text-xs text-slate-300">Personaliza tu cuenta</div>
             </div>
 
             <div className="mt-4 flex items-center gap-4">
@@ -428,8 +418,8 @@ export default function Profile() {
 
               <div className="min-w-0">
                 <div className="text-base font-bold truncate">{displayName}</div>
-                <div className="text-xs text-slate-400 truncate">{email}</div>
-                <div className="text-xs text-slate-500 mt-1">Cuenta creada: {createdAt}</div>
+                <div className="text-xs text-slate-300 truncate">{email}</div>
+                <div className="text-xs text-slate-300 mt-1">Cuenta creada: {createdAt}</div>
               </div>
             </div>
 
@@ -461,7 +451,7 @@ export default function Profile() {
               />
             </div>
 
-            <div className="mt-4 text-xs text-slate-400 leading-relaxed">
+            <div className="mt-4 text-xs text-slate-300 leading-relaxed">
               Tip: usa una foto clara para que tu cuenta se sienta más personal.
             </div>
           </div>
@@ -469,7 +459,7 @@ export default function Profile() {
 
         {/* Panel derecho */}
         <div className="lg:col-span-2 grid grid-cols-1 gap-4">
-          {/* Estado membresía (fondo hero-copa.png) */}
+          {/* Estado membresía */}
           <HudCard
             bg={BG_STATUS}
             overlayVariant="dark"
@@ -480,8 +470,7 @@ export default function Profile() {
               <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                 <div>
                   <div className="text-sm md:text-base font-semibold text-slate-100">
-                    Estado de la{" "}
-                    <span style={{ color: theme.accent }}>Membresía</span>
+                    Estado de la <span style={{ color: theme.accent }}>Membresía</span>
                   </div>
                   <div className="text-xs text-slate-300 mt-1 max-w-md">
                     Revisa tu estado en tiempo real.
@@ -503,68 +492,44 @@ export default function Profile() {
                 </div>
 
                 <div className="grid grid-cols-1 gap-2 md:min-w-[260px]">
-                  <div
-                    className="rounded-2xl border px-4 py-3"
-                    style={{
-                      borderColor: "rgba(255,255,255,0.12)",
-                      background: "rgba(2,6,23,0.35)",
-                      boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset`,
-                      backdropFilter: "blur(6px)",
-                    }}
-                  >
-                    <div className="text-xs text-slate-300">Acceso</div>
-                    <div className="mt-0.5 text-sm font-bold" style={{ color: "rgba(167,243,208,0.95)" }}>
-                      Activo
+                  {[
+                    { label: "Acceso", value: "Activo", color: "rgba(167,243,208,0.95)" },
+                    { label: "Plan", value: planLabel, color: theme.accent },
+                    { label: "Soporte", value: getSupportLabel(planLabel), color: "rgba(226,232,240,0.92)" },
+                  ].map((x) => (
+                    <div
+                      key={x.label}
+                      className="rounded-2xl border px-4 py-3"
+                      style={{
+                        borderColor: "rgba(255,255,255,0.12)",
+                        background: "rgba(2,6,23,0.35)",
+                        boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset`,
+                        backdropFilter: "blur(6px)",
+                      }}
+                    >
+                      <div className="text-xs text-slate-300">{x.label}</div>
+                      <div className="mt-0.5 text-sm font-bold" style={{ color: x.color }}>
+                        {x.value}
+                      </div>
                     </div>
-                  </div>
-
-                  <div
-                    className="rounded-2xl border px-4 py-3"
-                    style={{
-                      borderColor: "rgba(255,255,255,0.12)",
-                      background: "rgba(2,6,23,0.35)",
-                      boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset`,
-                      backdropFilter: "blur(6px)",
-                    }}
-                  >
-                    <div className="text-xs text-slate-300">Plan</div>
-                    <div className="mt-0.5 text-sm font-bold" style={{ color: theme.accent }}>
-                      {planLabel}
-                    </div>
-                  </div>
-
-                  <div
-                    className="rounded-2xl border px-4 py-3"
-                    style={{
-                      borderColor: "rgba(255,255,255,0.12)",
-                      background: "rgba(2,6,23,0.35)",
-                      boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset`,
-                      backdropFilter: "blur(6px)",
-                    }}
-                  >
-                    <div className="text-xs text-slate-300">Soporte</div>
-                    <div className="mt-0.5 text-sm font-bold text-slate-100">
-                      {getSupportLabel(planLabel)}
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
             </div>
           </HudCard>
 
-          {/* Gestionar plan (sin fondo especial, como lo tienes) */}
+          {/* Gestionar plan (vuelve hero-fondo-casillas.png) */}
           <HudCard
-            bg={null}
-            overlay={false}
+            bg={BG_CASILLAS}
+            overlayVariant="soft"
             style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 40px ${theme.glow}` }}
+            imgPosition="center"
           >
             <div className="p-5 md:p-6">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-sm font-semibold">Gestionar plan</div>
-                  <div className="text-xs text-slate-400 mt-1">
-                    Maneja tus preferencias.
-                  </div>
+                  <div className="text-xs text-slate-300 mt-1">Maneja tus preferencias.</div>
                 </div>
 
                 <Chip
@@ -620,25 +585,24 @@ export default function Profile() {
                 ) : null}
               </div>
 
-              <div className="mt-3 text-xs text-slate-400">
+              <div className="mt-3 text-xs text-slate-300">
                 Sube o baja tu membresía directamente, sin esperar soporte.
               </div>
             </div>
           </HudCard>
 
-          {/* Beneficios */}
+          {/* Beneficios (vuelve hero-fondo-casillas.png) */}
           <HudCard
-            bg={null}
-            overlay={false}
+            bg={BG_CASILLAS}
+            overlayVariant="soft"
             style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 36px ${theme.glow}` }}
+            imgPosition="center"
           >
             <div className="p-5 md:p-6">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-sm font-semibold">Beneficios incluidos</div>
-                  <div className="text-xs text-slate-400 mt-1">
-                    Ventajas disponibles con tu membresía.
-                  </div>
+                  <div className="text-xs text-slate-300 mt-1">Ventajas disponibles con tu membresía.</div>
                 </div>
                 <Chip
                   className="border-white/10"
@@ -666,7 +630,7 @@ export default function Profile() {
             </div>
           </HudCard>
 
-          {/* Documentos (fondo jugador) — arreglado para que NO se corte la cabeza */}
+          {/* Documentos (jugador) — con encuadre para NO cortar cabeza */}
           <HudCard
             bg={BG_DOCS}
             overlayVariant="dark"
