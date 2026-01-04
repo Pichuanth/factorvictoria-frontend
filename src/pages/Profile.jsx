@@ -5,7 +5,7 @@ import { useAuth } from "../lib/auth";
 
 const GOLD = "#E6C464";
 
-/* ------------------- Helpers ------------------- */
+/* ------------------- Helpers de plan ------------------- */
 function getSupportLabel(planLabel = "") {
   const p = String(planLabel || "").toUpperCase();
   if (p.includes("VITAL")) return "Prioritario";
@@ -14,7 +14,6 @@ function getSupportLabel(planLabel = "") {
   return "Estándar";
 }
 
-/* ------------------- Theme por plan ------------------- */
 function getPlanTheme(planLabel = "") {
   const p = String(planLabel || "").toUpperCase();
 
@@ -124,6 +123,66 @@ function Chip({ children, style, className = "" }) {
   );
 }
 
+/**
+ * Card con fondo (imagen) + overlays para legibilidad.
+ * Úsalo con bg="/hero-fondo-casillas.png" o bg="/hero-profile-hud.png"
+ */
+function HudCard({
+  bg,
+  children,
+  className = "",
+  style = {},
+  overlay = true,
+  overlayVariant = "casillas", // "casillas" | "player"
+}) {
+  const overlayLayers =
+    overlayVariant === "player"
+      ? [
+          // más oscuro porque la imagen del jugador tiene más detalle/luz
+          "linear-gradient(90deg, rgba(2,6,23,0.92) 0%, rgba(2,6,23,0.68) 52%, rgba(2,6,23,0.40) 78%, rgba(2,6,23,0.25) 100%)",
+          "radial-gradient(circle at 20% 45%, rgba(16,185,129,0.20), rgba(2,6,23,0) 58%)",
+          "radial-gradient(circle at 82% 50%, rgba(230,196,100,0.18), rgba(2,6,23,0) 58%)",
+        ]
+      : [
+          // casillas: más suave, para que se note el verde/esmeralda
+          "linear-gradient(180deg, rgba(2,6,23,0.88) 0%, rgba(2,6,23,0.62) 38%, rgba(2,6,23,0.86) 100%)",
+          "radial-gradient(circle at 18% 30%, rgba(16,185,129,0.18), rgba(2,6,23,0) 60%)",
+          "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.14), rgba(2,6,23,0) 60%)",
+        ];
+
+  return (
+    <div
+      className={`relative overflow-hidden rounded-3xl border bg-white/5 ${className}`}
+      style={{
+        borderColor: "rgba(255,255,255,0.10)",
+        ...style,
+      }}
+    >
+      {/* Fondo */}
+      {bg ? (
+        <img
+          src={bg}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      ) : null}
+
+      {/* Overlays */}
+      {overlay ? (
+        <>
+          <div className="absolute inset-0" style={{ background: overlayLayers[0] }} />
+          <div className="absolute inset-0" style={{ background: overlayLayers[1] }} />
+          <div className="absolute inset-0" style={{ background: overlayLayers[2] }} />
+        </>
+      ) : null}
+
+      {/* Contenido */}
+      <div className="relative">{children}</div>
+    </div>
+  );
+}
+
 export default function Profile() {
   const { user, isLoggedIn } = useAuth();
   const fileRef = useRef(null);
@@ -149,18 +208,13 @@ export default function Profile() {
 
   const planLabel = useMemo(() => {
     const raw = user?.planId || user?.plan?.id || user?.plan || user?.membership || "";
-    return String(raw || "MENSUAL").toUpperCase();
+    return String(raw || "ACTIVA").toUpperCase();
   }, [user]);
 
   const theme = useMemo(() => getPlanTheme(planLabel), [planLabel]);
 
-  const displayName = useMemo(() => {
-    return user?.name || user?.fullName || user?.email || "Usuario";
-  }, [user]);
-
-  const email = useMemo(() => {
-    return user?.email || "—";
-  }, [user]);
+  const displayName = useMemo(() => user?.name || user?.fullName || user?.email || "Usuario", [user]);
+  const email = useMemo(() => user?.email || "—", [user]);
 
   const createdAt = useMemo(() => {
     const raw = user?.createdAt || user?.created_at || user?.created || "";
@@ -198,9 +252,11 @@ export default function Profile() {
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  // Navegación estable a la sección de planes
-  function goToPlans() {
-    window.location.href = "/#planes";
+  // Ruta donde tienes tus planes (según tu captura: /#planes)
+  const PLANS_URL = "/#planes";
+
+  function goToPlans(targetPlan) {
+    window.location.href = PLANS_URL + (targetPlan ? `&plan=${encodeURIComponent(targetPlan)}` : "");
   }
 
   function upgradeSuggestion() {
@@ -237,25 +293,28 @@ export default function Profile() {
     );
   }
 
+  // Fondos
+  const BG_CASILLAS = "/hero-fondo-casillas.png"; // tu nueva imagen
+  const BG_JUGADOR = "/hero-profile-hud.png"; // tu imagen del jugador (la de antes)
+
   return (
     <div className="relative max-w-5xl mx-auto px-4 pb-20">
-      {/* ------------------- Fondo Futurista HUD ------------------- */}
+      {/* ------------------- Fondo general HUD (suave) ------------------- */}
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div
-          className="absolute -top-44 left-1/2 -translate-x-1/2 h-[640px] w-[640px] rounded-full blur-3xl opacity-25"
+          className="absolute -top-44 left-1/2 -translate-x-1/2 h-[640px] w-[640px] rounded-full blur-3xl opacity-20"
           style={{
             background: `radial-gradient(circle at center, ${theme.hudA}, rgba(15,23,42,0) 60%)`,
           }}
         />
         <div
-          className="absolute -top-52 right-[-140px] h-[560px] w-[560px] rounded-full blur-3xl opacity-20"
+          className="absolute -top-52 right-[-140px] h-[560px] w-[560px] rounded-full blur-3xl opacity-16"
           style={{
             background: `radial-gradient(circle at center, ${theme.hudB}, rgba(15,23,42,0) 62%)`,
           }}
         />
-
         <div
-          className="absolute inset-0 opacity-[0.14]"
+          className="absolute inset-0 opacity-[0.10]"
           style={{
             backgroundImage:
               "linear-gradient(to right, rgba(255,255,255,0.10) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.10) 1px, transparent 1px)",
@@ -264,105 +323,80 @@ export default function Profile() {
             WebkitMaskImage: "radial-gradient(circle at 50% 18%, black 0%, transparent 70%)",
           }}
         />
-
-        <div
-          className="absolute inset-0 opacity-[0.08]"
-          style={{
-            backgroundImage: "linear-gradient(to bottom, rgba(255,255,255,0.14) 1px, transparent 1px)",
-            backgroundSize: "100% 10px",
-            maskImage: "radial-gradient(circle at 50% 12%, black 0%, transparent 78%)",
-            WebkitMaskImage: "radial-gradient(circle at 50% 12%, black 0%, transparent 78%)",
-          }}
-        />
-
-        <div
-          className="absolute inset-0 opacity-[0.10]"
-          style={{
-            backgroundImage: "radial-gradient(rgba(255,255,255,0.35) 1px, transparent 1px)",
-            backgroundSize: "22px 22px",
-            maskImage: "radial-gradient(circle at 50% 28%, black 0%, transparent 70%)",
-            WebkitMaskImage: "radial-gradient(circle at 50% 28%, black 0%, transparent 70%)",
-          }}
-        />
-
-        <div
-          className="absolute top-16 left-6 h-px w-[320px] opacity-25"
-          style={{ background: `linear-gradient(90deg, transparent, ${GOLD}, transparent)` }}
-        />
-        <div
-          className="absolute top-28 right-8 h-px w-[360px] opacity-25"
-          style={{
-            background: `linear-gradient(90deg, transparent, rgba(16,185,129,0.95), transparent)`,
-          }}
-        />
       </div>
 
-      {/* ------------------- Header ------------------- */}
-      <section className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5 md:p-7">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold">Mi perfil</h1>
-            <p className="text-slate-300 text-sm md:text-base mt-1 max-w-2xl">
-              Tu cuenta está conectada al panel de análisis de Factor Victoria. Personaliza tu perfil y revisa el estado
-              de tu membresía.
-            </p>
-          </div>
+      {/* ------------------- Header perfil (con casillas) ------------------- */}
+      <HudCard
+        bg={BG_CASILLAS}
+        overlayVariant="casillas"
+        className="mt-6"
+        style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 46px ${theme.glow}` }}
+      >
+        <div className="p-5 md:p-7">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold">Mi perfil</h1>
+              <p className="text-slate-300 text-sm md:text-base mt-1 max-w-2xl">
+                Tu cuenta está conectada al panel de análisis de Factor Victoria. Personaliza tu perfil y revisa el estado de tu membresía.
+              </p>
+            </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Chip
-              className="border-emerald-500/20"
-              style={{
-                background: "rgba(16,185,129,0.10)",
-                color: "rgba(167,243,208,0.95)",
-                boxShadow: "0 0 0 1px rgba(16,185,129,0.10) inset",
-              }}
-            >
-              Membresía activa
-            </Chip>
+            <div className="flex flex-wrap items-center gap-2">
+              <Chip
+                className="border-emerald-500/20"
+                style={{
+                  background: "rgba(16,185,129,0.10)",
+                  color: "rgba(167,243,208,0.95)",
+                  boxShadow: "0 0 0 1px rgba(16,185,129,0.10) inset",
+                }}
+              >
+                Membresía activa
+              </Chip>
 
-            <Chip
-              className="border-white/10"
-              style={{
-                background: "rgba(255,255,255,0.06)",
-                color: "rgba(226,232,240,0.92)",
-                boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset",
-              }}
-            >
-              Plan <span className="font-semibold" style={{ color: GOLD }}>{planLabel}</span>
-            </Chip>
+              <Chip
+                className="border-white/10"
+                style={{
+                  background: "rgba(255,255,255,0.06)",
+                  color: "rgba(226,232,240,0.92)",
+                  boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset",
+                }}
+              >
+                Plan <span className="font-semibold" style={{ color: GOLD }}>{planLabel}</span>
+              </Chip>
 
-            <Chip
-              style={{
-                background: theme.badgeBg,
-                borderColor: theme.badgeBorder,
-                color: theme.badgeText,
-                boxShadow: `0 0 28px ${theme.glow}`,
-              }}
-            >
-              <MedalIcon color={theme.accent || GOLD} />
-              Rango: <span className="font-semibold">{theme.name}</span>
-            </Chip>
+              <Chip
+                style={{
+                  background: theme.badgeBg,
+                  borderColor: theme.badgeBorder,
+                  color: theme.badgeText,
+                  boxShadow: `0 0 28px ${theme.glow}`,
+                }}
+              >
+                <MedalIcon color={theme.accent || GOLD} />
+                Rango: <span className="font-semibold">{theme.name}</span>
+              </Chip>
+            </div>
           </div>
         </div>
-      </section>
+      </HudCard>
 
-      {/* ------------------- Grid principal ------------------- */}
+      {/* ------------------- Grid: Identidad + Panel derecho ------------------- */}
       <section className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Identidad */}
-        <div
-          className="lg:col-span-1 rounded-3xl border bg-white/5 p-5 md:p-6 relative overflow-hidden"
-          style={{
-            borderColor: "rgba(255,255,255,0.10)",
-            boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 40px ${theme.glow}`,
-          }}
+        {/* Identidad (con casillas) */}
+        <HudCard
+          bg={BG_CASILLAS}
+          overlayVariant="casillas"
+          className="lg:col-span-1"
+          style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 40px ${theme.glow}` }}
         >
-          <div className="relative">
+          <div className="p-5 md:p-6">
             <div className="flex items-start justify-between gap-3">
               <div className="text-sm font-semibold">Identidad</div>
               <div className="text-xs text-slate-400">Personaliza tu cuenta</div>
             </div>
 
             <div className="mt-4 flex items-center gap-4">
+              {/* Avatar */}
               <div className="relative">
                 <div
                   className="h-20 w-20 rounded-full overflow-hidden border border-white/10 bg-slate-950/40 flex items-center justify-center"
@@ -373,10 +407,13 @@ export default function Profile() {
                   {avatarUrl ? (
                     <img src={avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
                   ) : (
-                    <div className="text-lg font-bold tracking-wide text-slate-200">{getInitials(displayName)}</div>
+                    <div className="text-lg font-bold tracking-wide text-slate-200">
+                      {getInitials(displayName)}
+                    </div>
                   )}
                 </div>
 
+                {/* Anillo HUD */}
                 <div
                   className="pointer-events-none absolute -inset-2 rounded-full opacity-70 border"
                   style={{
@@ -393,6 +430,7 @@ export default function Profile() {
               </div>
             </div>
 
+            {/* Acciones avatar */}
             <div className="mt-4 flex flex-wrap gap-2">
               <button
                 type="button"
@@ -421,252 +459,238 @@ export default function Profile() {
               />
             </div>
 
-            <div className="mt-4 text-xs text-slate-400 leading-relaxed">
+            <div className="mt-4 text-xs text-slate-300 leading-relaxed">
               Tip: usa una foto clara para que tu cuenta se sienta más personal. Esta imagen se guarda en tu dispositivo (por ahora).
             </div>
           </div>
-        </div>
+        </HudCard>
 
-        {/* Columna derecha */}
+        {/* Panel derecho */}
         <div className="lg:col-span-2 grid grid-cols-1 gap-4">
-          {/* Estado membresía HERO (imagen + datos) */}
-          <div
-            className="rounded-3xl overflow-hidden border bg-white/5"
-            style={{
-              borderColor: "rgba(255,255,255,0.10)",
-              boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 40px ${theme.glow}`,
-            }}
+          {/* Estado membresía (con casillas) */}
+          <HudCard
+            bg={BG_CASILLAS}
+            overlayVariant="casillas"
+            style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px ${theme.glow}` }}
           >
-            <div className="relative min-h-[220px] md:min-h-[240px]">
-              <img
-                src="/hero-profile-hud.png"
-                alt="Estado de la membresía - Factor Victoria"
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-
-              <div
-                className="absolute inset-0"
-                style={{
-                  background:
-                    "linear-gradient(90deg, rgba(2,6,23,0.92) 0%, rgba(2,6,23,0.65) 45%, rgba(2,6,23,0.35) 70%, rgba(2,6,23,0.20) 100%)",
-                }}
-              />
-              <div
-                className="absolute inset-0"
-                style={{
-                  background: "radial-gradient(circle at 20% 40%, rgba(16,185,129,0.22), rgba(2,6,23,0) 55%)",
-                }}
-              />
-              <div
-                className="absolute inset-0"
-                style={{
-                  background: "radial-gradient(circle at 80% 50%, rgba(230,196,100,0.20), rgba(2,6,23,0) 55%)",
-                }}
-              />
-
-              <div className="relative p-5 md:p-6">
-                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                  <div>
-                    <div className="text-sm md:text-base font-semibold text-slate-100">
-                      Estado de la <span style={{ color: theme.accent }}>Membresía</span>
-                    </div>
-                    <div className="text-xs text-slate-300 mt-1 max-w-md">
-                      Tu acceso está habilitado según tu plan. Aquí ves tu estado en tiempo real.
-                    </div>
-
-                    <div className="mt-3">
-                      <span
-                        className="inline-flex items-center px-3 py-1.5 rounded-full text-[12px] border"
-                        style={{
-                          background: theme.badgeBg,
-                          borderColor: theme.badgeBorder,
-                          color: theme.badgeText,
-                          boxShadow: `0 0 28px ${theme.glow}`,
-                        }}
-                      >
-                        Rango: <span className="ml-1 font-semibold">{theme.name}</span>
-                      </span>
-                    </div>
+            <div className="p-5 md:p-6">
+              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                <div>
+                  <div className="text-sm md:text-base font-semibold text-slate-100">
+                    Estado de la{" "}
+                    <span style={{ color: theme.accent }}>Membresía</span>
+                  </div>
+                  <div className="text-xs text-slate-300 mt-1 max-w-md">
+                    Tu acceso está habilitado según tu plan. Aquí ves tu estado en tiempo real.
                   </div>
 
-                  <div className="grid grid-cols-1 gap-2 md:min-w-[260px]">
-                    <div
-                      className="rounded-2xl border px-4 py-3"
+                  <div className="mt-3">
+                    <span
+                      className="inline-flex items-center px-3 py-1.5 rounded-full text-[12px] border"
                       style={{
-                        borderColor: "rgba(255,255,255,0.12)",
-                        background: "rgba(2,6,23,0.35)",
-                        boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset`,
-                        backdropFilter: "blur(6px)",
+                        background: theme.badgeBg,
+                        borderColor: theme.badgeBorder,
+                        color: theme.badgeText,
+                        boxShadow: `0 0 28px ${theme.glow}`,
                       }}
                     >
-                      <div className="text-xs text-slate-300">Acceso</div>
-                      <div className="mt-0.5 text-sm font-bold" style={{ color: "rgba(167,243,208,0.95)" }}>
-                        Activo
-                      </div>
-                    </div>
-
-                    <div
-                      className="rounded-2xl border px-4 py-3"
-                      style={{
-                        borderColor: "rgba(255,255,255,0.12)",
-                        background: "rgba(2,6,23,0.35)",
-                        boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset`,
-                        backdropFilter: "blur(6px)",
-                      }}
-                    >
-                      <div className="text-xs text-slate-300">Plan</div>
-                      <div className="mt-0.5 text-sm font-bold" style={{ color: theme.accent }}>
-                        {planLabel}
-                      </div>
-                    </div>
-
-                    <div
-                      className="rounded-2xl border px-4 py-3"
-                      style={{
-                        borderColor: "rgba(255,255,255,0.12)",
-                        background: "rgba(2,6,23,0.35)",
-                        boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset`,
-                        backdropFilter: "blur(6px)",
-                      }}
-                    >
-                      <div className="text-xs text-slate-300">Soporte</div>
-                      <div className="mt-0.5 text-sm font-bold text-slate-100">
-                        {getSupportLabel(planLabel)}
-                      </div>
-                    </div>
+                      Rango: <span className="ml-1 font-semibold">{theme.name}</span>
+                    </span>
                   </div>
                 </div>
 
-                <div className="mt-4">
+                <div className="grid grid-cols-1 gap-2 md:min-w-[260px]">
+                  <div
+                    className="rounded-2xl border px-4 py-3"
+                    style={{
+                      borderColor: "rgba(255,255,255,0.12)",
+                      background: "rgba(2,6,23,0.35)",
+                      boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset`,
+                      backdropFilter: "blur(6px)",
+                    }}
+                  >
+                    <div className="text-xs text-slate-300">Acceso</div>
+                    <div className="mt-0.5 text-sm font-bold" style={{ color: "rgba(167,243,208,0.95)" }}>
+                      Activo
+                    </div>
+                  </div>
+
+                  <div
+                    className="rounded-2xl border px-4 py-3"
+                    style={{
+                      borderColor: "rgba(255,255,255,0.12)",
+                      background: "rgba(2,6,23,0.35)",
+                      boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset`,
+                      backdropFilter: "blur(6px)",
+                    }}
+                  >
+                    <div className="text-xs text-slate-300">Plan</div>
+                    <div className="mt-0.5 text-sm font-bold" style={{ color: theme.accent }}>
+                      {planLabel}
+                    </div>
+                  </div>
+
+                  <div
+                    className="rounded-2xl border px-4 py-3"
+                    style={{
+                      borderColor: "rgba(255,255,255,0.12)",
+                      background: "rgba(2,6,23,0.35)",
+                      boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset`,
+                      backdropFilter: "blur(6px)",
+                    }}
+                  >
+                    <div className="text-xs text-slate-300">Soporte</div>
+                    <div className="mt-0.5 text-sm font-bold text-slate-100">
+                      {getSupportLabel(planLabel)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </HudCard>
+
+          {/* Gestionar plan (con casillas) */}
+          <HudCard
+            bg={BG_CASILLAS}
+            overlayVariant="casillas"
+            style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 40px ${theme.glow}` }}
+          >
+            <div className="p-5 md:p-6">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold">Gestionar plan</div>
+                  <div className="text-xs text-slate-300 mt-1">
+                    Sube o baja tu membresía directamente, sin esperar soporte.
+                  </div>
+                </div>
+
+                <Chip
+                  className="border-white/10"
+                  style={{
+                    background: "rgba(255,255,255,0.06)",
+                    color: "rgba(226,232,240,0.92)",
+                  }}
+                >
+                  Tu nivel:{" "}
+                  <span className="font-semibold" style={{ color: theme.accent || GOLD }}>
+                    {theme.name}
+                  </span>
+                </Chip>
+              </div>
+
+              <div className="mt-4 flex flex-col md:flex-row gap-2">
+                <button
+                  type="button"
+                  onClick={() => goToPlans()}
+                  className="w-full md:w-auto px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition"
+                >
+                  Ver planes
+                </button>
+
+                {suggestUp ? (
                   <button
                     type="button"
-                    onClick={goToPlans}
-                    className="inline-flex items-center justify-center px-4 py-2 rounded-full text-sm font-semibold border border-white/10 bg-white/5 hover:bg-white/10 transition"
-                    style={{ boxShadow: `0 0 28px ${theme.glow}` }}
+                    onClick={() => goToPlans(suggestUp)}
+                    className="w-full md:w-auto px-5 py-2.5 rounded-full text-sm font-semibold"
+                    style={{ backgroundColor: GOLD, color: "#0f172a", boxShadow: `0 0 26px ${theme.glow}` }}
                   >
-                    Gestionar plan
+                    Subir a {suggestUp}
                   </button>
-                </div>
+                ) : (
+                  <button
+                    type="button"
+                    disabled
+                    className="w-full md:w-auto px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 text-slate-400 cursor-not-allowed"
+                  >
+                    Máximo nivel alcanzado
+                  </button>
+                )}
+
+                {suggestDown ? (
+                  <button
+                    type="button"
+                    onClick={() => goToPlans(suggestDown)}
+                    className="w-full md:w-auto px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-slate-950/30 hover:bg-slate-950/50 transition"
+                  >
+                    Bajar a {suggestDown}
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="mt-3 text-xs text-slate-300">
+                Factor Victoria no es una casa de apuestas: es una herramienta de decisión. Tú eliges tu casa de apuestas favorita.
               </div>
             </div>
-          </div>
+          </HudCard>
 
-          {/* Gestionar plan (extra, con subir/bajar) */}
-          <div
-            className="rounded-3xl border bg-white/5 p-5 md:p-6"
-            style={{
-              borderColor: "rgba(255,255,255,0.10)",
-              boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 36px ${theme.glow}`,
-            }}
+          {/* Beneficios (con casillas) */}
+          <HudCard
+            bg={BG_CASILLAS}
+            overlayVariant="casillas"
+            style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 36px ${theme.glow}` }}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-sm font-semibold">Gestionar plan</div>
-                <div className="text-xs text-slate-400 mt-1">
-                  Sube o baja tu membresía directamente, sin esperar soporte.
+            <div className="p-5 md:p-6">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold">Beneficios incluidos</div>
+                  <div className="text-xs text-slate-300 mt-1">
+                    Ventajas disponibles con tu membresía.
+                  </div>
                 </div>
+                <Chip
+                  className="border-white/10"
+                  style={{ background: "rgba(255,255,255,0.06)", color: "rgba(226,232,240,0.92)" }}
+                >
+                  Modo PRO
+                </Chip>
               </div>
 
-              <Chip
-                className="border-white/10"
-                style={{ background: "rgba(255,255,255,0.06)", color: "rgba(226,232,240,0.92)" }}
-              >
-                Tu nivel: <span className="font-semibold" style={{ color: theme.accent || GOLD }}>{theme.name}</span>
-              </Chip>
+              <ul className="mt-4 space-y-2 text-sm text-slate-200">
+                {[
+                  "Acceso al comparador profesional de parlays.",
+                  "Módulo de partidos con filtros por país, liga y equipo.",
+                  "Actualizaciones y mejoras continuas de la plataforma.",
+                  "Más combinadas disponibles según tu plan.",
+                  "Regalo físico asociado a tu plan (trofeos + medallas conmemorativas).",
+                  "Acceso de por vida a Factor Victoria (plan vitalicio).",
+                ].map((b) => (
+                  <li key={b} className="flex gap-2">
+                    <span className="mt-1 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: GOLD }} />
+                    <span>{b}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
+          </HudCard>
 
-            <div className="mt-4 flex flex-col md:flex-row gap-2">
+          {/* Documentos (con jugador, como querías) */}
+          <HudCard
+            bg={BG_JUGADOR}
+            overlayVariant="player"
+            style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px ${theme.glow}` }}
+          >
+            <div className="p-5 md:p-6">
+              <div className="text-sm font-semibold">Documentos de tu membresía</div>
+              <p className="text-xs text-slate-300 mt-1">
+                Próximamente podrás descargar un PDF con condiciones, beneficios y regalos físicos.
+              </p>
+
               <button
                 type="button"
-                onClick={goToPlans}
-                className="w-full md:w-auto px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition"
+                disabled
+                className="mt-4 w-full md:w-fit px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 text-slate-300 cursor-not-allowed"
               >
-                Ver planes
+                Descarga de PDF disponible próximamente
               </button>
-
-              {suggestUp ? (
-                <button
-                  type="button"
-                  onClick={goToPlans}
-                  className="w-full md:w-auto px-5 py-2.5 rounded-full text-sm font-semibold"
-                  style={{ backgroundColor: GOLD, color: "#0f172a" }}
-                >
-                  Subir (recomendado): {suggestUp}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled
-                  className="w-full md:w-auto px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 text-slate-400 cursor-not-allowed"
-                >
-                  Máximo nivel alcanzado
-                </button>
-              )}
-
-              {suggestDown ? (
-                <button
-                  type="button"
-                  onClick={goToPlans}
-                  className="w-full md:w-auto px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-slate-950/30 hover:bg-slate-950/50 transition"
-                >
-                  Bajar: {suggestDown}
-                </button>
-              ) : null}
             </div>
-
-            <div className="mt-3 text-xs text-slate-400">
-              Factor Victoria no es una casa de apuestas: es una herramienta de decisión.
-            </div>
-          </div>
-
-          {/* Beneficios */}
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-5 md:p-6">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-sm font-semibold">Beneficios incluidos</div>
-                <div className="text-xs text-slate-400 mt-1">Ventajas disponibles con tu membresía.</div>
-              </div>
-              <Chip className="border-white/10" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(226,232,240,0.92)" }}>
-                Modo PRO
-              </Chip>
-            </div>
-
-            <ul className="mt-4 space-y-2 text-sm text-slate-200">
-              {[
-                "Acceso al comparador profesional de parlays.",
-                "Módulo de partidos con filtros por país, liga y equipo.",
-                "Actualizaciones y mejoras continuas de la plataforma.",
-                "Más combinadas disponibles según tu plan.",
-                "Regalo físico asociado a tu plan (trofeos + medallas conmemorativas).",
-                "Acceso de por vida a Factor Victoria (plan vitalicio).",
-              ].map((b) => (
-                <li key={b} className="flex gap-2">
-                  <span className="mt-1 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: GOLD }} />
-                  <span>{b}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Documentos */}
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-5 md:p-6">
-            <div className="text-sm font-semibold">Documentos de tu membresía</div>
-            <p className="text-xs text-slate-400 mt-1">
-              Próximamente podrás descargar un PDF con condiciones, beneficios y regalos físicos.
-            </p>
-
-            <button
-              type="button"
-              disabled
-              className="mt-4 w-full md:w-fit px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 text-slate-300 cursor-not-allowed"
-            >
-              Descarga de PDF disponible próximamente
-            </button>
-          </div>
+          </HudCard>
         </div>
       </section>
 
-      <div className="mt-8 text-center text-xs text-slate-500">© {new Date().getFullYear()} Factor Victoria</div>
+      {/* Footer mini */}
+      <div className="mt-8 text-center text-xs text-slate-500">
+        © {new Date().getFullYear()} Factor Victoria
+      </div>
     </div>
   );
 }
