@@ -371,9 +371,7 @@ export default function Fixtures() {
             con verdadero valor. 
             Deja atrás las decisiones improvisadas y los grupos sin estrategia,
             apuesta con datos, planificación y visión ganadora. 
-            Factor Victoria no es una casa de apuestas, es una herramienta de decisión.
-            Te entregamos la información necesaria para que triunfes en tu casa de apuestas favorita.
-          </p>
+            </p>
         </div>
 
         <div className="w-full h-[260px] md:h-[360px] lg:h-[420px] bg-slate-950 overflow-hidden">
