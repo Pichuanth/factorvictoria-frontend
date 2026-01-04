@@ -285,8 +285,8 @@ export default function Profile() {
   }
 
   // Fondos (en /public)
-  const BG_PROFILE = "/hero-fondo-casillas.png";
-  const BG_STATUS = "/hero-fondo-casillas-corona.png";
+  const BG_PROFILE = "/hero-fondo-casillas-corona.png";
+  const BG_STATUS = "/hero-fondo-casillas.png";
   const BG_CASILLAS = "/hero-fondo-casillas.png";
   const BG_DOCS = "/hero-profile-hud.png";
 
