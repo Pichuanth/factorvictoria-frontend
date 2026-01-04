@@ -460,7 +460,7 @@ export default function Profile() {
             </div>
 
             <div className="mt-4 text-xs text-slate-300 leading-relaxed">
-              Tip: usa una foto clara para que tu cuenta se sienta más personal. Esta imagen se guarda en tu dispositivo (por ahora).
+              Tip: usa una foto clara para que tu cuenta se sienta más personal.
             </div>
           </div>
         </HudCard>
@@ -481,7 +481,7 @@ export default function Profile() {
                     <span style={{ color: theme.accent }}>Membresía</span>
                   </div>
                   <div className="text-xs text-slate-300 mt-1 max-w-md">
-                    Tu acceso está habilitado según tu plan. Aquí ves tu estado en tiempo real.
+                    Revisa tu estado en tiempo real.
                   </div>
 
                   <div className="mt-3">
@@ -560,7 +560,7 @@ export default function Profile() {
                 <div>
                   <div className="text-sm font-semibold">Gestionar plan</div>
                   <div className="text-xs text-slate-300 mt-1">
-                    Sube o baja tu membresía directamente, sin esperar soporte.
+                    Maneja tus preferencias.
                   </div>
                 </div>
 
@@ -618,7 +618,7 @@ export default function Profile() {
               </div>
 
               <div className="mt-3 text-xs text-slate-300">
-                Factor Victoria no es una casa de apuestas: es una herramienta de decisión. Tú eliges tu casa de apuestas favorita.
+                Sube o baja tu membresía directamente, sin esperar soporte.
               </div>
             </div>
           </HudCard>
@@ -672,7 +672,7 @@ export default function Profile() {
             <div className="p-5 md:p-6">
               <div className="text-sm font-semibold">Documentos de tu membresía</div>
               <p className="text-xs text-slate-300 mt-1">
-                Próximamente podrás descargar un PDF con condiciones, beneficios y regalos físicos.
+                Proximamente.
               </p>
 
               <button
