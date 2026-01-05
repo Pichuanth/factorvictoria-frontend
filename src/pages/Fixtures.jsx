@@ -1,12 +1,28 @@
 // src/pages/Fixtures.jsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 
 const GOLD = "#E6C464";
-const BG_CASILLAS = "/hero-fondo-casillas.png";
 
-/* ------------------- UI helpers ------------------- */
+/* ------------------- Helpers de plan ------------------- */
+function getPlanLabel(user) {
+  const raw = user?.planId || user?.plan?.id || user?.plan || user?.membership || "";
+  return String(raw || "").toUpperCase();
+}
+
+function hasPaidMembership(planLabel = "") {
+  const p = String(planLabel || "").toUpperCase();
+  // Ajusta aquí si tus IDs reales son distintos
+  if (p.includes("VITAL")) return true;
+  if (p.includes("ANUAL") || p.includes("CAMPE")) return true;
+  if (p.includes("TRI") || p.includes("GOLE") || p.includes("3")) return true;
+  // Mensual también cuenta como pagado si lo usas:
+  if (p.includes("MENS") || p.includes("MONTH")) return true;
+  return false;
+}
+
+/* ------------------- UI reutilizable (estilo Perfil) ------------------- */
 function Chip({ children, style, className = "" }) {
   return (
     <span
@@ -18,41 +34,8 @@ function Chip({ children, style, className = "" }) {
   );
 }
 
-function Badge({ children, tone = "neutral" }) {
-  const tones = {
-    neutral: {
-      background: "rgba(255,255,255,0.06)",
-      borderColor: "rgba(255,255,255,0.12)",
-      color: "rgba(226,232,240,0.92)",
-    },
-    good: {
-      background: "rgba(16,185,129,0.10)",
-      borderColor: "rgba(16,185,129,0.20)",
-      color: "rgba(167,243,208,0.95)",
-    },
-    warn: {
-      background: "rgba(230,196,100,0.10)",
-      borderColor: "rgba(230,196,100,0.22)",
-      color: "rgba(255,241,199,0.95)",
-    },
-    bad: {
-      background: "rgba(239,68,68,0.10)",
-      borderColor: "rgba(239,68,68,0.22)",
-      color: "rgba(254,202,202,0.95)",
-    },
-  };
-
-  return (
-    <span className="inline-flex items-center px-3 py-1 rounded-full text-[12px] border" style={tones[tone] || tones.neutral}>
-      {children}
-    </span>
-  );
-}
-
 /**
  * Card con fondo (imagen) + overlays para legibilidad.
- * overlayVariant:
- *  - "casillasSharp": nítido (recomendado)
  */
 function HudCard({
   bg,
@@ -60,21 +43,20 @@ function HudCard({
   className = "",
   style = {},
   overlay = true,
-  overlayVariant = "casillasSharp",
-  imgStyle = {},
+  overlayVariant = "casillas", // "casillas" | "player"
 }) {
-  const variants = {
-    casillasSharp: {
-      overlays: [
-        "linear-gradient(180deg, rgba(2,6,23,0.78) 0%, rgba(2,6,23,0.45) 42%, rgba(2,6,23,0.78) 100%)",
-        "radial-gradient(circle at 18% 30%, rgba(16,185,129,0.14), rgba(2,6,23,0) 62%)",
-        "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.10), rgba(2,6,23,0) 62%)",
-      ],
-      imgFilter: "contrast(1.18) saturate(1.10) brightness(0.97)",
-    },
-  };
-
-  const v = variants[overlayVariant] || variants.casillasSharp;
+  const overlayLayers =
+    overlayVariant === "player"
+      ? [
+          "linear-gradient(90deg, rgba(2,6,23,0.92) 0%, rgba(2,6,23,0.68) 52%, rgba(2,6,23,0.40) 78%, rgba(2,6,23,0.25) 100%)",
+          "radial-gradient(circle at 20% 45%, rgba(16,185,129,0.20), rgba(2,6,23,0) 58%)",
+          "radial-gradient(circle at 82% 50%, rgba(230,196,100,0.18), rgba(2,6,23,0) 58%)",
+        ]
+      : [
+          "linear-gradient(180deg, rgba(2,6,23,0.88) 0%, rgba(2,6,23,0.62) 38%, rgba(2,6,23,0.86) 100%)",
+          "radial-gradient(circle at 18% 30%, rgba(16,185,129,0.18), rgba(2,6,23,0) 60%)",
+          "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.14), rgba(2,6,23,0) 60%)",
+        ];
 
   return (
     <div
@@ -90,21 +72,14 @@ function HudCard({
           alt=""
           aria-hidden="true"
           className="absolute inset-0 h-full w-full object-cover"
-          style={{
-            transform: "translateZ(0)",
-            backfaceVisibility: "hidden",
-            WebkitBackfaceVisibility: "hidden",
-            filter: v.imgFilter,
-            ...imgStyle,
-          }}
         />
       ) : null}
 
       {overlay ? (
         <>
-          <div className="absolute inset-0" style={{ background: v.overlays[0] }} />
-          <div className="absolute inset-0" style={{ background: v.overlays[1] }} />
-          <div className="absolute inset-0" style={{ background: v.overlays[2] }} />
+          <div className="absolute inset-0" style={{ background: overlayLayers[0] }} />
+          <div className="absolute inset-0" style={{ background: overlayLayers[1] }} />
+          <div className="absolute inset-0" style={{ background: overlayLayers[2] }} />
         </>
       ) : null}
 
@@ -113,145 +88,150 @@ function HudCard({
   );
 }
 
-/* ------------------- Data helpers ------------------- */
-function toInputDateYYYYMMDD(d = new Date()) {
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-function fmtKickoff(isoLike) {
-  if (!isoLike) return "—";
-  const d = new Date(isoLike);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
-}
-
-function safeText(v, fallback = "—") {
-  const s = String(v ?? "").trim();
-  return s ? s : fallback;
-}
-
-function getStatusTone(statusShort = "", statusLong = "") {
-  const s = `${statusShort} ${statusLong}`.toUpperCase();
-  if (s.includes("FT") || s.includes("AET") || s.includes("PEN") || s.includes("FINAL")) return "neutral";
-  if (s.includes("LIVE") || s.includes("1H") || s.includes("2H") || s.includes("IN PLAY")) return "good";
-  if (s.includes("NS") || s.includes("NOT STARTED") || s.includes("SCHEDULED")) return "warn";
-  if (s.includes("POSTP") || s.includes("CANC") || s.includes("SUSP") || s.includes("ABAN")) return "bad";
-  return "neutral";
-}
-
+/* ------------------- Página ------------------- */
 export default function Fixtures() {
-  const { isLoggedIn } = useAuth();
-  const abortRef = useRef(null);
+  const { user, isLoggedIn } = useAuth();
 
-  // Config API
-  const API_BASE = (import.meta?.env?.VITE_API_BASE || "").replace(/\/$/, "");
-  const ENDPOINT = API_BASE ? `${API_BASE}/api/fixtures` : `/api/fixtures`;
+  // Ajusta aquí si tus planes están en otra ruta
+  const UPSELL_URL = "/#planes";
 
-  // Filtros UI
-  const [date, setDate] = useState(() => toInputDateYYYYMMDD(new Date()));
+  // Fondos
+  const BG_CASILLAS = "/hero-fondo-casillas.png";
+  const BG_HERO = "/hero-profile-hud.png";
+  const BG_12000 = "/hero-12000.png";
+
+  const planLabel = useMemo(() => getPlanLabel(user), [user]);
+  const canUsePremium = useMemo(() => hasPaidMembership(planLabel), [planLabel]);
+
+  const API_BASE = import.meta.env.VITE_API_BASE || "";
+
+  // Filtros (similares a tu UI)
+  const [date, setDate] = useState(() => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  });
   const [country, setCountry] = useState("");
   const [league, setLeague] = useState("");
   const [team, setTeam] = useState("");
   const [onlyToday, setOnlyToday] = useState(false);
 
-  // Data
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [fixtures, setFixtures] = useState([]);
 
-  const query = useMemo(() => {
-    // Ajusta aquí según tu backend:
-    // - si tu endpoint acepta date=YYYY-MM-DD, country, league, team -> perfecto
-    // - si no, igual funciona sin filtros (solo muestra lo que devuelva)
-    const params = new URLSearchParams();
-    if (date) params.set("date", date);
-    if (country.trim()) params.set("country", country.trim());
-    if (league.trim()) params.set("league", league.trim());
-    if (team.trim()) params.set("team", team.trim());
-    if (onlyToday) params.set("onlyToday", "1");
-    return params.toString();
-  }, [date, country, league, team, onlyToday]);
+  function goUpsell() {
+    window.location.href = UPSELL_URL;
+  }
 
-  async function loadFixtures() {
+  function guardPremium(actionName = "esta función") {
+    if (canUsePremium) return true;
+
+    // Mensaje corto + redirección directa (como pediste)
+    // Si prefieres sin alert, bórralo.
+    alert(`Para usar ${actionName} necesitas una membresía. Te llevamos a los planes.`);
+    goUpsell();
+    return false;
+  }
+
+  async function fetchFixtures() {
     setLoading(true);
     setError("");
 
     try {
-      abortRef.current?.abort?.();
-      const controller = new AbortController();
-      abortRef.current = controller;
+      const qs = new URLSearchParams();
+      if (date) qs.set("date", date);
+      if (country) qs.set("country", country);
+      if (league) qs.set("league", league);
+      if (team) qs.set("team", team);
+      if (onlyToday) qs.set("today", "1");
 
-      const url = query ? `${ENDPOINT}?${query}` : ENDPOINT;
-      const res = await fetch(url, { signal: controller.signal });
-
-      if (!res.ok) {
-        throw new Error(`Error HTTP ${res.status}`);
-      }
+      const url = `${API_BASE}/api/fixtures?${qs.toString()}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Error HTTP ${res.status}`);
 
       const data = await res.json();
-
-      // Normalización flexible:
-      // - si tu backend devuelve {response:[...]} tipo API-FOOTBALL
-      // - o si devuelve directamente [...]
-      const list = Array.isArray(data) ? data : Array.isArray(data?.response) ? data.response : Array.isArray(data?.fixtures) ? data.fixtures : [];
+      const list = Array.isArray(data) ? data : data?.fixtures || data?.response || [];
       setFixtures(list);
     } catch (e) {
-      if (String(e?.name) === "AbortError") return;
-      setError(e?.message || "No se pudo cargar la lista de partidos.");
+      setError(e?.message || "Error cargando partidos");
       setFixtures([]);
     } finally {
       setLoading(false);
     }
   }
 
+  // Cargar al entrar / al cambiar fecha
   useEffect(() => {
-    loadFixtures();
+    fetchFixtures();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query]);
+  }, [date]);
 
-  if (!isLoggedIn) {
-    return (
-      <div className="max-w-5xl mx-auto px-4 pb-20">
-        <HudCard
-          bg={BG_CASILLAS}
-          overlayVariant="casillasSharp"
-          className="mt-6"
-          style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 46px rgba(230,196,100,0.18)` }}
-        >
-          <div className="p-6">
-            <h1 className="text-xl md:text-2xl font-bold">Partidos</h1>
-            <p className="text-slate-300 mt-2">
-              Para ver partidos y estadísticas,{" "}
-              <Link to="/login" className="underline font-semibold">
-                inicia sesión
-              </Link>
-              .
-            </p>
-          </div>
-        </HudCard>
-      </div>
-    );
+  // Render helpers (tolerante a distintos formatos de API)
+  function getFixtureMeta(fx) {
+    // Intenta cubrir: API-Football style y BD propia
+    const home =
+      fx?.teams?.home?.name ||
+      fx?.homeTeam ||
+      fx?.home ||
+      fx?.home_name ||
+      "Local";
+    const away =
+      fx?.teams?.away?.name ||
+      fx?.awayTeam ||
+      fx?.away ||
+      fx?.away_name ||
+      "Visita";
+
+    const leagueName =
+      fx?.league?.name ||
+      fx?.leagueName ||
+      fx?.league_name ||
+      fx?.competition ||
+      "Liga";
+    const countryName =
+      fx?.league?.country ||
+      fx?.country ||
+      fx?.country_name ||
+      "";
+
+    const status =
+      fx?.fixture?.status?.short ||
+      fx?.status ||
+      fx?.status_short ||
+      "";
+
+    const ts =
+      fx?.fixture?.date ||
+      fx?.date ||
+      fx?.kickoff ||
+      "";
+
+    let timeLabel = "";
+    if (ts) {
+      const d = new Date(ts);
+      if (!Number.isNaN(d.getTime())) {
+        timeLabel = d.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
+      }
+    }
+
+    return { home, away, leagueName, countryName, status, timeLabel };
   }
 
   return (
     <div className="relative max-w-5xl mx-auto px-4 pb-20">
-      {/* Fondo general suave (igual que perfil) */}
+      {/* Fondo general suave (igual a Perfil) */}
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div
           className="absolute -top-44 left-1/2 -translate-x-1/2 h-[640px] w-[640px] rounded-full blur-3xl opacity-18"
           style={{
-            background: "radial-gradient(circle at center, rgba(16,185,129,0.45), rgba(15,23,42,0) 60%)",
+            background: "radial-gradient(circle at center, rgba(16,185,129,0.55), rgba(15,23,42,0) 60%)",
           }}
         />
         <div
-          className="absolute -top-52 right-[-140px] h-[560px] w-[560px] rounded-full blur-3xl opacity-14"
-          style={{
-            background: "radial-gradient(circle at center, rgba(230,196,100,0.38), rgba(15,23,42,0) 62%)",
-          }}
-        />
-        <div
-          className="absolute inset-0 opacity-[0.09]"
+          className="absolute inset-0 opacity-[0.10]"
           style={{
             backgroundImage:
               "linear-gradient(to right, rgba(255,255,255,0.10) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.10) 1px, transparent 1px)",
@@ -262,13 +242,13 @@ export default function Fixtures() {
         />
       </div>
 
-      {/* Header */}
+      {/* HERO: Partidos (con hero-profile-hud.png) */}
       <HudCard
-        bg={BG_CASILLAS}
-        overlayVariant="casillasSharp"
+        bg={BG_HERO}
+        overlayVariant="player"
         className="mt-6"
         style={{
-          boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 46px rgba(230,196,100,0.18)`,
+          boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 46px rgba(230,196,100,0.20)",
         }}
       >
         <div className="p-5 md:p-7">
@@ -276,7 +256,7 @@ export default function Fixtures() {
             <div>
               <h1 className="text-xl md:text-2xl font-bold">Partidos</h1>
               <p className="text-slate-300 text-sm md:text-base mt-1 max-w-2xl">
-                Revisa partidos por fecha y aplica filtros rápidos. Este módulo está pensado para analizar antes de armar tus combinadas.
+                Revisa partidos por fecha y aplica filtros rápidos. Esta vista es una muestra gratuita; para ver estadísticas y construir combinadas necesitas membresía.
               </p>
             </div>
 
@@ -286,7 +266,6 @@ export default function Fixtures() {
                 style={{
                   background: "rgba(255,255,255,0.06)",
                   color: "rgba(226,232,240,0.92)",
-                  boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset",
                 }}
               >
                 Fuente: <span className="font-semibold" style={{ color: GOLD }}>Datos en vivo</span>
@@ -302,18 +281,36 @@ export default function Fixtures() {
               >
                 Modo análisis
               </Chip>
+
+              {!canUsePremium ? (
+                <button
+                  type="button"
+                  onClick={goUpsell}
+                  className="px-4 py-2 rounded-full text-sm font-semibold"
+                  style={{ backgroundColor: GOLD, color: "#0f172a" }}
+                >
+                  Comprar membresía
+                </button>
+              ) : (
+                <Chip
+                  className="border-white/10"
+                  style={{ background: "rgba(255,255,255,0.06)", color: "rgba(226,232,240,0.92)" }}
+                >
+                  Plan <span className="font-semibold" style={{ color: GOLD }}>{planLabel || "ACTIVO"}</span>
+                </Chip>
+              )}
             </div>
           </div>
         </div>
       </HudCard>
 
-      {/* Filtros */}
+      {/* FILTROS (casillas) */}
       <HudCard
         bg={BG_CASILLAS}
-        overlayVariant="casillasSharp"
+        overlayVariant="casillas"
         className="mt-4"
         style={{
-          boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 40px rgba(230,196,100,0.16)`,
+          boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 40px rgba(230,196,100,0.16)",
         }}
       >
         <div className="p-5 md:p-6">
@@ -321,88 +318,106 @@ export default function Fixtures() {
             <div>
               <div className="text-sm font-semibold">Filtros</div>
               <div className="text-xs text-slate-300 mt-1">
-                Ajusta la búsqueda. Si tu backend no usa algunos parámetros, igual no rompe.
+                Ajusta la búsqueda. Si tu backend no usa algunos parámetros, no se rompe.
               </div>
             </div>
 
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => loadFixtures()}
-                className="px-4 py-2 rounded-full text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition"
-                style={{ boxShadow: "0 0 22px rgba(230,196,100,0.12)" }}
-              >
-                Actualizar
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                // “Actualizar / Generar” bloqueado para no miembros (como pediste)
+                if (!guardPremium("Actualizar / Generar")) return;
+                fetchFixtures();
+              }}
+              className="px-4 py-2 rounded-full text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition"
+              style={{ boxShadow: "0 0 26px rgba(230,196,100,0.12)" }}
+            >
+              Actualizar
+            </button>
           </div>
 
           <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
-            <label className="block">
+            <div>
               <div className="text-xs text-slate-300 mb-1">Fecha</div>
               <input
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full rounded-2xl border border-white/10 bg-slate-950/35 px-4 py-2.5 text-sm outline-none focus:border-white/20"
+                className="w-full rounded-2xl px-4 py-2.5 bg-slate-950/30 border border-white/10 text-slate-100 outline-none"
               />
-            </label>
+              <label className="mt-2 inline-flex items-center gap-2 text-xs text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={onlyToday}
+                  onChange={(e) => setOnlyToday(e.target.checked)}
+                />
+                Solo hoy (si backend lo soporta)
+              </label>
+            </div>
 
-            <label className="block">
+            <div>
               <div className="text-xs text-slate-300 mb-1">País</div>
               <input
                 value={country}
                 onChange={(e) => setCountry(e.target.value)}
                 placeholder="Ej: Chile"
-                className="w-full rounded-2xl border border-white/10 bg-slate-950/35 px-4 py-2.5 text-sm outline-none focus:border-white/20"
+                className="w-full rounded-2xl px-4 py-2.5 bg-slate-950/30 border border-white/10 text-slate-100 outline-none"
               />
-            </label>
+            </div>
 
-            <label className="block">
+            <div>
               <div className="text-xs text-slate-300 mb-1">Liga</div>
               <input
                 value={league}
                 onChange={(e) => setLeague(e.target.value)}
                 placeholder="Ej: Primera"
-                className="w-full rounded-2xl border border-white/10 bg-slate-950/35 px-4 py-2.5 text-sm outline-none focus:border-white/20"
+                className="w-full rounded-2xl px-4 py-2.5 bg-slate-950/30 border border-white/10 text-slate-100 outline-none"
               />
-            </label>
+            </div>
 
-            <label className="block">
+            <div>
               <div className="text-xs text-slate-300 mb-1">Equipo</div>
               <input
                 value={team}
                 onChange={(e) => setTeam(e.target.value)}
                 placeholder="Ej: Colo Colo"
-                className="w-full rounded-2xl border border-white/10 bg-slate-950/35 px-4 py-2.5 text-sm outline-none focus:border-white/20"
+                className="w-full rounded-2xl px-4 py-2.5 bg-slate-950/30 border border-white/10 text-slate-100 outline-none"
               />
-            </label>
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <label className="inline-flex items-center gap-2 text-xs text-slate-300">
-              <input
-                type="checkbox"
-                checked={onlyToday}
-                onChange={(e) => setOnlyToday(e.target.checked)}
-              />
-              Solo hoy (si backend lo soporta)
-            </label>
-
-            <div className="text-xs text-slate-400">
-              Endpoint: <span className="text-slate-300">{ENDPOINT}</span>
             </div>
           </div>
+
+          <div className="mt-3 text-[11px] text-slate-400">
+            Endpoint:{" "}
+            <span className="text-slate-300">
+              {API_BASE ? `${API_BASE}/api/fixtures` : "/api/fixtures"}
+            </span>
+          </div>
+
+          {!canUsePremium ? (
+            <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3">
+              <div className="text-sm font-semibold" style={{ color: GOLD }}>
+                Vista gratuita (limitada)
+              </div>
+              <div className="text-xs text-slate-200 mt-1">
+                Puedes ver partidos del día. Para estadísticas avanzadas y combinadas (parlays), necesitas membresía.
+                {" "}
+                <button onClick={goUpsell} className="underline font-semibold" style={{ color: GOLD }}>
+                  Ver planes
+                </button>
+                .
+              </div>
+            </div>
+          ) : null}
         </div>
       </HudCard>
 
-      {/* Lista */}
+      {/* RESULTADOS (casillas) */}
       <HudCard
         bg={BG_CASILLAS}
-        overlayVariant="casillasSharp"
+        overlayVariant="casillas"
         className="mt-4"
         style={{
-          boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.16)`,
+          boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.16)",
         }}
       >
         <div className="p-5 md:p-6">
@@ -416,127 +431,134 @@ export default function Fixtures() {
 
             <Chip
               className="border-white/10"
-              style={{
-                background: "rgba(255,255,255,0.06)",
-                color: "rgba(226,232,240,0.92)",
-              }}
+              style={{ background: "rgba(255,255,255,0.06)", color: "rgba(226,232,240,0.92)" }}
             >
               Zona horaria: <span className="font-semibold" style={{ color: GOLD }}>America/Santiago</span>
             </Chip>
           </div>
 
           {error ? (
-            <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-100">
-              {error}
-            </div>
+            <div className="mt-4 text-sm text-red-300">{error}</div>
           ) : null}
 
-          {loading ? (
-            <div className="mt-5 grid grid-cols-1 gap-3">
-              {Array.from({ length: 6 }).map((_, i) => (
+          <div className="mt-4 space-y-3">
+            {fixtures.length === 0 && !loading ? (
+              <div className="text-sm text-slate-300">
+                Por ahora no hay partidos para este rango o filtro.
+              </div>
+            ) : null}
+
+            {fixtures.map((fx, idx) => {
+              const m = getFixtureMeta(fx);
+              return (
                 <div
-                  key={i}
-                  className="rounded-3xl border border-white/10 bg-slate-950/25 p-4"
-                  style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset" }}
+                  key={fx?.id || fx?.fixture?.id || idx}
+                  className="rounded-3xl border border-white/10 bg-slate-950/25 p-4 md:p-5"
+                  style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.02) inset" }}
                 >
-                  <div className="h-4 w-40 bg-white/10 rounded mb-3" />
-                  <div className="h-3 w-64 bg-white/10 rounded" />
-                </div>
-              ))}
-            </div>
-          ) : fixtures.length === 0 ? (
-            <div className="mt-5 rounded-3xl border border-white/10 bg-slate-950/25 p-5 text-sm text-slate-200">
-              No hay partidos para esos filtros/fecha.
-            </div>
-          ) : (
-            <div className="mt-5 grid grid-cols-1 gap-3">
-              {fixtures.map((fx, idx) => {
-                // Compatible con estructura API-FOOTBALL:
-                const fixture = fx?.fixture || fx;
-                const teams = fx?.teams || fx?.team || {};
-                const leagueObj = fx?.league || {};
-                const status = fixture?.status || {};
-                const home = teams?.home?.name || fx?.home?.name || fx?.home || fx?.homeTeam || "Local";
-                const away = teams?.away?.name || fx?.away?.name || fx?.away || fx?.awayTeam || "Visita";
-                const kickoff = fixture?.date || fx?.date || fx?.kickoff || "";
-                const leagueName = leagueObj?.name || fx?.leagueName || fx?.league || "Liga";
-                const countryName = leagueObj?.country || fx?.country || "";
-
-                const tone = getStatusTone(status?.short, status?.long);
-
-                return (
-                  <div
-                    key={fixture?.id || fx?.id || idx}
-                    className="rounded-3xl border border-white/10 bg-slate-950/25 p-4 md:p-5"
-                    style={{
-                      boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 26px rgba(230,196,100,0.08)",
-                    }}
-                  >
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-semibold truncate">
-                            {safeText(home)} <span className="text-slate-400">vs</span> {safeText(away)}
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <div className="text-sm font-bold truncate">
+                          {m.home} <span className="text-slate-400 font-semibold">vs</span> {m.away}
+                        </div>
+                        {m.status ? (
+                          <span className="text-[11px] px-2 py-0.5 rounded-full border border-white/10 bg-white/5 text-slate-200">
+                            {m.status}
                           </span>
-                          <Badge tone={tone}>
-                            {safeText(status?.short || status?.long || "NS")}
-                          </Badge>
-                        </div>
-
-                        <div className="mt-1 text-xs text-slate-300">
-                          {countryName ? `${countryName} • ` : ""}
-                          {leagueName} • {fmtKickoff(kickoff)}
-                        </div>
+                        ) : null}
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          className="px-4 py-2 rounded-full text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition"
-                        >
-                          Ver estadísticas
-                        </button>
-                        <button
-                          type="button"
-                          className="px-4 py-2 rounded-full text-sm font-semibold"
-                          style={{
-                            backgroundColor: GOLD,
-                            color: "#0f172a",
-                            boxShadow: "0 0 26px rgba(230,196,100,0.18)",
-                          }}
-                        >
-                          Añadir a combinada
-                        </button>
+                      <div className="text-xs text-slate-300 mt-1">
+                        {m.countryName ? `${m.countryName} · ` : ""}
+                        {m.leagueName}
+                        {m.timeLabel ? ` · ${m.timeLabel}` : ""}
                       </div>
                     </div>
 
-                    {/* Placeholder: mini panel de métricas (para que se vea pro) */}
-                    <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
-                      {[
-                        ["Forma", "—"],
-                        ["Tarjetas", "—"],
-                        ["Corners", "—"],
-                        ["Prob.", "—"],
-                      ].map(([k, v]) => (
-                        <div
-                          key={k}
-                          className="rounded-2xl border px-3 py-2"
-                          style={{
-                            borderColor: "rgba(255,255,255,0.10)",
-                            background: "rgba(2,6,23,0.35)",
-                            backdropFilter: "blur(6px)",
-                          }}
-                        >
-                          <div className="text-[11px] text-slate-300">{k}</div>
-                          <div className="text-sm font-bold text-slate-100">{v}</div>
-                        </div>
-                      ))}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => guardPremium("Ver estadísticas")}
+                        className="px-4 py-2 rounded-full text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition"
+                      >
+                        Ver estadísticas
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => guardPremium("Añadir a combinada")}
+                        className="px-4 py-2 rounded-full text-sm font-semibold"
+                        style={{ backgroundColor: GOLD, color: "#0f172a" }}
+                      >
+                        Añadir a combinada
+                      </button>
                     </div>
                   </div>
-                );
-              })}
+
+                  {/* mini placeholders (se ven “pro” pero no entregan valor premium) */}
+                  <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {[
+                      ["Forma", "—"],
+                      ["Tarjetas", "—"],
+                      ["Corners", "—"],
+                      ["Prob.", "—"],
+                    ].map(([k, v]) => (
+                      <div
+                        key={k}
+                        className="rounded-2xl border border-white/10 bg-slate-950/20 px-3 py-2"
+                      >
+                        <div className="text-[11px] text-slate-300">{k}</div>
+                        <div className="text-sm font-semibold text-slate-100">{v}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {!isLoggedIn ? (
+            <div className="mt-4 text-xs text-slate-300">
+              Nota: Estás viendo la versión pública.{" "}
+              <Link to="/login" className="underline font-semibold" style={{ color: GOLD }}>
+                Inicia sesión
+              </Link>{" "}
+              para ver tu plan.
             </div>
-          )}
+          ) : null}
+        </div>
+      </HudCard>
+
+      {/* CTA final 12.000 (hero-12000.png) */}
+      <HudCard
+        bg={BG_12000}
+        overlayVariant="player"
+        className="mt-4"
+        style={{
+          boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 46px rgba(230,196,100,0.18)",
+        }}
+      >
+        <div className="p-5 md:p-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <div className="text-sm md:text-base font-semibold text-slate-100">
+                Únete a la comunidad
+              </div>
+              <div className="text-xs text-slate-200 mt-1 max-w-xl">
+                +12.000 usuarios activos. Miles de usuarios confían en nuestros datos, simulador y picks para apostar con ventaja.
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={goUpsell}
+              className="w-full md:w-auto px-5 py-2.5 rounded-full text-sm font-semibold"
+              style={{ backgroundColor: GOLD, color: "#0f172a" }}
+            >
+              Ver planes y comprar
+            </button>
+          </div>
         </div>
       </HudCard>
 
