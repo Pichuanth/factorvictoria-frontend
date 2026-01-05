@@ -126,51 +126,93 @@ function Chip({ children, style, className = "" }) {
 /**
  * Card con fondo + overlays para legibilidad
  */
+/**
+ * Card con fondo (imagen) + overlays para legibilidad.
+ * overlayVariant:
+ *  - "casillas": suave (como lo tienes)
+ *  - "casillasSharp": más nítido (menos neblina)
+ *  - "player": oscuro (para el jugador)
+ */
 function HudCard({
   bg,
   children,
   className = "",
   style = {},
   overlay = true,
-  overlayVariant = "dark", // "dark" | "soft"
-  imgPosition = "center",
+  overlayVariant = "casillas", // "casillas" | "casillasSharp" | "player"
+  imgStyle = {},              // opcional
 }) {
-  const overlayLayers =
-    overlayVariant === "soft"
-      ? [
-          "linear-gradient(180deg, rgba(2,6,23,0.82) 0%, rgba(2,6,23,0.60) 38%, rgba(2,6,23,0.84) 100%)",
-          "radial-gradient(circle at 18% 30%, rgba(16,185,129,0.16), rgba(2,6,23,0) 60%)",
-          "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.12), rgba(2,6,23,0) 60%)",
-        ]
-      : [
-          "linear-gradient(90deg, rgba(2,6,23,0.90) 0%, rgba(2,6,23,0.68) 52%, rgba(2,6,23,0.42) 78%, rgba(2,6,23,0.28) 100%)",
-          "radial-gradient(circle at 20% 45%, rgba(16,185,129,0.18), rgba(2,6,23,0) 58%)",
-          "radial-gradient(circle at 82% 50%, rgba(230,196,100,0.16), rgba(2,6,23,0) 58%)",
-        ];
+  const variants = {
+    player: {
+      overlays: [
+        "linear-gradient(90deg, rgba(2,6,23,0.92) 0%, rgba(2,6,23,0.68) 52%, rgba(2,6,23,0.40) 78%, rgba(2,6,23,0.25) 100%)",
+        "radial-gradient(circle at 20% 45%, rgba(16,185,129,0.20), rgba(2,6,23,0) 58%)",
+        "radial-gradient(circle at 82% 50%, rgba(230,196,100,0.18), rgba(2,6,23,0) 58%)",
+      ],
+      // imagen con un poco más de contraste para que “corte” mejor
+      imgFilter: "contrast(1.12) saturate(1.08) brightness(0.95)",
+    },
+
+    casillas: {
+      overlays: [
+        "linear-gradient(180deg, rgba(2,6,23,0.88) 0%, rgba(2,6,23,0.62) 38%, rgba(2,6,23,0.86) 100%)",
+        "radial-gradient(circle at 18% 30%, rgba(16,185,129,0.18), rgba(2,6,23,0) 60%)",
+        "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.14), rgba(2,6,23,0) 60%)",
+      ],
+      imgFilter: "contrast(1.10) saturate(1.06) brightness(0.96)",
+    },
+
+    // NUEVO: menos neblina + más “sharp”
+    casillasSharp: {
+      overlays: [
+        // baja la niebla (menos opacidad) y deja más textura visible
+        "linear-gradient(180deg, rgba(2,6,23,0.78) 0%, rgba(2,6,23,0.45) 42%, rgba(2,6,23,0.78) 100%)",
+        "radial-gradient(circle at 18% 30%, rgba(16,185,129,0.14), rgba(2,6,23,0) 62%)",
+        "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.10), rgba(2,6,23,0) 62%)",
+      ],
+      // sube un poco más el contraste
+      imgFilter: "contrast(1.18) saturate(1.10) brightness(0.97)",
+    },
+  };
+
+  const v = variants[overlayVariant] || variants.casillas;
 
   return (
     <div
       className={`relative overflow-hidden rounded-3xl border bg-white/5 ${className}`}
-      style={{ borderColor: "rgba(255,255,255,0.10)", ...style }}
+      style={{
+        borderColor: "rgba(255,255,255,0.10)",
+        ...style,
+      }}
     >
+      {/* Fondo */}
       {bg ? (
         <img
           src={bg}
           alt=""
           aria-hidden="true"
           className="absolute inset-0 h-full w-full object-cover"
-          style={{ objectPosition: imgPosition }}
+          style={{
+            // esto ayuda a que el render no se vea “lavado” al escalar
+            transform: "translateZ(0)",
+            backfaceVisibility: "hidden",
+            WebkitBackfaceVisibility: "hidden",
+            filter: v.imgFilter,
+            ...imgStyle,
+          }}
         />
       ) : null}
 
+      {/* Overlays */}
       {overlay ? (
         <>
-          <div className="absolute inset-0" style={{ background: overlayLayers[0] }} />
-          <div className="absolute inset-0" style={{ background: overlayLayers[1] }} />
-          <div className="absolute inset-0" style={{ background: overlayLayers[2] }} />
+          <div className="absolute inset-0" style={{ background: v.overlays[0] }} />
+          <div className="absolute inset-0" style={{ background: v.overlays[1] }} />
+          <div className="absolute inset-0" style={{ background: v.overlays[2] }} />
         </>
       ) : null}
 
+      {/* Contenido */}
       <div className="relative">{children}</div>
     </div>
   );
