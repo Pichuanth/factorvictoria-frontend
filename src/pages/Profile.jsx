@@ -631,26 +631,36 @@ export default function Profile() {
           </HudCard>
 
           {/* Documentos (jugador) — con encuadre para NO cortar cabeza */}
-          <HudCard
-            bg={BG_DOCS}
-            overlayVariant="dark"
-            className="min-h-[240px] md:min-h-[260px]"
-            style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px ${theme.glow}` }}
-            imgPosition="50% 18%"
-          >
-            <div className="p-5 md:p-6">
-              <div className="text-sm font-semibold">Documentos de tu membresía</div>
-              <p className="text-xs text-slate-300 mt-1">Próximamente.</p>
+          {/* Documentos (jugador) */}
+<HudCard
+  bg={BG_DOCS}
+  overlayVariant="dark"
+  className="min-h-[260px] md:min-h-[280px]"
+  style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px ${theme.glow}` }}
+  imgPosition="50% 18%"
+>
+  <div className="p-5 md:p-6 flex flex-col min-h-[260px] md:min-h-[280px]">
+    <div>
+      <div className="text-sm font-semibold">Documentos de tu membresía</div>
+      <p className="text-xs text-slate-300 mt-1">Próximamente.</p>
+    </div>
 
-              <button
-                type="button"
-                disabled
-                className="mt-4 w-full md:w-fit px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 text-slate-300 cursor-not-allowed"
-              >
-                Descarga de PDF disponible próximamente
-              </button>
-            </div>
-          </HudCard>
+    {/* Empuja el botón hacia abajo */}
+    <div className="mt-auto pt-6">
+      <button
+        type="button"
+        disabled
+        className="w-full md:w-fit px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 text-slate-300 cursor-not-allowed"
+      >
+        Descarga de PDF disponible próximamente
+      </button>
+
+      <div className="mt-2 text-[11px] text-slate-400">
+        Estamos preparando el documento con beneficios, condiciones y regalos físicos según tu plan.
+      </div>
+    </div>
+  </div>
+</HudCard>
         </div>
       </section>
 
