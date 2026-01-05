@@ -652,7 +652,7 @@ export default function Profile() {
         disabled
         className="w-full md:w-fit px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 text-slate-300 cursor-not-allowed"
       >
-        Descarga de PDF disponible próximamente
+        Documentos PDF
       </button>
 
       <div className="mt-2 text-[11px] text-slate-400">
