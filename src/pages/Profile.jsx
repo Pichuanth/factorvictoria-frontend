@@ -363,7 +363,7 @@ export default function Profile() {
       {/* Mi perfil */}
       <HudCard
         bg={BG_PROFILE}
-        overlayVariant="dark"
+        overlayVariant="casillasSharp"
         className="mt-6"
         style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 46px ${theme.glow}` }}
         imgPosition="center"
@@ -504,7 +504,7 @@ export default function Profile() {
           {/* Estado membresía */}
           <HudCard
             bg={BG_STATUS}
-            overlayVariant="dark"
+            overlayVariant="casillasSharp"
             style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px ${theme.glow}` }}
             imgPosition="center"
           >
@@ -636,7 +636,7 @@ export default function Profile() {
           {/* Beneficios (vuelve hero-fondo-casillas.png) */}
           <HudCard
             bg={BG_CASILLAS}
-            overlayVariant="soft"
+            overlayVariant="casillasSharp"
             style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 36px ${theme.glow}` }}
             imgPosition="center"
           >
