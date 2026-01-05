@@ -421,7 +421,7 @@ export default function Profile() {
         {/* Identidad (vuelve hero-fondo-casillas.png) */}
         <HudCard
           bg={BG_CASILLAS}
-          overlayVariant="soft"
+          overlayVariant="casillasSharp"
           className="lg:col-span-1"
           style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 40px ${theme.glow}` }}
           imgPosition="center"
@@ -563,7 +563,7 @@ export default function Profile() {
           {/* Gestionar plan (vuelve hero-fondo-casillas.png) */}
           <HudCard
             bg={BG_CASILLAS}
-            overlayVariant="soft"
+            overlayVariant="casillasSharp"
             style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 40px ${theme.glow}` }}
             imgPosition="center"
           >
@@ -676,7 +676,7 @@ export default function Profile() {
           {/* Documentos (jugador) */}
 <HudCard
   bg={BG_DOCS}
-  overlayVariant="dark"
+  overlayVariant="player"
   className="min-h-[260px] md:min-h-[280px]"
   style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px ${theme.glow}` }}
   imgPosition="50% 18%"
