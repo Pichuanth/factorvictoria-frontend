@@ -231,7 +231,7 @@ function GainSimulatorCard({ onGoPlans }) {
 
   return (
     <HudCard
-      bg={BG_CASILLAS}
+      bg={BG_PARTIDAZOS}
       overlayVariant="casillas"
       className="mt-4"
       style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.14)` }}
@@ -258,18 +258,22 @@ function GainSimulatorCard({ onGoPlans }) {
 
         <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-            <div className="text-xs text-slate-300">Monto</div>
-            <input
-              type="number"
-              value={stake}
-              onChange={(e) => setStake(e.target.value)}
-              className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 outline-none"
-              placeholder="Ej: 10000"
-            />
-            <div className="mt-2 text-[11px] text-slate-400">
-              Vista: <span className="font-semibold">{formatMoney(stake, currency)}</span>
-            </div>
-          </div>
+  <div className="text-xs text-slate-300">Monto</div>
+
+  <input
+    type="text"
+    inputMode="numeric"
+    value={formatMoney(stake, currency)} // <-- aquí ya sale $10.000
+    onChange={(e) => {
+      // deja solo números
+      const digits = String(e.target.value || "").replace(/[^\d]/g, "");
+      const n = digits ? Number(digits) : 0;
+      setStake(n);
+    }}
+    className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 outline-none"
+    placeholder={currency === "CLP" ? "$10.000" : "$100.00"}
+  />
+</div>
 
           <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
             <div className="text-xs text-slate-300">Cuota potenciada</div>
@@ -624,10 +628,19 @@ export default function Fixtures() {
           ) : null}
 
           <div className="mt-4 space-y-4">
-            {fixtures.slice(0, 60).map((f, idx) => {
+            {fixturesSorted.slice(0, 200).map((f, idx) => {
               const title = fixtureTitle(f);
               const meta = fixtureMeta(f);
               const flagUrl = fixtureFlagUrl(meta.country);
+const fixturesSorted = useMemo(() => {
+  const arr = Array.isArray(fixtures) ? [...fixtures] : [];
+  arr.sort((a, b) => {
+    const da = new Date(a?.fixture?.date || a?.date || 0).getTime();
+    const db = new Date(b?.fixture?.date || b?.date || 0).getTime();
+    return da - db;
+  });
+  return arr;
+}, [fixtures]);
 
               return (
                 <div
