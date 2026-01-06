@@ -187,7 +187,7 @@ function RecoWeeklyCard() {
         </div>
         <div className="mt-1 text-lg md:text-xl font-bold text-slate-100">Partidazos de la semana</div>
         <div className="mt-1 text-xs text-slate-300">
-          Actualizado cada lunes. Estos son los encuentros más atractivos para analizar.
+          Estos son los encuentros más atractivos para analizar.
         </div>
 
         <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/30 overflow-hidden">
