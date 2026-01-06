@@ -343,7 +343,7 @@ export default function Fixtures() {
         {/* Bloque PRO (candados) */}
         <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
           {[
-            { label: "Forma", key: "forma" }, // si quieres, lo cambiamos a "1X2" (ver nota abajo)
+            { label: "1x2", key: "forma" }, // si quieres, lo cambiamos a "1X2" (ver nota abajo)
             { label: "Tarjetas", key: "cards" },
             { label: "Corners", key: "corners" },
             { label: "Prob.", key: "prob" },
@@ -556,7 +556,7 @@ export default function Fixtures() {
                 Vista gratuita (limitada)
               </div>
               <div className="text-xs text-slate-200 mt-1">
-                Puedes ver partidos del día. Para estadísticas avanzadas, combinadas (parlays) y cuotas potenciadas,
+                Para estadísticas avanzadas, combinadas (parlays) y cuotas potenciadas,
                 necesitas membresía.{" "}
                 <button type="button" onClick={goToPlans} className="underline font-semibold" style={{ color: GOLD }}>
                   Ver planes
@@ -575,7 +575,7 @@ export default function Fixtures() {
                   Cuotas potenciadas (x10 · x20 · x50 · x100)
                 </div>
                 <div className="text-xs text-slate-300 mt-1">
-                  Para generar cuotas potenciadas x10, x20, x50 o x100, adquiere tu membresía PRO.
+                  Para generar cuotas potenciadas, adquiere tu membresía PRO.
                 </div>
 
                 <div className="mt-2 flex flex-col sm:flex-row gap-2">
