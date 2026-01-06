@@ -200,7 +200,7 @@ function RecoWeeklyCard() {
         </div>
 
         <div className="mt-3 text-[11px] text-slate-400">
-          Tip: reemplaza <span className="font-semibold">/public/partidazos-semana.png</span> cada lunes.
+          Tip: Apuesta con datos , planificación y visión ganadora.
         </div>
       </div>
     </div>
