@@ -591,7 +591,7 @@ export default function Fixtures() {
                 <input
                   value={country}
                   onChange={(e) => setCountry(e.target.value)}
-                  placeholder="Ej: Chile/España/Inglaterra"
+                  placeholder="Ej: España"
                   className="mt-1 w-full rounded-2xl border px-4 py-3 bg-slate-950/30 text-slate-100"
                   style={{ borderColor: "rgba(255,255,255,0.12)" }}
                 />
@@ -602,7 +602,7 @@ export default function Fixtures() {
                 <input
                   value={league}
                   onChange={(e) => setLeague(e.target.value)}
-                  placeholder="Ej: Primera/ligue1/Champions"
+                  placeholder="Ej: Premier League"
                   className="mt-1 w-full rounded-2xl border px-4 py-3 bg-slate-950/30 text-slate-100"
                   style={{ borderColor: "rgba(255,255,255,0.12)" }}
                 />
@@ -613,7 +613,7 @@ export default function Fixtures() {
                 <input
                   value={team}
                   onChange={(e) => setTeam(e.target.value)}
-                  placeholder="Ej: Manchester/Barcelona/Colo Colo"
+                  placeholder="Ej: Manchester"
                   className="mt-1 w-full rounded-2xl border px-4 py-3 bg-slate-950/30 text-slate-100"
                   style={{ borderColor: "rgba(255,255,255,0.12)" }}
                 />
