@@ -645,14 +645,7 @@ export default function Fixtures() {
             >
               <div className="text-sm font-semibold" style={{ color: GOLD }}>
                 Vista gratuita (limitada)
-              </div>
-              <div className="text-xs text-slate-200 mt-1">
-                Para estadísticas avanzadas, combinadas (parlays) y cuotas potenciadas,
-                necesitas membresía.{" "}
-                <button type="button" onClick={goToPlans} className="underline font-semibold" style={{ color: GOLD }}>
-                  Ver planes
-                </button>
-                .
+              
               </div>
 
               <div
@@ -665,10 +658,7 @@ export default function Fixtures() {
                 <div className="text-xs font-semibold" style={{ color: CYAN_TEXT }}>
                   Cuotas potenciadas (x10 · x20 · x50 · x100)
                 </div>
-                <div className="text-xs text-slate-300 mt-1">
-                  Para generar cuotas potenciadas, adquiere tu membresía PRO.
-                </div>
-
+                
                 <div className="mt-2 flex flex-col sm:flex-row gap-2">
                   <button
                     type="button"
@@ -680,7 +670,7 @@ export default function Fixtures() {
                       color: CYAN_TEXT,
                     }}
                   >
-                    Generar cuotas potenciadas x100
+                    Generar cuotas potenciadas
                   </button>
 
                   <button
