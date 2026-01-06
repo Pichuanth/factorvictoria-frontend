@@ -447,7 +447,7 @@ export default function Fixtures() {
         {/* Bloque PRO (candados) */}
         <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
           {[
-            { label: "Forma", key: "forma" }, // si prefieres: cámbialo a "1X2"
+            { label: "1x2/Goles", key: "forma" }, // si prefieres: cámbialo a "1X2"
             { label: "Tarjetas", key: "cards" },
             { label: "Corners", key: "corners" },
             { label: "Prob.", key: "prob" },
@@ -591,7 +591,7 @@ export default function Fixtures() {
                 <input
                   value={country}
                   onChange={(e) => setCountry(e.target.value)}
-                  placeholder="Ej: Chile"
+                  placeholder="Ej: Chile/España/Inglaterra"
                   className="mt-1 w-full rounded-2xl border px-4 py-3 bg-slate-950/30 text-slate-100"
                   style={{ borderColor: "rgba(255,255,255,0.12)" }}
                 />
@@ -602,7 +602,7 @@ export default function Fixtures() {
                 <input
                   value={league}
                   onChange={(e) => setLeague(e.target.value)}
-                  placeholder="Ej: Primera"
+                  placeholder="Ej: Primera/ligue1/Champions"
                   className="mt-1 w-full rounded-2xl border px-4 py-3 bg-slate-950/30 text-slate-100"
                   style={{ borderColor: "rgba(255,255,255,0.12)" }}
                 />
@@ -613,7 +613,7 @@ export default function Fixtures() {
                 <input
                   value={team}
                   onChange={(e) => setTeam(e.target.value)}
-                  placeholder="Ej: Colo Colo"
+                  placeholder="Ej: Manchester/Barcelona/Colo Colo"
                   className="mt-1 w-full rounded-2xl border px-4 py-3 bg-slate-950/30 text-slate-100"
                   style={{ borderColor: "rgba(255,255,255,0.12)" }}
                 />
