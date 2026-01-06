@@ -761,7 +761,7 @@ export default function Fixtures() {
                   {/* Candados (SIEMPRE candado por ahora para no filtrar datos) */}
                   <div className="mt-4 grid grid-cols-2 gap-3">
                     {[
-                      { label: "1X2", key: "odds" },
+                      { label: "1X2/Goles", key: "odds" },
                       { label: "Tarjetas", key: "cards" },
                       { label: "Corners", key: "corners" },
                       { label: "Prob.", key: "prob" },
@@ -826,7 +826,7 @@ export default function Fixtures() {
               boxShadow: "0 0 26px rgba(230,196,100,0.18)",
             }}
           >
-            Ver planes
+            Unirme
           </button>
         </div>
       </HudCard>
