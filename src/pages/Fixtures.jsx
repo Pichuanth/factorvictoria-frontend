@@ -5,17 +5,19 @@ import { useAuth } from "../lib/auth";
 
 const GOLD = "#E6C464";
 const CYAN = "#4CC9F0"; // celeste “comparador”
+
 const API_BASE =
   import.meta?.env?.VITE_API_BASE?.replace(/\/$/, "") ||
   "https://factorvictoria-backend.vercel.app";
 
 /** Fondos (public/) */
-const BG_CASILLAS = "/hero-fondo-casillas.png"; // casillasSharp en tu public
+const BG_CASILLAS = "/hero-fondo-casillas.png";
 const BG_JUGADOR = "/hero-profile-hud.png";
 const BG_12000 = "/hero-12000.png";
 const BG_PARTIDAZOS = "/hero-fondo-partidos.png";
+const BG_DINERO = "/hero.dinero.png"; // <-- tu imagen para el simulador
 
-/** IMPORTANTE: nombre fijo para el banner semanal; cada lunes reemplazas el archivo */
+/** Banner semanal (nombre fijo) */
 const IMG_PARTIDAZOS_SEMANA = "/partidazos-semana.png";
 
 /* ------------------- helpers ------------------- */
@@ -32,7 +34,6 @@ function addDays(date, days) {
 }
 
 function enumerateDates(fromStr, toStr, hardLimit = 10) {
-  // Devuelve array de YYYY-MM-DD (máx hardLimit días) para no spamear el backend.
   const from = new Date(fromStr);
   const to = new Date(toStr);
   if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return [];
@@ -61,7 +62,13 @@ function Chip({ children, style, className = "" }) {
 
 function LockIcon({ size = 18, color = "rgba(230,196,100,0.9)" }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         d="M7.5 11V8.8c0-2.9 2.1-5.3 4.7-5.3s4.7 2.4 4.7 5.3V11"
         stroke={color}
@@ -149,7 +156,8 @@ function RecoWeeklyCard() {
       className="relative overflow-hidden rounded-3xl border bg-white/5"
       style={{
         borderColor: "rgba(255,255,255,0.10)",
-        boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 46px rgba(230,196,100,0.16)",
+        boxShadow:
+          "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 46px rgba(230,196,100,0.16)",
       }}
     >
       <img
@@ -185,7 +193,9 @@ function RecoWeeklyCard() {
         <div className="text-xs tracking-wide text-emerald-200/90 font-semibold">
           Factor Victoria recomienda
         </div>
-        <div className="mt-1 text-lg md:text-xl font-bold text-slate-100">Partidazos de la semana</div>
+        <div className="mt-1 text-lg md:text-xl font-bold text-slate-100">
+          Partidazos de la semana
+        </div>
         <div className="mt-1 text-xs text-slate-300">
           Estos son los encuentros más atractivos para analizar.
         </div>
@@ -200,7 +210,7 @@ function RecoWeeklyCard() {
         </div>
 
         <div className="mt-3 text-[11px] text-slate-400">
-          Tip: Apuesta con datos , planificación y visión ganadora.
+          Tip: Apuesta con datos, planificación y visión ganadora.
         </div>
       </div>
     </div>
@@ -211,6 +221,7 @@ function RecoWeeklyCard() {
 function formatMoney(value, currency) {
   const n = Number(value || 0);
   const safe = Number.isFinite(n) ? n : 0;
+
   const decimals = currency === "CLP" ? 0 : 2;
   const locale = currency === "CLP" ? "es-CL" : "en-US";
 
@@ -231,15 +242,21 @@ function GainSimulatorCard({ onGoPlans }) {
 
   return (
     <HudCard
-      bg={BG_PARTIDAZOS}
+      bg={BG_DINERO} // <-- tu fondo hero.dinero.png
       overlayVariant="casillas"
       className="mt-4"
-      style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.14)` }}
+      style={{
+        boxShadow:
+          "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.14)",
+      }}
+      imgStyle={{ objectPosition: "60% 35%" }}
     >
       <div className="p-5 md:p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-sm font-semibold text-slate-100">Simulador de ganancias</div>
+            <div className="text-sm font-semibold text-slate-100">
+              Simulador de ganancias
+            </div>
             <div className="text-xs text-slate-300 mt-1">
               Estima cuánto podrías obtener con cuotas potenciadas.
             </div>
@@ -257,23 +274,23 @@ function GainSimulatorCard({ onGoPlans }) {
         </div>
 
         <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* Monto formateado dentro del input */}
           <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-  <div className="text-xs text-slate-300">Monto</div>
+            <div className="text-xs text-slate-300">Monto</div>
 
-  <input
-    type="text"
-    inputMode="numeric"
-    value={formatMoney(stake, currency)} // <-- aquí ya sale $10.000
-    onChange={(e) => {
-      // deja solo números
-      const digits = String(e.target.value || "").replace(/[^\d]/g, "");
-      const n = digits ? Number(digits) : 0;
-      setStake(n);
-    }}
-    className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 outline-none"
-    placeholder={currency === "CLP" ? "$10.000" : "$100.00"}
-  />
-</div>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={formatMoney(stake, currency)}
+              onChange={(e) => {
+                const digits = String(e.target.value || "").replace(/[^\d]/g, "");
+                const n = digits ? Number(digits) : 0;
+                setStake(n);
+              }}
+              className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 outline-none"
+              placeholder={currency === "CLP" ? "$10.000" : "$100.00"}
+            />
+          </div>
 
           <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
             <div className="text-xs text-slate-300">Cuota potenciada</div>
@@ -294,7 +311,9 @@ function GainSimulatorCard({ onGoPlans }) {
                 </button>
               ))}
             </div>
-            <div className="mt-2 text-[11px] text-slate-400">Para activar x20/x50/x100 necesitas membresía.</div>
+            <div className="mt-2 text-[11px] text-slate-400">
+              Para activar x20/x50/x100 necesitas membresía.
+            </div>
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
@@ -302,7 +321,9 @@ function GainSimulatorCard({ onGoPlans }) {
             <div className="mt-2 text-lg font-bold" style={{ color: "rgba(230,196,100,0.95)" }}>
               {formatMoney(potential, currency)}
             </div>
-            <div className="mt-1 text-[11px] text-slate-400">(Simulación simple: monto × multiplicador)</div>
+            <div className="mt-1 text-[11px] text-slate-400">
+              (Simulación simple: monto × multiplicador)
+            </div>
 
             <button
               type="button"
@@ -337,7 +358,6 @@ export default function Fixtures() {
   const [err, setErr] = useState("");
   const [fixtures, setFixtures] = useState([]);
 
-  // CTA a planes
   const goPlans = () => nav("/#planes");
 
   function parseQuickFilter(q) {
@@ -378,10 +398,10 @@ export default function Fixtures() {
     try {
       const quick = parseQuickFilter(filterText);
       const dates = enumerateDates(fromDate, toDate, 10);
+
       if (!dates.length) {
         setFixtures([]);
         setErr("Rango de fechas inválido.");
-        setLoading(false);
         return;
       }
 
@@ -392,7 +412,7 @@ export default function Fixtures() {
         chunks.push(...day);
       }
 
-      // Dedup (por fixture id si viene)
+      // Dedup
       const map = new Map();
       for (const f of chunks) {
         const id =
@@ -426,11 +446,15 @@ export default function Fixtures() {
     const country = f?.league?.country || f?.country || "";
     const league = f?.league?.name || f?.league || "";
     const when = f?.fixture?.date || f?.date || "";
+
     let timeLabel = "";
     if (when) {
       const d = new Date(when);
       if (!Number.isNaN(d.getTime())) {
-        timeLabel = d.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
+        timeLabel = d.toLocaleTimeString("es-CL", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
       }
     }
     return { country, league, timeLabel };
@@ -465,16 +489,30 @@ export default function Fixtures() {
     return `https://flagcdn.com/w40/${code}.png`;
   }
 
-  const total = fixtures.length;
+  // Ordenar por hora para que no “desaparezcan” ligas grandes por orden aleatorio
+  const fixturesSorted = useMemo(() => {
+    const arr = Array.isArray(fixtures) ? [...fixtures] : [];
+    arr.sort((a, b) => {
+      const da = new Date(a?.fixture?.date || a?.date || 0).getTime();
+      const db = new Date(b?.fixture?.date || b?.date || 0).getTime();
+      return da - db;
+    });
+    return arr;
+  }, [fixtures]);
+
+  const total = fixturesSorted.length;
 
   return (
     <div className="relative max-w-5xl mx-auto px-4 pb-20">
-      {/* ------------------- Hero: Partidos (jugador) ------------------- */}
+      {/* Hero */}
       <HudCard
         bg={BG_JUGADOR}
         overlayVariant="player"
         className="mt-6"
-        style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 46px rgba(230,196,100,0.18)` }}
+        style={{
+          boxShadow:
+            "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 46px rgba(230,196,100,0.18)",
+        }}
         imgClassName="object-right"
         imgStyle={{ objectPosition: "80% 18%" }}
       >
@@ -495,7 +533,10 @@ export default function Fixtures() {
                   color: "rgba(226,232,240,0.92)",
                 }}
               >
-                Fuente: <span className="font-semibold" style={{ color: GOLD }}>Datos en vivo</span>
+                Fuente:{" "}
+                <span className="font-semibold" style={{ color: GOLD }}>
+                  Datos en vivo
+                </span>
               </Chip>
 
               <Chip
@@ -513,17 +554,18 @@ export default function Fixtures() {
         </div>
       </HudCard>
 
-      {/* ------------------- Filtros (casillas) ------------------- */}
+      {/* Filtros (con fondo partidos, como venías ajustando) */}
       <HudCard
-        bg={BG_CASILLAS}
+        bg={BG_PARTIDAZOS}
         overlayVariant="casillas"
         className="mt-4"
-        style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 40px rgba(230,196,100,0.14)` }}
+        style={{
+          boxShadow:
+            "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 40px rgba(230,196,100,0.14)",
+        }}
       >
         <div className="p-5 md:p-6">
-          <div>
-            <div className="text-sm font-semibold">Filtros</div>
-          </div>
+          <div className="text-sm font-semibold">Filtros</div>
 
           <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="flex flex-col gap-1">
@@ -547,7 +589,9 @@ export default function Fixtures() {
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-300">Filtro (país / liga / equipo)</label>
+              <label className="text-xs text-slate-300">
+                Filtro (país / liga / equipo)
+              </label>
               <input
                 value={filterText}
                 onChange={(e) => setFilterText(e.target.value)}
@@ -557,7 +601,7 @@ export default function Fixtures() {
             </div>
           </div>
 
-          {/* ✅ Botón abajo (como pediste) */}
+          {/* Botón abajo */}
           <div className="mt-4 flex justify-end">
             <button
               type="button"
@@ -569,7 +613,6 @@ export default function Fixtures() {
             </button>
           </div>
 
-          {/* Mensaje de “vista gratuita” */}
           {!isLoggedIn ? (
             <div
               className="mt-4 rounded-2xl border px-4 py-3"
@@ -584,7 +627,12 @@ export default function Fixtures() {
               <div className="text-xs text-slate-200 mt-1">
                 Puedes ver partidos del día. Para estadísticas avanzadas y cuotas potenciadas (x10, x20, x50 o x100),
                 necesitas membresía.{" "}
-                <button type="button" onClick={goPlans} className="underline font-semibold" style={{ color: GOLD }}>
+                <button
+                  type="button"
+                  onClick={goPlans}
+                  className="underline font-semibold"
+                  style={{ color: GOLD }}
+                >
                   Ver planes
                 </button>
                 .
@@ -596,17 +644,20 @@ export default function Fixtures() {
         </div>
       </HudCard>
 
-      {/* ✅ NUEVA: Partidazos de la semana (siempre entre filtros y resultados) */}
+      {/* Reco semanal entre filtros y resultados */}
       <div className="mt-4">
         <RecoWeeklyCard />
       </div>
 
-      {/* ------------------- Resultados (casillas) ------------------- */}
+      {/* Resultados */}
       <HudCard
         bg={BG_CASILLAS}
         overlayVariant="casillas"
         className="mt-4"
-        style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 36px rgba(230,196,100,0.12)` }}
+        style={{
+          boxShadow:
+            "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 36px rgba(230,196,100,0.12)",
+        }}
       >
         <div className="p-5 md:p-6">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
@@ -617,14 +668,22 @@ export default function Fixtures() {
 
             <Chip
               className="border-white/10"
-              style={{ background: "rgba(255,255,255,0.06)", color: "rgba(226,232,240,0.92)" }}
+              style={{
+                background: "rgba(255,255,255,0.06)",
+                color: "rgba(226,232,240,0.92)",
+              }}
             >
-              Zona horaria: <span className="font-semibold" style={{ color: GOLD }}>America/Santiago</span>
+              Zona horaria:{" "}
+              <span className="font-semibold" style={{ color: GOLD }}>
+                America/Santiago
+              </span>
             </Chip>
           </div>
 
           {total === 0 && !loading ? (
-            <div className="mt-4 text-sm text-slate-200">Por ahora no hay partidos para este rango o filtro.</div>
+            <div className="mt-4 text-sm text-slate-200">
+              Por ahora no hay partidos para este rango o filtro.
+            </div>
           ) : null}
 
           <div className="mt-4 space-y-4">
@@ -632,15 +691,6 @@ export default function Fixtures() {
               const title = fixtureTitle(f);
               const meta = fixtureMeta(f);
               const flagUrl = fixtureFlagUrl(meta.country);
-const fixturesSorted = useMemo(() => {
-  const arr = Array.isArray(fixtures) ? [...fixtures] : [];
-  arr.sort((a, b) => {
-    const da = new Date(a?.fixture?.date || a?.date || 0).getTime();
-    const db = new Date(b?.fixture?.date || b?.date || 0).getTime();
-    return da - db;
-  });
-  return arr;
-}, [fixtures]);
 
               return (
                 <div
@@ -708,7 +758,7 @@ const fixturesSorted = useMemo(() => {
                     </button>
                   </div>
 
-                  {/* Candados */}
+                  {/* Candados (SIEMPRE candado por ahora para no filtrar datos) */}
                   <div className="mt-4 grid grid-cols-2 gap-3">
                     {[
                       { label: "1X2", key: "odds" },
@@ -725,7 +775,7 @@ const fixturesSorted = useMemo(() => {
                           <div className="text-xs text-slate-300">{item.label}</div>
                           <div className="text-sm font-bold text-slate-100 mt-0.5">—</div>
                         </div>
-                        {!isLoggedIn ? <LockIcon /> : <span className="text-xs text-slate-400">OK</span>}
+                        <LockIcon />
                       </div>
                     ))}
                   </div>
@@ -746,15 +796,18 @@ const fixturesSorted = useMemo(() => {
         </div>
       </HudCard>
 
-      {/* ✅ NUEVO: Simulador antes de “Únete a la comunidad” */}
+      {/* Simulador antes del CTA final */}
       <GainSimulatorCard onGoPlans={goPlans} />
 
-      {/* ------------------- CTA final: 12.000 ------------------- */}
+      {/* CTA final */}
       <HudCard
         bg={BG_12000}
         overlayVariant="player"
         className="mt-4"
-        style={{ boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.16)` }}
+        style={{
+          boxShadow:
+            "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.16)",
+        }}
         imgStyle={{ objectPosition: "70% 22%" }}
       >
         <div className="p-5 md:p-6">
@@ -778,7 +831,9 @@ const fixturesSorted = useMemo(() => {
         </div>
       </HudCard>
 
-      <div className="mt-8 text-center text-xs text-slate-500">© {new Date().getFullYear()} Factor Victoria</div>
+      <div className="mt-8 text-center text-xs text-slate-500">
+        © {new Date().getFullYear()} Factor Victoria
+      </div>
     </div>
   );
 }
