@@ -131,6 +131,220 @@ function HudCard({
     </div>
   );
 }
+function RecoWeeklyCard() {
+  return (
+    <div
+      className="relative overflow-hidden rounded-3xl border bg-white/5"
+      style={{
+        borderColor: "rgba(255,255,255,0.10)",
+        boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 46px rgba(230,196,100,0.16)",
+      }}
+    >
+      {/* Fondo */}
+      <img
+        src={BG_PARTIDAZOS}
+        alt=""
+        aria-hidden="true"
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+
+      {/* Overlays para legibilidad */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(2,6,23,0.86) 0%, rgba(2,6,23,0.55) 48%, rgba(2,6,23,0.88) 100%)",
+        }}
+      />
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(circle at 18% 30%, rgba(16,185,129,0.16), rgba(2,6,23,0) 60%)",
+        }}
+      />
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.16), rgba(2,6,23,0) 60%)",
+        }}
+      />
+
+      <div className="relative p-5 md:p-6">
+        <div className="text-xs tracking-wide text-emerald-200/90 font-semibold">
+          Factor Victoria recomienda
+        </div>
+        <div className="mt-1 text-lg md:text-xl font-bold text-slate-100">
+          Partidazos de la semana
+        </div>
+        <div className="mt-1 text-xs text-slate-300">
+          Actualizado cada lunes. Estos son los encuentros más atractivos para analizar.
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/30 overflow-hidden">
+          <img
+            src={IMG_PARTIDAZOS_SEMANA}
+            alt="Partidazos de la semana"
+            className="w-full h-auto block"
+            loading="lazy"
+          />
+        </div>
+
+        <div className="mt-3 text-[11px] text-slate-400">
+          Tip: reemplaza <span className="font-semibold">/public/partidazos-semana.png</span> cada lunes y listo.
+        </div>
+      </div>
+    </div>
+  );
+}
+function formatMoney(value, currency) {
+  const n = Number(value || 0);
+  const safe = Number.isFinite(n) ? n : 0;
+
+  // CLP sin decimales; USD/EUR con 2
+  const decimals = currency === "CLP" ? 0 : 2;
+
+  const locale = currency === "CLP" ? "es-CL" : "en-US";
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency,
+    maximumFractionDigits: decimals,
+    minimumFractionDigits: decimals,
+  }).format(safe);
+}
+
+function GainSimulatorCard() {
+  const [currency, setCurrency] = React.useState("CLP");
+  const [stake, setStake] = React.useState(10000);
+  const [mult, setMult] = React.useState(10); // x10 / x20 / x50 / x100
+
+  const potential = Number(stake || 0) * Number(mult || 1);
+
+  return (
+    <div
+      className="relative overflow-hidden rounded-3xl border bg-white/5"
+      style={{
+        borderColor: "rgba(255,255,255,0.10)",
+        boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.14)",
+      }}
+    >
+      <img
+        src={BG_CASILLAS}
+        alt=""
+        aria-hidden="true"
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(2,6,23,0.88) 0%, rgba(2,6,23,0.62) 38%, rgba(2,6,23,0.88) 100%)",
+        }}
+      />
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(circle at 18% 30%, rgba(16,185,129,0.18), rgba(2,6,23,0) 60%)",
+        }}
+      />
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.14), rgba(2,6,23,0) 60%)",
+        }}
+      />
+
+      <div className="relative p-5 md:p-6">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-slate-100">Simulador de ganancias</div>
+            <div className="text-xs text-slate-300 mt-1">
+              Estima cuánto podrías obtener con cuotas potenciadas.
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <select
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              className="rounded-full border border-white/10 bg-slate-950/30 px-3 py-2 text-xs text-slate-200 outline-none"
+            >
+              <option value="CLP">CLP</option>
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+            <div className="text-xs text-slate-300">Monto</div>
+            <input
+              type="number"
+              value={stake}
+              onChange={(e) => setStake(e.target.value)}
+              className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 outline-none"
+              placeholder="Ej: 10000"
+            />
+            <div className="mt-2 text-[11px] text-slate-400">
+              Vista: <span className="font-semibold">{formatMoney(stake, currency)}</span>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+            <div className="text-xs text-slate-300">Cuota potenciada</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {[10, 20, 50, 100].map((x) => (
+                <button
+                  key={x}
+                  type="button"
+                  onClick={() => setMult(x)}
+                  className="px-3 py-2 rounded-full text-xs font-semibold border transition"
+                  style={{
+                    borderColor: "rgba(255,255,255,0.12)",
+                    background: mult === x ? "rgba(56,189,248,0.18)" : "rgba(2,6,23,0.25)",
+                    color: mult === x ? "rgba(186,230,253,0.95)" : "rgba(226,232,240,0.92)",
+                  }}
+                >
+                  x{x}
+                </button>
+              ))}
+            </div>
+            <div className="mt-2 text-[11px] text-slate-400">
+              Para activar x20/x50/x100 necesitas membresía.
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+            <div className="text-xs text-slate-300">Resultado estimado</div>
+            <div className="mt-2 text-lg font-bold" style={{ color: "rgba(230,196,100,0.95)" }}>
+              {formatMoney(potential, currency)}
+            </div>
+            <div className="mt-1 text-[11px] text-slate-400">
+              (Simulación simple: monto × multiplicador)
+            </div>
+
+            <a
+              href="/#planes"
+              className="mt-3 inline-flex w-full justify-center rounded-full px-4 py-2 text-sm font-semibold"
+              style={{
+                background: "#E6C464",
+                color: "#0f172a",
+                boxShadow: "0 0 26px rgba(230,196,100,0.18)",
+              }}
+            >
+              Ver planes
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ------------------- Fixtures ------------------- */
 export default function Fixtures() {
@@ -141,6 +355,12 @@ export default function Fixtures() {
   const BG_CASILLAS = "/hero-fondo-casillas.png"; // casillasSharp en tu public
   const BG_JUGADOR = "/hero-profile-hud.png";
   const BG_12000 = "/hero-12000.png";
+  const BG_HEADER_PARTIDOS = "/hero-profile-hud.png";
+  const BG_PARTIDAZOS = "/hero-fondo-partidos.png";
+
+// IMPORTANTE: deja un nombre fijo para el banner semanal y solo lo reemplazas en /public cada lunes.
+// Ej: subes la nueva imagen y la guardas como "partidazos-semana.png"
+const IMG_PARTIDAZOS_SEMANA = "/partidazos-semana.png";
 
   const today = useMemo(() => toYYYYMMDD(new Date()), []);
   const [fromDate, setFromDate] = useState(today);
@@ -365,7 +585,7 @@ export default function Fixtures() {
             <button
               type="button"
               onClick={onSearch}
-              className="px-4 py-2 rounded-full text-sm font-semibold border border-white/10 bg-slate-950/25 hover:bg-slate-950/45 transition"
+              className="px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition"
               disabled={loading}
             >
               {loading ? "Buscando..." : "Buscar partidos"}
