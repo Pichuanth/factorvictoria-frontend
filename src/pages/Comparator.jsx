@@ -1,10 +1,14 @@
 // src/pages/Comparator.jsx
 import React, { useMemo, useState, useEffect, useCallback } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 
 const GOLD = "#E6C464";
 const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(/\/$/, "");
+
+/** Fondos (public/) */
+const BG_12000 = "/hero.12000.png";
+const BG_DINERO = "/hero.dinero.png";
 
 /* --------------------- helpers --------------------- */
 
@@ -30,10 +34,7 @@ const COUNTRY_ALIAS = {
 };
 
 function normalizeCountryQuery(q) {
-  const key = String(q || "")
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, "");
+  const key = String(q || "").toLowerCase().trim().replace(/\s+/g, "");
   return COUNTRY_ALIAS[key] || null;
 }
 
@@ -221,11 +222,7 @@ function FeatureCard({ title, badge, children, locked, lockText }) {
     <div className="relative rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5 overflow-hidden">
       <div className="flex items-start justify-between gap-3">
         <div>
-          {/* TITULO EN verde premium */}
-        <div className="text-sm md:text-base font-semibold text-emerald-400">
-  {title}
-</div>
-
+          <div className="text-sm md:text-base font-semibold text-emerald-400">{title}</div>
           {badge && (
             <div className="mt-1 inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/5 border border-white/10 text-slate-200">
               {badge}
@@ -242,7 +239,7 @@ function FeatureCard({ title, badge, children, locked, lockText }) {
             <div className="text-sm font-semibold text-slate-50">Bloqueado por plan</div>
             <div className="mt-1 text-xs text-slate-300">{lockText || "Disponible en planes superiores."}</div>
             <Link
-              to="/"
+              to="/#planes"
               className="inline-flex mt-3 items-center justify-center rounded-xl px-3 py-2 text-xs font-semibold border border-yellow-400/60 bg-yellow-500/10 text-yellow-200"
             >
               Ver planes
@@ -254,11 +251,166 @@ function FeatureCard({ title, badge, children, locked, lockText }) {
   );
 }
 
+/* ------------------- HUD Card (igual estilo Partidos) ------------------- */
+function HudCard({ bg, children, className = "", style = {}, overlayVariant = "casillas", imgStyle = {} }) {
+  const overlayLayers =
+    overlayVariant === "player"
+      ? [
+          "linear-gradient(90deg, rgba(2,6,23,0.92) 0%, rgba(2,6,23,0.70) 52%, rgba(2,6,23,0.42) 78%, rgba(2,6,23,0.25) 100%)",
+          "radial-gradient(circle at 20% 45%, rgba(16,185,129,0.20), rgba(2,6,23,0) 58%)",
+          "radial-gradient(circle at 82% 50%, rgba(230,196,100,0.18), rgba(2,6,23,0) 58%)",
+        ]
+      : [
+          "linear-gradient(180deg, rgba(2,6,23,0.86) 0%, rgba(2,6,23,0.60) 38%, rgba(2,6,23,0.86) 100%)",
+          "radial-gradient(circle at 18% 30%, rgba(16,185,129,0.18), rgba(2,6,23,0) 60%)",
+          "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.14), rgba(2,6,23,0) 60%)",
+        ];
+
+  return (
+    <div
+      className={`relative overflow-hidden rounded-3xl border bg-white/5 ${className}`}
+      style={{ borderColor: "rgba(255,255,255,0.10)", ...style }}
+    >
+      {bg ? (
+        <img
+          src={bg}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 h-full w-full object-cover"
+          style={imgStyle}
+        />
+      ) : null}
+
+      <div className="absolute inset-0" style={{ background: overlayLayers[0] }} />
+      <div className="absolute inset-0" style={{ background: overlayLayers[1] }} />
+      <div className="absolute inset-0" style={{ background: overlayLayers[2] }} />
+
+      <div className="relative">{children}</div>
+    </div>
+  );
+}
+
+/* ------------------- Simulador (igual Partidos) ------------------- */
+function formatMoney(value, currency) {
+  const n = Number(value || 0);
+  const safe = Number.isFinite(n) ? n : 0;
+  const decimals = currency === "CLP" ? 0 : 2;
+  const locale = currency === "CLP" ? "es-CL" : "en-US";
+
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency,
+    maximumFractionDigits: decimals,
+    minimumFractionDigits: decimals,
+  }).format(safe);
+}
+
+function GainSimulatorCard({ onGoPlans }) {
+  const [currency, setCurrency] = useState("CLP");
+  const [stake, setStake] = useState(10000);
+  const [mult, setMult] = useState(10);
+
+  const potential = Number(stake || 0) * Number(mult || 1);
+
+  return (
+    <HudCard
+      bg={BG_DINERO}
+      overlayVariant="casillas"
+      className="mt-4"
+      style={{
+        boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.14)",
+      }}
+      imgStyle={{ objectPosition: "60% 35%" }}
+    >
+      <div className="p-5 md:p-6">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-slate-100">Simulador de ganancias</div>
+            <div className="text-xs text-slate-300 mt-1">Estima cuánto podrías obtener con cuotas potenciadas.</div>
+          </div>
+
+          <select
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value)}
+            className="rounded-full border border-white/10 bg-slate-950/30 px-3 py-2 text-xs text-slate-200 outline-none"
+          >
+            <option value="CLP">CLP</option>
+            <option value="USD">USD</option>
+            <option value="EUR">EUR</option>
+          </select>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+            <div className="text-xs text-slate-300">Monto</div>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={formatMoney(stake, currency)}
+              onChange={(e) => {
+                const digits = String(e.target.value || "").replace(/[^\d]/g, "");
+                const n = digits ? Number(digits) : 0;
+                setStake(n);
+              }}
+              className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 outline-none"
+              placeholder={currency === "CLP" ? "$10.000" : "$100.00"}
+            />
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+            <div className="text-xs text-slate-300">Cuota potenciada</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {[10, 20, 50, 100].map((x) => (
+                <button
+                  key={x}
+                  type="button"
+                  onClick={() => setMult(x)}
+                  className="px-3 py-2 rounded-full text-xs font-semibold border transition"
+                  style={{
+                    borderColor: "rgba(255,255,255,0.12)",
+                    background: mult === x ? "rgba(56,189,248,0.18)" : "rgba(2,6,23,0.25)",
+                    color: mult === x ? "rgba(186,230,253,0.95)" : "rgba(226,232,240,0.92)",
+                  }}
+                >
+                  x{x}
+                </button>
+              ))}
+            </div>
+            <div className="mt-2 text-[11px] text-slate-400">Para activar x20/x50/x100 necesitas membresía.</div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+            <div className="text-xs text-slate-300">Resultado estimado</div>
+            <div className="mt-2 text-lg font-bold" style={{ color: "rgba(230,196,100,0.95)" }}>
+              {formatMoney(potential, currency)}
+            </div>
+            <div className="mt-1 text-[11px] text-slate-400">(Simulación simple: monto × multiplicador)</div>
+
+            <button
+              type="button"
+              onClick={onGoPlans}
+              className="mt-3 inline-flex w-full justify-center rounded-full px-4 py-2 text-sm font-semibold"
+              style={{
+                background: GOLD,
+                color: "#0f172a",
+                boxShadow: "0 0 26px rgba(230,196,100,0.18)",
+              }}
+            >
+              Ver planes
+            </button>
+          </div>
+        </div>
+      </div>
+    </HudCard>
+  );
+}
+
 /* --------------------- componente --------------------- */
 
 export default function Comparator() {
   const { isLoggedIn, user } = useAuth();
   const [searchParams] = useSearchParams();
+  const nav = useNavigate();
 
   const today = useMemo(() => new Date(), []);
   const [from, setFrom] = useState(toYYYYMMDD(today));
@@ -274,8 +426,6 @@ export default function Comparator() {
 
   const [parlayResult, setParlayResult] = useState(null);
   const [parlayError, setParlayError] = useState("");
-
-  const [stake, setStake] = useState("");
 
   // odds cache
   const [oddsByFixture, setOddsByFixture] = useState({});
@@ -303,29 +453,32 @@ export default function Comparator() {
   const maxBoost = getMaxBoostFromPlan(planLabel);
   const features = useMemo(() => getPlanFeatures(planLabel), [planLabel]);
 
-  const quickCountries = ["Chile","España","Portugal","Italia","Alemania","Argentina","Inglaterra","Francia"];
+  const quickCountries = ["Chile", "España", "Portugal", "Italia", "Alemania", "Argentina", "Inglaterra", "Francia"];
 
-  const ensureOdds = useCallback(async (fixtureId) => {
-    if (!fixtureId) return;
-    if (oddsByFixture[fixtureId]) return;
+  const ensureOdds = useCallback(
+    async (fixtureId) => {
+      if (!fixtureId) return;
+      if (oddsByFixture[fixtureId]) return;
 
-    try {
-      const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(fixtureId)}`);
-      if (!res.ok) return;
-      const data = await res.json();
+      try {
+        const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(fixtureId)}`);
+        if (!res.ok) return;
+        const data = await res.json();
 
-      setOddsByFixture((prev) => ({
-        ...prev,
-        [fixtureId]: {
-          found: !!data?.found,
-          markets: data?.markets || {},
-          fetchedAt: Date.now(),
-        },
-      }));
-    } catch {
-      // silencio
-    }
-  }, [oddsByFixture]);
+        setOddsByFixture((prev) => ({
+          ...prev,
+          [fixtureId]: {
+            found: !!data?.found,
+            markets: data?.markets || {},
+            fetchedAt: Date.now(),
+          },
+        }));
+      } catch {
+        // silencio
+      }
+    },
+    [oddsByFixture]
+  );
 
   const loadReferees = useCallback(async (fromArg, toArg, countryENOrNull) => {
     try {
@@ -351,8 +504,6 @@ export default function Comparator() {
       setRefData(j);
     } catch (e) {
       const msg = String(e?.message || e);
-
-      // “Failed to fetch” suele ser backend caído / URL base incorrecta / CORS / deploy
       if (msg.toLowerCase().includes("failed to fetch")) {
         setRefErr(
           "No se pudo conectar al backend para cargar árbitros. Verifica que el backend tenga /api/referees/cards y que VITE_API_BASE apunte al backend correcto."
@@ -360,7 +511,6 @@ export default function Comparator() {
       } else {
         setRefErr(msg);
       }
-
       setRefData(null);
     } finally {
       setRefLoading(false);
@@ -382,9 +532,10 @@ export default function Comparator() {
     setRefData(null);
     setRefErr("");
 
+    // NUEVO: no tiramos “error feo”; solo no ejecutamos el comparador en modo visitante
     if (!isLoggedIn) {
       setLoading(false);
-      setErr("Necesitas iniciar sesión y tener una membresía activa para usar el comparador. Usa la pestaña Partidos mientras tanto.");
+      setInfo("Para generar cuotas x10/x20/x50/x100 necesitas iniciar sesión y tener una membresía activa.");
       return;
     }
 
@@ -409,10 +560,7 @@ export default function Comparator() {
         (Array.isArray(data?.response) && data.response) ||
         [];
 
-      const base = itemsRaw
-        .filter(isFutureFixture)
-        .filter((fx) => !isYouthOrWomenOrReserve(fx));
-
+      const base = itemsRaw.filter(isFutureFixture).filter((fx) => !isYouthOrWomenOrReserve(fx));
       const major = base.filter(isMajorLeague);
       const filtered = major.length >= 8 ? major : base;
 
@@ -431,7 +579,7 @@ export default function Comparator() {
       if (!LIMITED.length) {
         setErr(
           `No encontramos partidos para ese rango. API devolvió: ${itemsRaw.length} | base: ${base.length} | ligas top: ${major.length}. ` +
-          `Prueba con 7–14 días y sin filtro (q vacío).`
+            `Prueba con 7–14 días y sin filtro (q vacío).`
         );
         setFixtures([]);
         return;
@@ -544,6 +692,8 @@ export default function Comparator() {
     setParlayResult({ mode: "selected", ...suggestion });
   }
 
+  const goPlans = () => nav("/#planes");
+
   return (
     <div className="max-w-5xl mx-auto px-4 pb-20">
       {/* Cabecera */}
@@ -557,12 +707,51 @@ export default function Comparator() {
           </p>
         ) : (
           <p className="text-slate-300 text-sm md:text-base">
-            Modo visitante: prueba la plataforma con información limitada.{" "}
-            <Link to="/" className="underline font-semibold">Activa una membresía</Link>{" "}
-            para desbloquear el comparador profesional.
+            Modo visitante: puedes explorar, pero para generar cuotas x10/x20/x50/x100 debes iniciar sesión y activar una membresía.
           </p>
         )}
       </section>
+
+      {/* NUEVO: Banner visitante con hero.12000.png */}
+      {!isLoggedIn ? (
+        <HudCard
+          bg={BG_12000}
+          overlayVariant="player"
+          className="mt-4"
+          style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 46px rgba(230,196,100,0.18)" }}
+          imgStyle={{ objectPosition: "70% 22%" }}
+        >
+          <div className="p-5 md:p-6">
+            <div className="text-xs tracking-wide text-emerald-200/90 font-semibold">
+              Factor Victoria recomienda
+            </div>
+            <div className="mt-1 text-lg md:text-xl font-bold text-slate-100">
+              Activa tu membresía para crear cuotas potenciadas
+            </div>
+            <p className="text-sm text-slate-200 mt-2 max-w-2xl">
+              Desbloquea el comparador para generar combinadas x10, x20, x50 y x100 (según tu plan). También puedes iniciar sesión si ya compraste.
+            </p>
+
+            <div className="mt-4 flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={goPlans}
+                className="w-full sm:w-auto px-6 py-3 rounded-full text-sm font-bold"
+                style={{ backgroundColor: GOLD, color: "#0f172a", boxShadow: "0 0 26px rgba(230,196,100,0.18)" }}
+              >
+                Comprar membresía
+              </button>
+
+              <Link
+                to="/login"
+                className="w-full sm:w-auto inline-flex justify-center px-6 py-3 rounded-full text-sm font-bold border border-white/15 bg-white/5 hover:bg-white/10 transition"
+              >
+                Iniciar sesión
+              </Link>
+            </div>
+          </div>
+        </HudCard>
+      ) : null}
 
       {/* Filtros */}
       <section className="mt-4 rounded-2xl bg-white/5 border border-white/10 p-4 md:p-6">
@@ -600,9 +789,10 @@ export default function Comparator() {
           <div>
             <button
               type="submit"
-              disabled={!isLoggedIn || loading}
+              disabled={loading || !isLoggedIn}
               className="w-full rounded-2xl font-semibold px-4 py-2 mt-4 md:mt-0 disabled:opacity-60 disabled:cursor-not-allowed"
               style={{ backgroundColor: GOLD, color: "#0f172a" }}
+              title={!isLoggedIn ? "Activa una membresía o inicia sesión para usar el comparador." : ""}
             >
               {loading ? "Generando..." : "Generar"}
             </button>
@@ -622,12 +812,7 @@ export default function Comparator() {
           ))}
         </div>
 
-        {err && (
-          <div className="mt-3 text-sm text-amber-300">
-            {err}{" "}
-            {!isLoggedIn && <Link to="/" className="underline font-semibold">Ver planes</Link>}
-          </div>
-        )}
+        {err && <div className="mt-3 text-sm text-amber-300">{err}</div>}
         {!err && info && <div className="mt-3 text-xs text-slate-400">{info}</div>}
       </section>
 
@@ -643,7 +828,9 @@ export default function Comparator() {
 
         {fixtures.length === 0 ? (
           <div className="px-4 py-6 text-sm text-slate-300">
-            Por ahora no hay partidos para este rango o filtro. Prueba con más días o sin filtrar por país/equipo.
+            {isLoggedIn
+              ? "Por ahora no hay partidos para este rango o filtro. Prueba con más días o sin filtrar por país/equipo."
+              : "Activa una membresía e inicia sesión para generar partidos y cuotas en el comparador."}
           </div>
         ) : (
           <ul className="divide-y divide-slate-800/80">
@@ -671,13 +858,15 @@ export default function Comparator() {
                 <li
                   key={id}
                   onClick={() => {
+                    if (!isLoggedIn) return;
                     toggleFixtureSelection(id);
                     ensureOdds(id);
                     setParlayResult(null);
                     setParlayError("");
                   }}
                   className={[
-                    "px-4 py-3 flex items-center gap-3 cursor-pointer transition-colors",
+                    "px-4 py-3 flex items-center gap-3 transition-colors",
+                    isLoggedIn ? "cursor-pointer" : "cursor-not-allowed opacity-70",
                     isSelected ? "bg-slate-900/90" : "hover:bg-slate-900/70",
                   ].join(" ")}
                 >
@@ -798,7 +987,6 @@ export default function Comparator() {
                   : `Ejemplo con tu selección: ${parlayResult.games} partidos, cuota x${parlayResult.finalOdd}`}
               </p>
 
-              {/* Mini explicación para principiantes */}
               <div className="mt-2 text-xs text-slate-300">
                 <div className="font-semibold text-slate-200">¿Qué significa 1X2 y O/U 2.5?</div>
                 <div className="mt-1">
@@ -845,31 +1033,6 @@ export default function Comparator() {
                     </li>
                   ))}
                 </ul>
-
-                <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-3">
-                  <div className="text-xs text-slate-400">🔥 Partido recomendado por árbitro tarjetero</div>
-
-                  {refData?.recommended ? (
-                    <>
-                      <div className="mt-1 text-sm font-semibold text-slate-50">
-                        {refData.recommended.referee?.name}{" "}
-                        {refData.recommended.referee?.avgCards != null && (
-                          <span className="text-amber-200">(prom. {refData.recommended.referee.avgCards} tarjetas)</span>
-                        )}
-                      </div>
-                      <div className="mt-2 text-xs text-slate-300">
-                        {refData.recommended.fixture?.teams?.home?.name} vs {refData.recommended.fixture?.teams?.away?.name}
-                      </div>
-                      <div className="text-[11px] text-slate-400 mt-1">
-                        {refData.recommended.fixture?.league?.country} · {refData.recommended.fixture?.league?.name}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="mt-1 text-xs text-slate-300">
-                      Aún no se encontró un partido futuro en este rango. Prueba ampliando fechas o quitando el filtro país.
-                    </div>
-                  )}
-                </div>
               </>
             )}
           </div>
@@ -921,61 +1084,9 @@ export default function Comparator() {
           </p>
         </FeatureCard>
       </section>
-      {/* ---------------- SIMULADOR DE GANANCIAS ---------------- */}
-<section className="mt-12 rounded-3xl border border-white/10 bg-white/5 p-5 md:p-7">
-  <h3 className="text-lg md:text-xl font-bold mb-1">
-    Simula tus ganancias
-  </h3>
 
-  <p className="text-slate-300 text-sm mb-4">
-    Ingresa tu monto y visualiza cuánto podrías ganar según tu plan.
-  </p>
-
-  {/* Input */}
-  <input
-  value={
-    stake
-      ? `$${Number(stake.replace(/[^\d]/g, "")).toLocaleString("es-CL")}`
-      : ""
-  }
-  onChange={(e) => {
-    const raw = e.target.value.replace(/[^\d]/g, "");
-    setStake(raw);
-  }}
-  placeholder="Monto a apostar (CLP)"
-  className="w-full md:max-w-md rounded-2xl bg-white/10 text-white px-4 py-3 border border-white/10"
-/>
-
-  {/* Resultados */}
-  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-    {[
-      { label: "Mensual • x10", mult: 10 },
-      { label: "Trimestral • x20", mult: 20 },
-      { label: "Anual • x50", mult: 50 },
-      { label: "Vitalicio • x100", mult: 100 },
-    ].map((c) => {
-      const raw = Number(String(stake).replace(/[^\d]/g, "")) || 0;
-      const win = raw * c.mult;
-
-      return (
-        <div
-          key={c.label}
-          className="rounded-2xl border border-white/10 bg-slate-950/30 p-4"
-        >
-          <div className="text-sm font-semibold">{c.label}</div>
-
-          <div className="text-xs text-slate-400 mt-1">
-            Apuesta: ${raw.toLocaleString("es-CL")}
-          </div>
-
-          <div className="text-sm font-bold mt-2 text-emerald-300">
-            Ganancia: ${win.toLocaleString("es-CL")}
-          </div>
-        </div>
-      );
-    })}
-  </div>
-</section>
+      {/* NUEVO: Simulador (mismo de Partidos, hero.dinero.png) */}
+      <GainSimulatorCard onGoPlans={goPlans} />
     </div>
   );
 }
