@@ -924,3 +924,16 @@ export default function Comparator() {
     </div>
   );
 }
+<section className="mt-6 rounded-3xl border border-white/10 overflow-hidden bg-white/5">
+  <div className="relative w-full h-[260px] md:h-[360px] lg:h-[420px]">
+    <img
+      src={BG_CIERRE}
+      alt="Factor Victoria"
+      className="w-full h-full object-cover object-center"
+    />
+  </div>
+
+  <div className="p-4 text-center text-xs text-slate-500">
+    © 2026 Factor Victoria
+  </div>
+</section>
