@@ -10,9 +10,10 @@ const API_BASE =
   "https://factorvictoria-backend.vercel.app";
 
 /** Fondos (public/) */
-const BG_12000 = "/hero-fondo-partidos.png";
-const BG_DINERO = "/hero.dinero.png";
-const BG_CIERRE = "/hero-12000.png";
+const BG_VISITOR = "/hero-fondo-partidos.png";   // banner modo visitante
+const BG_END = "/hero-12000.png";                // cierre solo visitante
+const BG_PROFILE_HUD = "/hero-profile-hud.png";  // fondo para sección "Generar" logueado
+const BG_DINERO = "/hero.dinero.png";            // simulador (dinero)
 
 /* --------------------- helpers --------------------- */
 
@@ -224,7 +225,6 @@ function getPlanFeatures(planLabel) {
 /* --------------------- UI helpers --------------------- */
 
 function HudCard({ bg, children, className = "", style = {}, overlayVariant = "casillas" }) {
-  // Ajuste CLAVE: overlays menos oscuros para que la hero-12000 se vea
   const overlayLayers =
     overlayVariant === "player"
       ? [
@@ -261,17 +261,18 @@ function HudCard({ bg, children, className = "", style = {}, overlayVariant = "c
   );
 }
 
+/* --------------------- Visitante banner --------------------- */
+
 function VisitorBanner() {
   const nav = useNavigate();
 
   const goPlans = () => {
-    // hash + scroll confiable en SPA
     window.location.assign("/#planes");
   };
 
   return (
     <HudCard
-      bg={BG_12000}
+      bg={BG_VISITOR}
       overlayVariant="player"
       className="mt-4"
       style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.16)" }}
@@ -313,7 +314,7 @@ function VisitorBanner() {
   );
 }
 
-/* ------------------- Simulador (sin "Ver planes") ------------------- */
+/* ------------------- Simulador ------------------- */
 
 function formatMoney(value, currency) {
   const n = Number(value || 0);
@@ -373,8 +374,8 @@ function GainSimulatorCard() {
               value={formatMoney(stake, currency)}
               onChange={(e) => {
                 const digits = String(e.target.value || "").replace(/[^\d]/g, "");
-                const n = digits ? Number(digits) : 0;
-                setStake(n);
+                const nn = digits ? Number(digits) : 0;
+                setStake(nn);
               }}
               className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 outline-none"
               placeholder={currency === "CLP" ? "$10.000" : "$100.00"}
@@ -504,13 +505,8 @@ function VisitorEndingHero() {
   return (
     <div className="mt-6 rounded-3xl border border-white/10 overflow-hidden bg-white/5">
       <div className="w-full h-[260px] md:h-[360px] lg:h-[420px] bg-slate-950 overflow-hidden">
-        <img
-          src={BG_12000}
-          alt="Factor Victoria"
-          className="w-full h-full object-cover object-center"
-        />
+        <img src={BG_END} alt="Factor Victoria" className="w-full h-full object-cover object-center" />
       </div>
-
       <div className="p-4 text-center text-xs text-slate-500">© 2026 Factor Victoria</div>
     </div>
   );
@@ -552,29 +548,147 @@ function FeatureCard({ title, badge, children, locked, lockText }) {
   );
 }
 
-/* --------------------- componente principal --------------------- */
-export default function Comparator() {
-  const { isLoggedIn, user } = useAuth();
-  const nav = useNavigate();
-  const [searchParams] = useSearchParams();
+/* --------------------- Cuotas manuales (logueado) --------------------- */
 
-  // ✅ MODO VISITANTE: solo lo que pediste (banner + 4 cards + simulador + hero final)
-  if (!isLoggedIn) {
+function ManualPicksSection() {
+  // EDITA SOLO ESTOS DATOS (tú y tu hermana)
+  const singles = [
+    { label: "PSG gana (1X2)", odd: 1.55, note: "Alta probabilidad" },
+    { label: "Real Madrid Doble oportunidad (1X)", odd: 1.35, note: "Conservador" },
+  ];
+
+  const combos = [
+    { label: "Combinada 2 partidos", odd: 2.1, note: "Cuota media" },
+    { label: "Combinada 3 partidos", odd: 3.4, note: "Más riesgo" },
+  ];
+
+  const players = [
+    { label: "Haaland anota", odd: 1.8, note: "Si es titular" },
+    { label: "Mbappé +1 tiro a puerta", odd: 1.55, note: "Tendencia" },
+  ];
+
+  function Card({ title, items }) {
     return (
-      <div className="max-w-5xl mx-auto px-4 pb-20">
-        <VisitorBanner />
-
-        <VisitorPlansGrid />
-
-        <GainSimulatorCard />
-
-        <VisitorEndingHero />
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5">
+        <div className="text-sm font-semibold text-slate-100">{title}</div>
+        <div className="mt-3 space-y-2">
+          {items.map((x) => (
+            <div
+              key={x.label}
+              className="flex items-start justify-between gap-3 rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2"
+            >
+              <div className="min-w-0">
+                <div className="text-sm text-slate-100 font-semibold truncate">{x.label}</div>
+                {x.note ? <div className="text-[11px] text-slate-400">{x.note}</div> : null}
+              </div>
+              <div className="text-sm font-bold text-emerald-200">x{Number(x.odd).toFixed(2)}</div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
 
-  /* --------------------- LOGUEADO: tu comparador completo --------------------- */
+  return (
+    <section className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+      <Card title="Partidos únicos" items={singles} />
+      <Card title="Combinadas" items={combos} />
+      <Card title="Jugadores" items={players} />
+    </section>
+  );
+}
 
+/* --------------------- Calculadora precios (logueado) --------------------- */
+
+function PriceCalculatorCard() {
+  const [currency, setCurrency] = useState("CLP");
+  const [stake, setStake] = useState(10000);
+  const [odd, setOdd] = useState(1.56);
+
+  const result = Number(stake || 0) * Number(odd || 0);
+
+  const format = (v) => {
+    const n = Number(v || 0);
+    const decimals = currency === "CLP" ? 0 : 2;
+    const locale = currency === "CLP" ? "es-CL" : "en-US";
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency,
+      maximumFractionDigits: decimals,
+      minimumFractionDigits: decimals,
+    }).format(Number.isFinite(n) ? n : 0);
+  };
+
+  return (
+    <section className="mt-6">
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 md:p-6">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-slate-100">Calculadora de precios</div>
+            <div className="text-xs text-slate-300 mt-1">
+              Ingresa tu monto y tu cuota para calcular ganancia estimada.
+            </div>
+          </div>
+
+          <select
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value)}
+            className="rounded-full border border-white/10 bg-slate-950/30 px-3 py-2 text-xs text-slate-200 outline-none"
+          >
+            <option value="CLP">CLP</option>
+            <option value="USD">USD</option>
+            <option value="EUR">EUR</option>
+          </select>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+            <div className="text-xs text-slate-300">Monto</div>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={format(stake)}
+              onChange={(e) => {
+                const digits = String(e.target.value || "").replace(/[^\d]/g, "");
+                setStake(digits ? Number(digits) : 0);
+              }}
+              className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 outline-none"
+            />
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+            <div className="text-xs text-slate-300">Cuota</div>
+            <input
+              type="number"
+              step="0.01"
+              value={odd}
+              onChange={(e) => setOdd(e.target.value)}
+              className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 outline-none"
+            />
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+            <div className="text-xs text-slate-300">Resultado</div>
+            <div className="mt-2 text-lg font-bold" style={{ color: "rgba(230,196,100,0.95)" }}>
+              {format(result)}
+            </div>
+            <div className="mt-1 text-[11px] text-slate-400">(monto × cuota)</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* =========================
+   COMPONENTE PRINCIPAL
+   ========================= */
+
+export default function Comparator() {
+  const { isLoggedIn, user } = useAuth();
+  const [searchParams] = useSearchParams();
+
+  // Hooks SIEMPRE arriba (no condicional)
   const today = useMemo(() => new Date(), []);
   const [from, setFrom] = useState(toYYYYMMDD(today));
   const [to, setTo] = useState(toYYYYMMDD(today));
@@ -590,10 +704,8 @@ export default function Comparator() {
   const [parlayResult, setParlayResult] = useState(null);
   const [parlayError, setParlayError] = useState("");
 
-  // odds cache
   const [oddsByFixture, setOddsByFixture] = useState({});
 
-  // referees module
   const [refData, setRefData] = useState(null);
   const [refLoading, setRefLoading] = useState(false);
   const [refErr, setRefErr] = useState("");
@@ -851,89 +963,246 @@ export default function Comparator() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 pb-20">
-      {/* Cabecera */}
-      
-      {/* Filtros */}
-      <section className="mt-4 rounded-2xl bg-white/5 border border-white/10 p-4 md:p-6">
-        <form onSubmit={handleGenerate} className="flex flex-col md:flex-row md:items-end gap-3 items-stretch">
-          <div className="flex-1">
-            <label className="block text-xs text-slate-400 mb-1">Desde</label>
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
-            />
-          </div>
+      {/* =========================
+          VISITANTE
+         ========================= */}
+      {!isLoggedIn ? (
+        <>
+          <VisitorBanner />
+          <VisitorPlansGrid />
+          <GainSimulatorCard />
+          <VisitorEndingHero />
+        </>
+      ) : (
+        <>
+          {/* =========================
+              LOGUEADO
+             ========================= */}
 
-          <div className="flex-1">
-            <label className="block text-xs text-slate-400 mb-1">Hasta</label>
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
-            />
-          </div>
+          {/* Generar (HUD) */}
+          <HudCard
+            bg={BG_PROFILE_HUD}
+            overlayVariant="casillas"
+            className="mt-4"
+            style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset" }}
+          >
+            <div className="p-4 md:p-6">
+              <form onSubmit={handleGenerate} className="flex flex-col md:flex-row md:items-end gap-3 items-stretch">
+                <div className="flex-1">
+                  <label className="block text-xs text-slate-400 mb-1">Desde</label>
+                  <input
+                    type="date"
+                    value={from}
+                    onChange={(e) => setFrom(e.target.value)}
+                    className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
+                  />
+                </div>
 
-          <div className="flex-[2]">
-            <label className="block text-xs text-slate-400 mb-1">Filtro (país / liga / equipo)</label>
-            <input
-              placeholder="Ej: Chile, La Liga, Colo Colo, Premier League..."
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
-            />
-          </div>
+                <div className="flex-1">
+                  <label className="block text-xs text-slate-400 mb-1">Hasta</label>
+                  <input
+                    type="date"
+                    value={to}
+                    onChange={(e) => setTo(e.target.value)}
+                    className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
+                  />
+                </div>
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-2xl font-semibold px-4 py-2 mt-4 md:mt-0 disabled:opacity-60 disabled:cursor-not-allowed"
-              style={{ backgroundColor: GOLD, color: "#0f172a" }}
-            >
-              {loading ? "Generando..." : "Generar"}
-            </button>
-          </div>
-        </form>
+                <div className="flex-[2]">
+                  <label className="block text-xs text-slate-400 mb-1">Filtro (país / liga / equipo)</label>
+                  <input
+                    placeholder="Ej: Chile, La Liga, Colo Colo, Premier League..."
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
+                  />
+                </div>
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          {quickCountries.map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => handleQuickCountry(c)}
-              className="text-xs md:text-sm rounded-full px-3 py-1 border border-white/15 bg-white/5 hover:bg-white/10 transition"
-            >
-              {c}
-            </button>
-          ))}
-        </div>
+                <div>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full rounded-2xl font-semibold px-4 py-2 mt-4 md:mt-0 disabled:opacity-60 disabled:cursor-not-allowed"
+                    style={{ backgroundColor: GOLD, color: "#0f172a" }}
+                  >
+                    {loading ? "Generando..." : "Generar"}
+                  </button>
+                </div>
+              </form>
 
-        {err && <div className="mt-3 text-sm text-amber-300">{err}</div>}
-        {!err && info && <div className="mt-3 text-xs text-slate-400">{info}</div>}
-      </section>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {quickCountries.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => handleQuickCountry(c)}
+                    className="text-xs md:text-sm rounded-full px-3 py-1 border border-white/15 bg-white/5 hover:bg-white/10 transition"
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
 
-      {/* Lista + módulos + simulador: aquí mantienes tu versión actual (sin cambios de lógica) */}
-      {/* Tu bloque grande original puede quedarse tal cual desde acá en adelante */}
-      {/* Para no duplicar, pega aquí el resto de tu código tal como lo tenías si quieres. */}
+              {err && <div className="mt-3 text-sm text-amber-300">{err}</div>}
+              {!err && info && <div className="mt-3 text-xs text-slate-300/80">{info}</div>}
+            </div>
+          </HudCard>
 
-      {/* ✅ Simulador */}
-      <GainSimulatorCard />
+          {/* Cuotas manuales */}
+          <ManualPicksSection />
+
+          {/* Lista de partidos */}
+          <section className="mt-4 rounded-2xl border border-slate-800/80 bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-950 shadow-[0_18px_40px_rgba(15,23,42,0.85)]">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/80 text-[11px] md:text-xs text-slate-300 tracking-wide">
+              <span className="uppercase">
+                Partidos encontrados: <span className="font-semibold text-slate-50">{fixtures.length}</span>
+              </span>
+              <span className="uppercase text-right">Toca un partido para añadirlo / quitarlo de tu combinada.</span>
+            </div>
+
+            {fixtures.length === 0 ? (
+              <div className="px-4 py-6 text-sm text-slate-300">
+                Por ahora no hay partidos para este rango o filtro. Prueba con más días o sin filtrar.
+              </div>
+            ) : (
+              <ul className="divide-y divide-slate-800/80">
+                {fixtures.map((fx) => {
+                  const id = getFixtureId(fx);
+                  const isSelected = selectedIds.includes(id);
+
+                  const league = getLeagueName(fx);
+                  const countryName = getCountryName(fx);
+                  const flagEmoji = COUNTRY_FLAG[countryName] || (countryName === "World" ? "🌍" : "🏳️");
+                  const home = getHomeName(fx);
+                  const away = getAwayName(fx);
+                  const time = getKickoffTime(fx);
+
+                  const oddsPack = oddsByFixture[id] || null;
+                  const m1x2 = oddsPack?.markets?.["1X2"] || null;
+                  const mou = oddsPack?.markets?.["OU_2_5"] || null;
+                  const found = oddsPack?.found;
+
+                  const hasOdds =
+                    (m1x2 && (m1x2.home != null || m1x2.draw != null || m1x2.away != null)) ||
+                    (mou && (mou.over != null || mou.under != null));
+
+                  return (
+                    <li
+                      key={id}
+                      onClick={() => {
+                        toggleFixtureSelection(id);
+                        ensureOdds(id);
+                        setParlayResult(null);
+                        setParlayError("");
+                      }}
+                      className={[
+                        "px-4 py-3 flex items-center gap-3 cursor-pointer transition-colors",
+                        isSelected ? "bg-slate-900/90" : "hover:bg-slate-900/70",
+                      ].join(" ")}
+                    >
+                      <div className="w-14 text-[11px] md:text-xs font-semibold text-slate-100">{time || "--:--"}</div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1 text-xs md:text-sm text-slate-200">
+                          <span className="mr-1 text-lg leading-none">{flagEmoji}</span>
+                          <span className="font-medium truncate">{countryName}</span>
+                          {league && (
+                            <span className="text-[11px] md:text-xs text-slate-400 truncate">
+                              {" "}· {league}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="mt-0.5 text-xs md:text-sm text-slate-100">
+                          <div className="font-semibold leading-snug whitespace-normal break-words">{home}</div>
+                          <div className="text-[11px] text-slate-400">vs</div>
+                          <div className="font-semibold leading-snug whitespace-normal break-words">{away}</div>
+                        </div>
+                      </div>
+
+                      <div className="w-[40%] md:w-[32%] text-right text-[11px] md:text-xs leading-snug">
+                        {hasOdds ? (
+                          <div className="text-slate-200">
+                            {m1x2 && (
+                              <div className="text-cyan-200 font-semibold">
+                                1X2: <span className="text-slate-100">1</span> {m1x2.home ?? "--"}{" "}
+                                <span className="text-slate-100">X</span> {m1x2.draw ?? "--"}{" "}
+                                <span className="text-slate-100">2</span> {m1x2.away ?? "--"}
+                              </div>
+                            )}
+                            {mou && (
+                              <div className="text-emerald-200">
+                                O/U 2.5: O {mou.over ?? "--"} · U {mou.under ?? "--"}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="block text-cyan-300 font-semibold">
+                            {found === false ? "Sin cuotas disponibles para este partido (API)." : "Toca para cargar cuotas 1X2 y O/U 2.5."}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="w-6 flex justify-end">
+                        <span
+                          className={[
+                            "inline-block w-3.5 h-3.5 rounded-full border",
+                            isSelected
+                              ? "border-emerald-400 bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.9)]"
+                              : "border-slate-500/80 bg-slate-950/90",
+                          ].join(" ")}
+                        />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+
+          {/* Módulos premium (aquí vuelve tu “alma del proyecto”) */}
+          <section className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Reemplaza estos placeholders por tus FeatureCard reales */}
+            <FeatureCard title="Cuota segura (regalo)" badge="Base">
+              <div className="text-sm text-slate-200">
+                Aquí va tu lógica de cuota regalo.
+              </div>
+            </FeatureCard>
+
+            <FeatureCard title="Cuotas potenciadas" badge={`Hasta x${maxBoost}`}>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={handleAutoParlay}
+                  className="rounded-xl px-4 py-2 text-sm font-semibold border border-white/10 bg-white/5 hover:bg-white/10 transition text-slate-100"
+                >
+                  Generar combinada automática
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSelectedParlay}
+                  className="rounded-xl px-4 py-2 text-sm font-semibold border border-white/10 bg-white/5 hover:bg-white/10 transition text-slate-100"
+                >
+                  Generar con partidos seleccionados ({selectedCount})
+                </button>
+
+                {parlayError ? <div className="text-sm text-amber-300">{parlayError}</div> : null}
+                {parlayResult ? (
+                  <div className="text-sm text-slate-200">
+                    Resultado: <span className="font-semibold text-emerald-200">x{parlayResult.finalOdd}</span>{" "}
+                    · partidos: {parlayResult.games} · prob. implícita: {parlayResult.impliedProb}%
+                  </div>
+                ) : null}
+              </div>
+            </FeatureCard>
+          </section>
+
+          {/* Simulador + calculadora */}
+          <GainSimulatorCard />
+          <PriceCalculatorCard />
+        </>
+      )}
     </div>
   );
 }
-<section className="mt-6 rounded-3xl border border-white/10 overflow-hidden bg-white/5">
-  <div className="relative w-full h-[260px] md:h-[360px] lg:h-[420px]">
-    <img
-      src={BG_CIERRE}
-      alt="Factor Victoria"
-      className="w-full h-full object-cover object-center"
-    />
-  </div>
-
-  <div className="p-4 text-center text-xs text-slate-500">
-    © 2026 Factor Victoria
-  </div>
-</section>
