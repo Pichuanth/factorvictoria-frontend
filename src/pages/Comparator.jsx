@@ -10,7 +10,7 @@ const API_BASE =
   "https://factorvictoria-backend.vercel.app";
 
 /** Fondos (public/) */
-const BG_12000 = "/hero-12000.png";
+const BG_12000 = "/hero-fondo-partidos.png";
 const BG_DINERO = "/hero.dinero.png";
 
 /* --------------------- helpers --------------------- */
@@ -501,36 +501,17 @@ function VisitorPlansGrid() {
 
 function VisitorEndingHero() {
   return (
-    <HudCard bg={BG_12000} overlayVariant="player" className="mt-6">
-      <div className="p-5 md:p-7">
-        <div className="text-lg md:text-xl font-bold text-slate-100">
-          Convierte información en ventaja
-        </div>
-        <div className="mt-2 text-sm text-slate-200 max-w-2xl">
-          Únete a la comunidad y accede a estadísticas, comparador y herramientas premium para apostar con criterio.
-        </div>
-
-        <div className="mt-4 flex flex-col sm:flex-row gap-2">
-          <a
-            href="/#planes"
-            className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 rounded-full text-sm font-bold"
-            style={{ backgroundColor: GOLD, color: "#0f172a" }}
-          >
-            Ver planes
-          </a>
-          <a
-            href="/login"
-            className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 rounded-full text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition"
-          >
-            Iniciar sesión
-          </a>
-        </div>
-
-        <div className="mt-5 text-center text-xs text-slate-300/80">
-          © 2026 Factor Victoria
-        </div>
+    <div className="mt-6 rounded-3xl border border-white/10 overflow-hidden bg-white/5">
+      <div className="w-full h-[260px] md:h-[360px] lg:h-[420px] bg-slate-950 overflow-hidden">
+        <img
+          src={BG_12000}
+          alt="Factor Victoria"
+          className="w-full h-full object-cover object-center"
+        />
       </div>
-    </HudCard>
+
+      <div className="p-4 text-center text-xs text-slate-500">© 2026 Factor Victoria</div>
+    </div>
   );
 }
 
@@ -581,14 +562,6 @@ export default function Comparator() {
     return (
       <div className="max-w-5xl mx-auto px-4 pb-20">
         <VisitorBanner />
-
-        <section className="mt-6 rounded-2xl bg-white/5 border border-white/10 p-4 md:p-6">
-          <h1 className="text-xl md:text-2xl font-bold mb-2">Comparador</h1>
-          <p className="text-slate-300 text-sm md:text-base">
-            Desbloquea el comparador profesional con tu membresía. Elige el plan que se ajuste a tus objetivos
-            y activa cuotas potenciadas, combinadas y módulos premium.
-          </p>
-        </section>
 
         <VisitorPlansGrid />
 
