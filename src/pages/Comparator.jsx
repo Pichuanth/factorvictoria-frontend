@@ -12,6 +12,7 @@ const API_BASE =
 /** Fondos (public/) */
 const BG_12000 = "/hero-fondo-partidos.png";
 const BG_DINERO = "/hero.dinero.png";
+const BG_CIERRE = "/hero-12000.png";
 
 /* --------------------- helpers --------------------- */
 
@@ -851,16 +852,7 @@ export default function Comparator() {
   return (
     <div className="max-w-5xl mx-auto px-4 pb-20">
       {/* Cabecera */}
-      <section className="mt-6 rounded-2xl bg-white/5 border border-white/10 p-4 md:p-6">
-        <h1 className="text-xl md:text-2xl font-bold mb-2">Comparador</h1>
-
-        <p className="text-slate-300 text-sm md:text-base">
-          Estás usando Factor Victoria con tu membresía{" "}
-          <span className="font-semibold">{planLabel}</span>. Elige un rango de fechas y filtra por país,
-          liga o equipo para generar tus parlays.
-        </p>
-      </section>
-
+      
       {/* Filtros */}
       <section className="mt-4 rounded-2xl bg-white/5 border border-white/10 p-4 md:p-6">
         <form onSubmit={handleGenerate} className="flex flex-col md:flex-row md:items-end gap-3 items-stretch">
