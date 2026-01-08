@@ -122,10 +122,15 @@ function Home() {
   return (
     <div className="min-h-screen bg-slate-950 text-white">
       <div className="max-w-6xl mx-auto px-4 pt-10 pb-16">
+        {/* Hero */}
         <section className="rounded-3xl border border-white/10 bg-gradient-to-b from-slate-900/60 to-slate-950/40 p-6 md:p-10">
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-3">
-              <img src="/logo-fv.png" alt="Factor Victoria" className="h-20 md:h-22 w-auto scale-[1.30]" />
+              <img
+                src="/logo-fv.png"
+                alt="Factor Victoria"
+                className="h-20 md:h-22 w-auto scale-[1.30]"
+              />
               <div className="text-sm text-slate-300">
                 Paga con Flow, Mercado Pago o Stripe • hasta 6 cuotas
               </div>
@@ -153,77 +158,92 @@ function Home() {
           </div>
         </section>
 
+        {/* Planes */}
         <section id="planes" className="mt-10">
           <div className="flex items-end justify-between gap-4 mb-4">
             <h2 className="text-xl md:text-2xl font-bold">Planes</h2>
-            <div className="text-xs text-slate-400">Pronto mas cupos disponibles.</div>
+            <div className="text-xs text-slate-400">Pronto más cupos disponibles.</div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {plans.map((p) => (
-              <div
-                key={p.tag}
-                className={[
-                  "relative rounded-3xl border bg-white/5 p-5 md:p-6",
-                  p.highlight
-                    ? "border-yellow-500/60 shadow-[0_0_40px_rgba(234,179,8,0.12)]"
-                    : "border-white/10",
-                ].join(" ")}
-              >
-                {p.highlight && p.badge ? (
-                  <div className="absolute -top-3 right-4 rounded-full bg-yellow-500 px-3 py-1 text-[11px] font-bold text-black shadow">
-                    {p.badge}
-                  </div>
-                ) : null}
+            {plans.map((p) => {
+              const planId =
+                p.tag === "Mensual"
+                  ? "plan-mensual"
+                  : p.tag === "Trimestral"
+                  ? "plan-trimestral"
+                  : p.tag === "Anual"
+                  ? "plan-anual"
+                  : "plan-vitalicio";
 
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="text-lg font-bold">{p.tag}</div>
-                    <span className="inline-flex items-center rounded-full border border-yellow-400/40 bg-yellow-500/10 px-2 py-0.5 text-[11px] font-semibold text-yellow-200">
-                      {p.planName}
-                    </span>
-                  </div>
-
-                  {!p.highlight && p.badge ? (
-                    <span className="text-[11px] px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-200 border border-yellow-500/30">
-                      {p.badge}
-                    </span>
-                  ) : null}
-                </div>
-
-                <div className="flex items-baseline gap-2 mb-1">
-                  <div className="text-3xl font-extrabold">{p.price}</div>
-                  <div className="text-xs text-slate-400">{p.sub}</div>
-                </div>
-
-                <ul className="mt-4 space-y-2 text-sm text-slate-200">
-                  {p.bullets.map((b) => (
-                    <li key={b} className="flex gap-2">
-                      <span className="mt-1 w-1.5 h-1.5 rounded-full bg-yellow-400/80" />
-                      <span>{b}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <button
-                  type="button"
-                  className="mt-5 w-fit px-5 py-2.5 rounded-full text-sm font-semibold"
-                  style={{ backgroundColor: GOLD, color: "#0f172a" }}
-                  onClick={() => alert("Checkout próximamente (Flow).")}
+              return (
+                <div
+                  id={planId}
+                  key={p.tag}
+                  className={[
+                    "relative rounded-3xl border bg-white/5 p-5 md:p-6",
+                    p.highlight
+                      ? "border-yellow-500/60 shadow-[0_0_40px_rgba(234,179,8,0.12)]"
+                      : "border-white/10",
+                  ].join(" ")}
                 >
-                  Comprar
-                </button>
-              </div>
-            ))}
+                  {p.highlight && p.badge ? (
+                    <div className="absolute -top-3 right-4 rounded-full bg-yellow-500 px-3 py-1 text-[11px] font-bold text-black shadow">
+                      {p.badge}
+                    </div>
+                  ) : null}
+
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="text-lg font-bold">{p.tag}</div>
+                      <span className="inline-flex items-center rounded-full border border-yellow-400/40 bg-yellow-500/10 px-2 py-0.5 text-[11px] font-semibold text-yellow-200">
+                        {p.planName}
+                      </span>
+                    </div>
+
+                    {!p.highlight && p.badge ? (
+                      <span className="text-[11px] px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-200 border border-yellow-500/30">
+                        {p.badge}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className="flex items-baseline gap-2 mb-1">
+                    <div className="text-3xl font-extrabold">{p.price}</div>
+                    <div className="text-xs text-slate-400">{p.sub}</div>
+                  </div>
+
+                  <ul className="mt-4 space-y-2 text-sm text-slate-200">
+                    {p.bullets.map((b) => (
+                      <li key={b} className="flex gap-2">
+                        <span className="mt-1 w-1.5 h-1.5 rounded-full bg-yellow-400/80" />
+                        <span>{b}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <button
+                    type="button"
+                    className="mt-5 w-fit px-5 py-2.5 rounded-full text-sm font-semibold"
+                    style={{ backgroundColor: GOLD, color: "#0f172a" }}
+                    onClick={() => alert("Checkout próximamente (Flow).")}
+                  >
+                    Comprar
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </section>
 
+        {/* Confianza / social proof */}
         <div className="mt-10 rounded-3xl border border-white/10 bg-white/5 px-5 py-4 md:px-7 md:py-5">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <div>
               <div className="text-sm md:text-base font-semibold">+12.000 usuarios activos</div>
               <div className="text-xs text-slate-300 mt-1">
-                Miles de usuarios confían en nuestros datos, simulador y picks para apostar con ventaja. ¿Y tú, qué esperas para unirte a la comunidad?
+                Miles de usuarios confían en nuestros datos, simulador y picks para apostar con ventaja.
+                ¿Y tú, qué esperas para unirte a la comunidad?
               </div>
             </div>
 
@@ -238,6 +258,7 @@ function Home() {
           </div>
         </div>
 
+        {/* Simulador */}
         <section className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-5 md:p-7">
           <h3 className="text-lg md:text-xl font-bold mb-1">Simula tus ganancias</h3>
           <p className="text-slate-300 text-sm mb-4">
@@ -300,7 +321,10 @@ function Home() {
               const cur = CURRENCIES.find((x) => x.code === currency) || CURRENCIES[0];
 
               return (
-                <div key={c.label} className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+                <div
+                  key={c.label}
+                  className="rounded-2xl border border-white/10 bg-slate-950/30 p-4"
+                >
                   <div className="text-sm font-semibold">{c.label}</div>
 
                   <div className="text-xs text-slate-400 mt-1">
@@ -316,17 +340,23 @@ function Home() {
           </div>
         </section>
 
+        {/* Imagen final */}
         <section className="mt-10 rounded-3xl border border-white/10 overflow-hidden bg-white/5">
           <div className="p-5 md:p-7">
             <h3 className="text-lg md:text-xl font-bold">Convierte información en ventaja</h3>
             <p className="text-slate-300 text-sm mt-1">
-              Nuestra IA analiza estadísticas y señales del mercado en tiempo real para detectar cuotas con verdadero valor.
-              Deja atrás las decisiones improvisadas y los grupos sin estrategia, apuesta con datos, planificación y visión ganadora.
+              Nuestra IA analiza estadísticas y señales del mercado en tiempo real para detectar cuotas
+              con verdadero valor. Deja atrás las decisiones improvisadas y apuesta con datos, planificación
+              y visión ganadora.
             </p>
           </div>
 
           <div className="w-full h-[260px] md:h-[360px] lg:h-[420px] bg-slate-950 overflow-hidden">
-            <img src="/hero-players.png" alt="Factor Victoria" className="w-full h-full object-cover object-center" />
+            <img
+              src="/hero-players.png"
+              alt="Factor Victoria"
+              className="w-full h-full object-cover object-center"
+            />
           </div>
 
           <div className="p-4 text-center text-xs text-slate-500">
@@ -402,7 +432,7 @@ function AppInner() {
         <Routes>
           <Route path="/" element={<Home />} />
 
-          {/* ✅ Comparador ahora es público para mostrar el banner a visitantes */}
+          {/* ✅ Comparador público: muestra visitor banner + cards si no está logueado */}
           <Route path="/app" element={<Comparator />} />
 
           <Route path="/fixture" element={<Fixtures />} />
