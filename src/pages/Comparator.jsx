@@ -1416,7 +1416,6 @@ export default function Comparator() {
           </div>
         </FeatureCard>
       </section>
-
       {/* 4) Partidazos de la semana (arreglado + títulos) */}
       <PartidazosDeLaSemanaCard />
 
