@@ -1,6 +1,6 @@
 // src/pages/Comparator.jsx
 import React, { useMemo, useState, useEffect, useCallback, useRef } from "react";
-import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 
 const GOLD = "#E6C464";
@@ -27,7 +27,7 @@ function toYYYYMMDD(d) {
 function stripDiacritics(s) {
   return String(s || "")
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, ""); // quita acentos
+    .replace(/[\u0300-\u036f]/g, "");
 }
 
 // Alias ES -> EN para country de API-SPORTS
@@ -55,7 +55,7 @@ function normalizeCountryQuery(q) {
   return COUNTRY_ALIAS[key] || null;
 }
 
-// Emojis de banderas (fallback a 🏳️)
+// Emojis de banderas
 const COUNTRY_FLAG = {
   Chile: "🇨🇱",
   Argentina: "🇦🇷",
@@ -71,20 +71,45 @@ const COUNTRY_FLAG = {
 };
 
 const IMPORTANT_LEAGUES = [
-  "UEFA Champions League",
-  "Champions League",
-  "Europa League",
-  "CONMEBOL Libertadores",
-  "Copa Libertadores",
-  "CONMEBOL Sudamericana",
+  // Europa (top ligas)
   "Premier League",
   "La Liga",
   "Serie A",
   "Bundesliga",
   "Ligue 1",
+  "Primeira Liga",
+  "Eredivisie",
+
+  // Copas grandes (Europa)
+  "FA Cup",
+  "EFL Cup",
   "Copa del Rey",
+  "DFB Pokal",
+  "Coppa Italia",
+  "Coupe de France",
+  "Supercopa",
+  "Super Cup",
+
+  // Conmebol / FIFA / UEFA
+  "UEFA Champions League",
+  "UEFA Europa League",
+  "UEFA Conference League",
+  "Copa Libertadores",
+  "Copa Sudamericana",
+  "Club World Cup",
+  "World Cup",
+  "Euro Championship",
+
+  // América
+  "Liga MX",
+  "Brasileirão",
+  "Copa do Brasil",
+  "Primera Division",
+  "Copa Argentina",
+  "Copa Chile",
 ];
 
+// Prioridad para ordenar ligas
 function getLeaguePriority(leagueName = "", country = "") {
   const name = String(leagueName || "").toLowerCase();
   const countryLower = String(country || "").toLowerCase();
@@ -185,35 +210,63 @@ function isYouthOrWomenOrReserve(fx) {
   return banned.some((p) => blob.includes(p));
 }
 
-/** Solo ligas “top” (con fallback automático si deja 0) */
+/** Solo ligas “top” y evita ligas desconocidas */
 function isMajorLeague(fx) {
-  const name = String(getLeagueName(fx) || "").toLowerCase();
-  const country = String(getCountryName(fx) || "").toLowerCase();
+  const league = String(getLeagueName(fx) || "");
+  const s = league.toLowerCase();
 
-  const hit = IMPORTANT_LEAGUES.some((imp) => name.includes(String(imp).toLowerCase()));
-  if (hit) return true;
+  // Excluir juveniles / amistosos / regionales
+  const bad = [
+    "u17",
+    "u18",
+    "u19",
+    "u20",
+    "u21",
+    "youth",
+    "reserve",
+    "reserves",
+    "friendly",
+    "women",
+    "femen",
+    "amateur",
+    "regional",
+    "state",
+    "non league",
+    "development",
+  ];
+  if (bad.some((k) => s.includes(k))) return false;
 
-  const commonTop =
-    name.includes("primera") ||
-    name.includes("1st division") ||
-    name.includes("first division") ||
-    name.includes("liga professional") ||
-    name.includes("serie a") ||
-    name.includes("bundesliga") ||
-    name.includes("ligue 1") ||
-    name.includes("premier league") ||
-    name.includes("la liga");
+  // Permitidos explícitos
+  if (IMPORTANT_LEAGUES.some((x) => s.includes(String(x).toLowerCase()))) return true;
 
-  if (
-    commonTop &&
-    ["england", "spain", "italy", "germany", "france", "chile", "argentina", "brazil", "portugal", "mexico"].includes(
-      country
-    )
-  ) {
-    return true;
-  }
+  // Heurística controlada
+  const okPatterns = [
+    "champions league",
+    "europa league",
+    "conference league",
+    "libertadores",
+    "sudamericana",
+    "copa",
+    "cup",
+    "supercopa",
+    "super cup",
+    "serie a",
+    "serie b",
+    "primera division",
+    "liga",
+    "la liga",
+    "bundesliga",
+    "ligue 1",
+    "premier league",
+    "primeira liga",
+    "eredivisie",
+  ];
 
-  return false;
+  // Inglaterra: excluir ruido
+  const englandNoise = ["isthmian", "northern", "southern", "npl", "vanarama", "trophy", "vase", "counties", "county"];
+  if (getCountryName(fx) === "England" && englandNoise.some((k) => s.includes(k))) return false;
+
+  return okPatterns.some((p) => s.includes(p));
 }
 
 /* --------------------- UI helpers --------------------- */
@@ -244,6 +297,21 @@ function HudCard({ bg, children, className = "", style = {}, overlayVariant = "c
       <div className="absolute inset-0" style={{ background: overlayLayers[2] }} />
 
       <div className="relative">{children}</div>
+    </div>
+  );
+}
+
+function RecoWeeklyCard() {
+  return (
+    <div className="mt-6 rounded-3xl border border-white/10 overflow-hidden bg-white/5">
+      <div className="relative w-full h-[260px] md:h-[320px] bg-slate-950 overflow-hidden">
+        <img
+          src={BG_PARTIDAZOS}
+          alt="Factor Victoria recomienda: Partidazos de la semana"
+          className="absolute inset-0 w-full h-full object-cover object-center"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/10 via-slate-950/25 to-slate-950/55" />
+      </div>
     </div>
   );
 }
@@ -472,23 +540,6 @@ function GainSimulatorCard() {
   );
 }
 
-/* ------------------- Partidazos de la semana ------------------- */
-
-function PartidazosSemana() {
-  return (
-    <section className="mt-6">
-      <HudCard
-        bg={BG_PARTIDAZOS}
-        overlayVariant="casillas"
-        className="overflow-hidden"
-        style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.10)" }}
-      >
-        <div className="h-[320px] md:h-[420px] lg:h-[520px]" />
-      </HudCard>
-    </section>
-  );
-}
-
 /* ------------------- Manual Picks (3 columnas) ------------------- */
 
 function ManualPicksSection() {
@@ -562,7 +613,7 @@ function PriceCalculatorCard() {
   const [odd, setOdd] = useState(1.56);
 
   const result = Number(stake || 0) * Number(odd || 0);
-  const net = Math.max(0, result - Number(stake || 0));
+  const net = result - Number(stake || 0);
 
   const format = (v) => {
     const n = Number(v || 0);
@@ -577,92 +628,220 @@ function PriceCalculatorCard() {
   };
 
   return (
-    <section className="mt-6">
-      <HudCard
-        bg={BG_DINERO}
-        overlayVariant="casillas"
-        style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.10)" }}
-      >
-        <div className="p-5 md:p-6">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-sm font-semibold text-slate-100">Calculadora de precios</div>
-              <div className="text-xs text-slate-300 mt-1">
-                Ingresa tu monto y tu cuota para calcular ganancia estimada.
-              </div>
+    <HudCard bg={BG_DINERO} overlayVariant="casillas" className="mt-6">
+      <div className="p-5 md:p-6">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-slate-100">Calculadora de precios</div>
+            <div className="text-xs text-slate-300 mt-1">
+              Ingresa tu monto y tu cuota para calcular ganancia estimada.
             </div>
-
-            <select
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-              className="rounded-full border border-white/10 bg-slate-950/30 px-3 py-2 text-xs text-slate-200 outline-none"
-            >
-              <option value="CLP">CLP</option>
-              <option value="USD">USD</option>
-              <option value="EUR">EUR</option>
-            </select>
           </div>
 
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-              <div className="text-xs text-slate-300">Monto</div>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={format(stake)}
-                onChange={(e) => {
-                  const digits = String(e.target.value || "").replace(/[^\d]/g, "");
-                  setStake(digits ? Number(digits) : 0);
-                }}
-                className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 outline-none"
-              />
+          <select
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value)}
+            className="rounded-full border border-white/10 bg-slate-950/30 px-3 py-2 text-xs text-slate-200 outline-none"
+          >
+            <option value="CLP">CLP</option>
+            <option value="USD">USD</option>
+            <option value="EUR">EUR</option>
+          </select>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+            <div className="text-xs text-slate-300">Monto</div>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={format(stake)}
+              onChange={(e) => {
+                const digits = String(e.target.value || "").replace(/[^\d]/g, "");
+                setStake(digits ? Number(digits) : 0);
+              }}
+              className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 outline-none"
+            />
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+            <div className="text-xs text-slate-300">Cuota</div>
+            <input
+              type="number"
+              step="0.01"
+              value={odd}
+              onChange={(e) => setOdd(e.target.value)}
+              className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 outline-none"
+            />
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-xs text-slate-300">Resultado</div>
+              <div className="text-xs text-slate-300">Ganancia neta</div>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-              <div className="text-xs text-slate-300">Cuota</div>
-              <input
-                type="number"
-                step="0.01"
-                value={odd}
-                onChange={(e) => setOdd(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 outline-none"
-              />
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <div className="text-xs text-slate-300">Resultado</div>
-                  <div className="mt-2 text-lg font-bold" style={{ color: "rgba(230,196,100,0.95)" }}>
-                    {format(result)}
-                  </div>
-                  <div className="mt-1 text-[11px] text-slate-400">(monto × cuota)</div>
+            <div className="mt-2 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-lg font-bold" style={{ color: "rgba(230,196,100,0.95)" }}>
+                  {format(result)}
                 </div>
+                <div className="mt-1 text-[11px] text-slate-400">(monto × cuota)</div>
+              </div>
 
-                <div className="text-right">
-                  <div className="text-xs text-slate-300">Ganancia neta</div>
-                  <div className="mt-2 text-lg font-bold text-emerald-400">{format(net)}</div>
-                  <div className="mt-1 text-[11px] text-slate-400">(resultado - monto)</div>
-                </div>
+              <div className="text-right min-w-0">
+                <div className="text-lg font-bold text-emerald-300">{format(net)}</div>
+                <div className="mt-1 text-[11px] text-slate-400">(resultado − monto)</div>
               </div>
             </div>
           </div>
         </div>
-      </HudCard>
-    </section>
+      </div>
+    </HudCard>
   );
 }
 
-/* ------------------- Tarjeta estilo "Partidos" (pero desbloqueada en Comparador) ------------------- */
+/* ------------------- Tarjeta profesional reutilizable (FixtureCard) ------------------- */
 
-function StatTile({ title, value, locked = false }) {
+function FixtureCard({ fx, isSelected, onToggle, onLoadOdds, oddsPack }) {
+  const id = getFixtureId(fx);
+
+  const league = getLeagueName(fx);
+  const countryName = getCountryName(fx);
+  const flagEmoji = COUNTRY_FLAG[countryName] || (countryName === "World" ? "🌍" : "🏳️");
+  const home = getHomeName(fx);
+  const away = getAwayName(fx);
+  const time = getKickoffTime(fx);
+
+  const m1x2 = oddsPack?.markets?.["1X2"] || null;
+  const mou = oddsPack?.markets?.["OU_2_5"] || null;
+  const found = oddsPack?.found;
+
+  const hasOdds =
+    (m1x2 && (m1x2.home != null || m1x2.draw != null || m1x2.away != null)) ||
+    (mou && (mou.over != null || mou.under != null));
+
+  const formatOdd = (v) => {
+    const n = Number(v);
+    if (!Number.isFinite(n) || n <= 0) return "—";
+    return n.toFixed(n < 10 ? 2 : 1).replace(/\.0+$/, "");
+  };
+
+  const prob = (() => {
+    const h = Number(m1x2?.home);
+    const d = Number(m1x2?.draw);
+    const a = Number(m1x2?.away);
+    if (![h, d, a].every((x) => Number.isFinite(x) && x > 1.0001)) return null;
+
+    const ih = 1 / h;
+    const idd = 1 / d;
+    const ia = 1 / a;
+    const s = ih + idd + ia;
+
+    const ph = ih / s;
+    const pd = idd / s;
+    const pa = ia / s;
+
+    const best = Math.max(ph, pd, pa);
+    const label = best === ph ? "Local" : best === pd ? "Empate" : "Visita";
+    return { pct: Math.round(best * 100), label };
+  })();
+
   return (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-slate-200">{title}</div>
-        {locked ? <span className="text-yellow-300/80">🔒</span> : null}
+    <div className="relative rounded-3xl border border-white/10 bg-white/5 p-5 md:p-6 overflow-hidden">
+      <div className="absolute top-5 right-5">
+        <span
+          className={[
+            "inline-block w-5 h-5 rounded-full border",
+            isSelected
+              ? "border-emerald-400 bg-emerald-400 shadow-[0_0_14px_rgba(16,185,129,0.9)]"
+              : "border-white/10 bg-slate-950/40",
+          ].join(" ")}
+        />
       </div>
-      <div className="mt-2 text-lg font-semibold text-slate-50">{value}</div>
+
+      <div className="text-xl md:text-2xl font-bold text-slate-100 pr-10">
+        {home} <span className="text-slate-400 font-semibold">vs</span> {away}
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-300">
+        <span className="text-lg leading-none">{flagEmoji}</span>
+        <span className="font-medium">{countryName}</span>
+        <span className="text-slate-500">·</span>
+        <span className="truncate">{league}</span>
+        <span className="text-slate-500">·</span>
+        <span className="font-semibold">{time}</span>
+      </div>
+
+      <div className="mt-4 flex flex-col gap-2">
+        <button
+          type="button"
+          onClick={() => window.alert("En construcción: aquí irá la vista de estadísticas por partido.")}
+          className="w-full rounded-full px-5 py-3 text-sm font-semibold border border-white/10 bg-white/5 hover:bg-white/10 transition text-slate-100"
+        >
+          Ver estadísticas
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            onToggle(id);
+            onLoadOdds(id);
+          }}
+          className="w-full rounded-full px-5 py-3 text-sm font-bold"
+          style={{ backgroundColor: GOLD, color: "#0f172a" }}
+        >
+          {isSelected ? "Quitar de combinada" : "Añadir a combinada"}
+        </button>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+          <div className="text-xs text-slate-300 mb-2">1X2 / Goles</div>
+          {hasOdds ? (
+            <div className="text-sm text-slate-100 leading-snug">
+              {m1x2 ? (
+                <div className="font-semibold">
+                  1: {formatOdd(m1x2.home)} · X: {formatOdd(m1x2.draw)} · 2: {formatOdd(m1x2.away)}
+                </div>
+              ) : null}
+              {mou ? (
+                <div className="mt-1 text-emerald-200">
+                  O2.5: {formatOdd(mou.over)} · U2.5: {formatOdd(mou.under)}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="text-xs text-cyan-200 font-semibold">
+              {found === false ? "Sin cuotas (API)." : "Toca “Añadir a combinada” para cargar cuotas."}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+          <div className="text-xs text-slate-300 mb-2 flex items-center justify-between">
+            <span>Prob.</span>
+            <span className="text-[11px] text-slate-500">simple</span>
+          </div>
+          {prob ? (
+            <div className="text-sm font-semibold text-slate-100">
+              {prob.pct}% <span className="text-slate-400 font-medium">{prob.label}</span>
+            </div>
+          ) : (
+            <div className="text-xs text-slate-400">—</div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+          <div className="text-xs text-slate-300 mb-2">Tarjetas</div>
+          <div className="text-xs text-slate-400">En análisis</div>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+          <div className="text-xs text-slate-300 mb-2">Corners</div>
+          <div className="text-xs text-slate-400">En análisis</div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -700,13 +879,10 @@ export default function Comparator() {
     if (urlQ) setQ(urlQ);
   }, [searchParams]);
 
-  // ✅ agregados: Brasil y México
   const quickCountries = ["Chile", "España", "Portugal", "Italia", "Alemania", "Argentina", "Inglaterra", "Francia", "Brasil", "México"];
 
   const ensureOdds = useCallback(async (fixtureId) => {
     if (!fixtureId) return;
-
-    // cache estable (ref)
     if (oddsRef.current[fixtureId]) return;
 
     try {
@@ -827,7 +1003,7 @@ export default function Comparator() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 pb-20">
-      {/* 1) Filtros + Generar (con fondo HUD) */}
+      {/* 1) Filtros + Generar */}
       <HudCard
         bg={BG_PROFILE_HUD}
         overlayVariant="casillas"
@@ -896,104 +1072,55 @@ export default function Comparator() {
         </div>
       </HudCard>
 
-      {/* 2) Partidos generados (nuevo formato tipo "Partidos", pero desbloqueado) */}
-      <section className="mt-6 space-y-4">
+      {/* ===========================
+          2) LISTADO (PUNTO B) ✅
+         =========================== */}
+      <section className="mt-4">
+        <div className="flex items-center justify-between px-2 py-2 text-[11px] md:text-xs text-slate-300 tracking-wide">
+          <span className="uppercase">
+            Partidos encontrados: <span className="font-semibold text-slate-50">{fixtures.length}</span>
+          </span>
+          <span className="uppercase text-right">
+            Usa “Añadir a combinada” para seleccionar y cargar cuotas.
+          </span>
+        </div>
+
         {fixtures.length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
             Genera partidos para verlos aquí con el formato profesional.
           </div>
         ) : (
-          fixtures.map((fx) => {
-            const id = getFixtureId(fx);
-            const isSelected = selectedIds.includes(id);
+          <div className="grid grid-cols-1 gap-4">
+            {fixtures.map((fx) => {
+              const id = getFixtureId(fx);
+              const isSelected = selectedIds.includes(id);
+              const oddsPack = oddsByFixture[id] || null;
 
-            const league = getLeagueName(fx);
-            const countryName = getCountryName(fx);
-            const flagEmoji = COUNTRY_FLAG[countryName] || (countryName === "World" ? "🌍" : "🏳️");
-            const home = getHomeName(fx);
-            const away = getAwayName(fx);
-            const time = getKickoffTime(fx);
-
-            const oddsPack = oddsByFixture[id] || null;
-            const m1x2 = oddsPack?.markets?.["1X2"] || null;
-            const mou = oddsPack?.markets?.["OU_2_5"] || null;
-
-            const oddsText =
-              m1x2 || mou
-                ? `1X2: 1 ${m1x2?.home ?? "--"}  X ${m1x2?.draw ?? "--"}  2 ${m1x2?.away ?? "--"} · O/U 2.5: O ${
-                    mou?.over ?? "--"
-                  }  U ${mou?.under ?? "--"}`
-                : "Toca “Añadir a combinada” para cargar cuotas";
-
-            return (
-              <div key={id} className="relative rounded-3xl border border-white/10 bg-white/5 p-5 overflow-hidden">
-                {/* círculo estado (como el de tu lista actual) */}
-                <div className="absolute right-5 top-5">
-                  <div
-                    className={[
-                      "w-4 h-4 rounded-full border",
-                      isSelected
-                        ? "border-emerald-400 bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.9)]"
-                        : "border-white/20 bg-slate-950/30",
-                    ].join(" ")}
-                  />
-                </div>
-
-                <div className="text-xl md:text-2xl font-bold text-slate-100 pr-10">
-                  {home} <span className="text-slate-400">vs</span> {away}
-                </div>
-
-                <div className="mt-2 text-slate-300 flex items-center gap-2">
-                  <span className="text-lg">{flagEmoji}</span>
-                  <span className="text-sm">
-                    {countryName} · {league} · {time}
-                  </span>
-                </div>
-
-                <div className="mt-4 grid grid-cols-1 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => nav(`/fixture?q=${encodeURIComponent(`${home} vs ${away}`)}`)}
-                    className="w-full rounded-full border border-white/10 bg-slate-900/40 hover:bg-slate-900/55 transition px-4 py-3 text-slate-100 font-semibold"
-                  >
-                    Ver estadísticas
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      toggleFixtureSelection(id);
-                      ensureOdds(id);
-                    }}
-                    className="w-full rounded-full px-4 py-3 font-bold"
-                    style={{ backgroundColor: GOLD, color: "#0f172a" }}
-                  >
-                    {isSelected ? "Quitar de combinada" : "Añadir a combinada"}
-                  </button>
-                </div>
-
-                <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <StatTile title="1X2/Goles" value={oddsText} locked={false} />
-                  <StatTile title="Tarjetas" value="—" locked={false} />
-                  <StatTile title="Corners" value="—" locked={false} />
-                  <StatTile title="Prob." value="—" locked={false} />
-                </div>
-              </div>
-            );
-          })
+              return (
+                <FixtureCard
+                  key={id}
+                  fx={fx}
+                  isSelected={isSelected}
+                  oddsPack={oddsPack}
+                  onToggle={(fixtureId) => toggleFixtureSelection(fixtureId)}
+                  onLoadOdds={(fixtureId) => ensureOdds(fixtureId)}
+                />
+              );
+            })}
+          </div>
         )}
       </section>
 
-      {/* 3) Partidazos de la semana (después de generar, antes de manual picks) */}
-      <PartidazosSemana />
+      {/* 3) Partidazos de la semana (en el lugar correcto) */}
+      <RecoWeeklyCard />
 
-      {/* 4) Manual Picks (3 columnas) */}
+      {/* 4) Manual Picks */}
       <ManualPicksSection />
 
-      {/* 5) Simulador (no tocar) */}
+      {/* 5) Simulador */}
       <GainSimulatorCard />
 
-      {/* 6) Calculadora de precios (con ganancia neta) */}
+      {/* 6) Calculadora de precios */}
       <PriceCalculatorCard />
     </div>
   );
