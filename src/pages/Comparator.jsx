@@ -1,6 +1,6 @@
 // src/pages/Comparator.jsx
 import React, { useMemo, useState, useEffect, useCallback, useRef } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 
 const GOLD = "#E6C464";
@@ -269,6 +269,33 @@ function isMajorLeague(fx) {
   return okPatterns.some((p) => s.includes(p));
 }
 
+/* --------------------- Plan & Features (restaurado) --------------------- */
+
+function normalizePlanLabel(raw) {
+  const p = String(raw || "").toUpperCase();
+  if (p.includes("VITA")) return "VITALICIO";
+  if (p.includes("ANU")) return "ANUAL";
+  if (p.includes("TRI") || p.includes("3")) return "TRIMESTRAL";
+  if (p.includes("MES")) return "MENSUAL";
+  return "MENSUAL";
+}
+
+function getMaxBoostFromPlan(planLabel) {
+  if (planLabel === "VITALICIO") return 100;
+  if (planLabel === "ANUAL") return 50;
+  if (planLabel === "TRIMESTRAL") return 20;
+  return 10;
+}
+
+function getPlanFeatures(planLabel) {
+  const base = { giftPick: true, boosted: true };
+
+  if (planLabel === "MENSUAL") return { ...base, referees: false, marketValue: false, scorers: false, shooters: 0 };
+  if (planLabel === "TRIMESTRAL") return { ...base, referees: false, marketValue: false, scorers: false, shooters: 0 };
+  if (planLabel === "ANUAL") return { ...base, referees: true, marketValue: false, scorers: false, shooters: 5 };
+  return { ...base, referees: true, marketValue: true, scorers: true, shooters: 10 };
+}
+
 /* --------------------- UI helpers --------------------- */
 
 function HudCard({ bg, children, className = "", style = {}, overlayVariant = "casillas" }) {
@@ -301,18 +328,36 @@ function HudCard({ bg, children, className = "", style = {}, overlayVariant = "c
   );
 }
 
-function RecoWeeklyCard() {
+/* ------------------- Partidazos (arreglado + títulos) ------------------- */
+
+function PartidazosDeLaSemanaCard() {
   return (
-    <div className="mt-6 rounded-3xl border border-white/10 overflow-hidden bg-white/5">
-      <div className="relative w-full h-[260px] md:h-[320px] bg-slate-950 overflow-hidden">
-        <img
-          src={BG_PARTIDAZOS}
-          alt="Factor Victoria recomienda: Partidazos de la semana"
-          className="absolute inset-0 w-full h-full object-cover object-center"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/10 via-slate-950/25 to-slate-950/55" />
+    <HudCard
+      bg={null}
+      overlayVariant="casillas"
+      className="mt-6"
+      style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.10)" }}
+    >
+      <div className="p-4 md:p-6">
+        <div className="text-emerald-200/90 text-xs font-semibold tracking-wide">Factor Victoria recomienda</div>
+        <div className="mt-1 text-xl md:text-2xl font-bold text-slate-100">Partidazos de la semana</div>
+        <div className="mt-1 text-sm text-slate-200">Estos son los encuentros más atractivos para analizar.</div>
+
+        <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/30 overflow-hidden">
+          <div className="relative w-full aspect-[16/9] md:aspect-[21/9]">
+            <img
+              src={BG_PARTIDAZOS}
+              alt="Partidazos de la semana"
+              className="absolute inset-0 w-full h-full object-cover object-center"
+              loading="lazy"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-slate-950/10 via-slate-950/10 to-slate-950/35" />
+          </div>
+        </div>
+
+        <div className="mt-3 text-xs text-slate-400">Tip: Apuesta con datos, planificación y visión ganadora.</div>
       </div>
-    </div>
+    </HudCard>
   );
 }
 
@@ -633,9 +678,7 @@ function PriceCalculatorCard() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-sm font-semibold text-slate-100">Calculadora de precios</div>
-            <div className="text-xs text-slate-300 mt-1">
-              Ingresa tu monto y tu cuota para calcular ganancia estimada.
-            </div>
+            <div className="text-xs text-slate-300 mt-1">Ingresa tu monto y tu cuota para calcular ganancia estimada.</div>
           </div>
 
           <select
@@ -698,6 +741,42 @@ function PriceCalculatorCard() {
         </div>
       </div>
     </HudCard>
+  );
+}
+
+/* ------------------- FeatureCard (restaurado) ------------------- */
+
+function FeatureCard({ title, badge, children, locked, lockText }) {
+  return (
+    <div className="relative rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5 overflow-hidden">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-sm md:text-base font-semibold text-emerald-400">{title}</div>
+          {badge ? (
+            <div className="mt-1 inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/5 border border-white/10 text-slate-200">
+              {badge}
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-3">{children}</div>
+
+      {locked ? (
+        <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-[2px] flex items-center justify-center p-4">
+          <div className="max-w-sm text-center">
+            <div className="text-sm font-semibold text-slate-50">Bloqueado por plan</div>
+            <div className="mt-1 text-xs text-slate-300">{lockText || "Disponible en planes superiores."}</div>
+            <Link
+              to="/#planes"
+              className="inline-flex mt-3 items-center justify-center rounded-xl px-3 py-2 text-xs font-semibold border border-yellow-400/60 bg-yellow-500/10 text-yellow-200"
+            >
+              Ver planes
+            </Link>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -849,7 +928,7 @@ function FixtureCard({ fx, isSelected, onToggle, onLoadOdds, oddsPack }) {
 /* --------------------- componente principal --------------------- */
 
 export default function Comparator() {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, user } = useAuth();
   const nav = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -869,6 +948,24 @@ export default function Comparator() {
   const [oddsByFixture, setOddsByFixture] = useState({});
   const oddsRef = useRef({});
 
+  // Plan / Features (para módulos premium)
+  const planLabel = useMemo(() => {
+    const raw = user?.planId || user?.plan?.id || user?.plan || user?.membership || "MENSUAL";
+    return normalizePlanLabel(raw);
+  }, [user]);
+
+  const maxBoost = useMemo(() => getMaxBoostFromPlan(planLabel), [planLabel]);
+  const features = useMemo(() => getPlanFeatures(planLabel), [planLabel]);
+
+  // combinadas
+  const [parlayResult, setParlayResult] = useState(null);
+  const [parlayError, setParlayError] = useState("");
+
+  // referees module (placeholder / backend futuro)
+  const [refData, setRefData] = useState(null);
+  const [refLoading, setRefLoading] = useState(false);
+  const [refErr, setRefErr] = useState("");
+
   useEffect(() => {
     const urlDate = searchParams.get("date");
     const urlQ = searchParams.get("q");
@@ -879,7 +976,18 @@ export default function Comparator() {
     if (urlQ) setQ(urlQ);
   }, [searchParams]);
 
-  const quickCountries = ["Chile", "España", "Portugal", "Italia", "Alemania", "Argentina", "Inglaterra", "Francia", "Brasil", "México"];
+  const quickCountries = [
+    "Chile",
+    "España",
+    "Portugal",
+    "Italia",
+    "Alemania",
+    "Argentina",
+    "Inglaterra",
+    "Francia",
+    "Brasil",
+    "México",
+  ];
 
   const ensureOdds = useCallback(async (fixtureId) => {
     if (!fixtureId) return;
@@ -908,12 +1016,115 @@ export default function Comparator() {
     }
   }, []);
 
+  const loadReferees = useCallback(async () => {
+    // Por ahora: placeholder compatible (no rompe si backend aún no existe).
+    // Si luego creas /api/referees/cards, aquí conectas.
+    try {
+      setRefErr("");
+      setRefLoading(true);
+
+      // Intencionalmente no fetch por ahora para evitar errores.
+      setRefData(null);
+      setRefErr("Módulo en construcción: falta crear /api/referees/cards en el backend.");
+    } finally {
+      setRefLoading(false);
+    }
+  }, []);
+
   function handleQuickCountry(countryEs) {
     setQ(countryEs);
   }
 
   function toggleFixtureSelection(id) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  const selectedCount = selectedIds.length;
+
+  // (por ahora) generador “fake” para sugerencia de combinada (restaurado)
+  function fakeOddForFixture(fx) {
+    const id = getFixtureId(fx);
+    const key = String(id || getHomeName(fx) + getAwayName(fx));
+    let hash = 0;
+    for (let i = 0; i < key.length; i++) hash = (hash + key.charCodeAt(i) * (i + 7)) % 1000;
+    const base = 1.2 + (hash % 26) / 10;
+    return Number(base.toFixed(2));
+  }
+
+  function buildComboSuggestion(fixturesPool, maxBoostArg) {
+    if (!Array.isArray(fixturesPool) || fixturesPool.length === 0) return null;
+
+    const picks = [];
+    let product = 1;
+
+    for (const fx of fixturesPool) {
+      const odd = fakeOddForFixture(fx);
+      if (product * odd > maxBoostArg * 1.35) continue;
+
+      product *= odd;
+      picks.push({ id: getFixtureId(fx), label: `${getHomeName(fx)} vs ${getAwayName(fx)}`, odd });
+
+      if (picks.length >= 12) break;
+      if (product >= maxBoostArg * 0.8) break;
+    }
+
+    if (!picks.length) return null;
+
+    const finalOdd = Number(product.toFixed(2));
+    const impliedProb = Number(((1 / finalOdd) * 100).toFixed(1));
+    const reachedTarget = finalOdd >= maxBoostArg * 0.8;
+
+    return { games: picks.length, finalOdd, target: maxBoostArg, impliedProb, reachedTarget };
+  }
+
+  async function handleAutoParlay() {
+    setParlayError("");
+    setParlayResult(null);
+
+    if (!fixtures.length) {
+      setParlayError("Genera primero partidos con el botón de arriba.");
+      return;
+    }
+
+    fixtures
+      .slice(0, 10)
+      .map(getFixtureId)
+      .filter(Boolean)
+      .forEach((id) => ensureOdds(id));
+
+    const suggestion = buildComboSuggestion(fixtures, maxBoost);
+    if (!suggestion) {
+      setParlayError("No pudimos armar una combinada razonable con los partidos cargados. Prueba con otro rango de fechas.");
+      return;
+    }
+
+    setParlayResult({ mode: "auto", ...suggestion });
+  }
+
+  async function handleSelectedParlay() {
+    setParlayError("");
+    setParlayResult(null);
+
+    if (!fixtures.length) {
+      setParlayError("Genera primero partidos con el botón de arriba.");
+      return;
+    }
+
+    if (selectedCount < 2) {
+      setParlayError("Selecciona al menos 2 partidos de la lista superior.");
+      return;
+    }
+
+    const pool = fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)));
+    pool.map(getFixtureId).filter(Boolean).forEach((id) => ensureOdds(id));
+
+    const suggestion = buildComboSuggestion(pool, maxBoost);
+    if (!suggestion) {
+      setParlayError("Con esta combinación no pudimos llegar a una cuota interesante. Prueba agregando más partidos.");
+      return;
+    }
+
+    setParlayResult({ mode: "selected", ...suggestion });
   }
 
   async function handleGenerate(e) {
@@ -925,6 +1136,12 @@ export default function Comparator() {
     setSelectedIds([]);
     setOddsByFixture({});
     oddsRef.current = {};
+    setParlayResult(null);
+    setParlayError("");
+
+    setRefData(null);
+    setRefErr("");
+
     setLoading(true);
 
     try {
@@ -976,6 +1193,11 @@ export default function Comparator() {
 
       setFixtures(LIMITED);
       setInfo(`API: ${itemsRaw.length} | base: ${base.length} | top: ${major.length} | mostrando: ${LIMITED.length}`);
+
+      // Si tiene feature de árbitros, mostramos placeholder (backend futuro)
+      if (features.referees) {
+        await loadReferees();
+      }
     } catch (e2) {
       setErr(String(e2?.message || e2));
     } finally {
@@ -1072,17 +1294,13 @@ export default function Comparator() {
         </div>
       </HudCard>
 
-      {/* ===========================
-          2) LISTADO (PUNTO B) ✅
-         =========================== */}
+      {/* 2) LISTADO (FixtureCard) */}
       <section className="mt-4">
         <div className="flex items-center justify-between px-2 py-2 text-[11px] md:text-xs text-slate-300 tracking-wide">
           <span className="uppercase">
             Partidos encontrados: <span className="font-semibold text-slate-50">{fixtures.length}</span>
           </span>
-          <span className="uppercase text-right">
-            Usa “Añadir a combinada” para seleccionar y cargar cuotas.
-          </span>
+          <span className="uppercase text-right">Usa “Añadir a combinada” para seleccionar y cargar cuotas.</span>
         </div>
 
         {fixtures.length === 0 ? (
@@ -1102,7 +1320,11 @@ export default function Comparator() {
                   fx={fx}
                   isSelected={isSelected}
                   oddsPack={oddsPack}
-                  onToggle={(fixtureId) => toggleFixtureSelection(fixtureId)}
+                  onToggle={(fixtureId) => {
+                    toggleFixtureSelection(fixtureId);
+                    setParlayResult(null);
+                    setParlayError("");
+                  }}
                   onLoadOdds={(fixtureId) => ensureOdds(fixtureId)}
                 />
               );
@@ -1111,16 +1333,100 @@ export default function Comparator() {
         )}
       </section>
 
-      {/* 3) Partidazos de la semana (en el lugar correcto) */}
-      <RecoWeeklyCard />
+      {/* 3) MÓDULOS premium (cuota regalo / potenciadas / árbitros / VIP) */}
+      <section className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <FeatureCard title="Cuota segura (regalo)" badge="Alta probabilidad" locked={!features.giftPick}>
+          <div className="text-xs text-slate-300">Aquí mostrarás tu pick seguro del día (manual o generado).</div>
+          <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/30 p-3">
+            <div className="text-sm font-semibold text-slate-100">Ejemplo</div>
+            <div className="text-xs text-slate-300 mt-1">Under 3.5 goles · cuota x1.40</div>
+          </div>
+        </FeatureCard>
 
-      {/* 4) Manual Picks */}
+        <FeatureCard title="Cuotas potenciadas" badge={`Hasta x${maxBoost}`} locked={!features.boosted}>
+          <div className="text-xs text-slate-300">Arma una combinada automática o con partidos seleccionados.</div>
+
+          <div className="mt-3 flex flex-col sm:flex-row gap-2">
+            <button
+              type="button"
+              onClick={handleAutoParlay}
+              className="px-4 py-2 rounded-full text-xs font-bold"
+              style={{ backgroundColor: GOLD, color: "#0f172a" }}
+            >
+              Generar combinada automática
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSelectedParlay}
+              className="px-4 py-2 rounded-full text-xs font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition"
+            >
+              Generar con seleccionados ({selectedCount})
+            </button>
+          </div>
+
+          {parlayError ? <div className="mt-3 text-xs text-amber-300">{parlayError}</div> : null}
+
+          {parlayResult ? (
+            <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/30 p-3">
+              <div className="text-xs text-slate-300">
+                Modo: <span className="text-slate-100 font-semibold">{parlayResult.mode}</span>
+              </div>
+              <div className="mt-1 text-sm font-bold text-emerald-200">
+                Cuota final: x{parlayResult.finalOdd}{" "}
+                <span className="text-xs font-semibold text-slate-300">(objetivo x{parlayResult.target})</span>
+              </div>
+              <div className="mt-1 text-[11px] text-slate-400">
+                Prob. implícita aprox: {parlayResult.impliedProb}% · Partidos: {parlayResult.games}
+              </div>
+            </div>
+          ) : null}
+        </FeatureCard>
+
+        <FeatureCard
+          title="Árbitros tarjeteros"
+          badge="Tarjetas"
+          locked={!features.referees}
+          lockText="Disponible desde Plan Anual."
+        >
+          <div className="text-xs text-slate-300">Ranking de árbitros con más tarjetas (por rango de fechas y país).</div>
+
+          {refLoading ? <div className="mt-3 text-xs text-slate-300">Cargando árbitros…</div> : null}
+          {refErr ? <div className="mt-3 text-xs text-amber-300">{refErr}</div> : null}
+
+          {refData ? (
+            <pre className="mt-3 text-[11px] leading-snug text-slate-200 bg-slate-950/30 border border-white/10 rounded-xl p-3 overflow-auto">
+              {JSON.stringify(refData, null, 2)}
+            </pre>
+          ) : (
+            <div className="mt-3 text-[11px] text-slate-400">
+              Cuando el backend esté listo, aquí mostramos el top de árbitros.
+            </div>
+          )}
+        </FeatureCard>
+
+        <FeatureCard
+          title="Goleadores / Remates / Value"
+          badge="VIP"
+          locked={!(features.scorers || features.marketValue || features.shooters > 0)}
+          lockText="Disponible en planes superiores (Anual/Vitalicio)."
+        >
+          <div className="text-xs text-slate-300">
+            Aquí reactivaremos los módulos avanzados (goleadores, remates, value del mercado).
+          </div>
+        </FeatureCard>
+      </section>
+
+      {/* 4) Partidazos de la semana (arreglado + títulos) */}
+      <PartidazosDeLaSemanaCard />
+
+      {/* 5) Manual Picks (no tocar estilos) */}
       <ManualPicksSection />
 
-      {/* 5) Simulador */}
+      {/* 6) Simulador (no tocar) */}
       <GainSimulatorCard />
 
-      {/* 6) Calculadora de precios */}
+      {/* 7) Calculadora de precios (no tocar) */}
       <PriceCalculatorCard />
     </div>
   );
