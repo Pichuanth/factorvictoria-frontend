@@ -1,5 +1,5 @@
 // src/pages/Comparator.jsx
-import React, { useMemo, useState, useEffect, useCallback } from "react";
+import React, { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 
@@ -10,20 +10,24 @@ const API_BASE =
   "https://factorvictoria-backend.vercel.app";
 
 /** Fondos (public/) */
-const BG_VISITOR = "/hero-fondo-partidos.png"; // banner modo visitante
-const BG_END = "/hero-12000.png"; // cierre SOLO visitante
-const BG_PROFILE_HUD = "/hero-profile-hud.png"; // fondo sección Generar (logueado)
-const BG_DINERO = "/hero.dinero.png"; // simulador + calculadora
-const BG_MANUAL = "/hero-dorado-estadio.png"; // fondo cuotas manuales (3 columnas)
-
-// ✅ Cambia este nombre si tu archivo se llama distinto
-const BG_PARTIDAZOS = "/partidazos-semana.png"; // imagen “Partidazos de la semana”
+const BG_VISITOR = "/hero-fondo-partidos.png";
+const BG_END = "/hero-12000.png";
+const BG_PROFILE_HUD = "/hero-profile-hud.png";
+const BG_DINERO = "/hero.dinero.png";
+const BG_MANUAL = "/hero-dorado-estadio.png";
+const BG_PARTIDAZOS = "/partidazos-semana.png";
 
 /* --------------------- helpers --------------------- */
 
 function toYYYYMMDD(d) {
   const pad = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function stripDiacritics(s) {
+  return String(s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, ""); // quita acentos
 }
 
 // Alias ES -> EN para country de API-SPORTS
@@ -39,13 +43,15 @@ const COUNTRY_ALIAS = {
   alemania: "Germany",
   mexico: "Mexico",
   brasil: "Brazil",
-  brazil: "Brazil",
   eeuu: "USA",
   estadosunidos: "USA",
 };
 
 function normalizeCountryQuery(q) {
-  const key = String(q || "").toLowerCase().trim().replace(/\s+/g, "");
+  const key = stripDiacritics(String(q || ""))
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "");
   return COUNTRY_ALIAS[key] || null;
 }
 
@@ -87,10 +93,8 @@ function getLeaguePriority(leagueName = "", country = "") {
     if (name.includes(IMPORTANT_LEAGUES[i].toLowerCase())) return i;
   }
 
-  if (["england", "spain", "italy", "germany", "france"].includes(countryLower))
-    return 12;
-  if (["chile", "argentina", "brazil", "portugal", "mexico"].includes(countryLower))
-    return 14;
+  if (["england", "spain", "italy", "germany", "france"].includes(countryLower)) return 12;
+  if (["chile", "argentina", "brazil", "portugal", "mexico"].includes(countryLower)) return 14;
 
   return 25;
 }
@@ -158,11 +162,25 @@ function isFutureFixture(fx) {
 function isYouthOrWomenOrReserve(fx) {
   const blob = `${getLeagueName(fx)} ${getHomeName(fx)} ${getAwayName(fx)}`.toLowerCase();
   const banned = [
-    "u17","u18","u19","u20","u21","u23",
-    "reserves","reserve","youth","juvenil",
-    "sub-","sub ",
-    " women","womens","femen"," fem"," w ",
-    " ii"," b ",
+    "u17",
+    "u18",
+    "u19",
+    "u20",
+    "u21",
+    "u23",
+    "reserves",
+    "reserve",
+    "youth",
+    "juvenil",
+    "sub-",
+    "sub ",
+    " women",
+    "womens",
+    "femen",
+    " fem",
+    " w ",
+    " ii",
+    " b ",
   ];
   return banned.some((p) => blob.includes(p));
 }
@@ -188,46 +206,14 @@ function isMajorLeague(fx) {
 
   if (
     commonTop &&
-    ["england","spain","italy","germany","france","chile","argentina","brazil","portugal","mexico"].includes(country)
+    ["england", "spain", "italy", "germany", "france", "chile", "argentina", "brazil", "portugal", "mexico"].includes(
+      country
+    )
   ) {
     return true;
   }
 
   return false;
-}
-
-/* --------------------- Plan & Features --------------------- */
-
-function normalizePlanLabel(raw) {
-  const p = String(raw || "").toUpperCase();
-  if (p.includes("VITA")) return "VITALICIO";
-  if (p.includes("ANU")) return "ANUAL";
-  if (p.includes("TRI") || p.includes("3")) return "TRIMESTRAL";
-  if (p.includes("MES")) return "MENSUAL";
-  return "MENSUAL";
-}
-
-function getMaxBoostFromPlan(planLabel) {
-  if (planLabel === "VITALICIO") return 100;
-  if (planLabel === "ANUAL") return 50;
-  if (planLabel === "TRIMESTRAL") return 20;
-  return 10;
-}
-
-function getPlanFeatures(planLabel) {
-  const base = { giftPick: true, boosted: true };
-
-  if (planLabel === "MENSUAL") {
-    return { ...base, referees: false, marketValue: false, scorers: false, shooters: 0 };
-  }
-  if (planLabel === "TRIMESTRAL") {
-    return { ...base, referees: false, marketValue: false, scorers: false, shooters: 0 };
-  }
-  if (planLabel === "ANUAL") {
-    return { ...base, referees: true, marketValue: false, scorers: false, shooters: 5 };
-  }
-  // VITALICIO
-  return { ...base, referees: true, marketValue: true, scorers: true, shooters: 10 };
 }
 
 /* --------------------- UI helpers --------------------- */
@@ -251,9 +237,7 @@ function HudCard({ bg, children, className = "", style = {}, overlayVariant = "c
       className={`relative overflow-hidden rounded-3xl border bg-white/5 ${className}`}
       style={{ borderColor: "rgba(255,255,255,0.10)", ...style }}
     >
-      {bg ? (
-        <img src={bg} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover" />
-      ) : null}
+      {bg ? <img src={bg} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover" /> : null}
 
       <div className="absolute inset-0" style={{ background: overlayLayers[0] }} />
       <div className="absolute inset-0" style={{ background: overlayLayers[1] }} />
@@ -264,23 +248,18 @@ function HudCard({ bg, children, className = "", style = {}, overlayVariant = "c
   );
 }
 
-/* --------------------- Visitante --------------------- */
+/* ------------------- Visitante ------------------- */
 
 function VisitorBanner() {
   const nav = useNavigate();
-
-  const goPlans = () => {
-    window.location.assign("/#planes");
-  };
+  const goPlans = () => window.location.assign("/#planes");
 
   return (
     <HudCard
       bg={BG_VISITOR}
       overlayVariant="player"
       className="mt-4"
-      style={{
-        boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.16)",
-      }}
+      style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.16)" }}
     >
       <div className="p-5 md:p-7">
         <div className="text-xs tracking-wide text-emerald-200/90 font-semibold">Modo visitante</div>
@@ -290,8 +269,8 @@ function VisitorBanner() {
         </div>
 
         <div className="mt-2 text-sm text-slate-200 max-w-2xl">
-          Activa tu plan para desbloquear el comparador profesional (cuotas potenciadas, combinada automática y módulos premium).
-          Si ya tienes membresía, inicia sesión.
+          Activa tu plan para desbloquear el comparador profesional (cuotas potenciadas, combinada automática y módulos
+          premium). Si ya tienes membresía, inicia sesión.
         </div>
 
         <div className="mt-4 flex flex-col sm:flex-row gap-2">
@@ -387,12 +366,12 @@ function VisitorEndingHero() {
       <div className="w-full h-[260px] md:h-[360px] lg:h-[420px] bg-slate-950 overflow-hidden">
         <img src={BG_END} alt="Factor Victoria" className="w-full h-full object-cover object-center" />
       </div>
-      <div className="p-4 text-center text-xs text-slate-500">© 2026 Factor Victoria</div>
+      <div className="p-4 text-center text-xs text-slate-500">© {new Date().getFullYear()} Factor Victoria</div>
     </div>
   );
 }
 
-/* ------------------- Simulador + Calculadora ------------------- */
+/* ------------------- Simulador ------------------- */
 
 function formatMoney(value, currency) {
   const n = Number(value || 0);
@@ -443,13 +422,15 @@ function GainSimulatorCard() {
         <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
             <div className="text-xs text-slate-300">Monto</div>
+
             <input
               type="text"
               inputMode="numeric"
               value={formatMoney(stake, currency)}
               onChange={(e) => {
                 const digits = String(e.target.value || "").replace(/[^\d]/g, "");
-                setStake(digits ? Number(digits) : 0);
+                const n = digits ? Number(digits) : 0;
+                setStake(n);
               }}
               className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 outline-none"
               placeholder={currency === "CLP" ? "$10.000" : "$100.00"}
@@ -491,122 +472,24 @@ function GainSimulatorCard() {
   );
 }
 
-function PriceCalculatorCard() {
-  const [currency, setCurrency] = useState("CLP");
-  const [stake, setStake] = useState(10000);
-  const [odd, setOdd] = useState(1.56);
+/* ------------------- Partidazos de la semana ------------------- */
 
-  const result = Number(stake || 0) * Number(odd || 0);
-  const net = Math.max(0, result - Number(stake || 0)); // ganancia neta
-
+function PartidazosSemana() {
   return (
-    <HudCard
-      bg={BG_DINERO}
-      overlayVariant="casillas"
-      className="mt-6"
-      style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.12)" }}
-    >
-      <div className="p-5 md:p-6">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold text-slate-100">Calculadora de precios</div>
-            <div className="text-xs text-slate-300 mt-1">Ingresa tu monto y tu cuota para calcular ganancia estimada.</div>
-          </div>
-
-          <select
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value)}
-            className="rounded-full border border-white/10 bg-slate-950/30 px-3 py-2 text-xs text-slate-200 outline-none"
-          >
-            <option value="CLP">CLP</option>
-            <option value="USD">USD</option>
-            <option value="EUR">EUR</option>
-          </select>
-        </div>
-
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-            <div className="text-xs text-slate-300">Monto</div>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={formatMoney(stake, currency)}
-              onChange={(e) => {
-                const digits = String(e.target.value || "").replace(/[^\d]/g, "");
-                setStake(digits ? Number(digits) : 0);
-              }}
-              className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 outline-none"
-            />
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-            <div className="text-xs text-slate-300">Cuota</div>
-            <input
-              type="number"
-              step="0.01"
-              value={odd}
-              onChange={(e) => setOdd(e.target.value)}
-              className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 outline-none"
-            />
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <div className="text-xs text-slate-300">Resultado</div>
-                <div className="mt-2 text-lg font-bold" style={{ color: "rgba(230,196,100,0.95)" }}>
-                  {formatMoney(result, currency)}
-                </div>
-                <div className="mt-1 text-[11px] text-slate-400">(monto × cuota)</div>
-              </div>
-
-              <div className="text-right">
-                <div className="text-xs text-slate-300">Ganancia neta</div>
-                <div className="mt-2 text-lg font-bold text-emerald-300">
-                  {formatMoney(net, currency)}
-                </div>
-                <div className="mt-1 text-[11px] text-slate-400">(resultado − monto)</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </HudCard>
+    <section className="mt-6">
+      <HudCard
+        bg={BG_PARTIDAZOS}
+        overlayVariant="casillas"
+        className="overflow-hidden"
+        style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.10)" }}
+      >
+        <div className="h-[320px] md:h-[420px] lg:h-[520px]" />
+      </HudCard>
+    </section>
   );
 }
 
-/* --------------------- Partidazos de la semana --------------------- */
-
-function PartidazosDeLaSemanaCard() {
-  return (
-    <HudCard
-      bg={BG_VISITOR}
-      overlayVariant="casillas"
-      className="mt-4"
-      style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.10)" }}
-    >
-      <div className="p-4 md:p-6">
-        <div className="text-emerald-200/90 text-xs font-semibold tracking-wide">Factor Victoria recomienda</div>
-        <div className="mt-1 text-xl md:text-2xl font-bold text-slate-100">Partidazos de la semana</div>
-        <div className="mt-1 text-sm text-slate-200">Estos son los encuentros más atractivos para analizar.</div>
-
-        <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/30 overflow-hidden">
-          <img
-            src={BG_PARTIDAZOS}
-            alt="Partidazos de la semana"
-            className="w-full h-auto object-cover"
-          />
-        </div>
-
-        <div className="mt-3 text-xs text-slate-400">
-          Tip: Apuesta con datos, planificación y visión ganadora.
-        </div>
-      </div>
-    </HudCard>
-  );
-}
-
-/* --------------------- Manual Picks (3 columnas) --------------------- */
+/* ------------------- Manual Picks (3 columnas) ------------------- */
 
 function ManualPicksSection() {
   // EDITA SOLO ESTOS DATOS (tú y tu hermana)
@@ -627,91 +510,170 @@ function ManualPicksSection() {
 
   function Card({ title, items }) {
     return (
-      <HudCard
-        bg={BG_MANUAL}
-        overlayVariant="casillas"
-        className="rounded-2xl"
-        style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.04) inset" }}
-      >
-        <div className="p-4 md:p-5">
-          <div className="flex items-baseline justify-between gap-3">
-            <div className="text-sm font-semibold text-slate-100">{title}</div>
-            <div className="text-[11px] font-semibold text-emerald-200">
-              Cuotas exclusivas para miembros
-            </div>
-          </div>
-
-          <div className="mt-3 space-y-2">
-            {items.map((x) => (
-              <div
-                key={x.label}
-                className="flex items-start justify-between gap-3 rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2"
-              >
-                <div className="min-w-0">
-                  <div className="text-sm text-slate-100 font-semibold truncate">{x.label}</div>
-                  {x.note ? <div className="text-[11px] text-slate-400">{x.note}</div> : null}
-                </div>
-                <div className="text-sm font-bold text-emerald-200">x{Number(x.odd).toFixed(2)}</div>
-              </div>
-            ))}
-          </div>
+      <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4 md:p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-sm font-semibold text-slate-100">{title}</div>
+          <div className="text-xs font-semibold text-emerald-200">Cuotas exclusivas para miembros</div>
         </div>
-      </HudCard>
+
+        <div className="mt-3 space-y-2">
+          {items.map((x) => (
+            <div
+              key={x.label}
+              className="flex items-start justify-between gap-3 rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2"
+            >
+              <div className="min-w-0">
+                <div className="text-sm text-slate-100 font-semibold truncate">{x.label}</div>
+                {x.note ? <div className="text-[11px] text-slate-400">{x.note}</div> : null}
+              </div>
+              <div className="text-sm font-bold text-emerald-200">x{Number(x.odd).toFixed(2)}</div>
+            </div>
+          ))}
+        </div>
+      </div>
     );
   }
 
   return (
-    <section className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-      <Card title="Partidos únicos" items={singles} />
-      <Card title="Combinadas" items={combos} />
-      <Card title="Jugadores" items={players} />
+    <section className="mt-6">
+      <HudCard
+        bg={BG_MANUAL}
+        overlayVariant="casillas"
+        className="overflow-hidden"
+        style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset" }}
+      >
+        <div className="p-4 md:p-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card title="Partidos únicos" items={singles} />
+            <Card title="Combinadas" items={combos} />
+            <Card title="Jugadores" items={players} />
+          </div>
+        </div>
+      </HudCard>
     </section>
   );
 }
 
-/* --------------------- FeatureCard (logueado) --------------------- */
+/* ------------------- Calculadora de precios (con ganancia neta) ------------------- */
 
-function FeatureCard({ title, badge, children, locked, lockText }) {
+function PriceCalculatorCard() {
+  const [currency, setCurrency] = useState("CLP");
+  const [stake, setStake] = useState(10000);
+  const [odd, setOdd] = useState(1.56);
+
+  const result = Number(stake || 0) * Number(odd || 0);
+  const net = Math.max(0, result - Number(stake || 0));
+
+  const format = (v) => {
+    const n = Number(v || 0);
+    const decimals = currency === "CLP" ? 0 : 2;
+    const locale = currency === "CLP" ? "es-CL" : "en-US";
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency,
+      maximumFractionDigits: decimals,
+      minimumFractionDigits: decimals,
+    }).format(Number.isFinite(n) ? n : 0);
+  };
+
   return (
-    <div className="relative rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5 overflow-hidden">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-sm md:text-base font-semibold text-emerald-400">{title}</div>
-          {badge && (
-            <div className="mt-1 inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/5 border border-white/10 text-slate-200">
-              {badge}
+    <section className="mt-6">
+      <HudCard
+        bg={BG_DINERO}
+        overlayVariant="casillas"
+        style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.10)" }}
+      >
+        <div className="p-5 md:p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-slate-100">Calculadora de precios</div>
+              <div className="text-xs text-slate-300 mt-1">
+                Ingresa tu monto y tu cuota para calcular ganancia estimada.
+              </div>
             </div>
-          )}
-        </div>
-      </div>
 
-      <div className="mt-3">{children}</div>
-
-      {locked && (
-        <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-[2px] flex items-center justify-center p-4">
-          <div className="max-w-sm text-center">
-            <div className="text-sm font-semibold text-slate-50">Bloqueado por plan</div>
-            <div className="mt-1 text-xs text-slate-300">{lockText || "Disponible en planes superiores."}</div>
-            <Link
-              to="/#planes"
-              className="inline-flex mt-3 items-center justify-center rounded-xl px-3 py-2 text-xs font-semibold border border-yellow-400/60 bg-yellow-500/10 text-yellow-200"
+            <select
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              className="rounded-full border border-white/10 bg-slate-950/30 px-3 py-2 text-xs text-slate-200 outline-none"
             >
-              Ver planes
-            </Link>
+              <option value="CLP">CLP</option>
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+            </select>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+              <div className="text-xs text-slate-300">Monto</div>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={format(stake)}
+                onChange={(e) => {
+                  const digits = String(e.target.value || "").replace(/[^\d]/g, "");
+                  setStake(digits ? Number(digits) : 0);
+                }}
+                className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 outline-none"
+              />
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+              <div className="text-xs text-slate-300">Cuota</div>
+              <input
+                type="number"
+                step="0.01"
+                value={odd}
+                onChange={(e) => setOdd(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 outline-none"
+              />
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className="text-xs text-slate-300">Resultado</div>
+                  <div className="mt-2 text-lg font-bold" style={{ color: "rgba(230,196,100,0.95)" }}>
+                    {format(result)}
+                  </div>
+                  <div className="mt-1 text-[11px] text-slate-400">(monto × cuota)</div>
+                </div>
+
+                <div className="text-right">
+                  <div className="text-xs text-slate-300">Ganancia neta</div>
+                  <div className="mt-2 text-lg font-bold text-emerald-400">{format(net)}</div>
+                  <div className="mt-1 text-[11px] text-slate-400">(resultado - monto)</div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      )}
+      </HudCard>
+    </section>
+  );
+}
+
+/* ------------------- Tarjeta estilo "Partidos" (pero desbloqueada en Comparador) ------------------- */
+
+function StatTile({ title, value, locked = false }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-slate-200">{title}</div>
+        {locked ? <span className="text-yellow-300/80">🔒</span> : null}
+      </div>
+      <div className="mt-2 text-lg font-semibold text-slate-50">{value}</div>
     </div>
   );
 }
 
-/* --------------------- Página --------------------- */
+/* --------------------- componente principal --------------------- */
 
 export default function Comparator() {
-  const { isLoggedIn, user } = useAuth();
+  const { isLoggedIn } = useAuth();
+  const nav = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // ✅ hooks SIEMPRE arriba (no dentro de if), para evitar errores
   const today = useMemo(() => new Date(), []);
   const [from, setFrom] = useState(toYYYYMMDD(today));
   const [to, setTo] = useState(toYYYYMMDD(today));
@@ -724,16 +686,9 @@ export default function Comparator() {
   const [fixtures, setFixtures] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
 
-  const [parlayResult, setParlayResult] = useState(null);
-  const [parlayError, setParlayError] = useState("");
-
   // odds cache
   const [oddsByFixture, setOddsByFixture] = useState({});
-
-  // referees module
-  const [refData, setRefData] = useState(null);
-  const [refLoading, setRefLoading] = useState(false);
-  const [refErr, setRefErr] = useState("");
+  const oddsRef = useRef({});
 
   useEffect(() => {
     const urlDate = searchParams.get("date");
@@ -745,89 +700,45 @@ export default function Comparator() {
     if (urlQ) setQ(urlQ);
   }, [searchParams]);
 
-  const planLabel = useMemo(() => {
-    const raw = user?.planId || user?.plan?.id || user?.plan || user?.membership || "MENSUAL";
-    return normalizePlanLabel(raw);
-  }, [user]);
+  // ✅ agregados: Brasil y México
+  const quickCountries = ["Chile", "España", "Portugal", "Italia", "Alemania", "Argentina", "Inglaterra", "Francia", "Brasil", "México"];
 
-  const maxBoost = getMaxBoostFromPlan(planLabel);
-  const features = useMemo(() => getPlanFeatures(planLabel), [planLabel]);
+  const ensureOdds = useCallback(async (fixtureId) => {
+    if (!fixtureId) return;
 
-  // ✅ aquí agregamos Brasil y México como pediste
-  const quickCountries = [
-    "Chile",
-    "España",
-    "Portugal",
-    "Italia",
-    "Alemania",
-    "Argentina",
-    "Inglaterra",
-    "Francia",
-    "Brasil",
-    "México",
-  ];
+    // cache estable (ref)
+    if (oddsRef.current[fixtureId]) return;
 
-  const ensureOdds = useCallback(
-    async (fixtureId) => {
-      if (!fixtureId) return;
-      if (oddsByFixture[fixtureId]) return;
-
-      try {
-        const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(fixtureId)}`);
-        if (!res.ok) return;
-        const data = await res.json();
-
-        setOddsByFixture((prev) => ({
-          ...prev,
-          [fixtureId]: {
-            found: !!data?.found,
-            markets: data?.markets || {},
-            fetchedAt: Date.now(),
-          },
-        }));
-      } catch {
-        // silencio
-      }
-    },
-    [oddsByFixture]
-  );
-
-  const loadReferees = useCallback(async (fromArg, toArg, countryENOrNull) => {
     try {
-      setRefErr("");
-      setRefLoading(true);
-
-      const params = new URLSearchParams();
-      params.set("from", fromArg);
-      params.set("to", toArg);
-      if (countryENOrNull) params.set("country", countryENOrNull);
-
-      const r = await fetch(`${API_BASE}/api/referees/cards?${params.toString()}`);
-
-      if (r.status === 404) {
-        setRefData(null);
-        setRefErr("Módulo en construcción: falta crear /api/referees/cards en el backend.");
+      const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(fixtureId)}`);
+      if (!res.ok) {
+        oddsRef.current[fixtureId] = { found: false, markets: {} };
+        setOddsByFixture((prev) => ({ ...prev, [fixtureId]: oddsRef.current[fixtureId] }));
         return;
       }
 
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j?.message || j?.error || `HTTP ${r.status}`);
+      const data = await res.json();
 
-      setRefData(j);
-    } catch (e) {
-      const msg = String(e?.message || e);
-      if (msg.toLowerCase().includes("failed to fetch")) {
-        setRefErr(
-          "No se pudo conectar al backend para cargar árbitros. Verifica que el backend tenga /api/referees/cards y que VITE_API_BASE apunte al backend correcto."
-        );
-      } else {
-        setRefErr(msg);
-      }
-      setRefData(null);
-    } finally {
-      setRefLoading(false);
+      const pack = {
+        found: !!data?.found,
+        markets: data?.markets || {},
+        fetchedAt: Date.now(),
+      };
+
+      oddsRef.current[fixtureId] = pack;
+      setOddsByFixture((prev) => ({ ...prev, [fixtureId]: pack }));
+    } catch {
+      // silencio
     }
   }, []);
+
+  function handleQuickCountry(countryEs) {
+    setQ(countryEs);
+  }
+
+  function toggleFixtureSelection(id) {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
 
   async function handleGenerate(e) {
     e?.preventDefault?.();
@@ -837,12 +748,8 @@ export default function Comparator() {
     setFixtures([]);
     setSelectedIds([]);
     setOddsByFixture({});
-    setParlayResult(null);
-    setParlayError("");
+    oddsRef.current = {};
     setLoading(true);
-
-    setRefData(null);
-    setRefErr("");
 
     try {
       const params = new URLSearchParams();
@@ -867,7 +774,6 @@ export default function Comparator() {
         [];
 
       const base = itemsRaw.filter(isFutureFixture).filter((fx) => !isYouthOrWomenOrReserve(fx));
-
       const major = base.filter(isMajorLeague);
       const filtered = major.length >= 8 ? major : base;
 
@@ -894,13 +800,6 @@ export default function Comparator() {
 
       setFixtures(LIMITED);
       setInfo(`API: ${itemsRaw.length} | base: ${base.length} | top: ${major.length} | mostrando: ${LIMITED.length}`);
-
-      if (features.referees) {
-        const countryENForRefs = normalizeCountryQuery(qTrim);
-        await loadReferees(from, to, countryENForRefs);
-      } else {
-        setRefData(null);
-      }
     } catch (e2) {
       setErr(String(e2?.message || e2));
     } finally {
@@ -908,402 +807,194 @@ export default function Comparator() {
     }
   }
 
-  function handleQuickCountry(countryEs) {
-    setQ(countryEs);
+  /* =========================
+      VISITANTE (NO LOGUEADO)
+     ========================= */
+  if (!isLoggedIn) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 pb-20">
+        <VisitorBanner />
+        <VisitorPlansGrid />
+        <GainSimulatorCard />
+        <VisitorEndingHero />
+      </div>
+    );
   }
 
-  function toggleFixtureSelection(id) {
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  }
-
-  const selectedCount = selectedIds.length;
-
-  // (por ahora) generador “fake” de odds base para armar combinadas
-  function fakeOddForFixture(fx) {
-    const id = getFixtureId(fx);
-    const key = String(id || getHomeName(fx) + getAwayName(fx));
-    let hash = 0;
-    for (let i = 0; i < key.length; i++) hash = (hash + key.charCodeAt(i) * (i + 7)) % 1000;
-    const base = 1.2 + (hash % 26) / 10;
-    return Number(base.toFixed(2));
-  }
-
-  function buildComboSuggestion(fixturesPool, maxBoostArg) {
-    if (!Array.isArray(fixturesPool) || fixturesPool.length === 0) return null;
-
-    const picks = [];
-    let product = 1;
-
-    for (const fx of fixturesPool) {
-      const odd = fakeOddForFixture(fx);
-      if (product * odd > maxBoostArg * 1.35) continue;
-
-      product *= odd;
-      picks.push({ id: getFixtureId(fx), label: `${getHomeName(fx)} vs ${getAwayName(fx)}`, odd });
-
-      if (picks.length >= 12) break;
-      if (product >= maxBoostArg * 0.8) break;
-    }
-
-    if (!picks.length) return null;
-
-    const finalOdd = Number(product.toFixed(2));
-    const impliedProb = Number(((1 / finalOdd) * 100).toFixed(1));
-    const reachedTarget = finalOdd >= maxBoostArg * 0.8;
-
-    return { games: picks.length, finalOdd, target: maxBoostArg, impliedProb, reachedTarget };
-  }
-
-  async function handleAutoParlay() {
-    setParlayError("");
-    setParlayResult(null);
-
-    if (!fixtures.length) {
-      setParlayError("Genera primero partidos con el botón de arriba.");
-      return;
-    }
-
-    fixtures.slice(0, 10).map(getFixtureId).filter(Boolean).forEach((id) => ensureOdds(id));
-
-    const suggestion = buildComboSuggestion(fixtures, maxBoost);
-    if (!suggestion) {
-      setParlayError("No pudimos armar una combinada razonable con los partidos cargados. Prueba con otro rango de fechas.");
-      return;
-    }
-
-    setParlayResult({ mode: "auto", ...suggestion });
-  }
-
-  async function handleSelectedParlay() {
-    setParlayError("");
-    setParlayResult(null);
-
-    if (!fixtures.length) {
-      setParlayError("Genera primero partidos con el botón de arriba.");
-      return;
-    }
-
-    if (selectedCount < 2) {
-      setParlayError("Selecciona al menos 2 partidos de la lista superior.");
-      return;
-    }
-
-    const pool = fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)));
-    pool.map(getFixtureId).filter(Boolean).forEach((id) => ensureOdds(id));
-
-    const suggestion = buildComboSuggestion(pool, maxBoost);
-    if (!suggestion) {
-      setParlayError("Con esta combinación no pudimos llegar a una cuota interesante. Prueba agregando más partidos.");
-      return;
-    }
-
-    setParlayResult({ mode: "selected", ...suggestion });
-  }
+  /* =========================
+      LOGUEADO (COMPARADOR)
+     ========================= */
 
   return (
     <div className="max-w-5xl mx-auto px-4 pb-20">
-      {/* =========================
-          VISITANTE (NO LOGUEADO)
-         ========================= */}
-      {!isLoggedIn ? (
-        <>
-          <VisitorBanner />
-          <VisitorPlansGrid />
-          <GainSimulatorCard />
-          <VisitorEndingHero />
-        </>
-      ) : (
-        <>
-          {/* =========================
-              LOGUEADO (COMPARADOR FULL)
-             ========================= */}
+      {/* 1) Filtros + Generar (con fondo HUD) */}
+      <HudCard
+        bg={BG_PROFILE_HUD}
+        overlayVariant="casillas"
+        className="mt-4"
+        style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset" }}
+      >
+        <div className="p-4 md:p-6">
+          <form onSubmit={handleGenerate} className="flex flex-col md:flex-row md:items-end gap-3 items-stretch">
+            <div className="flex-1">
+              <label className="block text-xs text-slate-400 mb-1">Desde</label>
+              <input
+                type="date"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+                className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
+              />
+            </div>
 
-          {/* 1) Filtros + Generar con fondo HUD */}
-          <HudCard
-            bg={BG_PROFILE_HUD}
-            overlayVariant="casillas"
-            className="mt-4"
-            style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset" }}
-          >
-            <div className="p-4 md:p-6">
-              <form onSubmit={handleGenerate} className="flex flex-col md:flex-row md:items-end gap-3 items-stretch">
-                <div className="flex-1">
-                  <label className="block text-xs text-slate-400 mb-1">Desde</label>
-                  <input
-                    type="date"
-                    value={from}
-                    onChange={(e) => setFrom(e.target.value)}
-                    className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
+            <div className="flex-1">
+              <label className="block text-xs text-slate-400 mb-1">Hasta</label>
+              <input
+                type="date"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
+              />
+            </div>
+
+            <div className="flex-[2]">
+              <label className="block text-xs text-slate-400 mb-1">Filtro (país / liga / equipo)</label>
+              <input
+                placeholder="Ej: Chile, La Liga, Colo Colo, Premier League..."
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
+              />
+            </div>
+
+            <div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full rounded-2xl font-semibold px-4 py-2 mt-4 md:mt-0 disabled:opacity-60 disabled:cursor-not-allowed"
+                style={{ backgroundColor: GOLD, color: "#0f172a" }}
+              >
+                {loading ? "Generando..." : "Generar"}
+              </button>
+            </div>
+          </form>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {quickCountries.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => handleQuickCountry(c)}
+                className="text-xs md:text-sm rounded-full px-3 py-1 border border-white/15 bg-white/5 hover:bg-white/10 transition"
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+
+          {err && <div className="mt-3 text-sm text-amber-300">{err}</div>}
+          {!err && info && <div className="mt-3 text-xs text-slate-300/80">{info}</div>}
+        </div>
+      </HudCard>
+
+      {/* 2) Partidos generados (nuevo formato tipo "Partidos", pero desbloqueado) */}
+      <section className="mt-6 space-y-4">
+        {fixtures.length === 0 ? (
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
+            Genera partidos para verlos aquí con el formato profesional.
+          </div>
+        ) : (
+          fixtures.map((fx) => {
+            const id = getFixtureId(fx);
+            const isSelected = selectedIds.includes(id);
+
+            const league = getLeagueName(fx);
+            const countryName = getCountryName(fx);
+            const flagEmoji = COUNTRY_FLAG[countryName] || (countryName === "World" ? "🌍" : "🏳️");
+            const home = getHomeName(fx);
+            const away = getAwayName(fx);
+            const time = getKickoffTime(fx);
+
+            const oddsPack = oddsByFixture[id] || null;
+            const m1x2 = oddsPack?.markets?.["1X2"] || null;
+            const mou = oddsPack?.markets?.["OU_2_5"] || null;
+
+            const oddsText =
+              m1x2 || mou
+                ? `1X2: 1 ${m1x2?.home ?? "--"}  X ${m1x2?.draw ?? "--"}  2 ${m1x2?.away ?? "--"} · O/U 2.5: O ${
+                    mou?.over ?? "--"
+                  }  U ${mou?.under ?? "--"}`
+                : "Toca “Añadir a combinada” para cargar cuotas";
+
+            return (
+              <div key={id} className="relative rounded-3xl border border-white/10 bg-white/5 p-5 overflow-hidden">
+                {/* círculo estado (como el de tu lista actual) */}
+                <div className="absolute right-5 top-5">
+                  <div
+                    className={[
+                      "w-4 h-4 rounded-full border",
+                      isSelected
+                        ? "border-emerald-400 bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.9)]"
+                        : "border-white/20 bg-slate-950/30",
+                    ].join(" ")}
                   />
                 </div>
 
-                <div className="flex-1">
-                  <label className="block text-xs text-slate-400 mb-1">Hasta</label>
-                  <input
-                    type="date"
-                    value={to}
-                    onChange={(e) => setTo(e.target.value)}
-                    className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
-                  />
+                <div className="text-xl md:text-2xl font-bold text-slate-100 pr-10">
+                  {home} <span className="text-slate-400">vs</span> {away}
                 </div>
 
-                <div className="flex-[2]">
-                  <label className="block text-xs text-slate-400 mb-1">Filtro (país / liga / equipo)</label>
-                  <input
-                    placeholder="Ej: Chile, La Liga, Colo Colo, Premier League..."
-                    value={q}
-                    onChange={(e) => setQ(e.target.value)}
-                    className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
-                  />
+                <div className="mt-2 text-slate-300 flex items-center gap-2">
+                  <span className="text-lg">{flagEmoji}</span>
+                  <span className="text-sm">
+                    {countryName} · {league} · {time}
+                  </span>
                 </div>
 
-                <div>
+                <div className="mt-4 grid grid-cols-1 gap-3">
                   <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full rounded-2xl font-semibold px-4 py-2 mt-4 md:mt-0 disabled:opacity-60 disabled:cursor-not-allowed"
+                    type="button"
+                    onClick={() => nav(`/fixture?q=${encodeURIComponent(`${home} vs ${away}`)}`)}
+                    className="w-full rounded-full border border-white/10 bg-slate-900/40 hover:bg-slate-900/55 transition px-4 py-3 text-slate-100 font-semibold"
+                  >
+                    Ver estadísticas
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      toggleFixtureSelection(id);
+                      ensureOdds(id);
+                    }}
+                    className="w-full rounded-full px-4 py-3 font-bold"
                     style={{ backgroundColor: GOLD, color: "#0f172a" }}
                   >
-                    {loading ? "Generando..." : "Generar"}
+                    {isSelected ? "Quitar de combinada" : "Añadir a combinada"}
                   </button>
                 </div>
-              </form>
 
-              <div className="mt-3 flex flex-wrap gap-2">
-                {quickCountries.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => handleQuickCountry(c)}
-                    className="text-xs md:text-sm rounded-full px-3 py-1 border border-white/15 bg-white/5 hover:bg-white/10 transition"
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
-
-              {err && <div className="mt-3 text-sm text-amber-300">{err}</div>}
-              {!err && info && <div className="mt-3 text-xs text-slate-300/80">{info}</div>}
-            </div>
-          </HudCard>
-
-          {/* 2) Partidazos de la semana (manual) */}
-          <PartidazosDeLaSemanaCard />
-
-          {/* 3) Cuotas manuales (3 columnas) */}
-          <ManualPicksSection />
-
-          {/* 4) Lista de partidos + selección + odds */}
-          <section className="mt-4 rounded-2xl border border-slate-800/80 bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-950 shadow-[0_18px_40px_rgba(15,23,42,0.85)]">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/80 text-[11px] md:text-xs text-slate-300 tracking-wide">
-              <span className="uppercase">
-                Partidos encontrados:{" "}
-                <span className="font-semibold text-slate-50">{fixtures.length}</span>
-              </span>
-              <span className="uppercase text-right">Toca un partido para añadirlo / quitarlo de tu combinada.</span>
-            </div>
-
-            {fixtures.length === 0 ? (
-              <div className="px-4 py-6 text-sm text-slate-300">
-                Por ahora no hay partidos para este rango o filtro. Prueba con más días o sin filtrar.
-              </div>
-            ) : (
-              <ul className="divide-y divide-slate-800/80">
-                {fixtures.map((fx) => {
-                  const id = getFixtureId(fx);
-                  const isSelected = selectedIds.includes(id);
-
-                  const league = getLeagueName(fx);
-                  const countryName = getCountryName(fx);
-                  const flagEmoji = COUNTRY_FLAG[countryName] || (countryName === "World" ? "🌍" : "🏳️");
-                  const home = getHomeName(fx);
-                  const away = getAwayName(fx);
-                  const time = getKickoffTime(fx);
-
-                  const oddsPack = oddsByFixture[id] || null;
-                  const m1x2 = oddsPack?.markets?.["1X2"] || null;
-                  const mou = oddsPack?.markets?.["OU_2_5"] || null;
-                  const found = oddsPack?.found;
-
-                  const hasOdds =
-                    (m1x2 && (m1x2.home != null || m1x2.draw != null || m1x2.away != null)) ||
-                    (mou && (mou.over != null || mou.under != null));
-
-                  return (
-                    <li
-                      key={id}
-                      onClick={() => {
-                        toggleFixtureSelection(id);
-                        ensureOdds(id);
-                        setParlayResult(null);
-                        setParlayError("");
-                      }}
-                      className={[
-                        "px-4 py-3 flex items-center gap-3 cursor-pointer transition-colors",
-                        isSelected ? "bg-slate-900/90" : "hover:bg-slate-900/70",
-                      ].join(" ")}
-                    >
-                      <div className="w-14 text-[11px] md:text-xs font-semibold text-slate-100">{time || "--:--"}</div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1 text-xs md:text-sm text-slate-200">
-                          <span className="mr-1 text-lg leading-none">{flagEmoji}</span>
-                          <span className="font-medium truncate">{countryName}</span>
-                          {league && (
-                            <span className="text-[11px] md:text-xs text-slate-400 truncate">
-                              {" "}· {league}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="mt-0.5 text-xs md:text-sm text-slate-100">
-                          <div className="font-semibold leading-snug whitespace-normal break-words">{home}</div>
-                          <div className="text-[11px] text-slate-400">vs</div>
-                          <div className="font-semibold leading-snug whitespace-normal break-words">{away}</div>
-                        </div>
-                      </div>
-
-                      <div className="w-[40%] md:w-[32%] text-right text-[11px] md:text-xs leading-snug">
-                        {hasOdds ? (
-                          <div className="text-slate-200">
-                            {m1x2 && (
-                              <div className="text-cyan-200 font-semibold">
-                                1X2: <span className="text-slate-100">1</span> {m1x2.home ?? "--"}{" "}
-                                <span className="text-slate-100">X</span> {m1x2.draw ?? "--"}{" "}
-                                <span className="text-slate-100">2</span> {m1x2.away ?? "--"}
-                              </div>
-                            )}
-                            {mou && (
-                              <div className="text-emerald-200">
-                                O/U 2.5: O {mou.over ?? "--"} · U {mou.under ?? "--"}
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="block text-cyan-300 font-semibold">
-                            {found === false
-                              ? "Sin cuotas disponibles para este partido (API)."
-                              : "Toca para cargar cuotas 1X2 y O/U 2.5."}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="w-6 flex justify-end">
-                        <span
-                          className={[
-                            "inline-block w-3.5 h-3.5 rounded-full border",
-                            isSelected
-                              ? "border-emerald-400 bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.9)]"
-                              : "border-slate-500/80 bg-slate-950/90",
-                          ].join(" ")}
-                        />
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </section>
-
-          {/* 5) Módulos premium (restaurados base) */}
-          <section className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FeatureCard title="Cuota segura (regalo)" badge="Alta probabilidad" locked={!features.giftPick}>
-              <div className="text-xs text-slate-300">
-                Aquí mostrarás tu pick seguro del día (manual o generado).
-              </div>
-              <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/30 p-3">
-                <div className="text-sm font-semibold text-slate-100">Ejemplo</div>
-                <div className="text-xs text-slate-300 mt-1">Under 3.5 goles · cuota x1.40</div>
-              </div>
-            </FeatureCard>
-
-            <FeatureCard title="Cuotas potenciadas" badge={`Hasta x${maxBoost}`} locked={!features.boosted}>
-              <div className="text-xs text-slate-300">
-                Arma una combinada automática o con partidos seleccionados.
-              </div>
-
-              <div className="mt-3 flex flex-col sm:flex-row gap-2">
-                <button
-                  type="button"
-                  onClick={handleAutoParlay}
-                  className="px-4 py-2 rounded-full text-xs font-bold"
-                  style={{ backgroundColor: GOLD, color: "#0f172a" }}
-                >
-                  Generar combinada automática
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSelectedParlay}
-                  className="px-4 py-2 rounded-full text-xs font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition"
-                >
-                  Generar con seleccionados ({selectedCount})
-                </button>
-              </div>
-
-              {parlayError ? <div className="mt-3 text-xs text-amber-300">{parlayError}</div> : null}
-
-              {parlayResult ? (
-                <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/30 p-3">
-                  <div className="text-xs text-slate-300">
-                    Modo: <span className="text-slate-100 font-semibold">{parlayResult.mode}</span>
-                  </div>
-                  <div className="mt-1 text-sm font-bold text-emerald-200">
-                    Cuota final: x{parlayResult.finalOdd}{" "}
-                    <span className="text-xs font-semibold text-slate-300">
-                      (objetivo x{parlayResult.target})
-                    </span>
-                  </div>
-                  <div className="mt-1 text-[11px] text-slate-400">
-                    Prob. implícita aprox: {parlayResult.impliedProb}% · Partidos: {parlayResult.games}
-                  </div>
+                <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <StatTile title="1X2/Goles" value={oddsText} locked={false} />
+                  <StatTile title="Tarjetas" value="—" locked={false} />
+                  <StatTile title="Corners" value="—" locked={false} />
+                  <StatTile title="Prob." value="—" locked={false} />
                 </div>
-              ) : null}
-            </FeatureCard>
-
-            <FeatureCard
-              title="Árbitros tarjeteros"
-              badge="Tarjetas"
-              locked={!features.referees}
-              lockText="Disponible desde Plan Anual."
-            >
-              <div className="text-xs text-slate-300">
-                Ranking de árbitros con más tarjetas (por rango de fechas y país).
               </div>
+            );
+          })
+        )}
+      </section>
 
-              {refLoading ? <div className="mt-3 text-xs text-slate-300">Cargando árbitros…</div> : null}
-              {refErr ? <div className="mt-3 text-xs text-amber-300">{refErr}</div> : null}
+      {/* 3) Partidazos de la semana (después de generar, antes de manual picks) */}
+      <PartidazosSemana />
 
-              {refData ? (
-                <pre className="mt-3 text-[11px] leading-snug text-slate-200 bg-slate-950/30 border border-white/10 rounded-xl p-3 overflow-auto">
-                  {JSON.stringify(refData, null, 2)}
-                </pre>
-              ) : (
-                <div className="mt-3 text-[11px] text-slate-400">
-                  Cuando el backend esté listo, aquí mostramos el top de árbitros.
-                </div>
-              )}
-            </FeatureCard>
+      {/* 4) Manual Picks (3 columnas) */}
+      <ManualPicksSection />
 
-            <FeatureCard
-              title="Goleadores / Remates / Value"
-              badge="VIP"
-              locked={!(features.scorers || features.marketValue || features.shooters > 0)}
-              lockText="Disponible en planes superiores (Anual/Vitalicio)."
-            >
-              <div className="text-xs text-slate-300">
-                Aquí reactivaremos los módulos avanzados (goleadores, remates, value del mercado) tal como los tenías.
-              </div>
-            </FeatureCard>
-          </section>
+      {/* 5) Simulador (no tocar) */}
+      <GainSimulatorCard />
 
-          {/* 6) Simulador (no se toca) */}
-          <GainSimulatorCard />
-
-          {/* 7) Calculadora de precios (con ganancia neta) */}
-          <PriceCalculatorCard />
-        </>
-      )}
+      {/* 6) Calculadora de precios (con ganancia neta) */}
+      <PriceCalculatorCard />
     </div>
   );
 }
