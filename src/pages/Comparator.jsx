@@ -657,18 +657,18 @@ function GainSimulatorCard() {
 function ManualPicksSection() {
   // EDITA SOLO ESTOS DATOS (tú y tu hermana)
   const singles = [
-    { label: "PSG gana (1X2)", odd: 1.55, note: "Alta probabilidad" },
-    { label: "Real Madrid Doble oportunidad (1X)", odd: 1.35, note: "Conservador" },
+    { label: "Barcelona doble oportunidad (1X2)", odd: 1.30, note: "Alta probabilidad" },
+    { label: "Real Madrid (handicap+4)", odd: 1.10, note: "Conservador" },
   ];
 
   const combos = [
-    { label: "Combinada 2 partidos", odd: 2.1, note: "Cuota media" },
-    { label: "Combinada 3 partidos", odd: 3.4, note: "Más riesgo" },
+    { label: "Barcelona doble oportunidad", odd: 1.30, note: "Cuota media" },
+    { label: "1+ goles en el primer tiempo", odd: 1.35, note: "Más riesgo" },
   ];
 
   const players = [
-    { label: "Haaland anota", odd: 1.8, note: "Si es titular" },
-    { label: "Mbappé +1 tiro a puerta", odd: 1.55, note: "Tendencia" },
+    { label: "Raphinha +1.5 remates ", odd: 2.8, note: "Si es titular" },
+    { label: "Fermin Lopez tarjeta amarilla", odd: 2.88, note: "Tendencia" },
   ];
 
   function Card({ title, items }) {
