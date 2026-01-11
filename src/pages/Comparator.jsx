@@ -16,7 +16,8 @@ const BG_PROFILE_HUD = "/hero-profile-hud.png";
 const BG_DINERO = "/hero.dinero.png";
 const BG_MANUAL = "/hero-dorado-estadio.png";
 const BG_PARTIDAZOS = "/partidazos-semana.png";
-
+const BG_GRAFICO_DORADO = "/grafico-dorado.png";
+const BG_PASTO = "/hero-pasto.png";
 /* --------------------- helpers --------------------- */
 
 function toYYYYMMDD(d) {
@@ -400,8 +401,8 @@ function HudCard({ bg, children, className = "", style = {}, overlayVariant = "c
 function PartidazosDeLaSemanaCard() {
   return (
     <HudCard
-      bg={null}
-      overlayVariant="casillas"
+      bg={BG_VISITOR}              // ✅ hero-fondo-partidos.png
+      overlayVariant="player"
       className="mt-6"
       style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.10)" }}
     >
@@ -813,37 +814,44 @@ function PriceCalculatorCard() {
 
 /* ------------------- FeatureCard (restaurado) ------------------- */
 
-function FeatureCard({ title, badge, children, locked, lockText }) {
+function FeatureCard({ title, badge, children, locked, lockText, bg }) {
   return (
-    <div className="relative rounded-2xl bg-white/5 border border-white/10 p-4 md:p-5 overflow-hidden">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-sm md:text-base font-semibold text-emerald-400">{title}</div>
-          {badge ? (
-            <div className="mt-1 inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/5 border border-white/10 text-slate-200">
-              {badge}
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="mt-3">{children}</div>
-
-      {locked ? (
-        <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-[2px] flex items-center justify-center p-4">
-          <div className="max-w-sm text-center">
-            <div className="text-sm font-semibold text-slate-50">Bloqueado por plan</div>
-            <div className="mt-1 text-xs text-slate-300">{lockText || "Disponible en planes superiores."}</div>
-            <Link
-              to="/#planes"
-              className="inline-flex mt-3 items-center justify-center rounded-xl px-3 py-2 text-xs font-semibold border border-yellow-400/60 bg-yellow-500/10 text-yellow-200"
-            >
-              Ver planes
-            </Link>
+    <HudCard
+      bg={bg || BG_GRAFICO_DORADO} // ✅ grafico-dorado.png
+      overlayVariant="casillas"
+      className="overflow-hidden"
+      style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset" }}
+    >
+      <div className="relative p-4 md:p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-sm md:text-base font-semibold text-emerald-400">{title}</div>
+            {badge ? (
+              <div className="mt-1 inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/5 border border-white/10 text-slate-200">
+                {badge}
+              </div>
+            ) : null}
           </div>
         </div>
-      ) : null}
-    </div>
+
+        <div className="mt-3">{children}</div>
+
+        {locked ? (
+          <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-[2px] flex items-center justify-center p-4">
+            <div className="max-w-sm text-center">
+              <div className="text-sm font-semibold text-slate-50">Bloqueado por plan</div>
+              <div className="mt-1 text-xs text-slate-300">{lockText || "Disponible en planes superiores."}</div>
+              <Link
+                to="/#planes"
+                className="inline-flex mt-3 items-center justify-center rounded-xl px-3 py-2 text-xs font-semibold border border-yellow-400/60 bg-yellow-500/10 text-yellow-200"
+              >
+                Ver planes
+              </Link>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </HudCard>
   );
 }
 
@@ -1105,6 +1113,12 @@ export default function Comparator() {
   function toggleFixtureSelection(id) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
+const [selectedCountries, setSelectedCountries] = useState([]); // EN (Spain, Argentina, etc)
+
+function toggleCountryChip(countryEs) {
+  const en = normalizeCountryQuery(countryEs) || countryEs; // Chile/España -> EN si aplica
+  setSelectedCountries((prev) => (prev.includes(en) ? prev.filter((x) => x !== en) : [...prev, en]));
+}
 
   const selectedCount = selectedIds.length;
 
@@ -1223,10 +1237,23 @@ export default function Comparator() {
       params.set("to", to);
 
       const qTrim = String(q || "").trim();
-      const countryEN = normalizeCountryQuery(qTrim);
+const countries = selectedCountries.filter(Boolean);
 
-      if (countryEN) params.set("country", countryEN);
-      else if (qTrim) params.set("q", qTrim);
+// Si hay chips seleccionados:
+if (countries.length === 1) {
+  // ✅ 1 país: usamos endpoint country= (más limpio)
+  params.set("country", countries[0]);
+} else if (countries.length > 1) {
+  // ✅ 2+ países: NO mandamos country (porque backend solo acepta uno)
+  // y filtramos en frontend después de traer el rango por fecha.
+  // (Dejamos q como filtro de equipo/liga si lo escribió)
+  if (qTrim) params.set("q", qTrim);
+} else {
+  // Sin chips: usamos comportamiento anterior
+  const countryEN = normalizeCountryQuery(qTrim);
+  if (countryEN) params.set("country", countryEN);
+  else if (qTrim) params.set("q", qTrim);
+}
 
       const res = await fetch(`${API_BASE}/api/fixtures?${params.toString()}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1238,8 +1265,13 @@ export default function Comparator() {
         (Array.isArray(data?.response) && data.response) ||
         (Array.isArray(data?.fixtures) && data.fixtures) ||
         [];
+let items = itemsRaw;
 
-      const base = itemsRaw.filter(isFutureFixture).filter((fx) => !isYouthOrWomenOrReserve(fx));
+if (selectedCountries.length > 1) {
+  items = items.filter((fx) => selectedCountries.includes(getCountryName(fx)));
+}
+
+      const base = items.filter(isFutureFixture).filter((fx) => !isYouthOrWomenOrReserve(fx));
       const major = base.filter(isMajorLeague);
       const filtered = major.length >= 8 ? major : base;
 
@@ -1350,16 +1382,28 @@ export default function Comparator() {
           </form>
 
           <div className="mt-3 flex flex-wrap gap-2">
-            {quickCountries.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => handleQuickCountry(c)}
-                className="text-xs md:text-sm rounded-full px-3 py-1 border border-white/15 bg-white/5 hover:bg-white/10 transition"
-              >
-                {c}
-              </button>
-            ))}
+            {quickCountries.map((c) => {
+  const en = normalizeCountryQuery(c) || c;
+  const active = selectedCountries.includes(en);
+
+  return (
+    <button
+      key={c}
+      type="button"
+      onClick={() => toggleCountryChip(c)}
+      className="text-xs md:text-sm rounded-full px-3 py-1 border transition"
+      style={{
+        borderColor: active ? "rgba(16,185,129,0.55)" : "rgba(255,255,255,0.15)",
+        background: active ? "rgba(16,185,129,0.16)" : "rgba(255,255,255,0.05)",
+        color: "rgba(226,232,240,0.95)",
+      }}
+      title={active ? "Quitar" : "Agregar"}
+    >
+      {c}
+    </button>
+  );
+})}
+
           </div>
 
           {err && <div className="mt-3 text-sm text-amber-300">{err}</div>}
@@ -1371,43 +1415,51 @@ export default function Comparator() {
       <PartidazosDeLaSemanaCard />
 
       {/* 3) LISTADO (FixtureCard) */}
-      <section className="mt-4">
-        <div className="flex items-center justify-between px-2 py-2 text-[11px] md:text-xs text-slate-300 tracking-wide">
-          <span className="uppercase">
-            Partidos encontrados: <span className="font-semibold text-slate-50">{fixtures.length}</span>
-          </span>
-          <span className="uppercase text-right">Usa “Añadir a combinada” para seleccionar y cargar cuotas.</span>
-        </div>
+      {/* 3) LISTADO (FixtureCard) */}
+<HudCard
+  bg={BG_PASTO}                  // ✅ hero-pasto.png
+  overlayVariant="casillas"
+  className="mt-4"
+  style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset" }}
+>
+  <section className="p-3 md:p-4">
+    <div className="flex items-center justify-between px-2 py-2 text-[11px] md:text-xs text-slate-300 tracking-wide">
+      <span className="uppercase">
+        Partidos encontrados: <span className="font-semibold text-slate-50">{fixtures.length}</span>
+      </span>
+      <span className="uppercase text-right">Usa “Añadir a combinada” para seleccionar y cargar cuotas.</span>
+    </div>
 
-        {fixtures.length === 0 ? (
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
-            Genera partidos para verlos aquí con el formato profesional.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4">
-            {fixtures.map((fx) => {
-              const id = getFixtureId(fx);
-              const isSelected = selectedIds.includes(id);
-              const oddsPack = oddsByFixture[id] || null;
+    {fixtures.length === 0 ? (
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
+        Genera partidos para verlos aquí con el formato profesional.
+      </div>
+    ) : (
+      <div className="grid grid-cols-1 gap-4">
+        {fixtures.map((fx) => {
+          const id = getFixtureId(fx);
+          const isSelected = selectedIds.includes(id);
+          const oddsPack = oddsByFixture[id] || null;
 
-              return (
-                <FixtureCard
-                  key={id}
-                  fx={fx}
-                  isSelected={isSelected}
-                  oddsPack={oddsPack}
-                  onToggle={(fixtureId) => {
-                    toggleFixtureSelection(fixtureId);
-                    setParlayResult(null);
-                    setParlayError("");
-                  }}
-                  onLoadOdds={(fixtureId) => ensureOdds(fixtureId)}
-                />
-              );
-            })}
-          </div>
-        )}
-      </section>
+          return (
+            <FixtureCard
+              key={id}
+              fx={fx}
+              isSelected={isSelected}
+              oddsPack={oddsPack}
+              onToggle={(fixtureId) => {
+                toggleFixtureSelection(fixtureId);
+                setParlayResult(null);
+                setParlayError("");
+              }}
+              onLoadOdds={(fixtureId) => ensureOdds(fixtureId)}
+            />
+          );
+        })}
+      </div>
+    )}
+  </section>
+</HudCard>
 
       {/* 4) MÓDULOS premium (cuota regalo / potenciadas / árbitros / VIP) */}
       <section className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1492,6 +1544,28 @@ export default function Comparator() {
             Aquí reactivaremos los módulos avanzados (goleadores, remates, value del mercado).
           </div>
         </FeatureCard>
+        <FeatureCard
+  title="Cuota desfase del mercado"
+  badge="Value"
+  locked={!features.marketValue}
+  lockText="Disponible desde Plan Vitalicio."
+>
+  <div className="text-xs text-slate-300">
+    Detecta cuotas con posible valor (desfase entre tu estimación y el mercado).
+  </div>
+
+  <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/30 p-3">
+    <div className="text-sm font-semibold text-slate-100">Ejemplo</div>
+    <div className="text-xs text-slate-300 mt-1">
+      “Local gana” mercado x2.10 · FV estimado x1.85 → posible value.
+    </div>
+  </div>
+
+  <div className="mt-2 text-[11px] text-slate-400">
+    Módulo en construcción: luego lo conectamos a cuotas reales + rating FV.
+  </div>
+</FeatureCard>
+
       </section>
 
       {/* 5) Manual Picks (no tocar estilos) */}
