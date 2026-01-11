@@ -210,10 +210,53 @@ function isYouthOrWomenOrReserve(fx) {
   return banned.some((p) => blob.includes(p));
 }
 
+/** ✅ NUEVO: detecta 2ª/3ª/4ª y ligas “B”/reservas por nombre */
+function isLowerDivisionLeagueName(leagueName = "") {
+  const s = String(leagueName || "").toLowerCase();
+
+  // España (muy específico)
+  const spainBanned = ["rfef", "primera rfef", "segunda rfef", "tercera rfef", "federacion", "federación"];
+
+  // Genérico (2ª/3ª/4ª)
+  const genericBanned = [
+    "segunda",
+    "segunda división",
+    "segunda division",
+    "tercera",
+    "tercera división",
+    "tercera division",
+    "fourth",
+    "4th",
+    "reserve",
+    "reserves",
+    "b team",
+    " ii",
+    " u23",
+  ];
+
+  // Europa típicas divisiones inferiores (si NO las quieres)
+  const leaguesBanned = [
+    "serie b",
+    "serie c",
+    "ligue 2",
+    "2. bundesliga",
+    "3. liga",
+    "league one",
+    "league two",
+    "championship",
+  ];
+
+  const banned = [...spainBanned, ...genericBanned, ...leaguesBanned];
+  return banned.some((k) => s.includes(k));
+}
+
 /** Solo ligas “top” y evita ligas desconocidas */
 function isMajorLeague(fx) {
   const league = String(getLeagueName(fx) || "");
   const s = league.toLowerCase();
+
+  // ✅ FUERA: 2ª/3ª/4ª + reservas/B
+  if (isLowerDivisionLeagueName(league)) return false;
 
   // Excluir juveniles / amistosos / regionales
   const bad = [
@@ -239,31 +282,55 @@ function isMajorLeague(fx) {
   // Permitidos explícitos
   if (IMPORTANT_LEAGUES.some((x) => s.includes(String(x).toLowerCase()))) return true;
 
-  // Heurística controlada
+  // Heurística controlada (✅ sin "liga" genérico)
   const okPatterns = [
     "champions league",
     "europa league",
     "conference league",
     "libertadores",
     "sudamericana",
-    "copa",
-    "cup",
+
+    // Copas / supercopas
+    "copa del rey",
+    "fa cup",
+    "efl cup",
+    "dfb pokal",
+    "coppa italia",
+    "coupe de france",
     "supercopa",
     "super cup",
-    "serie a",
-    "serie b",
-    "primera division",
-    "liga",
+    "cup",
+    "copa",
+
+    // Ligas top
+    "premier league",
     "la liga",
+    "serie a",
     "bundesliga",
     "ligue 1",
-    "premier league",
     "primeira liga",
     "eredivisie",
+    "liga mx",
+    "brasileirão",
+    "copa do brasil",
+    "copa argentina",
+    "copa chile",
+    "primera división",
+    "primera division",
   ];
 
   // Inglaterra: excluir ruido
-  const englandNoise = ["isthmian", "northern", "southern", "npl", "vanarama", "trophy", "vase", "counties", "county"];
+  const englandNoise = [
+    "isthmian",
+    "northern",
+    "southern",
+    "npl",
+    "vanarama",
+    "trophy",
+    "vase",
+    "counties",
+    "county",
+  ];
   if (getCountryName(fx) === "England" && englandNoise.some((k) => s.includes(k))) return false;
 
   return okPatterns.some((p) => s.includes(p));
@@ -1071,6 +1138,7 @@ export default function Comparator() {
     if (!picks.length) return null;
 
     const finalOdd = Number(product.toFixed(2));
+    // ✅ mantenemos cálculo, pero NO lo mostramos (para no asustar)
     const impliedProb = Number(((1 / finalOdd) * 100).toFixed(1));
     const reachedTarget = finalOdd >= maxBoostArg * 0.8;
 
@@ -1094,7 +1162,9 @@ export default function Comparator() {
 
     const suggestion = buildComboSuggestion(fixtures, maxBoost);
     if (!suggestion) {
-      setParlayError("No pudimos armar una combinada razonable con los partidos cargados. Prueba con otro rango de fechas.");
+      setParlayError(
+        "No pudimos armar una combinada razonable con los partidos cargados. Prueba con otro rango de fechas."
+      );
       return;
     }
 
@@ -1116,7 +1186,10 @@ export default function Comparator() {
     }
 
     const pool = fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)));
-    pool.map(getFixtureId).filter(Boolean).forEach((id) => ensureOdds(id));
+    pool
+      .map(getFixtureId)
+      .filter(Boolean)
+      .forEach((id) => ensureOdds(id));
 
     const suggestion = buildComboSuggestion(pool, maxBoost);
     if (!suggestion) {
@@ -1294,7 +1367,10 @@ export default function Comparator() {
         </div>
       </HudCard>
 
-      {/* 2) LISTADO (FixtureCard) */}
+      {/* ✅ 2) Partidazos de la semana (ahora va justo debajo de Generar) */}
+      <PartidazosDeLaSemanaCard />
+
+      {/* 3) LISTADO (FixtureCard) */}
       <section className="mt-4">
         <div className="flex items-center justify-between px-2 py-2 text-[11px] md:text-xs text-slate-300 tracking-wide">
           <span className="uppercase">
@@ -1333,7 +1409,7 @@ export default function Comparator() {
         )}
       </section>
 
-      {/* 3) MÓDULOS premium (cuota regalo / potenciadas / árbitros / VIP) */}
+      {/* 4) MÓDULOS premium (cuota regalo / potenciadas / árbitros / VIP) */}
       <section className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
         <FeatureCard title="Cuota segura (regalo)" badge="Alta probabilidad" locked={!features.giftPick}>
           <div className="text-xs text-slate-300">Aquí mostrarás tu pick seguro del día (manual o generado).</div>
@@ -1376,8 +1452,11 @@ export default function Comparator() {
                 Cuota final: x{parlayResult.finalOdd}{" "}
                 <span className="text-xs font-semibold text-slate-300">(objetivo x{parlayResult.target})</span>
               </div>
+
+              {/* ✅ TEXTO NUEVO: sin porcentaje que asusta */}
               <div className="mt-1 text-[11px] text-slate-400">
-                Prob. implícita aprox: {parlayResult.impliedProb}% · Partidos: {parlayResult.games}
+                Partidos: {parlayResult.games} · En FV buscamos picks individuales de alta probabilidad (80–90%+ por
+                selección). En combinada el riesgo se acumula al multiplicar eventos.
               </div>
             </div>
           ) : null}
@@ -1399,9 +1478,7 @@ export default function Comparator() {
               {JSON.stringify(refData, null, 2)}
             </pre>
           ) : (
-            <div className="mt-3 text-[11px] text-slate-400">
-              Cuando el backend esté listo, aquí mostramos el top de árbitros.
-            </div>
+            <div className="mt-3 text-[11px] text-slate-400">Cuando el backend esté listo, aquí mostramos el top de árbitros.</div>
           )}
         </FeatureCard>
 
@@ -1416,8 +1493,6 @@ export default function Comparator() {
           </div>
         </FeatureCard>
       </section>
-      {/* 4) Partidazos de la semana (arreglado + títulos) */}
-      <PartidazosDeLaSemanaCard />
 
       {/* 5) Manual Picks (no tocar estilos) */}
       <ManualPicksSection />
