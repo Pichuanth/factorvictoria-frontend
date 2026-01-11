@@ -18,6 +18,8 @@ const BG_MANUAL = "/hero-dorado-estadio.png";
 const BG_PARTIDAZOS = "/partidazos-semana.png";
 const BG_GRAFICO_DORADO = "/grafico-dorado.png";
 const BG_PASTO = "/hero-pasto.png";
+const BG_ESTADIO_PAGE = "/estadio-fondo.png";
+
 /* --------------------- helpers --------------------- */
 
 function toYYYYMMDD(d) {
@@ -1315,13 +1317,148 @@ if (selectedCountries.length > 1) {
      ========================= */
   if (!isLoggedIn) {
     return (
-      <div className="max-w-5xl mx-auto px-4 pb-20">
-        <VisitorBanner />
-        <VisitorPlansGrid />
-        <GainSimulatorCard />
-        <VisitorEndingHero />
-      </div>
-    );
+  <div className="relative min-h-screen">
+    {/* Fondo de página */}
+    <img
+      src={BG_ESTADIO_PAGE}
+      alt=""
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+    />
+    {/* Overlay para que el texto siempre se lea bien */}
+    <div className="pointer-events-none absolute inset-0 bg-slate-950/70" />
+    <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/55 via-slate-950/50 to-slate-950/80" />
+
+    {/* Contenido */}
+    <div className="relative max-w-5xl mx-auto px-4 pb-20">
+      {/* 1) Filtros + Generar */}
+      <HudCard
+        bg={BG_PROFILE_HUD}
+        overlayVariant="casillas"
+        className="mt-4"
+        style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset" }}
+      >
+        <div className="p-4 md:p-6">
+          <form onSubmit={handleGenerate} className="flex flex-col md:flex-row md:items-end gap-3 items-stretch">
+            <div className="flex-1">
+              <label className="block text-xs text-slate-400 mb-1">Desde</label>
+              <input
+                type="date"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+                className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
+              />
+            </div>
+
+            <div className="flex-1">
+              <label className="block text-xs text-slate-400 mb-1">Hasta</label>
+              <input
+                type="date"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
+              />
+            </div>
+
+            <div className="flex-[2]">
+              <label className="block text-xs text-slate-400 mb-1">Filtro (país / liga / equipo)</label>
+              <input
+                placeholder="Ej: Chile, La Liga, Colo Colo, Premier League..."
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
+              />
+            </div>
+
+            <div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full rounded-2xl font-semibold px-4 py-2 mt-4 md:mt-0 disabled:opacity-60 disabled:cursor-not-allowed"
+                style={{ backgroundColor: GOLD, color: "#0f172a" }}
+              >
+                {loading ? "Generando..." : "Generar"}
+              </button>
+            </div>
+          </form>
+
+          {/* Chips (los tuyos quedan igual) */}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {quickCountries.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => handleQuickCountry(c)}
+                className="text-xs md:text-sm rounded-full px-3 py-1 border border-white/15 bg-white/5 hover:bg-white/10 transition"
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+
+          {err && <div className="mt-3 text-sm text-amber-300">{err}</div>}
+          {!err && info && <div className="mt-3 text-xs text-slate-300/80">{info}</div>}
+        </div>
+      </HudCard>
+
+      {/* 2) LISTADO (FixtureCard) */}
+      <section className="mt-4">
+        <div className="flex items-center justify-between px-2 py-2 text-[11px] md:text-xs text-slate-300 tracking-wide">
+          <span className="uppercase">
+            Partidos encontrados: <span className="font-semibold text-slate-50">{fixtures.length}</span>
+          </span>
+          <span className="uppercase text-right">Usa “Añadir a combinada” para seleccionar y cargar cuotas.</span>
+        </div>
+
+        {fixtures.length === 0 ? (
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
+            Genera partidos para verlos aquí con el formato profesional.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4">
+            {fixtures.map((fx) => {
+              const id = getFixtureId(fx);
+              const isSelected = selectedIds.includes(id);
+              const oddsPack = oddsByFixture[id] || null;
+
+              return (
+                <FixtureCard
+                  key={id}
+                  fx={fx}
+                  isSelected={isSelected}
+                  oddsPack={oddsPack}
+                  onToggle={(fixtureId) => {
+                    toggleFixtureSelection(fixtureId);
+                    setParlayResult(null);
+                    setParlayError("");
+                  }}
+                  onLoadOdds={(fixtureId) => ensureOdds(fixtureId)}
+                />
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* 3) MÓDULOS premium */}
+      <section className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* ...aquí dejas tus FeatureCard tal cual... */}
+      </section>
+
+      {/* 4) Partidazos */}
+      <PartidazosDeLaSemanaCard />
+
+      {/* 5) Manual Picks */}
+      <ManualPicksSection />
+
+      {/* 6) Simulador */}
+      <GainSimulatorCard />
+
+      {/* 7) Calculadora */}
+      <PriceCalculatorCard />
+    </div>
+  </div>
+);
   }
 
   /* =========================
