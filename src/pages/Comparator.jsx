@@ -9,16 +9,23 @@ const API_BASE =
   (import.meta.env.VITE_API_BASE || "").replace(/\/$/, "") ||
   "https://factorvictoria-backend.vercel.app";
 
+/** ✅ Helper: rutas a public que funcionan también en /app (Vite BASE_URL) */
+function asset(path) {
+  const base = import.meta.env.BASE_URL || "/";
+  const clean = String(path || "").replace(/^\/+/, "");
+  return `${base}${clean}`;
+}
+
 /** Fondos (public/) */
-const BG_VISITOR = "/hero-fondo-partidos.png";
-const BG_END = "/hero-12000.png";
-const BG_PROFILE_HUD = "/hero-profile-hud.png";
-const BG_DINERO = "/hero.dinero.png";
-const BG_MANUAL = "/hero-dorado-estadio.png";
-const BG_PARTIDAZOS = "/partidazos-semana.png";
-const BG_GRAFICO_DORADO = "/grafico-dorado.png";
-const BG_PASTO = "/hero-pasto.png";
-const BG_ESTADIO_PAGE = "/estadio-fondo.png";
+const BG_VISITOR = asset("hero-fondo-partidos.png");
+const BG_END = asset("hero-12000.png");
+const BG_PROFILE_HUD = asset("hero-profile-hud.png");
+const BG_DINERO = asset("hero.dinero.png");
+const BG_MANUAL = asset("hero-dorado-estadio.png");
+const BG_PARTIDAZOS = asset("partidazos-semana.png");
+const BG_GRAFICO_DORADO = asset("grafico-dorado.png");
+const BG_PASTO = asset("hero-pasto.png");
+const BG_ESTADIO_PAGE = asset("estadio-fondo.png");
 
 /* --------------------- helpers --------------------- */
 
@@ -213,7 +220,7 @@ function isYouthOrWomenOrReserve(fx) {
   return banned.some((p) => blob.includes(p));
 }
 
-/** ✅ NUEVO: detecta 2ª/3ª/4ª y ligas “B”/reservas por nombre */
+/** ✅ Detecta 2ª/3ª/4ª y ligas “B”/reservas por nombre */
 function isLowerDivisionLeagueName(leagueName = "") {
   const s = String(leagueName || "").toLowerCase();
 
@@ -237,17 +244,8 @@ function isLowerDivisionLeagueName(leagueName = "") {
     " u23",
   ];
 
-  // Europa típicas divisiones inferiores (si NO las quieres)
-  const leaguesBanned = [
-    "serie b",
-    "serie c",
-    "ligue 2",
-    "2. bundesliga",
-    "3. liga",
-    "league one",
-    "league two",
-    "championship",
-  ];
+  // Divisiones inferiores típicas (si NO las quieres)
+  const leaguesBanned = ["serie b", "serie c", "ligue 2", "2. bundesliga", "3. liga", "league one", "league two", "championship"];
 
   const banned = [...spainBanned, ...genericBanned, ...leaguesBanned];
   return banned.some((k) => s.includes(k));
@@ -285,7 +283,7 @@ function isMajorLeague(fx) {
   // Permitidos explícitos
   if (IMPORTANT_LEAGUES.some((x) => s.includes(String(x).toLowerCase()))) return true;
 
-  // Heurística controlada (✅ sin "liga" genérico)
+  // Heurística controlada (sin "liga" genérico)
   const okPatterns = [
     "champions league",
     "europa league",
@@ -322,24 +320,13 @@ function isMajorLeague(fx) {
     "primera division",
   ];
 
-  // Inglaterra: excluir ruido
-  const englandNoise = [
-    "isthmian",
-    "northern",
-    "southern",
-    "npl",
-    "vanarama",
-    "trophy",
-    "vase",
-    "counties",
-    "county",
-  ];
+  const englandNoise = ["isthmian", "northern", "southern", "npl", "vanarama", "trophy", "vase", "counties", "county"];
   if (getCountryName(fx) === "England" && englandNoise.some((k) => s.includes(k))) return false;
 
   return okPatterns.some((p) => s.includes(p));
 }
 
-/* --------------------- Plan & Features (restaurado) --------------------- */
+/* --------------------- Plan & Features --------------------- */
 
 function normalizePlanLabel(raw) {
   const p = String(raw || "").toUpperCase();
@@ -398,12 +385,29 @@ function HudCard({ bg, children, className = "", style = {}, overlayVariant = "c
   );
 }
 
-/* ------------------- Partidazos (arreglado + títulos) ------------------- */
+/** ✅ Wrapper para fondo global (funciona en visitante y logueado) */
+function PageShell({ children }) {
+  return (
+    <div className="relative min-h-screen">
+      <img
+        src={BG_ESTADIO_PAGE}
+        alt=""
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+      />
+      <div className="pointer-events-none absolute inset-0 bg-slate-950/70" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/55 via-slate-950/50 to-slate-950/80" />
+      <div className="relative max-w-5xl mx-auto px-4 pb-20">{children}</div>
+    </div>
+  );
+}
+
+/* ------------------- Partidazos ------------------- */
 
 function PartidazosDeLaSemanaCard() {
   return (
     <HudCard
-      bg={BG_VISITOR}              // ✅ hero-fondo-partidos.png
+      bg={BG_VISITOR} // ✅ hero-fondo-partidos.png
       overlayVariant="player"
       className="mt-6"
       style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.10)" }}
@@ -452,8 +456,8 @@ function VisitorBanner() {
         </div>
 
         <div className="mt-2 text-sm text-slate-200 max-w-2xl">
-          Activa tu plan para desbloquear el comparador profesional (cuotas potenciadas, combinada automática y módulos
-          premium). Si ya tienes membresía, inicia sesión.
+          Activa tu plan para desbloquear el comparador profesional (cuotas potenciadas, combinada automática y módulos premium).
+          Si ya tienes membresía, inicia sesión.
         </div>
 
         <div className="mt-4 flex flex-col sm:flex-row gap-2">
@@ -489,7 +493,6 @@ function LockedPlanCard({ title, price, bullets, href }) {
             {price}
           </div>
         </div>
-
         <div className="text-xs text-slate-400">Bloqueado por plan</div>
       </div>
 
@@ -655,22 +658,21 @@ function GainSimulatorCard() {
   );
 }
 
-/* ------------------- Manual Picks (3 columnas) ------------------- */
+/* ------------------- Manual Picks ------------------- */
 
 function ManualPicksSection() {
-  // EDITA SOLO ESTOS DATOS (tú y tu hermana)
   const singles = [
-    { label: "Barcelona doble oportunidad (1X2)", odd: 1.30, note: "Alta probabilidad" },
-    { label: "Real Madrid (handicap+4)", odd: 1.10, note: "Conservador" },
+    { label: "Barcelona doble oportunidad (1X2)", odd: 1.3, note: "Alta probabilidad" },
+    { label: "Real Madrid (handicap+4)", odd: 1.1, note: "Conservador" },
   ];
 
   const combos = [
-    { label: "Barcelona doble oportunidad", odd: 1.30, note: "Cuota media" },
+    { label: "Barcelona doble oportunidad", odd: 1.3, note: "Cuota media" },
     { label: "1+ goles en el primer tiempo", odd: 1.35, note: "Más riesgo" },
   ];
 
   const players = [
-    { label: "Raphinha +1.5 remates ", odd: 2.8, note: "Si es titular" },
+    { label: "Raphinha +1.5 remates", odd: 2.8, note: "Si es titular" },
     { label: "Fermin Lopez tarjeta amarilla", odd: 2.88, note: "Tendencia" },
   ];
 
@@ -702,12 +704,7 @@ function ManualPicksSection() {
 
   return (
     <section className="mt-6">
-      <HudCard
-        bg={BG_MANUAL}
-        overlayVariant="casillas"
-        className="overflow-hidden"
-        style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset" }}
-      >
+      <HudCard bg={BG_MANUAL} overlayVariant="casillas" className="overflow-hidden" style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset" }}>
         <div className="p-4 md:p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card title="Partidos únicos" items={singles} />
@@ -720,7 +717,7 @@ function ManualPicksSection() {
   );
 }
 
-/* ------------------- Calculadora de precios (con ganancia neta) ------------------- */
+/* ------------------- Calculadora de precios ------------------- */
 
 function PriceCalculatorCard() {
   const [currency, setCurrency] = useState("CLP");
@@ -814,15 +811,18 @@ function PriceCalculatorCard() {
   );
 }
 
-/* ------------------- FeatureCard (restaurado) ------------------- */
+/* ------------------- FeatureCard (con fondo + brillo dorado suave como Perfil) ------------------- */
 
 function FeatureCard({ title, badge, children, locked, lockText, bg }) {
   return (
     <HudCard
-      bg={bg || BG_GRAFICO_DORADO} // ✅ grafico-dorado.png
+      bg={bg || BG_GRAFICO_DORADO}
       overlayVariant="casillas"
       className="overflow-hidden"
-      style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset" }}
+      style={{
+        boxShadow:
+          "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 34px rgba(230,196,100,0.14)", // ✅ brillo suave
+      }}
     >
       <div className="relative p-4 md:p-5">
         <div className="flex items-start justify-between gap-3">
@@ -857,7 +857,7 @@ function FeatureCard({ title, badge, children, locked, lockText, bg }) {
   );
 }
 
-/* ------------------- Tarjeta profesional reutilizable (FixtureCard) ------------------- */
+/* ------------------- FixtureCard ------------------- */
 
 function FixtureCard({ fx, isSelected, onToggle, onLoadOdds, oddsPack }) {
   const id = getFixtureId(fx);
@@ -1006,7 +1006,6 @@ function FixtureCard({ fx, isSelected, onToggle, onLoadOdds, oddsPack }) {
 
 export default function Comparator() {
   const { isLoggedIn, user } = useAuth();
-  const nav = useNavigate();
   const [searchParams] = useSearchParams();
 
   const today = useMemo(() => new Date(), []);
@@ -1021,11 +1020,14 @@ export default function Comparator() {
   const [fixtures, setFixtures] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
 
+  // ✅ Multi-país
+  const [selectedCountries, setSelectedCountries] = useState([]); // EN: Spain, Argentina, etc.
+
   // odds cache
   const [oddsByFixture, setOddsByFixture] = useState({});
   const oddsRef = useRef({});
 
-  // Plan / Features (para módulos premium)
+  // Plan / Features
   const planLabel = useMemo(() => {
     const raw = user?.planId || user?.plan?.id || user?.plan || user?.membership || "MENSUAL";
     return normalizePlanLabel(raw);
@@ -1038,7 +1040,7 @@ export default function Comparator() {
   const [parlayResult, setParlayResult] = useState(null);
   const [parlayError, setParlayError] = useState("");
 
-  // referees module (placeholder / backend futuro)
+  // referees module
   const [refData, setRefData] = useState(null);
   const [refLoading, setRefLoading] = useState(false);
   const [refErr, setRefErr] = useState("");
@@ -1053,18 +1055,18 @@ export default function Comparator() {
     if (urlQ) setQ(urlQ);
   }, [searchParams]);
 
-  const quickCountries = [
-    "Chile",
-    "España",
-    "Portugal",
-    "Italia",
-    "Alemania",
-    "Argentina",
-    "Inglaterra",
-    "Francia",
-    "Brasil",
-    "México",
-  ];
+  const quickCountries = ["Chile", "España", "Portugal", "Italia", "Alemania", "Argentina", "Inglaterra", "Francia", "Brasil", "México"];
+
+  function toggleCountryChip(countryEs) {
+    const en = normalizeCountryQuery(countryEs) || countryEs;
+    setSelectedCountries((prev) => (prev.includes(en) ? prev.filter((x) => x !== en) : [...prev, en]));
+  }
+
+  function toggleFixtureSelection(id) {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  const selectedCount = selectedIds.length;
 
   const ensureOdds = useCallback(async (fixtureId) => {
     if (!fixtureId) return;
@@ -1094,13 +1096,9 @@ export default function Comparator() {
   }, []);
 
   const loadReferees = useCallback(async () => {
-    // Por ahora: placeholder compatible (no rompe si backend aún no existe).
-    // Si luego creas /api/referees/cards, aquí conectas.
     try {
       setRefErr("");
       setRefLoading(true);
-
-      // Intencionalmente no fetch por ahora para evitar errores.
       setRefData(null);
       setRefErr("Módulo en construcción: falta crear /api/referees/cards en el backend.");
     } finally {
@@ -1108,23 +1106,7 @@ export default function Comparator() {
     }
   }, []);
 
-  function handleQuickCountry(countryEs) {
-    setQ(countryEs);
-  }
-
-  function toggleFixtureSelection(id) {
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  }
-const [selectedCountries, setSelectedCountries] = useState([]); // EN (Spain, Argentina, etc)
-
-function toggleCountryChip(countryEs) {
-  const en = normalizeCountryQuery(countryEs) || countryEs; // Chile/España -> EN si aplica
-  setSelectedCountries((prev) => (prev.includes(en) ? prev.filter((x) => x !== en) : [...prev, en]));
-}
-
-  const selectedCount = selectedIds.length;
-
-  // (por ahora) generador “fake” para sugerencia de combinada (restaurado)
+  // generador “fake” para sugerencia de combinada
   function fakeOddForFixture(fx) {
     const id = getFixtureId(fx);
     const key = String(id || getHomeName(fx) + getAwayName(fx));
@@ -1154,8 +1136,7 @@ function toggleCountryChip(countryEs) {
     if (!picks.length) return null;
 
     const finalOdd = Number(product.toFixed(2));
-    // ✅ mantenemos cálculo, pero NO lo mostramos (para no asustar)
-    const impliedProb = Number(((1 / finalOdd) * 100).toFixed(1));
+    const impliedProb = Number(((1 / finalOdd) * 100).toFixed(1)); // se mantiene interno
     const reachedTarget = finalOdd >= maxBoostArg * 0.8;
 
     return { games: picks.length, finalOdd, target: maxBoostArg, impliedProb, reachedTarget };
@@ -1178,9 +1159,7 @@ function toggleCountryChip(countryEs) {
 
     const suggestion = buildComboSuggestion(fixtures, maxBoost);
     if (!suggestion) {
-      setParlayError(
-        "No pudimos armar una combinada razonable con los partidos cargados. Prueba con otro rango de fechas."
-      );
+      setParlayError("No pudimos armar una combinada razonable con los partidos cargados. Prueba con otro rango de fechas.");
       return;
     }
 
@@ -1202,10 +1181,7 @@ function toggleCountryChip(countryEs) {
     }
 
     const pool = fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)));
-    pool
-      .map(getFixtureId)
-      .filter(Boolean)
-      .forEach((id) => ensureOdds(id));
+    pool.map(getFixtureId).filter(Boolean).forEach((id) => ensureOdds(id));
 
     const suggestion = buildComboSuggestion(pool, maxBoost);
     if (!suggestion) {
@@ -1239,23 +1215,18 @@ function toggleCountryChip(countryEs) {
       params.set("to", to);
 
       const qTrim = String(q || "").trim();
-const countries = selectedCountries.filter(Boolean);
+      const countries = selectedCountries.filter(Boolean);
 
-// Si hay chips seleccionados:
-if (countries.length === 1) {
-  // ✅ 1 país: usamos endpoint country= (más limpio)
-  params.set("country", countries[0]);
-} else if (countries.length > 1) {
-  // ✅ 2+ países: NO mandamos country (porque backend solo acepta uno)
-  // y filtramos en frontend después de traer el rango por fecha.
-  // (Dejamos q como filtro de equipo/liga si lo escribió)
-  if (qTrim) params.set("q", qTrim);
-} else {
-  // Sin chips: usamos comportamiento anterior
-  const countryEN = normalizeCountryQuery(qTrim);
-  if (countryEN) params.set("country", countryEN);
-  else if (qTrim) params.set("q", qTrim);
-}
+      if (countries.length === 1) {
+        params.set("country", countries[0]);
+        if (qTrim) params.set("q", qTrim);
+      } else if (countries.length > 1) {
+        if (qTrim) params.set("q", qTrim);
+      } else {
+        const countryEN = normalizeCountryQuery(qTrim);
+        if (countryEN) params.set("country", countryEN);
+        else if (qTrim) params.set("q", qTrim);
+      }
 
       const res = await fetch(`${API_BASE}/api/fixtures?${params.toString()}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1267,11 +1238,12 @@ if (countries.length === 1) {
         (Array.isArray(data?.response) && data.response) ||
         (Array.isArray(data?.fixtures) && data.fixtures) ||
         [];
-let items = itemsRaw;
 
-if (selectedCountries.length > 1) {
-  items = items.filter((fx) => selectedCountries.includes(getCountryName(fx)));
-}
+      let items = itemsRaw;
+
+      if (selectedCountries.length > 1) {
+        items = items.filter((fx) => selectedCountries.includes(getCountryName(fx)));
+      }
 
       const base = items.filter(isFutureFixture).filter((fx) => !isYouthOrWomenOrReserve(fx));
       const major = base.filter(isMajorLeague);
@@ -1301,7 +1273,6 @@ if (selectedCountries.length > 1) {
       setFixtures(LIMITED);
       setInfo(`API: ${itemsRaw.length} | base: ${base.length} | top: ${major.length} | mostrando: ${LIMITED.length}`);
 
-      // Si tiene feature de árbitros, mostramos placeholder (backend futuro)
       if (features.referees) {
         await loadReferees();
       }
@@ -1317,148 +1288,13 @@ if (selectedCountries.length > 1) {
      ========================= */
   if (!isLoggedIn) {
     return (
-  <div className="relative min-h-screen">
-    {/* Fondo de página */}
-    <img
-      src={BG_ESTADIO_PAGE}
-      alt=""
-      aria-hidden="true"
-      className="pointer-events-none absolute inset-0 h-full w-full object-cover"
-    />
-    {/* Overlay para que el texto siempre se lea bien */}
-    <div className="pointer-events-none absolute inset-0 bg-slate-950/70" />
-    <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/55 via-slate-950/50 to-slate-950/80" />
-
-    {/* Contenido */}
-    <div className="relative max-w-5xl mx-auto px-4 pb-20">
-      {/* 1) Filtros + Generar */}
-      <HudCard
-        bg={BG_PROFILE_HUD}
-        overlayVariant="casillas"
-        className="mt-4"
-        style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset" }}
-      >
-        <div className="p-4 md:p-6">
-          <form onSubmit={handleGenerate} className="flex flex-col md:flex-row md:items-end gap-3 items-stretch">
-            <div className="flex-1">
-              <label className="block text-xs text-slate-400 mb-1">Desde</label>
-              <input
-                type="date"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-                className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
-              />
-            </div>
-
-            <div className="flex-1">
-              <label className="block text-xs text-slate-400 mb-1">Hasta</label>
-              <input
-                type="date"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-                className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
-              />
-            </div>
-
-            <div className="flex-[2]">
-              <label className="block text-xs text-slate-400 mb-1">Filtro (país / liga / equipo)</label>
-              <input
-                placeholder="Ej: Chile, La Liga, Colo Colo, Premier League..."
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
-              />
-            </div>
-
-            <div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full rounded-2xl font-semibold px-4 py-2 mt-4 md:mt-0 disabled:opacity-60 disabled:cursor-not-allowed"
-                style={{ backgroundColor: GOLD, color: "#0f172a" }}
-              >
-                {loading ? "Generando..." : "Generar"}
-              </button>
-            </div>
-          </form>
-
-          {/* Chips (los tuyos quedan igual) */}
-          <div className="mt-3 flex flex-wrap gap-2">
-            {quickCountries.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => handleQuickCountry(c)}
-                className="text-xs md:text-sm rounded-full px-3 py-1 border border-white/15 bg-white/5 hover:bg-white/10 transition"
-              >
-                {c}
-              </button>
-            ))}
-          </div>
-
-          {err && <div className="mt-3 text-sm text-amber-300">{err}</div>}
-          {!err && info && <div className="mt-3 text-xs text-slate-300/80">{info}</div>}
-        </div>
-      </HudCard>
-
-      {/* 2) LISTADO (FixtureCard) */}
-      <section className="mt-4">
-        <div className="flex items-center justify-between px-2 py-2 text-[11px] md:text-xs text-slate-300 tracking-wide">
-          <span className="uppercase">
-            Partidos encontrados: <span className="font-semibold text-slate-50">{fixtures.length}</span>
-          </span>
-          <span className="uppercase text-right">Usa “Añadir a combinada” para seleccionar y cargar cuotas.</span>
-        </div>
-
-        {fixtures.length === 0 ? (
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
-            Genera partidos para verlos aquí con el formato profesional.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4">
-            {fixtures.map((fx) => {
-              const id = getFixtureId(fx);
-              const isSelected = selectedIds.includes(id);
-              const oddsPack = oddsByFixture[id] || null;
-
-              return (
-                <FixtureCard
-                  key={id}
-                  fx={fx}
-                  isSelected={isSelected}
-                  oddsPack={oddsPack}
-                  onToggle={(fixtureId) => {
-                    toggleFixtureSelection(fixtureId);
-                    setParlayResult(null);
-                    setParlayError("");
-                  }}
-                  onLoadOdds={(fixtureId) => ensureOdds(fixtureId)}
-                />
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* 3) MÓDULOS premium */}
-      <section className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* ...aquí dejas tus FeatureCard tal cual... */}
-      </section>
-
-      {/* 4) Partidazos */}
-      <PartidazosDeLaSemanaCard />
-
-      {/* 5) Manual Picks */}
-      <ManualPicksSection />
-
-      {/* 6) Simulador */}
-      <GainSimulatorCard />
-
-      {/* 7) Calculadora */}
-      <PriceCalculatorCard />
-    </div>
-  </div>
-);
+      <PageShell>
+        <VisitorBanner />
+        <VisitorPlansGrid />
+        <GainSimulatorCard />
+        <VisitorEndingHero />
+      </PageShell>
+    );
   }
 
   /* =========================
@@ -1466,7 +1302,7 @@ if (selectedCountries.length > 1) {
      ========================= */
 
   return (
-    <div className="max-w-5xl mx-auto px-4 pb-20">
+    <PageShell>
       {/* 1) Filtros + Generar */}
       <HudCard
         bg={BG_PROFILE_HUD}
@@ -1518,29 +1354,29 @@ if (selectedCountries.length > 1) {
             </div>
           </form>
 
+          {/* Chips multi-país */}
           <div className="mt-3 flex flex-wrap gap-2">
             {quickCountries.map((c) => {
-  const en = normalizeCountryQuery(c) || c;
-  const active = selectedCountries.includes(en);
+              const en = normalizeCountryQuery(c) || c;
+              const active = selectedCountries.includes(en);
 
-  return (
-    <button
-      key={c}
-      type="button"
-      onClick={() => toggleCountryChip(c)}
-      className="text-xs md:text-sm rounded-full px-3 py-1 border transition"
-      style={{
-        borderColor: active ? "rgba(16,185,129,0.55)" : "rgba(255,255,255,0.15)",
-        background: active ? "rgba(16,185,129,0.16)" : "rgba(255,255,255,0.05)",
-        color: "rgba(226,232,240,0.95)",
-      }}
-      title={active ? "Quitar" : "Agregar"}
-    >
-      {c}
-    </button>
-  );
-})}
-
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => toggleCountryChip(c)}
+                  className="text-xs md:text-sm rounded-full px-3 py-1 border transition"
+                  style={{
+                    borderColor: active ? "rgba(16,185,129,0.55)" : "rgba(255,255,255,0.15)",
+                    background: active ? "rgba(16,185,129,0.16)" : "rgba(255,255,255,0.05)",
+                    color: "rgba(226,232,240,0.95)",
+                  }}
+                  title={active ? "Quitar" : "Agregar"}
+                >
+                  {c}
+                </button>
+              );
+            })}
           </div>
 
           {err && <div className="mt-3 text-sm text-amber-300">{err}</div>}
@@ -1548,57 +1384,56 @@ if (selectedCountries.length > 1) {
         </div>
       </HudCard>
 
-      {/* ✅ 2) Partidazos de la semana (ahora va justo debajo de Generar) */}
+      {/* 2) Partidazos */}
       <PartidazosDeLaSemanaCard />
 
-      {/* 3) LISTADO (FixtureCard) */}
-      {/* 3) LISTADO (FixtureCard) */}
-<HudCard
-  bg={BG_PASTO}                  // ✅ hero-pasto.png
-  overlayVariant="casillas"
-  className="mt-4"
-  style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset" }}
->
-  <section className="p-3 md:p-4">
-    <div className="flex items-center justify-between px-2 py-2 text-[11px] md:text-xs text-slate-300 tracking-wide">
-      <span className="uppercase">
-        Partidos encontrados: <span className="font-semibold text-slate-50">{fixtures.length}</span>
-      </span>
-      <span className="uppercase text-right">Usa “Añadir a combinada” para seleccionar y cargar cuotas.</span>
-    </div>
+      {/* 3) LISTADO (con fondo pasto) */}
+      <HudCard
+        bg={BG_PASTO}
+        overlayVariant="casillas"
+        className="mt-4"
+        style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset" }}
+      >
+        <section className="p-3 md:p-4">
+          <div className="flex items-center justify-between px-2 py-2 text-[11px] md:text-xs text-slate-300 tracking-wide">
+            <span className="uppercase">
+              Partidos encontrados: <span className="font-semibold text-slate-50">{fixtures.length}</span>
+            </span>
+            <span className="uppercase text-right">Usa “Añadir a combinada” para seleccionar y cargar cuotas.</span>
+          </div>
 
-    {fixtures.length === 0 ? (
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
-        Genera partidos para verlos aquí con el formato profesional.
-      </div>
-    ) : (
-      <div className="grid grid-cols-1 gap-4">
-        {fixtures.map((fx) => {
-          const id = getFixtureId(fx);
-          const isSelected = selectedIds.includes(id);
-          const oddsPack = oddsByFixture[id] || null;
+          {fixtures.length === 0 ? (
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-300">
+              Genera partidos para verlos aquí con el formato profesional.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {fixtures.map((fx) => {
+                const id = getFixtureId(fx);
+                const isSelected = selectedIds.includes(id);
+                const oddsPack = oddsByFixture[id] || null;
 
-          return (
-            <FixtureCard
-              key={id}
-              fx={fx}
-              isSelected={isSelected}
-              oddsPack={oddsPack}
-              onToggle={(fixtureId) => {
-                toggleFixtureSelection(fixtureId);
-                setParlayResult(null);
-                setParlayError("");
-              }}
-              onLoadOdds={(fixtureId) => ensureOdds(fixtureId)}
-            />
-          );
-        })}
-      </div>
-    )}
-  </section>
-</HudCard>
+                return (
+                  <FixtureCard
+                    key={id}
+                    fx={fx}
+                    isSelected={isSelected}
+                    oddsPack={oddsPack}
+                    onToggle={(fixtureId) => {
+                      toggleFixtureSelection(fixtureId);
+                      setParlayResult(null);
+                      setParlayError("");
+                    }}
+                    onLoadOdds={(fixtureId) => ensureOdds(fixtureId)}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </HudCard>
 
-      {/* 4) MÓDULOS premium (cuota regalo / potenciadas / árbitros / VIP) */}
+      {/* 4) MÓDULOS premium */}
       <section className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
         <FeatureCard title="Cuota segura (regalo)" badge="Alta probabilidad" locked={!features.giftPick}>
           <div className="text-xs text-slate-300">Aquí mostrarás tu pick seguro del día (manual o generado).</div>
@@ -1642,21 +1477,15 @@ if (selectedCountries.length > 1) {
                 <span className="text-xs font-semibold text-slate-300">(objetivo x{parlayResult.target})</span>
               </div>
 
-              {/* ✅ TEXTO NUEVO: sin porcentaje que asusta */}
               <div className="mt-1 text-[11px] text-slate-400">
-                Partidos: {parlayResult.games} · En FV buscamos picks individuales de alta probabilidad (80–90%+ por
-                selección). En combinada el riesgo se acumula al multiplicar eventos.
+                Partidos: {parlayResult.games} · En FV buscamos picks individuales de alta probabilidad (80–90%+ por selección).
+                En combinada el riesgo se acumula al multiplicar eventos.
               </div>
             </div>
           ) : null}
         </FeatureCard>
 
-        <FeatureCard
-          title="Árbitros tarjeteros"
-          badge="Tarjetas"
-          locked={!features.referees}
-          lockText="Disponible desde Plan Anual."
-        >
+        <FeatureCard title="Árbitros tarjeteros" badge="Tarjetas" locked={!features.referees} lockText="Disponible desde Plan Anual.">
           <div className="text-xs text-slate-300">Ranking de árbitros con más tarjetas (por rango de fechas y país).</div>
 
           {refLoading ? <div className="mt-3 text-xs text-slate-300">Cargando árbitros…</div> : null}
@@ -1677,42 +1506,40 @@ if (selectedCountries.length > 1) {
           locked={!(features.scorers || features.marketValue || features.shooters > 0)}
           lockText="Disponible en planes superiores (Anual/Vitalicio)."
         >
+          <div className="text-xs text-slate-300">Aquí reactivaremos los módulos avanzados (goleadores, remates, value del mercado).</div>
+        </FeatureCard>
+
+        <FeatureCard
+          title="Cuota desfase del mercado"
+          badge="Value"
+          locked={!features.marketValue}
+          lockText="Disponible desde Plan Vitalicio."
+        >
           <div className="text-xs text-slate-300">
-            Aquí reactivaremos los módulos avanzados (goleadores, remates, value del mercado).
+            Detecta cuotas con posible valor (desfase entre tu estimación y el mercado).
+          </div>
+
+          <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/30 p-3">
+            <div className="text-sm font-semibold text-slate-100">Ejemplo</div>
+            <div className="text-xs text-slate-300 mt-1">
+              “Local gana” mercado x2.10 · FV estimado x1.85 → posible value.
+            </div>
+          </div>
+
+          <div className="mt-2 text-[11px] text-slate-400">
+            Módulo en construcción: luego lo conectamos a cuotas reales + rating FV.
           </div>
         </FeatureCard>
-        <FeatureCard
-  title="Cuota desfase del mercado"
-  badge="Value"
-  locked={!features.marketValue}
-  lockText="Disponible desde Plan Vitalicio."
->
-  <div className="text-xs text-slate-300">
-    Detecta cuotas con posible valor (desfase entre tu estimación y el mercado).
-  </div>
-
-  <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/30 p-3">
-    <div className="text-sm font-semibold text-slate-100">Ejemplo</div>
-    <div className="text-xs text-slate-300 mt-1">
-      “Local gana” mercado x2.10 · FV estimado x1.85 → posible value.
-    </div>
-  </div>
-
-  <div className="mt-2 text-[11px] text-slate-400">
-    Módulo en construcción: luego lo conectamos a cuotas reales + rating FV.
-  </div>
-</FeatureCard>
-
       </section>
 
-      {/* 5) Manual Picks (no tocar estilos) */}
+      {/* 5) Manual Picks */}
       <ManualPicksSection />
 
-      {/* 6) Simulador (no tocar) */}
+      {/* 6) Simulador */}
       <GainSimulatorCard />
 
-      {/* 7) Calculadora de precios (no tocar) */}
+      {/* 7) Calculadora */}
       <PriceCalculatorCard />
-    </div>
+    </PageShell>
   );
 }
