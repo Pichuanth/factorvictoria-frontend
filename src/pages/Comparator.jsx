@@ -16,7 +16,7 @@ function asset(path) {
   return `${base}${clean}`;
 }
 
-/** Fondos (public/) */
+/** Fondos (public/) — quedan declarados por si luego los reactivas */
 const BG_VISITOR = asset("hero-fondo-partidos.png");
 const BG_END = asset("hero-12000.png");
 const BG_PROFILE_HUD = asset("hero-profile-hud.png");
@@ -81,7 +81,6 @@ const COUNTRY_FLAG = {
 };
 
 const IMPORTANT_LEAGUES = [
-  // Europa (top ligas)
   "Premier League",
   "La Liga",
   "Serie A",
@@ -90,7 +89,6 @@ const IMPORTANT_LEAGUES = [
   "Primeira Liga",
   "Eredivisie",
 
-  // Copas grandes (Europa)
   "FA Cup",
   "EFL Cup",
   "Copa del Rey",
@@ -100,7 +98,6 @@ const IMPORTANT_LEAGUES = [
   "Supercopa",
   "Super Cup",
 
-  // Conmebol / FIFA / UEFA
   "UEFA Champions League",
   "UEFA Europa League",
   "UEFA Conference League",
@@ -110,7 +107,6 @@ const IMPORTANT_LEAGUES = [
   "World Cup",
   "Euro Championship",
 
-  // América
   "Liga MX",
   "Brasileirão",
   "Copa do Brasil",
@@ -224,10 +220,8 @@ function isYouthOrWomenOrReserve(fx) {
 function isLowerDivisionLeagueName(leagueName = "") {
   const s = String(leagueName || "").toLowerCase();
 
-  // España (muy específico)
   const spainBanned = ["rfef", "primera rfef", "segunda rfef", "tercera rfef", "federacion", "federación"];
 
-  // Genérico (2ª/3ª/4ª)
   const genericBanned = [
     "segunda",
     "segunda división",
@@ -244,7 +238,6 @@ function isLowerDivisionLeagueName(leagueName = "") {
     " u23",
   ];
 
-  // Divisiones inferiores típicas (si NO las quieres)
   const leaguesBanned = ["serie b", "serie c", "ligue 2", "2. bundesliga", "3. liga", "league one", "league two", "championship"];
 
   const banned = [...spainBanned, ...genericBanned, ...leaguesBanned];
@@ -256,10 +249,8 @@ function isMajorLeague(fx) {
   const league = String(getLeagueName(fx) || "");
   const s = league.toLowerCase();
 
-  // ✅ FUERA: 2ª/3ª/4ª + reservas/B
   if (isLowerDivisionLeagueName(league)) return false;
 
-  // Excluir juveniles / amistosos / regionales
   const bad = [
     "u17",
     "u18",
@@ -280,10 +271,8 @@ function isMajorLeague(fx) {
   ];
   if (bad.some((k) => s.includes(k))) return false;
 
-  // Permitidos explícitos
   if (IMPORTANT_LEAGUES.some((x) => s.includes(String(x).toLowerCase()))) return true;
 
-  // Heurística controlada (sin "liga" genérico)
   const okPatterns = [
     "champions league",
     "europa league",
@@ -291,7 +280,6 @@ function isMajorLeague(fx) {
     "libertadores",
     "sudamericana",
 
-    // Copas / supercopas
     "copa del rey",
     "fa cup",
     "efl cup",
@@ -303,7 +291,6 @@ function isMajorLeague(fx) {
     "cup",
     "copa",
 
-    // Ligas top
     "premier league",
     "la liga",
     "serie a",
@@ -355,7 +342,14 @@ function getPlanFeatures(planLabel) {
 
 /* --------------------- UI helpers --------------------- */
 
-function HudCard({ bg, children, className = "", style = {}, overlayVariant = "casillas" }) {
+function HudCard({
+  bg,
+  children,
+  className = "",
+  style = {},
+  overlayVariant = "casillas",
+  border = "gold", // "gold" | "white" | "none"
+}) {
   const overlayLayers =
     overlayVariant === "player"
       ? [
@@ -369,10 +363,24 @@ function HudCard({ bg, children, className = "", style = {}, overlayVariant = "c
           "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.14), rgba(2,6,23,0) 60%)",
         ];
 
+  const borderColor =
+    border === "gold"
+      ? "rgba(230,196,100,0.28)"
+      : border === "white"
+      ? "rgba(255,255,255,0.10)"
+      : "transparent";
+
+  const baseShadow =
+    border === "gold"
+      ? "0 0 0 1px rgba(230,196,100,0.12) inset, 0 0 44px rgba(230,196,100,0.10)"
+      : border === "white"
+      ? "0 0 0 1px rgba(255,255,255,0.03) inset"
+      : "none";
+
   return (
     <div
       className={`relative overflow-hidden rounded-3xl border bg-white/5 ${className}`}
-      style={{ borderColor: "rgba(255,255,255,0.10)", ...style }}
+      style={{ borderColor, boxShadow: baseShadow, ...style }}
     >
       {bg ? <img src={bg} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover" /> : null}
 
@@ -385,21 +393,9 @@ function HudCard({ bg, children, className = "", style = {}, overlayVariant = "c
   );
 }
 
-/** ✅ Wrapper para fondo global (funciona en visitante y logueado) */
+/** ✅ Wrapper para layout (AHORA sí renderiza children) */
 function PageShell({ children }) {
-  return (
-    <div className="relative min-h-screen">
-      <img
-        src={BG_ESTADIO_PAGE}
-        alt=""
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 h-full w-full object-cover"
-      />
-      <div className="pointer-events-none absolute inset-0 bg-slate-950/35"/>
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/55 via-slate-950/50 to-slate-950/80" />
-      <div className="relative max-w-5xl mx-auto px-4 pb-20">{children}</div>
-    </div>
-  );
+  return <div className="max-w-5xl mx-auto px-4 pb-20">{children}</div>;
 }
 
 /* ------------------- Partidazos ------------------- */
@@ -407,10 +403,11 @@ function PageShell({ children }) {
 function PartidazosDeLaSemanaCard() {
   return (
     <HudCard
-      bg={BG_VISITOR} // ✅ hero-fondo-partidos.png
+      bg={BG_VISITOR}
       overlayVariant="player"
       className="mt-6"
-      style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.10)" }}
+      border="gold"
+      style={{ boxShadow: "0 0 0 1px rgba(230,196,100,0.10) inset, 0 0 44px rgba(230,196,100,0.12)" }}
     >
       <div className="p-4 md:p-6">
         <div className="text-emerald-200/90 text-xs font-semibold tracking-wide">Factor Victoria recomienda</div>
@@ -446,7 +443,8 @@ function VisitorBanner() {
       bg={BG_VISITOR}
       overlayVariant="player"
       className="mt-4"
-      style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.16)" }}
+      border="gold"
+      style={{ boxShadow: "0 0 0 1px rgba(230,196,100,0.10) inset, 0 0 44px rgba(230,196,100,0.16)" }}
     >
       <div className="p-5 md:p-7">
         <div className="text-xs tracking-wide text-emerald-200/90 font-semibold">Modo visitante</div>
@@ -582,10 +580,11 @@ function GainSimulatorCard() {
 
   return (
     <HudCard
-      bg={BG_DINERO}
+      bg={null} /* ✅ sin imagen */
       overlayVariant="casillas"
       className="mt-6"
-      style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.14)" }}
+      border="gold"
+      style={{ boxShadow: "0 0 0 1px rgba(230,196,100,0.10) inset, 0 0 44px rgba(230,196,100,0.10)" }}
     >
       <div className="p-5 md:p-6">
         <div className="flex items-start justify-between gap-3">
@@ -704,7 +703,13 @@ function ManualPicksSection() {
 
   return (
     <section className="mt-6">
-      <HudCard bg={BG_MANUAL} overlayVariant="casillas" className="overflow-hidden" style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset" }}>
+      <HudCard
+        bg={null} /* ✅ sin imagen */
+        overlayVariant="casillas"
+        border="gold"
+        className="overflow-hidden"
+        style={{ boxShadow: "0 0 0 1px rgba(230,196,100,0.10) inset, 0 0 44px rgba(230,196,100,0.10)" }}
+      >
         <div className="p-4 md:p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card title="Partidos únicos" items={singles} />
@@ -740,7 +745,13 @@ function PriceCalculatorCard() {
   };
 
   return (
-    <HudCard bg={BG_DINERO} overlayVariant="casillas" className="mt-6">
+    <HudCard
+      bg={null} /* ✅ sin imagen */
+      overlayVariant="casillas"
+      className="mt-6"
+      border="gold"
+      style={{ boxShadow: "0 0 0 1px rgba(230,196,100,0.10) inset, 0 0 44px rgba(230,196,100,0.10)" }}
+    >
       <div className="p-5 md:p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -811,17 +822,17 @@ function PriceCalculatorCard() {
   );
 }
 
-/* ------------------- FeatureCard (con fondo + brillo dorado suave como Perfil) ------------------- */
+/* ------------------- FeatureCard ------------------- */
 
 function FeatureCard({ title, badge, children, locked, lockText, bg }) {
   return (
     <HudCard
-      bg={bg || BG_GRAFICO_DORADO}
+      bg={bg || null} /* ✅ sin imagen por defecto */
       overlayVariant="casillas"
+      border="gold"
       className="overflow-hidden"
       style={{
-        boxShadow:
-          "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 34px rgba(230,196,100,0.14)", // ✅ brillo suave
+        boxShadow: "0 0 0 1px rgba(230,196,100,0.10) inset, 0 0 34px rgba(230,196,100,0.12)",
       }}
     >
       <div className="relative p-4 md:p-5">
@@ -904,7 +915,13 @@ function FixtureCard({ fx, isSelected, onToggle, onLoadOdds, oddsPack }) {
   })();
 
   return (
-    <div className="relative rounded-3xl border border-white/10 bg-white/5 p-5 md:p-6 overflow-hidden">
+    <div
+      className="relative rounded-3xl border bg-white/5 p-5 md:p-6 overflow-hidden"
+      style={{
+        borderColor: "rgba(230,196,100,0.22)",
+        boxShadow: "0 0 0 1px rgba(230,196,100,0.10) inset, 0 0 34px rgba(230,196,100,0.08)",
+      }}
+    >
       <div className="absolute top-5 right-5">
         <span
           className={[
@@ -1021,7 +1038,7 @@ export default function Comparator() {
   const [selectedIds, setSelectedIds] = useState([]);
 
   // ✅ Multi-país
-  const [selectedCountries, setSelectedCountries] = useState([]); // EN: Spain, Argentina, etc.
+  const [selectedCountries, setSelectedCountries] = useState([]);
 
   // odds cache
   const [oddsByFixture, setOddsByFixture] = useState({});
@@ -1106,7 +1123,6 @@ export default function Comparator() {
     }
   }, []);
 
-  // generador “fake” para sugerencia de combinada
   function fakeOddForFixture(fx) {
     const id = getFixtureId(fx);
     const key = String(id || getHomeName(fx) + getAwayName(fx));
@@ -1136,7 +1152,7 @@ export default function Comparator() {
     if (!picks.length) return null;
 
     const finalOdd = Number(product.toFixed(2));
-    const impliedProb = Number(((1 / finalOdd) * 100).toFixed(1)); // se mantiene interno
+    const impliedProb = Number(((1 / finalOdd) * 100).toFixed(1));
     const reachedTarget = finalOdd >= maxBoostArg * 0.8;
 
     return { games: picks.length, finalOdd, target: maxBoostArg, impliedProb, reachedTarget };
@@ -1305,10 +1321,11 @@ export default function Comparator() {
     <PageShell>
       {/* 1) Filtros + Generar */}
       <HudCard
-        bg={BG_PROFILE_HUD}
+        bg={null} /* ✅ sin imagen */
         overlayVariant="casillas"
         className="mt-4"
-        style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset" }}
+        border="gold"
+        style={{ boxShadow: "0 0 0 1px rgba(230,196,100,0.10) inset, 0 0 44px rgba(230,196,100,0.10)" }}
       >
         <div className="p-4 md:p-6">
           <form onSubmit={handleGenerate} className="flex flex-col md:flex-row md:items-end gap-3 items-stretch">
@@ -1384,15 +1401,16 @@ export default function Comparator() {
         </div>
       </HudCard>
 
-      {/* 2) Partidazos */}
+      {/* 2) Partidazos (puedes apagarlo si quieres cero imágenes en todo) */}
       <PartidazosDeLaSemanaCard />
 
-      {/* 3) LISTADO (con fondo pasto) */}
+      {/* 3) LISTADO (sin fondo imagen) */}
       <HudCard
-        bg={BG_PASTO}
+        bg={null} /* ✅ sin imagen */
         overlayVariant="casillas"
         className="mt-4"
-        style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset" }}
+        border="gold"
+        style={{ boxShadow: "0 0 0 1px rgba(230,196,100,0.10) inset, 0 0 44px rgba(230,196,100,0.08)" }}
       >
         <section className="p-3 md:p-4">
           <div className="flex items-center justify-between px-2 py-2 text-[11px] md:text-xs text-slate-300 tracking-wide">
@@ -1509,15 +1527,8 @@ export default function Comparator() {
           <div className="text-xs text-slate-300">Aquí reactivaremos los módulos avanzados (goleadores, remates, value del mercado).</div>
         </FeatureCard>
 
-        <FeatureCard
-          title="Cuota desfase del mercado"
-          badge="Value"
-          locked={!features.marketValue}
-          lockText="Disponible desde Plan Vitalicio."
-        >
-          <div className="text-xs text-slate-300">
-            Detecta cuotas con posible valor (desfase entre tu estimación y el mercado).
-          </div>
+        <FeatureCard title="Cuota desfase del mercado" badge="Value" locked={!features.marketValue} lockText="Disponible desde Plan Vitalicio.">
+          <div className="text-xs text-slate-300">Detecta cuotas con posible valor (desfase entre tu estimación y el mercado).</div>
 
           <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/30 p-3">
             <div className="text-sm font-semibold text-slate-100">Ejemplo</div>
@@ -1526,9 +1537,7 @@ export default function Comparator() {
             </div>
           </div>
 
-          <div className="mt-2 text-[11px] text-slate-400">
-            Módulo en construcción: luego lo conectamos a cuotas reales + rating FV.
-          </div>
+          <div className="mt-2 text-[11px] text-slate-400">Módulo en construcción: luego lo conectamos a cuotas reales + rating FV.</div>
         </FeatureCard>
       </section>
 

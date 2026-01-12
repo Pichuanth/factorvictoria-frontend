@@ -2,8 +2,8 @@
    FACTOR VICTORIA – THEME
    ========================= */
 :root{
-  --fv-navy:#0f172a;            /* azul marino */
-  --fv-navy-2:#111827;          /* un poco más claro */
+  --fv-navy:#071f1b;            /* verde oscuro base */
+  --fv-navy-2:#061a17;          /* verde oscuro 2 */
   --fv-muted:#6b7280;
   --fv-gold:#D4AF37;
   --fv-gold-2:#F0D98A;
@@ -16,8 +16,15 @@ html,body,#root{height:100%}
 body{
   margin:0;
   font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue","Noto Sans","Apple Color Emoji","Segoe UI Emoji";
-  color:#e5e7eb;                         /* slate-200 */
-  background-color:#0b1220 !important;   /* azul petróleo MUY oscuro */
+  color:#e5e7eb; /* slate-200 */
+
+  /* ✅ Fondo FV verde oscuro (sin imágenes) */
+  background:
+    radial-gradient(1200px 800px at 20% 10%, rgba(16, 185, 129, 0.10), transparent 55%),
+    radial-gradient(1000px 700px at 80% 40%, rgba(230, 196, 100, 0.06), transparent 55%),
+    linear-gradient(180deg, #071f1b 0%, #061a17 35%, #051614 100%) !important;
+
+  background-attachment:fixed;
 }
 :root{ color-scheme:dark }
 img{max-width:100%;display:block}
@@ -47,7 +54,10 @@ img{max-width:100%;display:block}
 }
 
 /* HERO */
-.fv-bg{background:linear-gradient(180deg,#0b1220 0%, #0f172a 60%, #0f172a 100%)}
+.fv-bg{
+  /* ✅ ahora verde oscuro consistente */
+  background:linear-gradient(180deg,#071f1b 0%, #061a17 60%, #051614 100%)
+}
 .fv-chip{background:#263044;color:#dbe3ff;border-radius:999px;padding:8px 14px;font-weight:600;display:inline-block}
 
 /* Botones */
