@@ -395,7 +395,7 @@ function PageShell({ children }) {
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 h-full w-full object-cover"
       />
-      <div className="pointer-events-none absolute inset-0 bg-slate-950/70" />
+      <div className="pointer-events-none absolute inset-0 bg-slate-950/35"/>
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950/55 via-slate-950/50 to-slate-950/80" />
       <div className="relative max-w-5xl mx-auto px-4 pb-20">{children}</div>
     </div>
