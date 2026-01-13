@@ -353,13 +353,13 @@ function getPlanFeatures(planLabel) {
  */
 function HudCard({
   bg,
-  bgColor, // opcional: para color sólido (ej #132A23)
+  bgColor,
   children,
   className = "",
   style = {},
   overlayVariant = "casillas", // "casillas" | "casillasSharp" | "player"
   glow = "gold", // "gold" | "none"
-  imgStyle = {}, // opcional
+  imgStyle = {},
 }) {
   const variants = {
     player: {
@@ -380,7 +380,6 @@ function HudCard({
       imgFilter: "contrast(1.10) saturate(1.06) brightness(0.96)",
     },
 
-    // ✅ si quieres menos “neblina” y más textura visible
     casillasSharp: {
       overlays: [
         "linear-gradient(180deg, rgba(2,6,23,0.78) 0%, rgba(2,6,23,0.45) 42%, rgba(2,6,23,0.78) 100%)",
@@ -394,16 +393,16 @@ function HudCard({
   const v = variants[overlayVariant] || variants.casillas;
   const [o1, o2, o3] = v.overlays;
 
-  // ✅ borde tipo Perfil (más limpio)
+  // Borde tipo Perfil
   const borderColor = "rgba(255,255,255,0.10)";
 
-  // ✅ sombra + glow tipo “tarjeta flotante” (como Perfil)
+  // Sombra + glow tipo “tarjeta flotante”
   const boxShadow =
     glow === "gold"
       ? [
           "0 0 0 1px rgba(255,255,255,0.03) inset",
           "0 18px 60px rgba(0,0,0,0.55)",     // profundidad (flotante)
-          "0 0 70px rgba(230,196,100,0.16)",  // glow dorado suave
+          "0 0 85px rgba(230,196,100,0.22)",  // glow dorado más notorio
         ].join(", ")
       : [
           "0 0 0 1px rgba(255,255,255,0.05) inset",
@@ -441,7 +440,37 @@ function HudCard({
 
 /** ✅ Wrapper layout */
 function PageShell({ children }) {
-  return <div className="max-w-5xl mx-auto px-4 pb-20">{children}</div>;
+  return (
+    <div className="relative max-w-5xl mx-auto px-4 pb-20">
+      {/* Fondo ambiental (como Perfil) */}
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <div
+          className="absolute -top-44 left-1/2 -translate-x-1/2 h-[640px] w-[640px] rounded-full blur-3xl opacity-20"
+          style={{
+            background: "radial-gradient(circle at center, rgba(16,185,129,0.55), rgba(15,23,42,0) 60%)",
+          }}
+        />
+        <div
+          className="absolute -top-52 right-[-140px] h-[560px] w-[560px] rounded-full blur-3xl opacity-16"
+          style={{
+            background: "radial-gradient(circle at center, rgba(230,196,100,0.45), rgba(15,23,42,0) 62%)",
+          }}
+        />
+        <div
+          className="absolute inset-0 opacity-[0.10]"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, rgba(255,255,255,0.10) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.10) 1px, transparent 1px)",
+            backgroundSize: "56px 56px",
+            maskImage: "radial-gradient(circle at 50% 18%, black 0%, transparent 70%)",
+            WebkitMaskImage: "radial-gradient(circle at 50% 18%, black 0%, transparent 70%)",
+          }}
+        />
+      </div>
+
+      {children}
+    </div>
+  );
 }
 
 /* ------------------- Partidazos ------------------- */
