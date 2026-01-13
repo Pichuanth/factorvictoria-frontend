@@ -375,7 +375,7 @@ function HudCard({
   // ✅ brillo dorado tipo Perfil (más fuerte)
   const goldGlow =
     glow === "gold"
-      ? "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 60px rgba(230,196,100,0.22)"
+      ? "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 70px rgba(230,196,100,0.28)"
       : "0 0 0 1px rgba(255,255,255,0.03) inset";
 
   return (
