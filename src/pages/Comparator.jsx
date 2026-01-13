@@ -402,7 +402,7 @@ function HudCard({
       ? [
           "0 0 0 1px rgba(255,255,255,0.03) inset",
           "0 18px 60px rgba(0,0,0,0.55)",     // profundidad (flotante)
-          "0 0 85px rgba(230,196,100,0.22)",  // glow dorado más notorio
+          "0 0 85px rgba(224, 188, 88, 0.28)",  // glow dorado más notorio
         ].join(", ")
       : [
           "0 0 0 1px rgba(255,255,255,0.05) inset",
