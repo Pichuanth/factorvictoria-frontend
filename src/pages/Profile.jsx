@@ -124,23 +124,22 @@ function Chip({ children, style, className = "" }) {
 }
 
 /**
- * Card con fondo + overlays para legibilidad
- */
-/**
- * Card con fondo (imagen) + overlays para legibilidad.
- * overlayVariant:
- *  - "casillas": suave (como lo tienes)
- *  - "casillasSharp": más nítido (menos neblina)
- *  - "player": oscuro (para el jugador)
+ * ✅ HudCard (estilo Perfil / “tarjeta flotante”)
+ * - Borde neutro limpio
+ * - Profundidad (sombra) para efecto flotante
+ * - Glow dorado suave opcional
+ * - Overlays + filtro de imagen (como Perfil)
+ * - Permite bg (imagen) o bgColor (color sólido)
  */
 function HudCard({
   bg,
+  bgColor, // opcional: para color sólido (ej #132A23)
   children,
   className = "",
   style = {},
-  overlay = true,
   overlayVariant = "casillas", // "casillas" | "casillasSharp" | "player"
-  imgStyle = {},              // opcional
+  glow = "gold", // "gold" | "none"
+  imgStyle = {}, // opcional
 }) {
   const variants = {
     player: {
@@ -149,7 +148,6 @@ function HudCard({
         "radial-gradient(circle at 20% 45%, rgba(16,185,129,0.20), rgba(2,6,23,0) 58%)",
         "radial-gradient(circle at 82% 50%, rgba(230,196,100,0.18), rgba(2,6,23,0) 58%)",
       ],
-      // imagen con un poco más de contraste para que “corte” mejor
       imgFilter: "contrast(1.12) saturate(1.08) brightness(0.95)",
     },
 
@@ -162,61 +160,65 @@ function HudCard({
       imgFilter: "contrast(1.10) saturate(1.06) brightness(0.96)",
     },
 
-    // NUEVO: menos neblina + más “sharp”
+    // ✅ si quieres menos “neblina” y más textura visible
     casillasSharp: {
       overlays: [
-        // baja la niebla (menos opacidad) y deja más textura visible
         "linear-gradient(180deg, rgba(2,6,23,0.78) 0%, rgba(2,6,23,0.45) 42%, rgba(2,6,23,0.78) 100%)",
         "radial-gradient(circle at 18% 30%, rgba(16,185,129,0.14), rgba(2,6,23,0) 62%)",
         "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.10), rgba(2,6,23,0) 62%)",
       ],
-      // sube un poco más el contraste
       imgFilter: "contrast(1.18) saturate(1.10) brightness(0.97)",
     },
   };
 
   const v = variants[overlayVariant] || variants.casillas;
+  const [o1, o2, o3] = v.overlays;
+
+  // ✅ borde tipo Perfil (más limpio)
+  const borderColor = "rgba(255,255,255,0.10)";
+
+  // ✅ sombra + glow tipo “tarjeta flotante” (como Perfil)
+  const boxShadow =
+    glow === "gold"
+      ? [
+          "0 0 0 1px rgba(255,255,255,0.03) inset",
+          "0 18px 60px rgba(0,0,0,0.55)",     // profundidad (flotante)
+          "0 0 70px rgba(230,196,100,0.18)",  // glow dorado suave
+        ].join(", ")
+      : [
+          "0 0 0 1px rgba(255,255,255,0.05) inset",
+          "0 18px 60px rgba(0,0,0,0.55)",
+        ].join(", ");
 
   return (
     <div
-      className={`relative overflow-hidden rounded-3xl border bg-white/5 ${className}`}
+      className={`relative overflow-hidden rounded-3xl border bg-slate-950/25 backdrop-blur-md ${className}`}
       style={{
-        borderColor: "rgba(255,255,255,0.10)",
+        borderColor,
+        boxShadow,
+        backgroundColor: bgColor || undefined,
         ...style,
       }}
     >
-      {/* Fondo */}
       {bg ? (
         <img
           src={bg}
           alt=""
           aria-hidden="true"
           className="absolute inset-0 h-full w-full object-cover"
-          style={{
-            // esto ayuda a que el render no se vea “lavado” al escalar
-            transform: "translateZ(0)",
-            backfaceVisibility: "hidden",
-            WebkitBackfaceVisibility: "hidden",
-            filter: v.imgFilter,
-            ...imgStyle,
-          }}
+          style={{ filter: v.imgFilter, ...imgStyle }}
         />
       ) : null}
 
-      {/* Overlays */}
-      {overlay ? (
-        <>
-          <div className="absolute inset-0" style={{ background: v.overlays[0] }} />
-          <div className="absolute inset-0" style={{ background: v.overlays[1] }} />
-          <div className="absolute inset-0" style={{ background: v.overlays[2] }} />
-        </>
-      ) : null}
+      <div className="absolute inset-0" style={{ background: o1 }} />
+      <div className="absolute inset-0" style={{ background: o2 }} />
+      <div className="absolute inset-0" style={{ background: o3 }} />
 
-      {/* Contenido */}
       <div className="relative">{children}</div>
     </div>
   );
 }
+
 
 export default function Profile() {
   const { user, isLoggedIn } = useAuth();
