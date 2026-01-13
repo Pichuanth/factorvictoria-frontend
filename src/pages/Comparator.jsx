@@ -351,6 +351,7 @@ function getPlanFeatures(planLabel) {
  */
 function HudCard({
   bg,
+  bgColor, // ✅ NUEVO: color sólido de fondo
   children,
   className = "",
   style = {},
@@ -364,16 +365,21 @@ function HudCard({
           "radial-gradient(circle at 20% 45%, rgba(16,185,129,0.22), rgba(2,6,23,0) 58%)",
           "radial-gradient(circle at 82% 50%, rgba(230,196,100,0.22), rgba(2,6,23,0) 58%)",
         ]
+      : overlayVariant === "verde" // ✅ NUEVO: verde premium SIN degradado al centro
+      ? [
+          "linear-gradient(180deg, rgba(2,6,23,0.32) 0%, rgba(2,6,23,0.32) 100%)",
+          "radial-gradient(circle at 18% 25%, rgba(16,185,129,0.14), rgba(2,6,23,0) 62%)",
+          "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.12), rgba(2,6,23,0) 62%)",
+        ]
       : [
+          // casillas (tu actual: aquí está el “más claro al medio”)
           "linear-gradient(180deg, rgba(2,6,23,0.82) 0%, rgba(2,6,23,0.50) 40%, rgba(2,6,23,0.82) 100%)",
           "radial-gradient(circle at 18% 30%, rgba(16,185,129,0.18), rgba(2,6,23,0) 60%)",
           "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.18), rgba(2,6,23,0) 60%)",
         ];
 
-  // ✅ borde neutro (no dorado)
   const borderColor = "rgba(255,255,255,0.08)";
 
-  // ✅ brillo dorado tipo Perfil (más fuerte)
   const goldGlow =
     glow === "gold"
       ? "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 60px rgba(230,196,100,0.24)"
@@ -381,10 +387,22 @@ function HudCard({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-3xl border bg-white/5 ${className}`}
-      style={{ borderColor, boxShadow: goldGlow, ...style }}
+      className={`relative overflow-hidden rounded-3xl border ${className}`}
+      style={{
+        borderColor,
+        boxShadow: goldGlow,
+        backgroundColor: bgColor || undefined, // ✅ usa #132A23 cuando lo pases
+        ...style,
+      }}
     >
-      {bg ? <img src={bg} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover" /> : null}
+      {bg ? (
+        <img
+          src={bg}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      ) : null}
 
       <div className="absolute inset-0" style={{ background: overlayLayers[0] }} />
       <div className="absolute inset-0" style={{ background: overlayLayers[1] }} />
@@ -1400,11 +1418,13 @@ export default function Comparator() {
 
       {/* 3) LISTADO (con fondo pasto como antes) */}
       <HudCard
-        bg={BG_VERDE_GENERAR}
-        overlayVariant="casillas"
-        className="mt-4"
-        glow="gold"
-      >
+  bg={null}                 // ✅ sin imagen
+  bgColor="#132A23"         // ✅ Opción B: verde sólido premium
+  overlayVariant="verde"    // ✅ overlay plano (sin “centro claro”)
+  className="mt-4"
+  glow="gold"
+>
+
         <section className="p-3 md:p-4">
           <div className="flex items-center justify-between px-2 py-2 text-[11px] md:text-xs text-slate-300 tracking-wide">
             <span className="uppercase">
