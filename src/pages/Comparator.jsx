@@ -1400,7 +1400,7 @@ export default function Comparator() {
 
       {/* 3) LISTADO (con fondo pasto como antes) */}
       <HudCard
-        bg={BG_VERDE-GENERAR}
+        bg={BG_VERDE_GENERAR}
         overlayVariant="casillas"
         className="mt-4"
         glow="gold"
