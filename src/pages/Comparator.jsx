@@ -1405,7 +1405,7 @@ export default function Comparator() {
                   onClick={() => toggleCountryChip(c)}
                   className="text-xs md:text-sm rounded-full px-3 py-1 border transition"
                   style={{
-                    borderColor: active ? "rgba(16,185,129,0.55)" : "rgba(255,255,255,0.15)",
+                    borderColor: active ? "rgba(16,185,129,0.55)" : "rgba(255,255,255,0.30)",
                     background: active ? "rgba(16,185,129,0.16)" : "rgba(255,255,255,0.05)",
                     color: "rgba(226,232,240,0.95)",
                   }}
