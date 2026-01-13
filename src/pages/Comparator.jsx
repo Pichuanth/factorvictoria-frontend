@@ -344,50 +344,66 @@ function getPlanFeatures(planLabel) {
 /* --------------------- UI helpers --------------------- */
 
 /**
- * ✅ HudCard:
- * - Sin borde dorado visible (borde neutro MUY suave)
- * - Brillo dorado más fuerte tipo Perfil
- * - Mantiene overlays y permite usar bg (imagen) como antes
+ * ✅ HudCard (estilo Perfil / “tarjeta flotante”)
+ * - Borde neutro limpio
+ * - Profundidad (sombra) para efecto flotante
+ * - Glow dorado suave opcional
+ * - Overlays + filtro de imagen (como Perfil)
+ * - Permite bg (imagen) o bgColor (color sólido)
  */
 function HudCard({
   bg,
-  bgColor, // ✅ NUEVO: color sólido de fondo
+  bgColor, // opcional: para color sólido (ej #132A23)
   children,
   className = "",
   style = {},
-  overlayVariant = "casillas",
+  overlayVariant = "casillas", // "casillas" | "casillasSharp" | "player"
   glow = "gold", // "gold" | "none"
+  imgStyle = {}, // opcional
 }) {
-  const overlayLayers =
-    overlayVariant === "player"
-      ? [
-          "linear-gradient(90deg, rgba(2,6,23,0.78) 0%, rgba(2,6,23,0.58) 55%, rgba(2,6,23,0.34) 80%, rgba(2,6,23,0.22) 100%)",
-          "radial-gradient(circle at 20% 45%, rgba(16,185,129,0.22), rgba(2,6,23,0) 58%)",
-          "radial-gradient(circle at 82% 50%, rgba(230,196,100,0.22), rgba(2,6,23,0) 58%)",
-        ]
-      : overlayVariant === "verde" // ✅ NUEVO: verde premium SIN degradado al centro
-      ? [
-          "linear-gradient(180deg, rgba(2,6,23,0.32) 0%, rgba(2,6,23,0.32) 100%)",
-          "radial-gradient(circle at 18% 25%, rgba(16,185,129,0.14), rgba(2,6,23,0) 62%)",
-          "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.12), rgba(2,6,23,0) 62%)",
-        ]
-      : [
-          // casillas (tu actual: aquí está el “más claro al medio”)
-          "linear-gradient(180deg, rgba(2,6,23,0.82) 0%, rgba(2,6,23,0.50) 40%, rgba(2,6,23,0.82) 100%)",
-          "radial-gradient(circle at 18% 30%, rgba(16,185,129,0.18), rgba(2,6,23,0) 60%)",
-          "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.18), rgba(2,6,23,0) 60%)",
-        ];
+  const variants = {
+    player: {
+      overlays: [
+        "linear-gradient(90deg, rgba(2,6,23,0.92) 0%, rgba(2,6,23,0.68) 52%, rgba(2,6,23,0.40) 78%, rgba(2,6,23,0.25) 100%)",
+        "radial-gradient(circle at 20% 45%, rgba(16,185,129,0.20), rgba(2,6,23,0) 58%)",
+        "radial-gradient(circle at 82% 50%, rgba(230,196,100,0.18), rgba(2,6,23,0) 58%)",
+      ],
+      imgFilter: "contrast(1.12) saturate(1.08) brightness(0.95)",
+    },
 
-    // ✅ borde tipo Perfil (más limpio)
+    casillas: {
+      overlays: [
+        "linear-gradient(180deg, rgba(2,6,23,0.88) 0%, rgba(2,6,23,0.62) 38%, rgba(2,6,23,0.86) 100%)",
+        "radial-gradient(circle at 18% 30%, rgba(16,185,129,0.18), rgba(2,6,23,0) 60%)",
+        "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.14), rgba(2,6,23,0) 60%)",
+      ],
+      imgFilter: "contrast(1.10) saturate(1.06) brightness(0.96)",
+    },
+
+    // ✅ si quieres menos “neblina” y más textura visible
+    casillasSharp: {
+      overlays: [
+        "linear-gradient(180deg, rgba(2,6,23,0.78) 0%, rgba(2,6,23,0.45) 42%, rgba(2,6,23,0.78) 100%)",
+        "radial-gradient(circle at 18% 30%, rgba(16,185,129,0.14), rgba(2,6,23,0) 62%)",
+        "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.10), rgba(2,6,23,0) 62%)",
+      ],
+      imgFilter: "contrast(1.18) saturate(1.10) brightness(0.97)",
+    },
+  };
+
+  const v = variants[overlayVariant] || variants.casillas;
+  const [o1, o2, o3] = v.overlays;
+
+  // ✅ borde tipo Perfil (más limpio)
   const borderColor = "rgba(255,255,255,0.10)";
 
   // ✅ sombra + glow tipo “tarjeta flotante” (como Perfil)
-  const goldGlow =
+  const boxShadow =
     glow === "gold"
       ? [
           "0 0 0 1px rgba(255,255,255,0.03) inset",
-          "0 18px 60px rgba(0,0,0,0.50)",           // profundidad (flotante)
-          "0 0 70px rgba(230,196,100,0.18)",        // glow dorado suave
+          "0 18px 60px rgba(0,0,0,0.55)",     // profundidad (flotante)
+          "0 0 70px rgba(230,196,100,0.18)",  // glow dorado suave
         ].join(", ")
       : [
           "0 0 0 1px rgba(255,255,255,0.05) inset",
@@ -399,8 +415,8 @@ function HudCard({
       className={`relative overflow-hidden rounded-3xl border bg-slate-950/25 backdrop-blur-md ${className}`}
       style={{
         borderColor,
-        boxShadow: goldGlow,
-        backgroundColor: bgColor || undefined, // ✅ usa #132A23 cuando lo pases
+        boxShadow,
+        backgroundColor: bgColor || undefined,
         ...style,
       }}
     >
@@ -410,12 +426,13 @@ function HudCard({
           alt=""
           aria-hidden="true"
           className="absolute inset-0 h-full w-full object-cover"
+          style={{ filter: v.imgFilter, ...imgStyle }}
         />
       ) : null}
 
-      <div className="absolute inset-0" style={{ background: overlayLayers[0] }} />
-      <div className="absolute inset-0" style={{ background: overlayLayers[1] }} />
-      <div className="absolute inset-0" style={{ background: overlayLayers[2] }} />
+      <div className="absolute inset-0" style={{ background: o1 }} />
+      <div className="absolute inset-0" style={{ background: o2 }} />
+      <div className="absolute inset-0" style={{ background: o3 }} />
 
       <div className="relative">{children}</div>
     </div>
