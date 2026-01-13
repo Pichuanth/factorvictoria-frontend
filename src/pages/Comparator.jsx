@@ -378,16 +378,25 @@ function HudCard({
           "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.18), rgba(2,6,23,0) 60%)",
         ];
 
-  const borderColor = "rgba(255,255,255,0.08)";
+    // ✅ borde tipo Perfil (más limpio)
+  const borderColor = "rgba(255,255,255,0.10)";
 
+  // ✅ sombra + glow tipo “tarjeta flotante” (como Perfil)
   const goldGlow =
     glow === "gold"
-      ? "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 60px rgba(230,196,100,0.24)"
-      : "0 0 0 1px rgba(255,255,255,0.03) inset";
+      ? [
+          "0 0 0 1px rgba(255,255,255,0.05) inset",
+          "0 18px 60px rgba(0,0,0,0.55)",           // profundidad (flotante)
+          "0 0 70px rgba(230,196,100,0.18)",        // glow dorado suave
+        ].join(", ")
+      : [
+          "0 0 0 1px rgba(255,255,255,0.05) inset",
+          "0 18px 60px rgba(0,0,0,0.55)",
+        ].join(", ");
 
   return (
     <div
-      className={`relative overflow-hidden rounded-3xl border ${className}`}
+      className={`relative overflow-hidden rounded-3xl border bg-slate-950/25 backdrop-blur-md ${className}`}
       style={{
         borderColor,
         boxShadow: goldGlow,
@@ -932,7 +941,7 @@ function FixtureCard({ fx, isSelected, onToggle, onLoadOdds, oddsPack }) {
 
   return (
     <div
-      className="relative rounded-3xl border bg-white/5 p-5 md:p-6 overflow-hidden"
+      className="relative rounded-3xl border bg-slate-950/25 backdrop-blur-md p-5 md:p-6 overflow-hidden"
       style={{ borderColor, boxShadow }}
     >
       <div className="absolute top-5 right-5">
