@@ -369,7 +369,7 @@ function HudCard({
         ];
 
   // ✅ borde neutro muy suave (no dorado)
-  const borderColor = "rgba(255,255,255,0.08)";
+  const borderColor = "rgba(255,255,255,0.30)";
 
   // ✅ brillo dorado suave (tipo Perfil)
   const baseShadow =
