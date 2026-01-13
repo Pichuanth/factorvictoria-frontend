@@ -26,6 +26,7 @@ const BG_PARTIDAZOS = asset("partidazos-semana.png");
 const BG_GRAFICO_DORADO = asset("grafico-dorado.png");
 const BG_PASTO = asset("hero-pasto.png");
 const BG_ESTADIO_PAGE = asset("estadio-fondo.png");
+const BG_VERDE_GENERAR = asset("hero-verde-generar.png");
 
 /* --------------------- helpers --------------------- */
 
@@ -1399,7 +1400,7 @@ export default function Comparator() {
 
       {/* 3) LISTADO (con fondo pasto como antes) */}
       <HudCard
-        bg={BG_PASTO}
+        bg={BG_VERDE-GENERAR}
         overlayVariant="casillas"
         className="mt-4"
         glow="gold"
