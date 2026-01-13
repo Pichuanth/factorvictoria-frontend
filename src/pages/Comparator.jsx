@@ -343,10 +343,10 @@ function getPlanFeatures(planLabel) {
 /* --------------------- UI helpers --------------------- */
 
 /**
- * ✅ HudCard corregido:
- * - SIN borde dorado visible (como pediste)
- * - CON brillo/sombreado dorado suave tipo "Perfil"
- * - Las imágenes vuelven (cuando pasas bg)
+ * ✅ HudCard:
+ * - Sin borde dorado visible (borde neutro MUY suave)
+ * - Brillo dorado más fuerte tipo Perfil
+ * - Mantiene overlays y permite usar bg (imagen) como antes
  */
 function HudCard({
   bg,
@@ -354,40 +354,36 @@ function HudCard({
   className = "",
   style = {},
   overlayVariant = "casillas",
+  glow = "gold", // "gold" | "none"
 }) {
   const overlayLayers =
     overlayVariant === "player"
       ? [
           "linear-gradient(90deg, rgba(2,6,23,0.78) 0%, rgba(2,6,23,0.58) 55%, rgba(2,6,23,0.34) 80%, rgba(2,6,23,0.22) 100%)",
           "radial-gradient(circle at 20% 45%, rgba(16,185,129,0.22), rgba(2,6,23,0) 58%)",
-          "radial-gradient(circle at 82% 50%, rgba(230,196,100,0.20), rgba(2,6,23,0) 58%)",
+          "radial-gradient(circle at 82% 50%, rgba(230,196,100,0.22), rgba(2,6,23,0) 58%)",
         ]
       : [
-          "linear-gradient(180deg, rgba(2,6,23,0.80) 0%, rgba(2,6,23,0.56) 38%, rgba(2,6,23,0.80) 100%)",
+          "linear-gradient(180deg, rgba(2,6,23,0.82) 0%, rgba(2,6,23,0.50) 40%, rgba(2,6,23,0.82) 100%)",
           "radial-gradient(circle at 18% 30%, rgba(16,185,129,0.18), rgba(2,6,23,0) 60%)",
-          "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.14), rgba(2,6,23,0) 60%)",
+          "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.18), rgba(2,6,23,0) 60%)",
         ];
 
-  // ✅ borde neutro muy suave (no dorado)
+  // ✅ borde neutro (no dorado)
   const borderColor = "rgba(255,255,255,0.08)";
 
-  // ✅ brillo dorado suave (tipo Perfil)
-  const baseShadow =
-    "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.12)";
+  // ✅ brillo dorado tipo Perfil (más fuerte)
+  const goldGlow =
+    glow === "gold"
+      ? "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 60px rgba(230,196,100,0.22)"
+      : "0 0 0 1px rgba(255,255,255,0.03) inset";
 
   return (
     <div
       className={`relative overflow-hidden rounded-3xl border bg-white/5 ${className}`}
-      style={{ borderColor, boxShadow: baseShadow, ...style }}
+      style={{ borderColor, boxShadow: goldGlow, ...style }}
     >
-      {bg ? (
-        <img
-          src={bg}
-          alt=""
-          aria-hidden="true"
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-      ) : null}
+      {bg ? <img src={bg} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover" /> : null}
 
       <div className="absolute inset-0" style={{ background: overlayLayers[0] }} />
       <div className="absolute inset-0" style={{ background: overlayLayers[1] }} />
@@ -398,7 +394,7 @@ function HudCard({
   );
 }
 
-/** ✅ Wrapper para layout (renderiza children) */
+/** ✅ Wrapper layout */
 function PageShell({ children }) {
   return <div className="max-w-5xl mx-auto px-4 pb-20">{children}</div>;
 }
@@ -411,19 +407,12 @@ function PartidazosDeLaSemanaCard() {
       bg={BG_VISITOR}
       overlayVariant="player"
       className="mt-6"
-      // solo un poco más glow, sin tocar borde
-      style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 50px rgba(230,196,100,0.14)" }}
+      glow="gold"
     >
       <div className="p-4 md:p-6">
-        <div className="text-emerald-200/90 text-xs font-semibold tracking-wide">
-          Factor Victoria recomienda
-        </div>
-        <div className="mt-1 text-xl md:text-2xl font-bold text-slate-100">
-          Partidazos de la semana
-        </div>
-        <div className="mt-1 text-sm text-slate-200">
-          Estos son los encuentros más atractivos para analizar.
-        </div>
+        <div className="text-emerald-200/90 text-xs font-semibold tracking-wide">Factor Victoria recomienda</div>
+        <div className="mt-1 text-xl md:text-2xl font-bold text-slate-100">Partidazos de la semana</div>
+        <div className="mt-1 text-sm text-slate-200">Estos son los encuentros más atractivos para analizar.</div>
 
         <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/30 overflow-hidden">
           <div className="relative w-full aspect-[16/9] md:aspect-[21/9]">
@@ -437,9 +426,7 @@ function PartidazosDeLaSemanaCard() {
           </div>
         </div>
 
-        <div className="mt-3 text-xs text-slate-400">
-          Tip: Apuesta con datos, planificación y visión ganadora.
-        </div>
+        <div className="mt-3 text-xs text-slate-400">Tip: Apuesta con datos, planificación y visión ganadora.</div>
       </div>
     </HudCard>
   );
@@ -456,20 +443,18 @@ function VisitorBanner() {
       bg={BG_VISITOR}
       overlayVariant="player"
       className="mt-4"
-      style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 60px rgba(230,196,100,0.18)" }}
+      glow="gold"
     >
       <div className="p-5 md:p-7">
-        <div className="text-xs tracking-wide text-emerald-200/90 font-semibold">
-          Modo visitante
-        </div>
+        <div className="text-xs tracking-wide text-emerald-200/90 font-semibold">Modo visitante</div>
 
         <div className="mt-1 text-lg md:text-xl font-bold text-slate-100">
           Para crear cuotas x10, x20, x50 y x100 necesitas membresía
         </div>
 
         <div className="mt-2 text-sm text-slate-200 max-w-2xl">
-          Activa tu plan para desbloquear el comparador profesional (cuotas potenciadas,
-          combinada automática y módulos premium). Si ya tienes membresía, inicia sesión.
+          Activa tu plan para desbloquear el comparador profesional (cuotas potenciadas, combinada automática y módulos premium).
+          Si ya tienes membresía, inicia sesión.
         </div>
 
         <div className="mt-4 flex flex-col sm:flex-row gap-2">
@@ -477,7 +462,7 @@ function VisitorBanner() {
             type="button"
             onClick={goPlans}
             className="w-full sm:w-auto px-6 py-3 rounded-full text-sm font-bold"
-            style={{ backgroundColor: GOLD, color: "#0f172a", boxShadow: "0 0 26px rgba(230,196,100,0.18)" }}
+            style={{ backgroundColor: GOLD, color: "#0f172a", boxShadow: "0 0 28px rgba(230,196,100,0.24)" }}
           >
             Comprar membresía
           </button>
@@ -594,9 +579,10 @@ function GainSimulatorCard() {
 
   return (
     <HudCard
-      bg={BG_DINERO} // ✅ vuelve la imagen
+      bg={BG_DINERO}
       overlayVariant="casillas"
       className="mt-6"
+      glow="gold"
     >
       <div className="p-5 md:p-6">
         <div className="flex items-start justify-between gap-3">
@@ -658,7 +644,7 @@ function GainSimulatorCard() {
 
           <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
             <div className="text-xs text-slate-300">Resultado estimado</div>
-            <div className="mt-2 text-lg font-bold" style={{ color: "rgba(230,196,100,0.95)" }}>
+            <div className="mt-2 text-lg font-bold" style={{ color: "rgba(230,196,100,0.98)" }}>
               {formatMoney(potential, currency)}
             </div>
             <div className="mt-1 text-[11px] text-slate-400">(Simulación simple: monto × multiplicador)</div>
@@ -716,8 +702,9 @@ function ManualPicksSection() {
   return (
     <section className="mt-6">
       <HudCard
-        bg={BG_MANUAL} // ✅ vuelve la imagen
+        bg={BG_MANUAL}
         overlayVariant="casillas"
+        glow="gold"
         className="overflow-hidden"
       >
         <div className="p-4 md:p-6">
@@ -756,9 +743,10 @@ function PriceCalculatorCard() {
 
   return (
     <HudCard
-      bg={BG_DINERO} // ✅ vuelve la imagen
+      bg={BG_DINERO}
       overlayVariant="casillas"
       className="mt-6"
+      glow="gold"
     >
       <div className="p-5 md:p-6">
         <div className="flex items-start justify-between gap-3">
@@ -812,7 +800,7 @@ function PriceCalculatorCard() {
 
             <div className="mt-2 flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-lg font-bold" style={{ color: "rgba(230,196,100,0.95)" }}>
+                <div className="text-lg font-bold" style={{ color: "rgba(230,196,100,0.98)" }}>
                   {format(result)}
                 </div>
                 <div className="mt-1 text-[11px] text-slate-400">(monto × cuota)</div>
@@ -835,11 +823,10 @@ function PriceCalculatorCard() {
 function FeatureCard({ title, badge, children, locked, lockText, bg }) {
   return (
     <HudCard
-      bg={bg || BG_GRAFICO_DORADO} // ✅ vuelve imagen por defecto
+      bg={bg || BG_GRAFICO_DORADO}
       overlayVariant="casillas"
+      glow="gold"
       className="overflow-hidden"
-      // leve ajuste (más perfil) sin borde dorado
-      style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 40px rgba(230,196,100,0.12)" }}
     >
       <div className="relative p-4 md:p-5">
         <div className="flex items-start justify-between gap-3">
@@ -920,15 +907,14 @@ function FixtureCard({ fx, isSelected, onToggle, onLoadOdds, oddsPack }) {
     return { pct: Math.round(best * 100), label };
   })();
 
+  // ✅ sin borde dorado: borde neutro + glow dorado suave/firme
+  const borderColor = "rgba(255,255,255,0.08)";
+  const boxShadow = "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 42px rgba(230,196,100,0.18)";
+
   return (
     <div
       className="relative rounded-3xl border bg-white/5 p-5 md:p-6 overflow-hidden"
-      style={{
-        // ✅ sin borde dorado (solo neutro)
-        borderColor: "rgba(255,255,255,0.08)",
-        // ✅ glow dorado suave como Perfil
-        boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 34px rgba(230,196,100,0.12)",
-      }}
+      style={{ borderColor, boxShadow }}
     >
       <div className="absolute top-5 right-5">
         <span
@@ -1329,10 +1315,10 @@ export default function Comparator() {
     <PageShell>
       {/* 1) Filtros + Generar */}
       <HudCard
-        bg={BG_PROFILE_HUD} // ✅ vuelve imagen
+        bg={BG_PROFILE_HUD}
         overlayVariant="casillas"
         className="mt-4"
-        style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 50px rgba(230,196,100,0.10)" }}
+        glow="gold"
       >
         <div className="p-4 md:p-6">
           <form onSubmit={handleGenerate} className="flex flex-col md:flex-row md:items-end gap-3 items-stretch">
@@ -1411,12 +1397,12 @@ export default function Comparator() {
       {/* 2) Partidazos */}
       <PartidazosDeLaSemanaCard />
 
-      {/* 3) LISTADO (vuelve la imagen pasto) */}
+      {/* 3) LISTADO (con fondo pasto como antes) */}
       <HudCard
-        bg={BG_PASTO} // ✅ vuelve imagen
+        bg={BG_PASTO}
         overlayVariant="casillas"
         className="mt-4"
-        style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 40px rgba(230,196,100,0.10)" }}
+        glow="gold"
       >
         <section className="p-3 md:p-4">
           <div className="flex items-center justify-between px-2 py-2 text-[11px] md:text-xs text-slate-300 tracking-wide">
@@ -1538,7 +1524,9 @@ export default function Comparator() {
 
           <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/30 p-3">
             <div className="text-sm font-semibold text-slate-100">Ejemplo</div>
-            <div className="text-xs text-slate-300 mt-1">“Local gana” mercado x2.10 · FV estimado x1.85 → posible value.</div>
+            <div className="text-xs text-slate-300 mt-1">
+              “Local gana” mercado x2.10 · FV estimado x1.85 → posible value.
+            </div>
           </div>
 
           <div className="mt-2 text-[11px] text-slate-400">Módulo en construcción: luego lo conectamos a cuotas reales + rating FV.</div>
