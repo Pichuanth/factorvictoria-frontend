@@ -385,7 +385,7 @@ function HudCard({
   const goldGlow =
     glow === "gold"
       ? [
-          "0 0 0 1px rgba(255,255,255,0.05) inset",
+          "0 0 0 1px rgba(255,255,255,0.10) inset",
           "0 18px 60px rgba(0,0,0,0.55)",           // profundidad (flotante)
           "0 0 70px rgba(230,196,100,0.18)",        // glow dorado suave
         ].join(", ")
@@ -1405,7 +1405,7 @@ export default function Comparator() {
                   onClick={() => toggleCountryChip(c)}
                   className="text-xs md:text-sm rounded-full px-3 py-1 border transition"
                   style={{
-                    borderColor: active ? "rgba(16,185,129,0.55)" : "rgba(255,255,255,0.30)",
+                    borderColor: active ? "rgba(16,185,129,0.55)" : "rgba(255,255,255,0.15)",
                     background: active ? "rgba(16,185,129,0.16)" : "rgba(255,255,255,0.05)",
                     color: "rgba(226,232,240,0.95)",
                   }}
