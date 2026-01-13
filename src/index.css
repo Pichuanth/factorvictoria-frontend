@@ -56,8 +56,9 @@ img{max-width:100%;display:block}
 /* HERO */
 .fv-bg{
   /* ✅ ahora verde oscuro consistente */
-  background:linear-gradient(180deg,#071f1b 0%, #061a17 60%, #051614 100%)
+    background: linear-gradient(180deg,#071a17 0%, #06211c 45%, #071a17 100%);
 }
+
 .fv-chip{background:#263044;color:#dbe3ff;border-radius:999px;padding:8px 14px;font-weight:600;display:inline-block}
 
 /* Botones */
