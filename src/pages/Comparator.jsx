@@ -385,8 +385,8 @@ function HudCard({
   const goldGlow =
     glow === "gold"
       ? [
-          "0 0 0 1px rgba(255,255,255,0.10) inset",
-          "0 18px 60px rgba(0,0,0,0.55)",           // profundidad (flotante)
+          "0 0 0 1px rgba(255,255,255,0.03) inset",
+          "0 18px 60px rgba(0,0,0,0.70)",           // profundidad (flotante)
           "0 0 70px rgba(230,196,100,0.18)",        // glow dorado suave
         ].join(", ")
       : [
