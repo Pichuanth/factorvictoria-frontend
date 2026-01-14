@@ -275,6 +275,7 @@ const PARTIDAZOS_MANUAL = [
   { date: "2026-01-20", league: "Champions League", match: "Real Madrid" },
   { date: "2026-01-20", league: "Champions League", match: "Monaco" },
   { date: "2026-01-20", league: "Champions League", match: "PSG" },
+  { date: "2026-01-20", league: "Champions League", match: "Paris" },
   { date: "2026-01-20", league: "Champions League", match: "Manchester City" },
   { date: "2026-01-20", league: "Champions League", match: "Napoli" },
 ];
