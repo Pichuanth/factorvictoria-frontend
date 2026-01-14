@@ -81,7 +81,7 @@ function leaguePriority(leagueName) {
   if (n.includes("europa league") || n.includes("uefa europa")) return 1;
   if (n.includes("conference league") || n.includes("uefa conference")) return 2;
 
-  // Big 5 (después la priorización por país hará el orden interno)
+  // Big 5
   if (n.includes("premier league")) return 3;
   if (n.includes("la liga") || n.includes("laliga")) return 4;
   if (n.includes("serie a")) return 5;
@@ -190,8 +190,8 @@ function HudCard({
   className = "",
   style = {},
   overlay = true,
-  overlayVariant = "casillasSharp", // "casillas" | "casillasSharp" | "player"
-  glow = "gold", // "gold" | "none"
+  overlayVariant = "casillasSharp",
+  glow = "gold",
   imgClassName = "",
   imgStyle = {},
 }) {
@@ -203,14 +203,6 @@ function HudCard({
         "radial-gradient(circle at 82% 50%, rgba(230,196,100,0.18), rgba(2,6,23,0) 58%)",
       ],
       imgFilter: "contrast(1.12) saturate(1.08) brightness(0.95)",
-    },
-    casillas: {
-      overlays: [
-        "linear-gradient(180deg, rgba(2,6,23,0.86) 0%, rgba(2,6,23,0.60) 38%, rgba(2,6,23,0.86) 100%)",
-        "radial-gradient(circle at 18% 30%, rgba(16,185,129,0.18), rgba(2,6,23,0) 60%)",
-        "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.14), rgba(2,6,23,0) 60%)",
-      ],
-      imgFilter: "contrast(1.10) saturate(1.06) brightness(0.96)",
     },
     casillasSharp: {
       overlays: [
@@ -226,7 +218,6 @@ function HudCard({
   const [o1, o2, o3] = v.overlays;
 
   const borderColor = "rgba(255,255,255,0.10)";
-
   const boxShadow =
     glow === "gold"
       ? [
@@ -269,33 +260,23 @@ function HudCard({
   );
 }
 
-/* ------------------- Reco semanal (dinámico) ------------------- */
 /* ------------------- Partidazos manuales ------------------- */
 /**
  * ✅ EDITA SOLO ESTA LISTA (PARTIDAZOS_MANUAL)
- * Puedes usar:
- * - fixtureId: el ID real (si lo conoces)
- * - o match: texto "equipoA vs equipoB" (parcial) + opcional league/country
- * - date: "YYYY-MM-DD" opcional para acotar
- *
- * Ejemplos:
- * { date:"2026-01-20", league:"Champions League", match:"Inter Milan vs Arsenal" }
- * { date:"2026-01-13", match:"Manchester" }  // matchea cualquier partido que contenga "Manchester"
+ * IMPORTANTE: agrega "date" cuando puedas (YYYY-MM-DD) para que sea 100% preciso.
  */
 const PARTIDAZOS_MANUAL = [
-  // --- Champions / top ---
+  // --- Champions (Martes 20-01-2026) ---
   { date: "2026-01-20", league: "Champions League", match: "Inter Milan vs Arsenal" },
   { date: "2026-01-20", league: "Champions League", match: "Tottenham vs Borussia" },
   { date: "2026-01-20", league: "Champions League", match: "Real Madrid vs AS Monaco" },
-  { date: "2026-01-20", league: "Champions League", match: "Sporting" }, // ejemplo flexible
-  { date: "2026-01-20", league: "Champions League", match: "PSG" },
+  { date: "2026-01-20", league: "Champions League", match: "Sporting vs PSG" },
+  { date: "2026-01-20", league: "Champions League", match: "Olympiacos vs Bayer" },
+  { date: "2026-01-20", league: "Champions League", match: "Kobenhavn vs Napoli" },
 
-  // --- Ligas top (ajusta a gusto) ---
-  { league: "Premier League", match: "Manchester" },
-  { league: "Premier League", match: "Liverpool" },
-  { league: "La Liga", match: "Real Madrid" },
-  { league: "Serie A", match: "Napoli" },
-  { league: "Ligue 1", match: "PSG" },
+  // --- Ejemplos liga top (si quieres usarlos en otra semana) ---
+  // { league: "Premier League", match: "Manchester" },
+  // { league: "La Liga", match: "Real Madrid" },
 ];
 
 function matchIncludes(haystack, needle) {
@@ -307,11 +288,11 @@ function picksFromFixtures(fixtures) {
   const used = new Set();
 
   for (const pick of PARTIDAZOS_MANUAL) {
-    const { fixtureId, date, league, country, match } = pick || {};
+    const { fixtureId: wantedId, date, league, country, match } = pick || {};
     let found = null;
 
-    if (fixtureId) {
-      found = fixtures.find((f) => String(f?.fixture?.id ?? f?.id ?? "") === String(fixtureId));
+    if (wantedId) {
+      found = fixtures.find((f) => String(f?.fixture?.id ?? f?.id ?? "") === String(wantedId));
     } else {
       found = fixtures.find((f) => {
         const dKey = fixtureDateKey(f);
@@ -340,96 +321,199 @@ function picksFromFixtures(fixtures) {
   return out;
 }
 
+function MatchLine({ f }) {
+  const { home, away } = fixtureTitleParts(f);
+  const meta = fixtureMeta(f);
+  const hLogo = teamLogo(f?.teams?.home);
+  const aLogo = teamLogo(f?.teams?.away);
+  const dKey = fixtureDateKey(f);
+
+  return (
+    <div
+      className="rounded-2xl border border-white/10 bg-slate-950/25 px-4 py-3"
+      style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.02) inset" }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[11px] text-slate-400 truncate">
+            {dKey} · {meta.league || "Liga"} {meta.country ? `· ${meta.country}` : ""}
+          </div>
+
+          <div className="mt-1 flex items-center gap-2 min-w-0">
+            {hLogo ? (
+              <img src={hLogo} alt="" aria-hidden="true" className="h-6 w-6 rounded-sm object-contain" />
+            ) : (
+              <div className="h-6 w-6 rounded-sm bg-white/5 border border-white/10" />
+            )}
+
+            <div className="text-sm font-semibold text-slate-100 truncate">{safeTeamShort(home, 18)}</div>
+
+            <div className="text-xs font-bold" style={{ color: "rgba(230,196,100,0.80)" }}>
+              vs
+            </div>
+
+            <div className="text-sm font-semibold text-slate-100 truncate">{safeTeamShort(away, 18)}</div>
+
+            {aLogo ? (
+              <img src={aLogo} alt="" aria-hidden="true" className="h-6 w-6 rounded-sm object-contain" />
+            ) : (
+              <div className="h-6 w-6 rounded-sm bg-white/5 border border-white/10" />
+            )}
+          </div>
+        </div>
+
+        <div
+          className="shrink-0 text-xs px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-slate-200"
+          style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.02) inset" }}
+        >
+          {meta.timeLabel || "—"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LockedFixtureCard({ f, isLoggedIn, goPlans }) {
+  const { home, away } = fixtureTitleParts(f);
+  const meta = fixtureMeta(f);
+  const hLogo = teamLogo(f?.teams?.home);
+  const aLogo = teamLogo(f?.teams?.away);
+
+  return (
+    <div
+      className="rounded-3xl border border-white/10 bg-slate-950/25 px-4 py-4"
+      style={{
+        boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset, 0 14px 44px rgba(0,0,0,0.50)",
+        backdropFilter: "blur(10px)",
+      }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            {hLogo ? (
+              <img src={hLogo} alt="" aria-hidden="true" className="h-8 w-8 rounded-sm object-contain" />
+            ) : (
+              <div className="h-8 w-8 rounded-sm bg-white/5 border border-white/10" />
+            )}
+
+            <div className="text-sm font-semibold text-slate-100 truncate">{safeTeamShort(home, 22)}</div>
+
+            <div className="text-xs font-bold" style={{ color: "rgba(230,196,100,0.80)" }}>
+              vs
+            </div>
+
+            <div className="text-sm font-semibold text-slate-100 truncate">{safeTeamShort(away, 22)}</div>
+
+            {aLogo ? (
+              <img src={aLogo} alt="" aria-hidden="true" className="h-8 w-8 rounded-sm object-contain" />
+            ) : (
+              <div className="h-8 w-8 rounded-sm bg-white/5 border border-white/10" />
+            )}
+          </div>
+
+          <div className="mt-1 text-[11px] text-slate-400 truncate">
+            {meta.league ? `${meta.league} · ` : ""}
+            {meta.country ? `${meta.country} · ` : ""}
+            {meta.timeLabel ? `${meta.timeLabel}` : ""}
+          </div>
+        </div>
+
+        <span className="shrink-0 text-xs px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-slate-200">
+          {f?.fixture?.status?.short || f?.status || "—"}
+        </span>
+      </div>
+
+      <div className="mt-3 flex flex-col sm:flex-row gap-2">
+        <button
+          type="button"
+          onClick={() => (isLoggedIn ? alert("Aquí abrirás estadísticas (PRO).") : goPlans())}
+          className="w-full sm:w-auto px-5 py-2.5 rounded-full text-sm font-semibold border transition"
+          style={{
+            borderColor: "rgba(76,201,240,0.28)",
+            background: "rgba(76,201,240,0.14)",
+            color: "rgba(219,242,255,0.96)",
+            boxShadow: "0 0 28px rgba(76,201,240,0.12)",
+          }}
+        >
+          Ver estadísticas
+        </button>
+
+        <button
+          type="button"
+          onClick={() => (isLoggedIn ? alert("Añadir a combinada (PRO).") : goPlans())}
+          className="w-full sm:w-auto px-5 py-2.5 rounded-full text-sm font-semibold"
+          style={{
+            backgroundColor: GOLD,
+            color: "#0f172a",
+            boxShadow: "0 0 26px rgba(230,196,100,0.18)",
+          }}
+        >
+          Añadir a combinada
+        </button>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        {[
+          { label: "1X2/Goles", key: "odds" },
+          { label: "Tarjetas", key: "cards" },
+          { label: "Corners", key: "corners" },
+          { label: "Prob.", key: "prob" },
+        ].map((item) => (
+          <div
+            key={item.key}
+            className="rounded-2xl border border-white/10 bg-slate-950/25 px-4 py-3 flex items-center justify-between"
+            style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.02) inset", backdropFilter: "blur(8px)" }}
+          >
+            <div>
+              <div className="text-xs text-slate-300">{item.label}</div>
+              <div className="text-sm font-bold text-slate-100 mt-0.5">—</div>
+            </div>
+            <LockIcon />
+          </div>
+        ))}
+      </div>
+
+      {!isLoggedIn ? (
+        <div className="mt-3 text-xs text-slate-300">
+          Nota: Este contenido está bloqueado.{" "}
+          <button type="button" onClick={goPlans} className="underline font-semibold" style={{ color: GOLD }}>
+            Ver planes
+          </button>
+          .
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function RecoWeeklyCard({ fixtures = [] }) {
   const picks = useMemo(() => picksFromFixtures(fixtures), [fixtures]);
 
   return (
     <HudCard bg={BG_PARTIDAZOS} overlayVariant="casillasSharp" glow="gold">
       <div className="relative p-5 md:p-6">
-        <div className="text-xs tracking-wide text-emerald-200/90 font-semibold">
-          Factor Victoria recomienda
-        </div>
-        <div className="mt-1 text-lg md:text-xl font-bold text-slate-100">
-          Partidazos de la semana
-        </div>
-        <div className="mt-1 text-xs text-slate-300">
-          Selección curada manualmente.
-        </div>
+        <div className="text-xs tracking-wide text-emerald-200/90 font-semibold">Factor Victoria recomienda</div>
+        <div className="mt-1 text-lg md:text-xl font-bold text-slate-100">Partidazos de la semana</div>
+        <div className="mt-1 text-xs text-slate-300">Selección curada manualmente.</div>
 
         <div className="mt-4 space-y-2">
           {picks.length === 0 ? (
             <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-slate-300">
-              Aún no has definido partidazos para este rango (o no están en el filtro de fechas).
+              Aún no hay coincidencias con tus partidazos manuales (revisa texto/fecha/liga).
             </div>
           ) : (
-            picks.map((f, i) => {
-              const { home, away } = fixtureTitleParts(f);
-              const meta = fixtureMeta(f);
-              const hLogo = teamLogo(f?.teams?.home);
-              const aLogo = teamLogo(f?.teams?.away);
-              const dKey = fixtureDateKey(f);
-
-              return (
-                <div
-                  key={`${fixtureId(f)}-${i}`}
-                  className="rounded-2xl border border-white/10 bg-slate-950/25 px-4 py-3"
-                  style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.02) inset" }}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-[11px] text-slate-400 truncate">
-                        {dKey} · {meta.league || "Liga"} {meta.country ? `· ${meta.country}` : ""}
-                      </div>
-
-                      <div className="mt-1 flex items-center gap-2 min-w-0">
-                        {hLogo ? (
-                          <img src={hLogo} alt="" aria-hidden="true" className="h-6 w-6 rounded-sm object-contain" />
-                        ) : (
-                          <div className="h-6 w-6 rounded-sm bg-white/5 border border-white/10" />
-                        )}
-
-                        <div className="text-sm font-semibold text-slate-100 truncate">
-                          {safeTeamShort(home, 18)}
-                        </div>
-
-                        <div className="text-xs font-bold" style={{ color: "rgba(230,196,100,0.80)" }}>
-                          vs
-                        </div>
-
-                        <div className="text-sm font-semibold text-slate-100 truncate">
-                          {safeTeamShort(away, 18)}
-                        </div>
-
-                        {aLogo ? (
-                          <img src={aLogo} alt="" aria-hidden="true" className="h-6 w-6 rounded-sm object-contain" />
-                        ) : (
-                          <div className="h-6 w-6 rounded-sm bg-white/5 border border-white/10" />
-                        )}
-                      </div>
-                    </div>
-
-                    <div
-                      className="shrink-0 text-xs px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-slate-200"
-                      style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.02) inset" }}
-                    >
-                      {meta.timeLabel || "—"}
-                    </div>
-                  </div>
-                </div>
-              );
-            })
+            picks.map((f, i) => <MatchLine key={`${fixtureId(f)}-${i}`} f={f} />)
           )}
         </div>
 
         <div className="mt-3 text-[11px] text-slate-400">
-          Edita la lista PARTIDAZOS_MANUAL en el código para cambiar la selección.
+          Edita la lista <span className="font-semibold">PARTIDAZOS_MANUAL</span> para cambiar la selección.
         </div>
       </div>
     </HudCard>
   );
 }
 
-  
 /* ------------------- Simulador ------------------- */
 function formatMoney(value, currency) {
   const n = Number(value || 0);
@@ -454,7 +538,13 @@ function GainSimulatorCard({ onGoPlans }) {
   const potential = Number(stake || 0) * Number(mult || 1);
 
   return (
-    <HudCard bg={BG_DINERO} overlayVariant="casillasSharp" className="mt-4" glow="gold" imgStyle={{ objectPosition: "60% 35%" }}>
+    <HudCard
+      bg={BG_DINERO}
+      overlayVariant="casillasSharp"
+      className="mt-4"
+      glow="gold"
+      imgStyle={{ objectPosition: "60% 35%" }}
+    >
       <div className="p-5 md:p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -579,21 +669,38 @@ export default function Fixtures() {
     return Array.isArray(list) ? list : [];
   }
 
+  function manualPickDates() {
+    // Trae las fechas únicas definidas en PARTIDAZOS_MANUAL (para que SIEMPRE aparezcan arriba)
+    const s = new Set();
+    for (const p of PARTIDAZOS_MANUAL) {
+      if (p?.date) s.add(String(p.date));
+    }
+    return [...s];
+  }
+
   async function onSearch() {
     setErr("");
     setLoading(true);
     try {
       const quick = parseQuickFilter(filterText);
-      const dates = enumerateDates(fromDate, toDate, 10);
 
-      if (!dates.length) {
+      // 1) Fechas del usuario
+      const baseDates = enumerateDates(fromDate, toDate, 10);
+
+      // 2) Fechas de partidazos manuales (para que aparezcan aunque el usuario esté en otra fecha)
+      const extraDates = manualPickDates();
+
+      // Merge + dedup (cap razonable para no abusar)
+      const merged = Array.from(new Set([...(baseDates || []), ...(extraDates || [])])).slice(0, 14);
+
+      if (!merged.length) {
         setFixtures([]);
         setErr("Rango de fechas inválido.");
         return;
       }
 
       const chunks = [];
-      for (const d of dates) {
+      for (const d of merged) {
         // eslint-disable-next-line no-await-in-loop
         const day = await fetchDay(d, quick);
         chunks.push(...day);
@@ -620,7 +727,7 @@ export default function Fixtures() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Orden general: fecha+hora, luego liga por prioridad, luego nombre liga
+  // Orden general
   const fixturesSorted = useMemo(() => {
     const arr = Array.isArray(fixtures) ? [...fixtures] : [];
 
@@ -635,23 +742,36 @@ export default function Fixtures() {
       const pb = leaguePriority(lb);
       if (pa !== pb) return pa - pb;
 
+      const ca = countryPriority(a?.league?.country || a?.country || "");
+      const cb = countryPriority(b?.league?.country || b?.country || "");
+      if (ca !== cb) return ca - cb;
+
       return String(la).localeCompare(String(lb));
     });
 
     return arr;
   }, [fixtures]);
 
-  // Agrupación: Día -> Liga
-  const grouped = useMemo(() => {
+  const picksAll = useMemo(() => picksFromFixtures(fixturesSorted), [fixturesSorted]);
+  const picksTop3 = useMemo(() => picksAll.slice(0, 3), [picksAll]);
+
+  // Agrupar SOLO para la sección "Todos los partidos" (del rango del usuario)
+  const baseDatesUser = useMemo(() => new Set(enumerateDates(fromDate, toDate, 10)), [fromDate, toDate]);
+
+  const groupedCompact = useMemo(() => {
     const byDate = new Map();
 
     for (const f of fixturesSorted) {
       const dKey = fixtureDateKey(f) || "Sin fecha";
+
+      // IMPORTANT: acá filtramos solo el rango del usuario (para que los extras manuales no contaminen “todos”)
+      if (!baseDatesUser.has(dKey)) continue;
+
       const meta = fixtureMeta(f);
       const league = meta.league || "Liga";
       const cPr = countryPriority(meta.country);
-const lPr = leaguePriority(league);
-const lKey = `${lPr}|${cPr}|${league}|${meta.country || ""}`;
+      const lPr = leaguePriority(league);
+      const lKey = `${lPr}|${cPr}|${league}|${meta.country || ""}`;
 
       if (!byDate.has(dKey)) byDate.set(dKey, new Map());
       const leagueMap = byDate.get(dKey);
@@ -660,31 +780,28 @@ const lKey = `${lPr}|${cPr}|${league}|${meta.country || ""}`;
       leagueMap.get(lKey).push(f);
     }
 
-    // Convertir a estructura ordenada
     const dates = [...byDate.keys()].sort((a, b) => a.localeCompare(b));
     return dates.map((dKey) => {
       const leagueMap = byDate.get(dKey);
       const leagues = [...leagueMap.keys()]
         .sort((a, b) => {
           const sa = String(a).split("|");
-const sb = String(b).split("|");
+          const sb = String(b).split("|");
 
-const lpa = Number(sa[0] || 999);
-const lpb = Number(sb[0] || 999);
-if (lpa !== lpb) return lpa - lpb;
+          const lpa = Number(sa[0] || 999);
+          const lpb = Number(sb[0] || 999);
+          if (lpa !== lpb) return lpa - lpb;
 
-const cpa = Number(sa[1] || 999);
-const cpb = Number(sb[1] || 999);
-if (cpa !== cpb) return cpa - cpb;
+          const cpa = Number(sa[1] || 999);
+          const cpb = Number(sb[1] || 999);
+          if (cpa !== cpb) return cpa - cpb;
 
-return String(a).localeCompare(String(b));
-
+          return String(a).localeCompare(String(b));
         })
-        .map((lKey) => {
-          const parts = String(lKey).split("|");
+        .map((k) => {
+          const parts = String(k).split("|");
           const leagueName = parts[2] || "Liga";
-          const items = leagueMap.get(lKey) || [];
-          // por hora dentro de liga
+          const items = leagueMap.get(k) || [];
           items.sort((x, y) => {
             const tx = new Date(x?.fixture?.date || x?.date || 0).getTime();
             const ty = new Date(y?.fixture?.date || y?.date || 0).getTime();
@@ -695,13 +812,21 @@ return String(a).localeCompare(String(b));
 
       return { dKey, leagues };
     });
-  }, [fixturesSorted]);
+  }, [fixturesSorted, baseDatesUser]);
 
-  const total = fixturesSorted.length;
+  const totalUserRange = useMemo(() => {
+    // total SOLO del rango usuario
+    let count = 0;
+    for (const f of fixturesSorted) {
+      const dKey = fixtureDateKey(f);
+      if (baseDatesUser.has(dKey)) count += 1;
+    }
+    return count;
+  }, [fixturesSorted, baseDatesUser]);
 
   return (
     <div className="relative max-w-5xl mx-auto px-4 pb-20">
-      {/* ✅ Fondo ambiental (igual a Perfil) */}
+      {/* Fondo ambiental */}
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div
           className="absolute -top-44 left-1/2 -translate-x-1/2 h-[640px] w-[640px] rounded-full blur-3xl opacity-20"
@@ -829,8 +954,7 @@ return String(a).localeCompare(String(b));
                 Vista gratuita (limitada)
               </div>
               <div className="text-xs text-slate-200 mt-1">
-                Puedes ver partidos del día. Para estadísticas avanzadas y cuotas potenciadas (x10, x20, x50 o x100),
-                necesitas membresía.{" "}
+                Para estadísticas avanzadas y cuotas potenciadas (x10, x20, x50 o x100), necesitas membresía.{" "}
                 <button type="button" onClick={goPlans} className="underline font-semibold" style={{ color: GOLD }}>
                   Ver planes
                 </button>
@@ -843,18 +967,18 @@ return String(a).localeCompare(String(b));
         </div>
       </HudCard>
 
-      {/* Partidazos (dinámico) */}
+      {/* 1) Partidazos de la semana (manual) */}
       <div className="mt-4">
         <RecoWeeklyCard fixtures={fixturesSorted} />
       </div>
 
-      {/* Resultados */}
+      {/* 2) Partidazos bloqueados (solo top 3) */}
       <HudCard bg={BG_CASILLAS} overlayVariant="casillasSharp" className="mt-4" glow="gold">
         <div className="p-5 md:p-6">
-          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+          <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-sm font-semibold">Partidos encontrados</div>
-              <div className="text-xs text-slate-300 mt-1">Total: {total}</div>
+              <div className="text-sm font-semibold">Partidazos bloqueados</div>
+              <div className="text-xs text-slate-300 mt-1">Solo 3 destacados para mostrar el valor de la membresía.</div>
             </div>
 
             <Chip
@@ -869,16 +993,41 @@ return String(a).localeCompare(String(b));
             </Chip>
           </div>
 
-          {total === 0 && !loading ? (
+          <div className="mt-4 space-y-3">
+            {picksTop3.length === 0 ? (
+              <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-slate-300">
+                Aún no hay coincidencias para bloquear. Revisa tus textos en PARTIDAZOS_MANUAL (ej: “Inter Milan vs Arsenal”).
+              </div>
+            ) : (
+              picksTop3.map((f) => (
+                <LockedFixtureCard key={fixtureId(f)} f={f} isLoggedIn={isLoggedIn} goPlans={goPlans} />
+              ))
+            )}
+          </div>
+        </div>
+      </HudCard>
+
+      {/* 3) Todos los partidos (del rango del usuario) en modo compacto */}
+      <HudCard bg={BG_CASILLAS} overlayVariant="casillasSharp" className="mt-4" glow="gold">
+        <div className="p-5 md:p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold">Todos los partidos</div>
+              <div className="text-xs text-slate-300 mt-1">Total (según tu filtro): {totalUserRange}</div>
+            </div>
+
+            <div className="text-[11px] text-slate-400">Ligas importantes primero</div>
+          </div>
+
+          {totalUserRange === 0 && !loading ? (
             <div className="mt-4 text-sm text-slate-200">Por ahora no hay partidos para este rango o filtro.</div>
           ) : null}
 
           <div className="mt-5 space-y-6">
-            {grouped.map((day) => (
+            {groupedCompact.map((day) => (
               <div key={day.dKey} className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-bold text-slate-100">{day.dKey}</div>
-                  <div className="text-[11px] text-slate-400">Ligas importantes primero</div>
                 </div>
 
                 {day.leagues.map((lg) => (
@@ -894,143 +1043,25 @@ return String(a).localeCompare(String(b));
                     </div>
 
                     <div className="px-3 md:px-4 pb-4 space-y-2">
-                      {lg.items.map((f, idx) => {
-                        const { home, away } = fixtureTitleParts(f);
-                        const meta = fixtureMeta(f);
-                        const hLogo = teamLogo(f?.teams?.home);
-                        const aLogo = teamLogo(f?.teams?.away);
-
-                        return (
-                          <div
-                            key={`${fixtureId(f)}-${idx}`}
-                            className="rounded-2xl border border-white/10 bg-slate-950/25 px-4 py-3"
-                            style={{
-                              boxShadow: "0 0 0 1px rgba(255,255,255,0.02) inset, 0 12px 38px rgba(0,0,0,0.45)",
-                              backdropFilter: "blur(10px)",
-                            }}
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              {/* Partido con escudos */}
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  {hLogo ? (
-                                    <img
-                                      src={hLogo}
-                                      alt=""
-                                      aria-hidden="true"
-                                      className="h-7 w-7 rounded-sm object-contain"
-                                    />
-                                  ) : (
-                                    <div className="h-7 w-7 rounded-sm bg-white/5 border border-white/10" />
-                                  )}
-
-                                  <div className="text-sm font-semibold text-slate-100 truncate">
-                                    {safeTeamShort(home, 20)}
-                                  </div>
-
-                                  <div className="text-xs font-bold" style={{ color: "rgba(230,196,100,0.80)" }}>
-                                    vs
-                                  </div>
-
-                                  <div className="text-sm font-semibold text-slate-100 truncate">
-                                    {safeTeamShort(away, 20)}
-                                  </div>
-
-                                  {aLogo ? (
-                                    <img
-                                      src={aLogo}
-                                      alt=""
-                                      aria-hidden="true"
-                                      className="h-7 w-7 rounded-sm object-contain"
-                                    />
-                                  ) : (
-                                    <div className="h-7 w-7 rounded-sm bg-white/5 border border-white/10" />
-                                  )}
-                                </div>
-
-                                <div className="mt-1 text-[11px] text-slate-400 truncate">
-                                  {meta.country ? `${meta.country} · ` : ""}
-                                  {meta.timeLabel ? `${meta.timeLabel}` : ""}
-                                </div>
-                              </div>
-
-                              <span className="shrink-0 text-xs px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-slate-200">
-                                {f?.fixture?.status?.short || f?.status || "—"}
-                              </span>
-                            </div>
-
-                            <div className="mt-3 flex flex-col sm:flex-row gap-2">
-                              <button
-                                type="button"
-                                onClick={() => (isLoggedIn ? alert("Aquí abrirás estadísticas (PRO).") : goPlans())}
-                                className="w-full sm:w-auto px-5 py-2.5 rounded-full text-sm font-semibold border transition"
-                                style={{
-                                  borderColor: "rgba(76,201,240,0.28)",
-                                  background: "rgba(76,201,240,0.14)",
-                                  color: "rgba(219,242,255,0.96)",
-                                  boxShadow: "0 0 28px rgba(76,201,240,0.12)",
-                                }}
-                              >
-                                Ver estadísticas
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => (isLoggedIn ? alert("Añadir a combinada (PRO).") : goPlans())}
-                                className="w-full sm:w-auto px-5 py-2.5 rounded-full text-sm font-semibold"
-                                style={{
-                                  backgroundColor: GOLD,
-                                  color: "#0f172a",
-                                  boxShadow: "0 0 26px rgba(230,196,100,0.18)",
-                                }}
-                              >
-                                Añadir a combinada
-                              </button>
-                            </div>
-
-                            {/* Candados */}
-                            <div className="mt-3 grid grid-cols-2 gap-3">
-                              {[
-                                { label: "1X2/Goles", key: "odds" },
-                                { label: "Tarjetas", key: "cards" },
-                                { label: "Corners", key: "corners" },
-                                { label: "Prob.", key: "prob" },
-                              ].map((item) => (
-                                <div
-                                  key={item.key}
-                                  className="rounded-2xl border border-white/10 bg-slate-950/25 px-4 py-3 flex items-center justify-between"
-                                  style={{
-                                    boxShadow: "0 0 0 1px rgba(255,255,255,0.02) inset",
-                                    backdropFilter: "blur(8px)",
-                                  }}
-                                >
-                                  <div>
-                                    <div className="text-xs text-slate-300">{item.label}</div>
-                                    <div className="text-sm font-bold text-slate-100 mt-0.5">—</div>
-                                  </div>
-                                  <LockIcon />
-                                </div>
-                              ))}
-                            </div>
-
-                            {!isLoggedIn ? (
-                              <div className="mt-3 text-xs text-slate-300">
-                                Nota: Estás viendo la versión pública.{" "}
-                                <Link to="/login" className="underline font-semibold" style={{ color: GOLD }}>
-                                  Inicia sesión
-                                </Link>{" "}
-                                para ver tu plan.
-                              </div>
-                            ) : null}
-                          </div>
-                        );
-                      })}
+                      {lg.items.map((f) => (
+                        <MatchLine key={fixtureId(f)} f={f} />
+                      ))}
                     </div>
                   </div>
                 ))}
               </div>
             ))}
           </div>
+
+          {!isLoggedIn ? (
+            <div className="mt-4 text-xs text-slate-300">
+              Nota: Para ver estadísticas avanzadas, picks y cuotas potenciadas,{" "}
+              <button type="button" onClick={goPlans} className="underline font-semibold" style={{ color: GOLD }}>
+                activa tu plan
+              </button>
+              .
+            </div>
+          ) : null}
         </div>
       </HudCard>
 
