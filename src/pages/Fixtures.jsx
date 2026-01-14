@@ -87,10 +87,14 @@ function leaguePriority(leagueName) {
   if (n.includes("serie a")) return 5;
   if (n.includes("bundesliga") && !n.includes("2.")) return 6;
   if (n.includes("ligue 1")) return 7;
+  if (n.includes("copa del rey")) return 8;
+  if (n.includes("paulista serie a1")) return 9;
+  if (n.includes("liga MX")) return 10;
+  if (n.includes("copa africana de naciones")) return 11;
 
   // Conmebol
-  if (n.includes("libertadores")) return 8;
-  if (n.includes("sudamericana")) return 9;
+  if (n.includes("libertadores")) return 12;
+  if (n.includes("sudamericana")) return 13;
 
   return 50;
 }
@@ -266,17 +270,13 @@ function HudCard({
  * IMPORTANTE: agrega "date" cuando puedas (YYYY-MM-DD) para que sea 100% preciso.
  */
 const PARTIDAZOS_MANUAL = [
-  // --- Champions (Martes 20-01-2026) ---
-  { date: "2026-01-20", league: "Champions League", match: "Inter Milan vs Arsenal" },
-  { date: "2026-01-20", league: "Champions League", match: "Tottenham vs Borussia" },
-  { date: "2026-01-20", league: "Champions League", match: "Real Madrid vs AS Monaco" },
-  { date: "2026-01-20", league: "Champions League", match: "Sporting vs PSG" },
-  { date: "2026-01-20", league: "Champions League", match: "Olympiacos vs Bayer" },
-  { date: "2026-01-20", league: "Champions League", match: "Kobenhavn vs Napoli" },
-
-  // --- Ejemplos liga top (si quieres usarlos en otra semana) ---
-  // { league: "Premier League", match: "Manchester" },
-  // { league: "La Liga", match: "Real Madrid" },
+  { date: "2026-01-20", league: "Champions League", match: "Inter" },
+  { date: "2026-01-20", league: "Champions League", match: "Arsenal" },
+  { date: "2026-01-20", league: "Champions League", match: "Real Madrid" },
+  { date: "2026-01-20", league: "Champions League", match: "Monaco" },
+  { date: "2026-01-20", league: "Champions League", match: "PSG" },
+  { date: "2026-01-20", league: "Champions League", match: "Manchester City" },
+  { date: "2026-01-20", league: "Champions League", match: "Napoli" },
 ];
 
 function matchIncludes(haystack, needle) {
@@ -692,7 +692,6 @@ export default function Fixtures() {
   try {
     const quick = parseQuickFilter(filterText);
 
-    // Fechas del filtro del usuario
     const dates = enumerateDates(fromDate, toDate, 10);
     if (!dates.length) {
       setFixtures([]);
@@ -700,20 +699,19 @@ export default function Fixtures() {
       return;
     }
 
-    // Fechas extra: las que están en PARTIDAZOS_MANUAL (para que siempre aparezcan)
+    // traer fechas de PARTIDAZOS aunque no estén en el rango
     const extra = manualPickDates().filter((d) => !dates.includes(d));
 
     const chunks = [];
 
-    // 1) Carga el rango que el usuario pidió
+    // rango del usuario (aplica filtro)
     for (const d of dates) {
       // eslint-disable-next-line no-await-in-loop
       const day = await fetchDay(d, quick);
       chunks.push(...day);
     }
 
-    // 2) Carga fechas “manuales” aunque estén fuera del rango (solo para poder mostrarlas arriba)
-    //    Aquí NO aplico quick filter para no “matar” los partidazos por un filtro del usuario.
+    // fechas partidazos (NO aplica filtro para no romperlos)
     for (const d of extra) {
       // eslint-disable-next-line no-await-in-loop
       const day = await fetchDay(d, { country: "", league: "", team: "" });
@@ -1028,7 +1026,7 @@ export default function Fixtures() {
       </HudCard>
 
       {/* 3) Todos los partidos (del rango del usuario) en modo compacto */}
-      <HudCard bg={BG_CASILLAS} overlayVariant="casillasSharp" className="mt-4" glow="gold">
+      <HudCard bg={null} bgColor="#071a17" overlayVariant="casillasSharp" className="mt-4" glow="gold">
         <div className="p-5 md:p-6">
           <div className="flex items-start justify-between gap-3">
             <div>
