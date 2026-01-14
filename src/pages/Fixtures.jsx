@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 
 const GOLD = "#E6C464";
-const CYAN = "#4CC9F0"; // celeste “comparador”
+const CYAN = "#4CC9F0";
 
 const API_BASE =
   import.meta?.env?.VITE_API_BASE?.replace(/\/$/, "") ||
@@ -15,12 +15,9 @@ const BG_CASILLAS = "/hero-fondo-casillas.png";
 const BG_JUGADOR = "/hero-profile-hud.png";
 const BG_12000 = "/hero-12000.png";
 const BG_PARTIDAZOS = "/hero-fondo-partidos.png";
-const BG_DINERO = "/hero.dinero.png"; // <-- tu imagen para el simulador
+const BG_DINERO = "/hero.dinero.png";
 
-/** Banner semanal (nombre fijo) */
-const IMG_PARTIDAZOS_SEMANA = "/partidazos-semana.png";
-
-/* ------------------- helpers ------------------- */
+/* ------------------- helpers fechas ------------------- */
 function toYYYYMMDD(d) {
   const pad = (n) => String(n).padStart(2, "0");
   const dt = new Date(d);
@@ -46,6 +43,93 @@ function enumerateDates(fromStr, toStr, hardLimit = 10) {
     cur = addDays(cur, 1);
   }
   return out;
+}
+
+/* ------------------- helpers orden/importancia ------------------- */
+function norm(s) {
+  return String(s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+// Prioridad menor = más importante
+function leaguePriority(leagueName) {
+  const n = norm(leagueName);
+
+  // Europe top
+  if (n.includes("champions league") || n.includes("uefa champions")) return 0;
+  if (n.includes("europa league") || n.includes("uefa europa")) return 1;
+  if (n.includes("conference league") || n.includes("uefa conference")) return 2;
+
+  // Big 5
+  if (n.includes("premier league")) return 3;
+  if (n.includes("la liga") || n.includes("laliga")) return 4;
+  if (n.includes("serie a")) return 5;
+  if (n.includes("bundesliga") && !n.includes("2.")) return 6;
+  if (n.includes("ligue 1")) return 7;
+
+  // South America (si las usas)
+  if (n.includes("libertadores")) return 8;
+  if (n.includes("sudamericana")) return 9;
+
+  // Secondary / cups
+  if (n.includes("coppa italia")) return 20;
+  if (n.includes("copa del rey")) return 20;
+  if (n.includes("fa cup")) return 20;
+  if (n.includes("efl cup") || n.includes("carabao")) return 21;
+  if (n.includes("efl trophy")) return 30;
+
+  // Default
+  return 50;
+}
+
+function fixtureDateKey(f) {
+  const when = f?.fixture?.date || f?.date || "";
+  if (!when) return "";
+  const d = new Date(when);
+  if (Number.isNaN(d.getTime())) return "";
+  return toYYYYMMDD(d);
+}
+
+function fixtureTimeLabel(f) {
+  const when = f?.fixture?.date || f?.date || "";
+  if (!when) return "";
+  const d = new Date(when);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
+}
+
+function fixtureTitleParts(f) {
+  const home = f?.teams?.home?.name || f?.home?.name || "Local";
+  const away = f?.teams?.away?.name || f?.away?.name || "Visita";
+  return { home, away };
+}
+
+function fixtureMeta(f) {
+  const country = f?.league?.country || f?.country || "";
+  const league = f?.league?.name || f?.league || "";
+  const timeLabel = fixtureTimeLabel(f);
+  return { country, league, timeLabel };
+}
+
+function teamLogo(teamObj) {
+  return teamObj?.logo || "";
+}
+
+function safeTeamShort(name, max = 16) {
+  const s = String(name || "").trim();
+  if (s.length <= max) return s;
+  return s.slice(0, max - 1) + "…";
+}
+
+function fixtureId(f) {
+  return (
+    f?.fixture?.id ??
+    f?.id ??
+    `${f?.teams?.home?.name}-${f?.teams?.away?.name}-${f?.fixture?.date || f?.date || ""}`
+  );
 }
 
 /* ------------------- Mini UI ------------------- */
@@ -87,11 +171,7 @@ function LockIcon({ size = 18, color = "rgba(230,196,100,0.9)" }) {
 }
 
 /**
- * ✅ HudCard (estilo Perfil / “tarjeta flotante”)
- * - Borde neutro limpio
- * - Profundidad (sombra) para efecto flotante
- * - Glow dorado suave opcional
- * - Overlays + filtro de imagen para legibilidad
+ * ✅ HudCard estilo Perfil (tarjeta flotante + glow dorado)
  */
 function HudCard({
   bg,
@@ -141,13 +221,10 @@ function HudCard({
     glow === "gold"
       ? [
           "0 0 0 1px rgba(255,255,255,0.03) inset",
-          "0 18px 60px rgba(0,0,0,0.55)", // profundidad (flotante)
-          "0 0 70px rgba(230,196,100,0.18)", // glow dorado suave
-        ].join(", ")
-      : [
-          "0 0 0 1px rgba(255,255,255,0.05) inset",
           "0 18px 60px rgba(0,0,0,0.55)",
-        ].join(", ");
+          "0 0 70px rgba(230,196,100,0.18)",
+        ].join(", ")
+      : ["0 0 0 1px rgba(255,255,255,0.05) inset", "0 18px 60px rgba(0,0,0,0.55)"].join(", ");
 
   return (
     <div
@@ -182,41 +259,87 @@ function HudCard({
   );
 }
 
-/* ------------------- Reco semanal ------------------- */
-function RecoWeeklyCard() {
+/* ------------------- Reco semanal (dinámico) ------------------- */
+function RecoWeeklyCard({ fixtures = [] }) {
+  const top = useMemo(() => {
+    const arr = Array.isArray(fixtures) ? [...fixtures] : [];
+    // Ya vienen ordenados por date + liga + hora (más abajo). Tomamos un “top” razonable.
+    return arr.slice(0, 10);
+  }, [fixtures]);
+
   return (
-    <HudCard
-      bg={BG_PARTIDAZOS}
-      overlayVariant="casillasSharp"
-      glow="gold"
-      style={{
-        boxShadow:
-          "0 0 0 1px rgba(255,255,255,0.03) inset, 0 18px 60px rgba(0,0,0,0.55), 0 0 70px rgba(230,196,100,0.18)",
-      }}
-    >
+    <HudCard bg={BG_PARTIDAZOS} overlayVariant="casillasSharp" glow="gold">
       <div className="relative p-5 md:p-6">
-        <div className="text-xs tracking-wide text-emerald-200/90 font-semibold">
-          Factor Victoria recomienda
-        </div>
-        <div className="mt-1 text-lg md:text-xl font-bold text-slate-100">
-          Partidazos de la semana
-        </div>
-        <div className="mt-1 text-xs text-slate-300">
-          Estos son los encuentros más atractivos para analizar.
+        <div className="text-xs tracking-wide text-emerald-200/90 font-semibold">Factor Victoria recomienda</div>
+        <div className="mt-1 text-lg md:text-xl font-bold text-slate-100">Partidazos de la semana</div>
+        <div className="mt-1 text-xs text-slate-300">Ligas top primero (Champions, Premier, LaLiga, etc.).</div>
+
+        <div className="mt-4 space-y-2">
+          {top.length === 0 ? (
+            <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-slate-300">
+              Aún no hay partidos cargados para mostrar aquí.
+            </div>
+          ) : (
+            top.map((f, i) => {
+              const { home, away } = fixtureTitleParts(f);
+              const meta = fixtureMeta(f);
+              const hLogo = teamLogo(f?.teams?.home);
+              const aLogo = teamLogo(f?.teams?.away);
+              const dKey = fixtureDateKey(f);
+
+              return (
+                <div
+                  key={`${fixtureId(f)}-${i}`}
+                  className="rounded-2xl border border-white/10 bg-slate-950/25 px-4 py-3"
+                  style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.02) inset" }}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-[11px] text-slate-400 truncate">
+                        {dKey} · {meta.league || "Liga"} {meta.country ? `· ${meta.country}` : ""}
+                      </div>
+
+                      <div className="mt-1 flex items-center gap-2 min-w-0">
+                        {hLogo ? (
+                          <img src={hLogo} alt="" aria-hidden="true" className="h-6 w-6 rounded-sm object-contain" />
+                        ) : (
+                          <div className="h-6 w-6 rounded-sm bg-white/5 border border-white/10" />
+                        )}
+
+                        <div className="text-sm font-semibold text-slate-100 truncate">
+                          {safeTeamShort(home, 18)}
+                        </div>
+
+                        <div className="text-xs font-bold" style={{ color: "rgba(230,196,100,0.80)" }}>
+                          vs
+                        </div>
+
+                        <div className="text-sm font-semibold text-slate-100 truncate">
+                          {safeTeamShort(away, 18)}
+                        </div>
+
+                        {aLogo ? (
+                          <img src={aLogo} alt="" aria-hidden="true" className="h-6 w-6 rounded-sm object-contain" />
+                        ) : (
+                          <div className="h-6 w-6 rounded-sm bg-white/5 border border-white/10" />
+                        )}
+                      </div>
+                    </div>
+
+                    <div
+                      className="shrink-0 text-xs px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-slate-200"
+                      style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.02) inset" }}
+                    >
+                      {meta.timeLabel || "—"}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
 
-        <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/30 overflow-hidden">
-          <img
-            src={IMG_PARTIDAZOS_SEMANA}
-            alt="Partidazos de la semana"
-            className="w-full h-auto block"
-            loading="lazy"
-          />
-        </div>
-
-        <div className="mt-3 text-[11px] text-slate-400">
-          Tip: Apuesta con datos, planificación y visión ganadora.
-        </div>
+        <div className="mt-3 text-[11px] text-slate-400">Tip: Menos es más. Escudos pequeños + texto limpio.</div>
       </div>
     </HudCard>
   );
@@ -246,20 +369,12 @@ function GainSimulatorCard({ onGoPlans }) {
   const potential = Number(stake || 0) * Number(mult || 1);
 
   return (
-    <HudCard
-      bg={BG_DINERO}
-      overlayVariant="casillasSharp"
-      className="mt-4"
-      glow="gold"
-      imgStyle={{ objectPosition: "60% 35%" }}
-    >
+    <HudCard bg={BG_DINERO} overlayVariant="casillasSharp" className="mt-4" glow="gold" imgStyle={{ objectPosition: "60% 35%" }}>
       <div className="p-5 md:p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-sm font-semibold text-slate-100">Simulador de ganancias</div>
-            <div className="text-xs text-slate-300 mt-1">
-              Estima cuánto podrías obtener con cuotas potenciadas.
-            </div>
+            <div className="text-xs text-slate-300 mt-1">Estima cuánto podrías obtener con cuotas potenciadas.</div>
           </div>
 
           <select
@@ -310,9 +425,7 @@ function GainSimulatorCard({ onGoPlans }) {
                 </button>
               ))}
             </div>
-            <div className="mt-2 text-[11px] text-slate-400">
-              Para activar x20/x50/x100 necesitas membresía.
-            </div>
+            <div className="mt-2 text-[11px] text-slate-400">Para activar x20/x50/x100 necesitas membresía.</div>
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
@@ -320,19 +433,13 @@ function GainSimulatorCard({ onGoPlans }) {
             <div className="mt-2 text-lg font-bold" style={{ color: "rgba(230,196,100,0.95)" }}>
               {formatMoney(potential, currency)}
             </div>
-            <div className="mt-1 text-[11px] text-slate-400">
-              (Simulación simple: monto × multiplicador)
-            </div>
+            <div className="mt-1 text-[11px] text-slate-400">(Simulación simple: monto × multiplicador)</div>
 
             <button
               type="button"
               onClick={onGoPlans}
               className="mt-3 inline-flex w-full justify-center rounded-full px-4 py-2 text-sm font-semibold"
-              style={{
-                background: GOLD,
-                color: "#0f172a",
-                boxShadow: "0 0 26px rgba(230,196,100,0.18)",
-              }}
+              style={{ background: GOLD, color: "#0f172a", boxShadow: "0 0 26px rgba(230,196,100,0.18)" }}
             >
               Ver planes
             </button>
@@ -368,11 +475,7 @@ export default function Fixtures() {
       .map((s) => s.trim())
       .filter(Boolean);
 
-    return {
-      country: parts[0] || "",
-      league: parts[1] || "",
-      team: parts[2] || "",
-    };
+    return { country: parts[0] || "", league: parts[1] || "", team: parts[2] || "" };
   }
 
   async function fetchDay(dateStr, { country, league, team }) {
@@ -414,10 +517,7 @@ export default function Fixtures() {
       // Dedup
       const map = new Map();
       for (const f of chunks) {
-        const id =
-          f?.fixture?.id ??
-          f?.id ??
-          `${f?.teams?.home?.name}-${f?.teams?.away?.name}-${f?.fixture?.date || f?.date || ""}`;
+        const id = fixtureId(f);
         if (!map.has(id)) map.set(id, f);
       }
 
@@ -435,65 +535,70 @@ export default function Fixtures() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function fixtureTitle(f) {
-    const home = f?.teams?.home?.name || f?.home?.name || "Local";
-    const away = f?.teams?.away?.name || f?.away?.name || "Visita";
-    return `${home} vs ${away}`;
-  }
-
-  function fixtureMeta(f) {
-    const country = f?.league?.country || f?.country || "";
-    const league = f?.league?.name || f?.league || "";
-    const when = f?.fixture?.date || f?.date || "";
-
-    let timeLabel = "";
-    if (when) {
-      const d = new Date(when);
-      if (!Number.isNaN(d.getTime())) {
-        timeLabel = d.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
-      }
-    }
-    return { country, league, timeLabel };
-  }
-
-  function fixtureFlagUrl(countryName) {
-    const name = String(countryName || "").toLowerCase();
-
-    const map = {
-      chile: "cl",
-      argentina: "ar",
-      brazil: "br",
-      brasil: "br",
-      spain: "es",
-      españa: "es",
-      portugal: "pt",
-      italy: "it",
-      italia: "it",
-      france: "fr",
-      francia: "fr",
-      england: "gb",
-      "united kingdom": "gb",
-      mexico: "mx",
-      germany: "de",
-      alemania: "de",
-      usa: "us",
-      "united states": "us",
-    };
-
-    const code = map[name];
-    if (!code) return "";
-    return `https://flagcdn.com/w40/${code}.png`;
-  }
-
+  // Orden general: fecha+hora, luego liga por prioridad, luego nombre liga
   const fixturesSorted = useMemo(() => {
     const arr = Array.isArray(fixtures) ? [...fixtures] : [];
+
     arr.sort((a, b) => {
       const da = new Date(a?.fixture?.date || a?.date || 0).getTime();
       const db = new Date(b?.fixture?.date || b?.date || 0).getTime();
-      return da - db;
+      if (da !== db) return da - db;
+
+      const la = a?.league?.name || a?.league || "";
+      const lb = b?.league?.name || b?.league || "";
+      const pa = leaguePriority(la);
+      const pb = leaguePriority(lb);
+      if (pa !== pb) return pa - pb;
+
+      return String(la).localeCompare(String(lb));
     });
+
     return arr;
   }, [fixtures]);
+
+  // Agrupación: Día -> Liga
+  const grouped = useMemo(() => {
+    const byDate = new Map();
+
+    for (const f of fixturesSorted) {
+      const dKey = fixtureDateKey(f) || "Sin fecha";
+      const meta = fixtureMeta(f);
+      const league = meta.league || "Liga";
+      const lKey = `${leaguePriority(league)}|${league}`;
+
+      if (!byDate.has(dKey)) byDate.set(dKey, new Map());
+      const leagueMap = byDate.get(dKey);
+
+      if (!leagueMap.has(lKey)) leagueMap.set(lKey, []);
+      leagueMap.get(lKey).push(f);
+    }
+
+    // Convertir a estructura ordenada
+    const dates = [...byDate.keys()].sort((a, b) => a.localeCompare(b));
+    return dates.map((dKey) => {
+      const leagueMap = byDate.get(dKey);
+      const leagues = [...leagueMap.keys()]
+        .sort((a, b) => {
+          const pa = Number(String(a).split("|")[0] || 999);
+          const pb = Number(String(b).split("|")[0] || 999);
+          if (pa !== pb) return pa - pb;
+          return String(a).localeCompare(String(b));
+        })
+        .map((lKey) => {
+          const leagueName = String(lKey).split("|").slice(1).join("|");
+          const items = leagueMap.get(lKey) || [];
+          // por hora dentro de liga
+          items.sort((x, y) => {
+            const tx = new Date(x?.fixture?.date || x?.date || 0).getTime();
+            const ty = new Date(y?.fixture?.date || y?.date || 0).getTime();
+            return tx - ty;
+          });
+          return { leagueName, items };
+        });
+
+      return { dKey, leagues };
+    });
+  }, [fixturesSorted]);
 
   const total = fixturesSorted.length;
 
@@ -503,17 +608,11 @@ export default function Fixtures() {
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div
           className="absolute -top-44 left-1/2 -translate-x-1/2 h-[640px] w-[640px] rounded-full blur-3xl opacity-20"
-          style={{
-            background:
-              "radial-gradient(circle at center, rgba(16,185,129,0.55), rgba(15,23,42,0) 60%)",
-          }}
+          style={{ background: "radial-gradient(circle at center, rgba(16,185,129,0.55), rgba(15,23,42,0) 60%)" }}
         />
         <div
           className="absolute -top-52 right-[-140px] h-[560px] w-[560px] rounded-full blur-3xl opacity-16"
-          style={{
-            background:
-              "radial-gradient(circle at center, rgba(230,196,100,0.45), rgba(15,23,42,0) 62%)",
-          }}
+          style={{ background: "radial-gradient(circle at center, rgba(230,196,100,0.45), rgba(15,23,42,0) 62%)" }}
         />
         <div
           className="absolute inset-0 opacity-[0.10]"
@@ -554,10 +653,7 @@ export default function Fixtures() {
                   boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset",
                 }}
               >
-                Fuente:{" "}
-                <span className="font-semibold" style={{ color: GOLD }}>
-                  Datos en vivo
-                </span>
+                Fuente: <span className="font-semibold" style={{ color: GOLD }}>Datos en vivo</span>
               </Chip>
 
               <Chip
@@ -576,12 +672,7 @@ export default function Fixtures() {
       </HudCard>
 
       {/* Filtros */}
-      <HudCard
-        bg={BG_PARTIDAZOS}
-        overlayVariant="casillasSharp"
-        className="mt-4"
-        glow="gold"
-      >
+      <HudCard bg={BG_PARTIDAZOS} overlayVariant="casillasSharp" className="mt-4" glow="gold">
         <div className="p-5 md:p-6">
           <div className="text-sm font-semibold">Filtros</div>
 
@@ -643,12 +734,7 @@ export default function Fixtures() {
               <div className="text-xs text-slate-200 mt-1">
                 Puedes ver partidos del día. Para estadísticas avanzadas y cuotas potenciadas (x10, x20, x50 o x100),
                 necesitas membresía.{" "}
-                <button
-                  type="button"
-                  onClick={goPlans}
-                  className="underline font-semibold"
-                  style={{ color: GOLD }}
-                >
+                <button type="button" onClick={goPlans} className="underline font-semibold" style={{ color: GOLD }}>
                   Ver planes
                 </button>
                 .
@@ -660,18 +746,13 @@ export default function Fixtures() {
         </div>
       </HudCard>
 
-      {/* Reco semanal */}
+      {/* Partidazos (dinámico) */}
       <div className="mt-4">
-        <RecoWeeklyCard />
+        <RecoWeeklyCard fixtures={fixturesSorted} />
       </div>
 
       {/* Resultados */}
-      <HudCard
-        bg={BG_CASILLAS}
-        overlayVariant="casillasSharp"
-        className="mt-4"
-        glow="gold"
-      >
+      <HudCard bg={BG_CASILLAS} overlayVariant="casillasSharp" className="mt-4" glow="gold">
         <div className="p-5 md:p-6">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
             <div>
@@ -687,126 +768,171 @@ export default function Fixtures() {
                 boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset",
               }}
             >
-              Zona horaria:{" "}
-              <span className="font-semibold" style={{ color: GOLD }}>
-                America/Santiago
-              </span>
+              Zona horaria: <span className="font-semibold" style={{ color: GOLD }}>America/Santiago</span>
             </Chip>
           </div>
 
           {total === 0 && !loading ? (
-            <div className="mt-4 text-sm text-slate-200">
-              Por ahora no hay partidos para este rango o filtro.
-            </div>
+            <div className="mt-4 text-sm text-slate-200">Por ahora no hay partidos para este rango o filtro.</div>
           ) : null}
 
-          <div className="mt-4 space-y-4">
-            {fixturesSorted.slice(0, 200).map((f, idx) => {
-              const title = fixtureTitle(f);
-              const meta = fixtureMeta(f);
-              const flagUrl = fixtureFlagUrl(meta.country);
-
-              return (
-                <div
-                  key={f?.fixture?.id ?? f?.id ?? idx}
-                  className="rounded-3xl border border-white/10 bg-slate-950/25 p-4 md:p-5"
-                  style={{
-                    boxShadow:
-                      "0 0 0 1px rgba(255,255,255,0.03) inset, 0 14px 44px rgba(0,0,0,0.50)",
-                    backdropFilter: "blur(10px)",
-                  }}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-base font-bold truncate">{title}</div>
-
-                      <div className="mt-1 text-xs text-slate-300 flex items-center gap-2">
-                        {flagUrl ? (
-                          <img
-                            src={flagUrl}
-                            alt=""
-                            aria-hidden="true"
-                            className="h-4 w-6 rounded-sm object-cover opacity-90"
-                          />
-                        ) : null}
-                        <span className="truncate">
-                          {meta.country ? `${meta.country} · ` : ""}
-                          {meta.league ? `${meta.league} · ` : ""}
-                          {meta.timeLabel ? `${meta.timeLabel}` : ""}
-                        </span>
-                      </div>
-                    </div>
-
-                    <span className="text-xs px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-slate-200">
-                      {f?.fixture?.status?.short || f?.status || "—"}
-                    </span>
-                  </div>
-
-                  <div className="mt-4 flex flex-col sm:flex-row gap-2">
-                    <button
-                      type="button"
-                      onClick={() => (isLoggedIn ? alert("Aquí abrirás estadísticas (PRO).") : goPlans())}
-                      className="w-full sm:w-auto px-5 py-2.5 rounded-full text-sm font-semibold border transition"
-                      style={{
-                        borderColor: "rgba(76,201,240,0.28)",
-                        background: "rgba(76,201,240,0.14)",
-                        color: "rgba(219,242,255,0.96)",
-                        boxShadow: "0 0 28px rgba(76,201,240,0.12)",
-                      }}
-                    >
-                      Ver estadísticas
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => (isLoggedIn ? alert("Añadir a combinada (PRO).") : goPlans())}
-                      className="w-full sm:w-auto px-5 py-2.5 rounded-full text-sm font-semibold"
-                      style={{
-                        backgroundColor: GOLD,
-                        color: "#0f172a",
-                        boxShadow: "0 0 26px rgba(230,196,100,0.18)",
-                      }}
-                    >
-                      Añadir a combinada
-                    </button>
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-2 gap-3">
-                    {[
-                      { label: "1X2/Goles", key: "odds" },
-                      { label: "Tarjetas", key: "cards" },
-                      { label: "Corners", key: "corners" },
-                      { label: "Prob.", key: "prob" },
-                    ].map((item) => (
-                      <div
-                        key={item.key}
-                        className="rounded-2xl border border-white/10 bg-slate-950/25 px-4 py-3 flex items-center justify-between"
-                        style={{
-                          boxShadow: "0 0 0 1px rgba(255,255,255,0.02) inset",
-                          backdropFilter: "blur(8px)",
-                        }}
-                      >
-                        <div>
-                          <div className="text-xs text-slate-300">{item.label}</div>
-                          <div className="text-sm font-bold text-slate-100 mt-0.5">—</div>
-                        </div>
-                        <LockIcon />
-                      </div>
-                    ))}
-                  </div>
-
-                  {!isLoggedIn ? (
-                    <div className="mt-4 text-xs text-slate-300">
-                      Nota: Estás viendo la versión pública.{" "}
-                      <Link to="/login" className="underline font-semibold" style={{ color: GOLD }}>
-                        Inicia sesión
-                      </Link>{" "}
-                      para ver tu plan.
-                    </div>
-                  ) : null}
+          <div className="mt-5 space-y-6">
+            {grouped.map((day) => (
+              <div key={day.dKey} className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-bold text-slate-100">{day.dKey}</div>
+                  <div className="text-[11px] text-slate-400">Ligas importantes primero</div>
                 </div>
-              );
-            })}
+
+                {day.leagues.map((lg) => (
+                  <div key={`${day.dKey}-${lg.leagueName}`} className="rounded-3xl border border-white/10 bg-slate-950/20">
+                    <div className="px-4 md:px-5 py-3 flex items-center justify-between">
+                      <div className="text-sm font-semibold text-slate-100">{lg.leagueName}</div>
+                      <div
+                        className="text-[11px] px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-slate-200"
+                        style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.02) inset" }}
+                      >
+                        {lg.items.length} partidos
+                      </div>
+                    </div>
+
+                    <div className="px-3 md:px-4 pb-4 space-y-2">
+                      {lg.items.map((f, idx) => {
+                        const { home, away } = fixtureTitleParts(f);
+                        const meta = fixtureMeta(f);
+                        const hLogo = teamLogo(f?.teams?.home);
+                        const aLogo = teamLogo(f?.teams?.away);
+
+                        return (
+                          <div
+                            key={`${fixtureId(f)}-${idx}`}
+                            className="rounded-2xl border border-white/10 bg-slate-950/25 px-4 py-3"
+                            style={{
+                              boxShadow: "0 0 0 1px rgba(255,255,255,0.02) inset, 0 12px 38px rgba(0,0,0,0.45)",
+                              backdropFilter: "blur(10px)",
+                            }}
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              {/* Partido con escudos */}
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  {hLogo ? (
+                                    <img
+                                      src={hLogo}
+                                      alt=""
+                                      aria-hidden="true"
+                                      className="h-7 w-7 rounded-sm object-contain"
+                                    />
+                                  ) : (
+                                    <div className="h-7 w-7 rounded-sm bg-white/5 border border-white/10" />
+                                  )}
+
+                                  <div className="text-sm font-semibold text-slate-100 truncate">
+                                    {safeTeamShort(home, 20)}
+                                  </div>
+
+                                  <div className="text-xs font-bold" style={{ color: "rgba(230,196,100,0.80)" }}>
+                                    vs
+                                  </div>
+
+                                  <div className="text-sm font-semibold text-slate-100 truncate">
+                                    {safeTeamShort(away, 20)}
+                                  </div>
+
+                                  {aLogo ? (
+                                    <img
+                                      src={aLogo}
+                                      alt=""
+                                      aria-hidden="true"
+                                      className="h-7 w-7 rounded-sm object-contain"
+                                    />
+                                  ) : (
+                                    <div className="h-7 w-7 rounded-sm bg-white/5 border border-white/10" />
+                                  )}
+                                </div>
+
+                                <div className="mt-1 text-[11px] text-slate-400 truncate">
+                                  {meta.country ? `${meta.country} · ` : ""}
+                                  {meta.timeLabel ? `${meta.timeLabel}` : ""}
+                                </div>
+                              </div>
+
+                              <span className="shrink-0 text-xs px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-slate-200">
+                                {f?.fixture?.status?.short || f?.status || "—"}
+                              </span>
+                            </div>
+
+                            <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                              <button
+                                type="button"
+                                onClick={() => (isLoggedIn ? alert("Aquí abrirás estadísticas (PRO).") : goPlans())}
+                                className="w-full sm:w-auto px-5 py-2.5 rounded-full text-sm font-semibold border transition"
+                                style={{
+                                  borderColor: "rgba(76,201,240,0.28)",
+                                  background: "rgba(76,201,240,0.14)",
+                                  color: "rgba(219,242,255,0.96)",
+                                  boxShadow: "0 0 28px rgba(76,201,240,0.12)",
+                                }}
+                              >
+                                Ver estadísticas
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => (isLoggedIn ? alert("Añadir a combinada (PRO).") : goPlans())}
+                                className="w-full sm:w-auto px-5 py-2.5 rounded-full text-sm font-semibold"
+                                style={{
+                                  backgroundColor: GOLD,
+                                  color: "#0f172a",
+                                  boxShadow: "0 0 26px rgba(230,196,100,0.18)",
+                                }}
+                              >
+                                Añadir a combinada
+                              </button>
+                            </div>
+
+                            {/* Candados */}
+                            <div className="mt-3 grid grid-cols-2 gap-3">
+                              {[
+                                { label: "1X2/Goles", key: "odds" },
+                                { label: "Tarjetas", key: "cards" },
+                                { label: "Corners", key: "corners" },
+                                { label: "Prob.", key: "prob" },
+                              ].map((item) => (
+                                <div
+                                  key={item.key}
+                                  className="rounded-2xl border border-white/10 bg-slate-950/25 px-4 py-3 flex items-center justify-between"
+                                  style={{
+                                    boxShadow: "0 0 0 1px rgba(255,255,255,0.02) inset",
+                                    backdropFilter: "blur(8px)",
+                                  }}
+                                >
+                                  <div>
+                                    <div className="text-xs text-slate-300">{item.label}</div>
+                                    <div className="text-sm font-bold text-slate-100 mt-0.5">—</div>
+                                  </div>
+                                  <LockIcon />
+                                </div>
+                              ))}
+                            </div>
+
+                            {!isLoggedIn ? (
+                              <div className="mt-3 text-xs text-slate-300">
+                                Nota: Estás viendo la versión pública.{" "}
+                                <Link to="/login" className="underline font-semibold" style={{ color: GOLD }}>
+                                  Inicia sesión
+                                </Link>{" "}
+                                para ver tu plan.
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
           </div>
         </div>
       </HudCard>
@@ -815,13 +941,7 @@ export default function Fixtures() {
       <GainSimulatorCard onGoPlans={goPlans} />
 
       {/* CTA final */}
-      <HudCard
-        bg={BG_12000}
-        overlayVariant="player"
-        className="mt-4"
-        glow="gold"
-        imgStyle={{ objectPosition: "70% 22%" }}
-      >
+      <HudCard bg={BG_12000} overlayVariant="player" className="mt-4" glow="gold" imgStyle={{ objectPosition: "70% 22%" }}>
         <div className="p-5 md:p-6">
           <div className="text-lg font-bold">Únete a la comunidad</div>
           <p className="text-sm text-slate-200 mt-1 max-w-xl">
@@ -832,20 +952,14 @@ export default function Fixtures() {
             type="button"
             onClick={goPlans}
             className="mt-4 w-full md:w-fit px-6 py-3 rounded-full text-sm font-bold"
-            style={{
-              backgroundColor: GOLD,
-              color: "#0f172a",
-              boxShadow: "0 0 26px rgba(230,196,100,0.18)",
-            }}
+            style={{ backgroundColor: GOLD, color: "#0f172a", boxShadow: "0 0 26px rgba(230,196,100,0.18)" }}
           >
             Unirme
           </button>
         </div>
       </HudCard>
 
-      <div className="mt-8 text-center text-xs text-slate-500">
-        © {new Date().getFullYear()} Factor Victoria
-      </div>
+      <div className="mt-8 text-center text-xs text-slate-500">© {new Date().getFullYear()} Factor Victoria</div>
     </div>
   );
 }
