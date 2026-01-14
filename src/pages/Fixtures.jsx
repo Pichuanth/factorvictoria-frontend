@@ -55,33 +55,43 @@ function norm(s) {
 }
 
 // Prioridad menor = más importante
+function countryPriority(countryName) {
+  const c = norm(countryName);
+
+  if (c.includes("england") || c.includes("inglaterra")) return 0;
+  if (c.includes("spain") || c.includes("espana") || c.includes("españa")) return 1;
+  if (c.includes("france") || c.includes("francia")) return 2;
+  if (c.includes("italy") || c.includes("italia")) return 3;
+  if (c.includes("argentina")) return 4;
+  if (c.includes("chile")) return 5;
+  if (c.includes("portugal")) return 6;
+  if (c.includes("mexico") || c.includes("méxico")) return 7;
+  if (c.includes("germany") || c.includes("alemania")) return 8;
+
+  return 50;
+}
+
 function leaguePriority(leagueName) {
   const n = norm(leagueName);
 
-  // Europe top
+  // Champions SIEMPRE arriba
   if (n.includes("champions league") || n.includes("uefa champions")) return 0;
+
+  // Europe
   if (n.includes("europa league") || n.includes("uefa europa")) return 1;
   if (n.includes("conference league") || n.includes("uefa conference")) return 2;
 
-  // Big 5
+  // Big 5 (después la priorización por país hará el orden interno)
   if (n.includes("premier league")) return 3;
   if (n.includes("la liga") || n.includes("laliga")) return 4;
   if (n.includes("serie a")) return 5;
   if (n.includes("bundesliga") && !n.includes("2.")) return 6;
   if (n.includes("ligue 1")) return 7;
 
-  // South America (si las usas)
+  // Conmebol
   if (n.includes("libertadores")) return 8;
   if (n.includes("sudamericana")) return 9;
 
-  // Secondary / cups
-  if (n.includes("coppa italia")) return 20;
-  if (n.includes("copa del rey")) return 20;
-  if (n.includes("fa cup")) return 20;
-  if (n.includes("efl cup") || n.includes("carabao")) return 21;
-  if (n.includes("efl trophy")) return 30;
-
-  // Default
   return 50;
 }
 
@@ -260,27 +270,99 @@ function HudCard({
 }
 
 /* ------------------- Reco semanal (dinámico) ------------------- */
+/* ------------------- Partidazos manuales ------------------- */
+/**
+ * ✅ EDITA SOLO ESTA LISTA (PARTIDAZOS_MANUAL)
+ * Puedes usar:
+ * - fixtureId: el ID real (si lo conoces)
+ * - o match: texto "equipoA vs equipoB" (parcial) + opcional league/country
+ * - date: "YYYY-MM-DD" opcional para acotar
+ *
+ * Ejemplos:
+ * { date:"2026-01-20", league:"Champions League", match:"Inter Milan vs Arsenal" }
+ * { date:"2026-01-13", match:"Manchester" }  // matchea cualquier partido que contenga "Manchester"
+ */
+const PARTIDAZOS_MANUAL = [
+  // --- Champions / top ---
+  { date: "2026-01-20", league: "Champions League", match: "Inter Milan vs Arsenal" },
+  { date: "2026-01-20", league: "Champions League", match: "Tottenham vs Borussia" },
+  { date: "2026-01-20", league: "Champions League", match: "Real Madrid vs AS Monaco" },
+  { date: "2026-01-20", league: "Champions League", match: "Sporting" }, // ejemplo flexible
+  { date: "2026-01-20", league: "Champions League", match: "PSG" },
+
+  // --- Ligas top (ajusta a gusto) ---
+  { league: "Premier League", match: "Manchester" },
+  { league: "Premier League", match: "Liverpool" },
+  { league: "La Liga", match: "Real Madrid" },
+  { league: "Serie A", match: "Napoli" },
+  { league: "Ligue 1", match: "PSG" },
+];
+
+function matchIncludes(haystack, needle) {
+  return norm(haystack).includes(norm(needle));
+}
+
+function picksFromFixtures(fixtures) {
+  const out = [];
+  const used = new Set();
+
+  for (const pick of PARTIDAZOS_MANUAL) {
+    const { fixtureId, date, league, country, match } = pick || {};
+    let found = null;
+
+    if (fixtureId) {
+      found = fixtures.find((f) => String(f?.fixture?.id ?? f?.id ?? "") === String(fixtureId));
+    } else {
+      found = fixtures.find((f) => {
+        const dKey = fixtureDateKey(f);
+        const meta = fixtureMeta(f);
+        const { home, away } = fixtureTitleParts(f);
+        const title = `${home} vs ${away}`;
+
+        if (date && dKey !== date) return false;
+        if (league && !matchIncludes(meta.league || "", league)) return false;
+        if (country && !matchIncludes(meta.country || "", country)) return false;
+        if (match && !matchIncludes(title, match)) return false;
+
+        return true;
+      });
+    }
+
+    if (found) {
+      const id = fixtureId(found);
+      if (!used.has(id)) {
+        used.add(id);
+        out.push(found);
+      }
+    }
+  }
+
+  return out;
+}
+
 function RecoWeeklyCard({ fixtures = [] }) {
-  const top = useMemo(() => {
-    const arr = Array.isArray(fixtures) ? [...fixtures] : [];
-    // Ya vienen ordenados por date + liga + hora (más abajo). Tomamos un “top” razonable.
-    return arr.slice(0, 10);
-  }, [fixtures]);
+  const picks = useMemo(() => picksFromFixtures(fixtures), [fixtures]);
 
   return (
     <HudCard bg={BG_PARTIDAZOS} overlayVariant="casillasSharp" glow="gold">
       <div className="relative p-5 md:p-6">
-        <div className="text-xs tracking-wide text-emerald-200/90 font-semibold">Factor Victoria recomienda</div>
-        <div className="mt-1 text-lg md:text-xl font-bold text-slate-100">Partidazos de la semana</div>
-        <div className="mt-1 text-xs text-slate-300">Ligas top primero (Champions, Premier, LaLiga, etc.).</div>
+        <div className="text-xs tracking-wide text-emerald-200/90 font-semibold">
+          Factor Victoria recomienda
+        </div>
+        <div className="mt-1 text-lg md:text-xl font-bold text-slate-100">
+          Partidazos de la semana
+        </div>
+        <div className="mt-1 text-xs text-slate-300">
+          Selección curada manualmente.
+        </div>
 
         <div className="mt-4 space-y-2">
-          {top.length === 0 ? (
+          {picks.length === 0 ? (
             <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-slate-300">
-              Aún no hay partidos cargados para mostrar aquí.
+              Aún no has definido partidazos para este rango (o no están en el filtro de fechas).
             </div>
           ) : (
-            top.map((f, i) => {
+            picks.map((f, i) => {
               const { home, away } = fixtureTitleParts(f);
               const meta = fixtureMeta(f);
               const hLogo = teamLogo(f?.teams?.home);
@@ -339,12 +421,15 @@ function RecoWeeklyCard({ fixtures = [] }) {
           )}
         </div>
 
-        <div className="mt-3 text-[11px] text-slate-400">Tip: Menos es más. Escudos pequeños + texto limpio.</div>
+        <div className="mt-3 text-[11px] text-slate-400">
+          Edita la lista PARTIDAZOS_MANUAL en el código para cambiar la selección.
+        </div>
       </div>
     </HudCard>
   );
 }
 
+  
 /* ------------------- Simulador ------------------- */
 function formatMoney(value, currency) {
   const n = Number(value || 0);
@@ -564,7 +649,9 @@ export default function Fixtures() {
       const dKey = fixtureDateKey(f) || "Sin fecha";
       const meta = fixtureMeta(f);
       const league = meta.league || "Liga";
-      const lKey = `${leaguePriority(league)}|${league}`;
+      const cPr = countryPriority(meta.country);
+const lPr = leaguePriority(league);
+const lKey = `${lPr}|${cPr}|${league}|${meta.country || ""}`;
 
       if (!byDate.has(dKey)) byDate.set(dKey, new Map());
       const leagueMap = byDate.get(dKey);
@@ -579,13 +666,23 @@ export default function Fixtures() {
       const leagueMap = byDate.get(dKey);
       const leagues = [...leagueMap.keys()]
         .sort((a, b) => {
-          const pa = Number(String(a).split("|")[0] || 999);
-          const pb = Number(String(b).split("|")[0] || 999);
-          if (pa !== pb) return pa - pb;
-          return String(a).localeCompare(String(b));
+          const sa = String(a).split("|");
+const sb = String(b).split("|");
+
+const lpa = Number(sa[0] || 999);
+const lpb = Number(sb[0] || 999);
+if (lpa !== lpb) return lpa - lpb;
+
+const cpa = Number(sa[1] || 999);
+const cpb = Number(sb[1] || 999);
+if (cpa !== cpb) return cpa - cpb;
+
+return String(a).localeCompare(String(b));
+
         })
         .map((lKey) => {
-          const leagueName = String(lKey).split("|").slice(1).join("|");
+          const parts = String(lKey).split("|");
+          const leagueName = parts[2] || "Liga";
           const items = leagueMap.get(lKey) || [];
           // por hora dentro de liga
           items.sort((x, y) => {
