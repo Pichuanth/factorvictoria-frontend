@@ -624,6 +624,14 @@ function GainSimulatorCard({ onGoPlans }) {
     </HudCard>
   );
 }
+function manualPickDates() {
+  const set = new Set(
+    (PARTIDAZOS_MANUAL || [])
+      .map((p) => (p?.date ? String(p.date).trim() : ""))
+      .filter(Boolean)
+  );
+  return [...set];
+}
 
 /* ------------------- Fixtures ------------------- */
 export default function Fixtures() {
@@ -679,48 +687,54 @@ export default function Fixtures() {
   }
 
   async function onSearch() {
-    setErr("");
-    setLoading(true);
-    try {
-      const quick = parseQuickFilter(filterText);
+  setErr("");
+  setLoading(true);
+  try {
+    const quick = parseQuickFilter(filterText);
 
-      // 1) Fechas del usuario
-      const baseDates = enumerateDates(fromDate, toDate, 10);
-
-      // 2) Fechas de partidazos manuales (para que aparezcan aunque el usuario esté en otra fecha)
-      const extraDates = manualPickDates();
-
-      // Merge + dedup (cap razonable para no abusar)
-      const merged = Array.from(new Set([...(baseDates || []), ...(extraDates || [])])).slice(0, 14);
-
-      if (!merged.length) {
-        setFixtures([]);
-        setErr("Rango de fechas inválido.");
-        return;
-      }
-
-      const chunks = [];
-      for (const d of merged) {
-        // eslint-disable-next-line no-await-in-loop
-        const day = await fetchDay(d, quick);
-        chunks.push(...day);
-      }
-
-      // Dedup
-      const map = new Map();
-      for (const f of chunks) {
-        const id = fixtureId(f);
-        if (!map.has(id)) map.set(id, f);
-      }
-
-      setFixtures([...map.values()]);
-    } catch (e) {
-      setErr("No se pudieron cargar los partidos. Intenta nuevamente.");
+    // Fechas del filtro del usuario
+    const dates = enumerateDates(fromDate, toDate, 10);
+    if (!dates.length) {
       setFixtures([]);
-    } finally {
-      setLoading(false);
+      setErr("Rango de fechas inválido.");
+      return;
     }
+
+    // Fechas extra: las que están en PARTIDAZOS_MANUAL (para que siempre aparezcan)
+    const extra = manualPickDates().filter((d) => !dates.includes(d));
+
+    const chunks = [];
+
+    // 1) Carga el rango que el usuario pidió
+    for (const d of dates) {
+      // eslint-disable-next-line no-await-in-loop
+      const day = await fetchDay(d, quick);
+      chunks.push(...day);
+    }
+
+    // 2) Carga fechas “manuales” aunque estén fuera del rango (solo para poder mostrarlas arriba)
+    //    Aquí NO aplico quick filter para no “matar” los partidazos por un filtro del usuario.
+    for (const d of extra) {
+      // eslint-disable-next-line no-await-in-loop
+      const day = await fetchDay(d, { country: "", league: "", team: "" });
+      chunks.push(...day);
+    }
+
+    // Dedup
+    const map = new Map();
+    for (const f of chunks) {
+      const id = fixtureId(f);
+      if (!map.has(id)) map.set(id, f);
+    }
+
+    setFixtures([...map.values()]);
+  } catch (e) {
+    setErr("No se pudieron cargar los partidos. Intenta nuevamente.");
+    setFixtures([]);
+  } finally {
+    setLoading(false);
   }
+}
 
   useEffect(() => {
     onSearch();
@@ -973,7 +987,13 @@ export default function Fixtures() {
       </div>
 
       {/* 2) Partidazos bloqueados (solo top 3) */}
-      <HudCard bg={BG_CASILLAS} overlayVariant="casillasSharp" className="mt-4" glow="gold">
+      <HudCard
+  bg={null}
+  bgColor="#071a17"
+  overlayVariant="casillasSharp"
+  className="mt-4"
+  glow="gold"
+>
         <div className="p-5 md:p-6">
           <div className="flex items-start justify-between gap-3">
             <div>
