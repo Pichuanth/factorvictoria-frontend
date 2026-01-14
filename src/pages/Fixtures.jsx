@@ -62,13 +62,7 @@ function Chip({ children, style, className = "" }) {
 
 function LockIcon({ size = 18, color = "rgba(230,196,100,0.9)" }) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
         d="M7.5 11V8.8c0-2.9 2.1-5.3 4.7-5.3s4.7 2.4 4.7 5.3V11"
         stroke={color}
@@ -93,36 +87,75 @@ function LockIcon({ size = 18, color = "rgba(230,196,100,0.9)" }) {
 }
 
 /**
- * Card con fondo (imagen) + overlays para legibilidad.
+ * ✅ HudCard (estilo Perfil / “tarjeta flotante”)
+ * - Borde neutro limpio
+ * - Profundidad (sombra) para efecto flotante
+ * - Glow dorado suave opcional
+ * - Overlays + filtro de imagen para legibilidad
  */
 function HudCard({
   bg,
+  bgColor,
   children,
   className = "",
   style = {},
   overlay = true,
-  overlayVariant = "casillas", // "casillas" | "player"
+  overlayVariant = "casillasSharp", // "casillas" | "casillasSharp" | "player"
+  glow = "gold", // "gold" | "none"
   imgClassName = "",
   imgStyle = {},
 }) {
-  const overlayLayers =
-    overlayVariant === "player"
+  const variants = {
+    player: {
+      overlays: [
+        "linear-gradient(90deg, rgba(2,6,23,0.92) 0%, rgba(2,6,23,0.70) 52%, rgba(2,6,23,0.42) 78%, rgba(2,6,23,0.25) 100%)",
+        "radial-gradient(circle at 20% 45%, rgba(16,185,129,0.20), rgba(2,6,23,0) 58%)",
+        "radial-gradient(circle at 82% 50%, rgba(230,196,100,0.18), rgba(2,6,23,0) 58%)",
+      ],
+      imgFilter: "contrast(1.12) saturate(1.08) brightness(0.95)",
+    },
+    casillas: {
+      overlays: [
+        "linear-gradient(180deg, rgba(2,6,23,0.86) 0%, rgba(2,6,23,0.60) 38%, rgba(2,6,23,0.86) 100%)",
+        "radial-gradient(circle at 18% 30%, rgba(16,185,129,0.18), rgba(2,6,23,0) 60%)",
+        "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.14), rgba(2,6,23,0) 60%)",
+      ],
+      imgFilter: "contrast(1.10) saturate(1.06) brightness(0.96)",
+    },
+    casillasSharp: {
+      overlays: [
+        "linear-gradient(180deg, rgba(2,6,23,0.78) 0%, rgba(2,6,23,0.45) 42%, rgba(2,6,23,0.78) 100%)",
+        "radial-gradient(circle at 18% 30%, rgba(16,185,129,0.14), rgba(2,6,23,0) 62%)",
+        "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.10), rgba(2,6,23,0) 62%)",
+      ],
+      imgFilter: "contrast(1.18) saturate(1.10) brightness(0.97)",
+    },
+  };
+
+  const v = variants[overlayVariant] || variants.casillasSharp;
+  const [o1, o2, o3] = v.overlays;
+
+  const borderColor = "rgba(255,255,255,0.10)";
+
+  const boxShadow =
+    glow === "gold"
       ? [
-          "linear-gradient(90deg, rgba(2,6,23,0.92) 0%, rgba(2,6,23,0.70) 52%, rgba(2,6,23,0.42) 78%, rgba(2,6,23,0.25) 100%)",
-          "radial-gradient(circle at 20% 45%, rgba(16,185,129,0.20), rgba(2,6,23,0) 58%)",
-          "radial-gradient(circle at 82% 50%, rgba(230,196,100,0.18), rgba(2,6,23,0) 58%)",
-        ]
+          "0 0 0 1px rgba(255,255,255,0.03) inset",
+          "0 18px 60px rgba(0,0,0,0.55)", // profundidad (flotante)
+          "0 0 70px rgba(230,196,100,0.18)", // glow dorado suave
+        ].join(", ")
       : [
-          "linear-gradient(180deg, rgba(2,6,23,0.86) 0%, rgba(2,6,23,0.60) 38%, rgba(2,6,23,0.86) 100%)",
-          "radial-gradient(circle at 18% 30%, rgba(16,185,129,0.18), rgba(2,6,23,0) 60%)",
-          "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.14), rgba(2,6,23,0) 60%)",
-        ];
+          "0 0 0 1px rgba(255,255,255,0.05) inset",
+          "0 18px 60px rgba(0,0,0,0.55)",
+        ].join(", ");
 
   return (
     <div
-      className={`relative overflow-hidden rounded-3xl border bg-white/5 ${className}`}
+      className={`relative overflow-hidden rounded-3xl border bg-slate-950/25 backdrop-blur-md ${className}`}
       style={{
-        borderColor: "rgba(255,255,255,0.10)",
+        borderColor,
+        boxShadow,
+        backgroundColor: bgColor || undefined,
         ...style,
       }}
     >
@@ -132,15 +165,15 @@ function HudCard({
           alt=""
           aria-hidden="true"
           className={`absolute inset-0 h-full w-full object-cover ${imgClassName}`}
-          style={imgStyle}
+          style={{ filter: v.imgFilter, ...imgStyle }}
         />
       ) : null}
 
       {overlay ? (
         <>
-          <div className="absolute inset-0" style={{ background: overlayLayers[0] }} />
-          <div className="absolute inset-0" style={{ background: overlayLayers[1] }} />
-          <div className="absolute inset-0" style={{ background: overlayLayers[2] }} />
+          <div className="absolute inset-0" style={{ background: o1 }} />
+          <div className="absolute inset-0" style={{ background: o2 }} />
+          <div className="absolute inset-0" style={{ background: o3 }} />
         </>
       ) : null}
 
@@ -152,43 +185,15 @@ function HudCard({
 /* ------------------- Reco semanal ------------------- */
 function RecoWeeklyCard() {
   return (
-    <div
-      className="relative overflow-hidden rounded-3xl border bg-white/5"
+    <HudCard
+      bg={BG_PARTIDAZOS}
+      overlayVariant="casillasSharp"
+      glow="gold"
       style={{
-        borderColor: "rgba(255,255,255,0.10)",
         boxShadow:
-          "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 46px rgba(230,196,100,0.16)",
+          "0 0 0 1px rgba(255,255,255,0.03) inset, 0 18px 60px rgba(0,0,0,0.55), 0 0 70px rgba(230,196,100,0.18)",
       }}
     >
-      <img
-        src={BG_PARTIDAZOS}
-        alt=""
-        aria-hidden="true"
-        className="absolute inset-0 h-full w-full object-cover"
-      />
-
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "linear-gradient(180deg, rgba(2,6,23,0.86) 0%, rgba(2,6,23,0.55) 48%, rgba(2,6,23,0.88) 100%)",
-        }}
-      />
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(circle at 18% 30%, rgba(16,185,129,0.16), rgba(2,6,23,0) 60%)",
-        }}
-      />
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(circle at 85% 60%, rgba(230,196,100,0.16), rgba(2,6,23,0) 60%)",
-        }}
-      />
-
       <div className="relative p-5 md:p-6">
         <div className="text-xs tracking-wide text-emerald-200/90 font-semibold">
           Factor Victoria recomienda
@@ -213,7 +218,7 @@ function RecoWeeklyCard() {
           Tip: Apuesta con datos, planificación y visión ganadora.
         </div>
       </div>
-    </div>
+    </HudCard>
   );
 }
 
@@ -242,21 +247,16 @@ function GainSimulatorCard({ onGoPlans }) {
 
   return (
     <HudCard
-      bg={BG_DINERO} // <-- tu fondo hero.dinero.png
-      overlayVariant="casillas"
+      bg={BG_DINERO}
+      overlayVariant="casillasSharp"
       className="mt-4"
-      style={{
-        boxShadow:
-          "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.14)",
-      }}
+      glow="gold"
       imgStyle={{ objectPosition: "60% 35%" }}
     >
       <div className="p-5 md:p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-sm font-semibold text-slate-100">
-              Simulador de ganancias
-            </div>
+            <div className="text-sm font-semibold text-slate-100">Simulador de ganancias</div>
             <div className="text-xs text-slate-300 mt-1">
               Estima cuánto podrías obtener con cuotas potenciadas.
             </div>
@@ -274,7 +274,6 @@ function GainSimulatorCard({ onGoPlans }) {
         </div>
 
         <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-          {/* Monto formateado dentro del input */}
           <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
             <div className="text-xs text-slate-300">Monto</div>
 
@@ -451,10 +450,7 @@ export default function Fixtures() {
     if (when) {
       const d = new Date(when);
       if (!Number.isNaN(d.getTime())) {
-        timeLabel = d.toLocaleTimeString("es-CL", {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
+        timeLabel = d.toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
       }
     }
     return { country, league, timeLabel };
@@ -489,7 +485,6 @@ export default function Fixtures() {
     return `https://flagcdn.com/w40/${code}.png`;
   }
 
-  // Ordenar por hora para que no “desaparezcan” ligas grandes por orden aleatorio
   const fixturesSorted = useMemo(() => {
     const arr = Array.isArray(fixtures) ? [...fixtures] : [];
     arr.sort((a, b) => {
@@ -504,15 +499,40 @@ export default function Fixtures() {
 
   return (
     <div className="relative max-w-5xl mx-auto px-4 pb-20">
+      {/* ✅ Fondo ambiental (igual a Perfil) */}
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <div
+          className="absolute -top-44 left-1/2 -translate-x-1/2 h-[640px] w-[640px] rounded-full blur-3xl opacity-20"
+          style={{
+            background:
+              "radial-gradient(circle at center, rgba(16,185,129,0.55), rgba(15,23,42,0) 60%)",
+          }}
+        />
+        <div
+          className="absolute -top-52 right-[-140px] h-[560px] w-[560px] rounded-full blur-3xl opacity-16"
+          style={{
+            background:
+              "radial-gradient(circle at center, rgba(230,196,100,0.45), rgba(15,23,42,0) 62%)",
+          }}
+        />
+        <div
+          className="absolute inset-0 opacity-[0.10]"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, rgba(255,255,255,0.10) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.10) 1px, transparent 1px)",
+            backgroundSize: "56px 56px",
+            maskImage: "radial-gradient(circle at 50% 18%, black 0%, transparent 70%)",
+            WebkitMaskImage: "radial-gradient(circle at 50% 18%, black 0%, transparent 70%)",
+          }}
+        />
+      </div>
+
       {/* Hero */}
       <HudCard
         bg={BG_JUGADOR}
         overlayVariant="player"
         className="mt-6"
-        style={{
-          boxShadow:
-            "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 46px rgba(230,196,100,0.18)",
-        }}
+        glow="gold"
         imgClassName="object-right"
         imgStyle={{ objectPosition: "80% 18%" }}
       >
@@ -531,6 +551,7 @@ export default function Fixtures() {
                 style={{
                   background: "rgba(255,255,255,0.06)",
                   color: "rgba(226,232,240,0.92)",
+                  boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset",
                 }}
               >
                 Fuente:{" "}
@@ -554,15 +575,12 @@ export default function Fixtures() {
         </div>
       </HudCard>
 
-      {/* Filtros (con fondo partidos, como venías ajustando) */}
+      {/* Filtros */}
       <HudCard
         bg={BG_PARTIDAZOS}
-        overlayVariant="casillas"
+        overlayVariant="casillasSharp"
         className="mt-4"
-        style={{
-          boxShadow:
-            "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 40px rgba(230,196,100,0.14)",
-        }}
+        glow="gold"
       >
         <div className="p-5 md:p-6">
           <div className="text-sm font-semibold">Filtros</div>
@@ -589,9 +607,7 @@ export default function Fixtures() {
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-300">
-                Filtro (país / liga / equipo)
-              </label>
+              <label className="text-xs text-slate-300">Filtro (país / liga / equipo)</label>
               <input
                 value={filterText}
                 onChange={(e) => setFilterText(e.target.value)}
@@ -601,7 +617,6 @@ export default function Fixtures() {
             </div>
           </div>
 
-          {/* Botón abajo */}
           <div className="mt-4 flex justify-end">
             <button
               type="button"
@@ -619,6 +634,7 @@ export default function Fixtures() {
               style={{
                 borderColor: "rgba(230,196,100,0.28)",
                 background: "rgba(230,196,100,0.08)",
+                boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset",
               }}
             >
               <div className="text-sm font-semibold" style={{ color: GOLD }}>
@@ -644,7 +660,7 @@ export default function Fixtures() {
         </div>
       </HudCard>
 
-      {/* Reco semanal entre filtros y resultados */}
+      {/* Reco semanal */}
       <div className="mt-4">
         <RecoWeeklyCard />
       </div>
@@ -652,12 +668,9 @@ export default function Fixtures() {
       {/* Resultados */}
       <HudCard
         bg={BG_CASILLAS}
-        overlayVariant="casillas"
+        overlayVariant="casillasSharp"
         className="mt-4"
-        style={{
-          boxShadow:
-            "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 36px rgba(230,196,100,0.12)",
-        }}
+        glow="gold"
       >
         <div className="p-5 md:p-6">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
@@ -671,6 +684,7 @@ export default function Fixtures() {
               style={{
                 background: "rgba(255,255,255,0.06)",
                 color: "rgba(226,232,240,0.92)",
+                boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset",
               }}
             >
               Zona horaria:{" "}
@@ -697,8 +711,9 @@ export default function Fixtures() {
                   key={f?.fixture?.id ?? f?.id ?? idx}
                   className="rounded-3xl border border-white/10 bg-slate-950/25 p-4 md:p-5"
                   style={{
-                    boxShadow: "0 0 0 1px rgba(255,255,255,0.03) inset",
-                    backdropFilter: "blur(8px)",
+                    boxShadow:
+                      "0 0 0 1px rgba(255,255,255,0.03) inset, 0 14px 44px rgba(0,0,0,0.50)",
+                    backdropFilter: "blur(10px)",
                   }}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -728,7 +743,6 @@ export default function Fixtures() {
                   </div>
 
                   <div className="mt-4 flex flex-col sm:flex-row gap-2">
-                    {/* Ver estadísticas (celeste) */}
                     <button
                       type="button"
                       onClick={() => (isLoggedIn ? alert("Aquí abrirás estadísticas (PRO).") : goPlans())}
@@ -743,7 +757,6 @@ export default function Fixtures() {
                       Ver estadísticas
                     </button>
 
-                    {/* Añadir a combinada (oro) */}
                     <button
                       type="button"
                       onClick={() => (isLoggedIn ? alert("Añadir a combinada (PRO).") : goPlans())}
@@ -758,7 +771,6 @@ export default function Fixtures() {
                     </button>
                   </div>
 
-                  {/* Candados (SIEMPRE candado por ahora para no filtrar datos) */}
                   <div className="mt-4 grid grid-cols-2 gap-3">
                     {[
                       { label: "1X2/Goles", key: "odds" },
@@ -769,7 +781,10 @@ export default function Fixtures() {
                       <div
                         key={item.key}
                         className="rounded-2xl border border-white/10 bg-slate-950/25 px-4 py-3 flex items-center justify-between"
-                        style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.02) inset" }}
+                        style={{
+                          boxShadow: "0 0 0 1px rgba(255,255,255,0.02) inset",
+                          backdropFilter: "blur(8px)",
+                        }}
                       >
                         <div>
                           <div className="text-xs text-slate-300">{item.label}</div>
@@ -796,7 +811,7 @@ export default function Fixtures() {
         </div>
       </HudCard>
 
-      {/* Simulador antes del CTA final */}
+      {/* Simulador */}
       <GainSimulatorCard onGoPlans={goPlans} />
 
       {/* CTA final */}
@@ -804,10 +819,7 @@ export default function Fixtures() {
         bg={BG_12000}
         overlayVariant="player"
         className="mt-4"
-        style={{
-          boxShadow:
-            "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 44px rgba(230,196,100,0.16)",
-        }}
+        glow="gold"
         imgStyle={{ objectPosition: "70% 22%" }}
       >
         <div className="p-5 md:p-6">
