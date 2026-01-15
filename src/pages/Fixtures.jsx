@@ -401,9 +401,11 @@ const PARTIDAZOS_MANUAL = [
   // Champions (Martes 20-01-2026)
   { date: "2026-01-20", league: "UEFA Champions League", home: "Inter", away: "Arsenal" },
   { date: "2026-01-20", league: "UEFA Champions League", home: "Tottenham", away: "Borussia Dortmund" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "Real Madrid", away: "AS Monaco" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Monaco" },
   { date: "2026-01-20", league: "UEFA Champions League", home: "Sporting CP", away: "Paris Saint-Germain" },
   { date: "2026-01-20", league: "UEFA Champions League", home: "Villarreal", away: "Ajax" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Paris" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "madrid" },
 
   // Los que te faltan: aquí conviene fixtureId (por nombres “raros” o abreviaciones)
   // { fixtureId: 123456 }, // Bodo/Glimt vs Manchester City
