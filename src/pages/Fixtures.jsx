@@ -17,17 +17,51 @@ const BG_12000 = "/hero-12000.png";
 const BG_PARTIDAZOS = "/hero-fondo-partidos.png";
 const BG_DINERO = "/hero.dinero.png";
 
-/* ------------------- helpers fechas ------------------- */
+/* ------------------- helpers fechas (SIN desfase UTC) ------------------- */
+function parseYMDLocal(ymd) {
+  // ymd: "YYYY-MM-DD" -> Date en horario LOCAL (sin corrimiento por UTC)
+  const [y, m, d] = String(ymd || "").split("-").map((x) => Number(x));
+  if (!y || !m || !d) return new Date(NaN);
+  return new Date(y, m - 1, d, 0, 0, 0, 0);
+}
+
 function toYYYYMMDD(d) {
   const pad = (n) => String(n).padStart(2, "0");
+
+  // Si viene string "YYYY-MM-DD", parsea LOCAL
+  if (typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+    const dt = parseYMDLocal(d);
+    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+  }
+
   const dt = new Date(d);
   return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
 }
-function addDays(date, days) {
-  const d = new Date(date);
+
+function addDays(dateObj, days) {
+  const d = new Date(dateObj);
   d.setDate(d.getDate() + days);
   return d;
 }
+
+function enumerateDates(fromStr, toStr, hardLimit = 10) {
+  // parse LOCAL (no UTC)
+  const from = parseYMDLocal(fromStr);
+  const to = parseYMDLocal(toStr);
+
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return [];
+  if (from > to) return [];
+
+  const out = [];
+  let cur = new Date(from);
+
+  while (cur <= to && out.length < hardLimit) {
+    out.push(toYYYYMMDD(cur));
+    cur = addDays(cur, 1);
+  }
+  return out;
+}
+
 function enumerateDates(fromStr, toStr, hardLimit = 10) {
   const from = new Date(fromStr);
   const to = new Date(toStr);
@@ -103,8 +137,11 @@ function leaguePriority(leagueName) {
 function fixtureDateKey(f) {
   const when = f?.fixture?.date || f?.date || "";
   if (!when) return "";
+
+  // when normalmente viene ISO con zona horaria desde el API (bien)
   const d = new Date(when);
   if (Number.isNaN(d.getTime())) return "";
+
   return toYYYYMMDD(d);
 }
 function fixtureTimeLabel(f) {
@@ -250,21 +287,18 @@ function isAllowedCompetition(countryName, leagueName) {
  * - Si no, usa { date, league, home, away } (esto es lo más estable)
  */
 const PARTIDAZOS_MANUAL = [
-  // Champions (20-01-2026)
-  { date: "2026-01-20", league: "Champions League", home: "Inter", away: "Arsenal" },
-  { date: "2026-01-20", league: "Champions League", home: "Tottenham", away: "Borussia" },
-  { date: "2026-01-20", league: "Champions League", home: "Real Madrid", away: "Monaco" },
-  { date: "2026-01-20", league: "Champions League", home: "Sporting", away: "Paris" },
-  { date: "2026-01-20", league: "Champions League", home: "Bayer leverkusen" },
-  { date: "2026-01-20", league: "Champions League", home: "Napoli" },
-  { date: "2026-01-20", league: "Champions League", home: "ajax" },
-  { date: "2026-01-20", league: "Champions League", home: "brugge" },
-  { date: "2026-01-20", league: "Champions League", home: "villarreal" },
-  { date: "2026-01-20", league: "Champions League", home: "manchester" },
-  { date: "2026-01-20", league: "Champions League", home: "city" },
+  // Champions (20-01-2026) — usa el nombre del API: "UEFA Champions League"
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Inter", away: "Arsenal" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Tottenham", away: "Borussia" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Real Madrid", away: "Monaco" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Sporting", away: "Paris" },
 
+  // Estos ponlos con el nombre real que trae el API (puede variar):
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Manchester City" }, // si no sabes rival, basta home
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Napoli" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Olympiacos" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Bayer" },
 ];
-
 
 function manualPickDates() {
   const set = new Set(
@@ -302,7 +336,40 @@ function picksFromFixtures(fixtures) {
   const used = new Set();
 
   for (const pick of PARTIDAZOS_MANUAL) {
-    const found = fixtures.find((f) => pickMatchesFixture(pick, f));
+    const { fixtureId: wantedId, date, league, country, match, home, away } = pick || {};
+    let found = null;
+
+    // 1) Si viene fixtureId, es 100% exacto
+    if (wantedId) {
+      found = fixtures.find((f) => String(f?.fixture?.id ?? f?.id ?? "") === String(wantedId));
+    } else {
+      // 2) Matching robusto por date + league + home/away (parciales)
+      found = fixtures.find((f) => {
+        const dKey = fixtureDateKey(f);
+        const meta = fixtureMeta(f);
+        const { home: hName, away: aName } = fixtureTitleParts(f);
+
+        // Fecha
+        if (date && dKey !== date) return false;
+
+        // Liga (y opcional país)
+        if (league && !matchIncludes(meta.league || "", league)) return false;
+        if (country && !matchIncludes(meta.country || "", country)) return false;
+
+        // Si me das home/away, los uso (parciales)
+        if (home && !matchIncludes(hName, home) && !matchIncludes(aName, home)) return false;
+        if (away && !matchIncludes(hName, away) && !matchIncludes(aName, away)) return false;
+
+        // Compatibilidad con tu modo antiguo (match string)
+        if (match) {
+          const title = `${hName} vs ${aName}`;
+          if (!matchIncludes(title, match)) return false;
+        }
+
+        return true;
+      });
+    }
+
     if (found) {
       const id = fixtureId(found);
       if (!used.has(id)) {
@@ -836,34 +903,34 @@ export default function Fixtures() {
 
   // ✅ FILTRO + ORDEN CORRECTO (aquí estaba el error típico)
   const fixturesSorted = useMemo(() => {
-    const arr = Array.isArray(fixtures) ? [...fixtures] : [];
+  const arr = Array.isArray(fixtures) ? [...fixtures] : [];
 
-    const filtered = arr.filter((f) => {
-      const country = f?.league?.country || f?.country || "";
-      const league = f?.league?.name || f?.league || "";
-      return isAllowedCompetition(country, league);
-    });
+  const filtered = arr.filter((f) => {
+    const country = f?.league?.country || f?.country || "";
+    const league = f?.league?.name || f?.league || "";
+    return isAllowedCompetition(country, league);
+  });
 
-    filtered.sort((a, b) => {
-      const da = new Date(a?.fixture?.date || a?.date || 0).getTime();
-      const db = new Date(b?.fixture?.date || b?.date || 0).getTime();
-      if (da !== db) return da - db;
+  filtered.sort((a, b) => {
+    const da = new Date(a?.fixture?.date || a?.date || 0).getTime();
+    const db = new Date(b?.fixture?.date || b?.date || 0).getTime();
+    if (da !== db) return da - db;
 
-      const la = a?.league?.name || a?.league || "";
-      const lb = b?.league?.name || b?.league || "";
-      const pa = leaguePriority(la);
-      const pb = leaguePriority(lb);
-      if (pa !== pb) return pa - pb;
+    const la = a?.league?.name || a?.league || "";
+    const lb = b?.league?.name || b?.league || "";
+    const pa = leaguePriority(la);
+    const pb = leaguePriority(lb);
+    if (pa !== pb) return pa - pb;
 
-      const ca = countryPriority(a?.league?.country || a?.country || "");
-      const cb = countryPriority(b?.league?.country || b?.country || "");
-      if (ca !== cb) return ca - cb;
+    const ca = countryPriority(a?.league?.country || a?.country || "");
+    const cb = countryPriority(b?.league?.country || b?.country || "");
+    if (ca !== cb) return ca - cb;
 
-      return String(la).localeCompare(String(lb));
-    });
+    return String(la).localeCompare(String(lb));
+  });
 
-    return filtered;
-  }, [fixtures]);
+  return filtered;
+}, [fixtures]);
 
   const picksAll = useMemo(() => picksFromFixtures(fixturesSorted), [fixturesSorted]);
   const picksTop3 = useMemo(() => picksAll.slice(0, 3), [picksAll]);
