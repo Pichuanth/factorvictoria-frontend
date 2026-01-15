@@ -419,7 +419,7 @@ const PARTIDAZOS_MANUAL = [
   // Los que te faltan: aquí conviene fixtureId (por nombres “raros” o abreviaciones)
   { fixtureId: 1504664 }, // Bodo/Glimt vs Manchester City
   { fixtureId: 1451134 }, // Olympiacos vs Bayer Leverkusen
-  { fixtureId: 123458 }, // FC Copenhagen vs Napoli
+  { fixtureId: 1451132 }, // FC Copenhagen vs Napoli
   // { fixtureId: 123459 }, // FC Kairat vs Club Brugge
 ];
 
