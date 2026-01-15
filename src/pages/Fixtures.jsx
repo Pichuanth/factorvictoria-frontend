@@ -518,6 +518,12 @@ function MatchLine({ f }) {
 function LockedFixtureCard({ f, locked = true, isLoggedIn, goPlans }) {
   const nav = useNavigate();
 
+  // ✅ DEFINIR TODO LO QUE USAS
+  const { home, away } = fixtureTitleParts(f);
+  const meta = fixtureMeta(f);
+  const hLogo = teamLogo(f?.teams?.home);
+  const aLogo = teamLogo(f?.teams?.away);
+
   const onStats = () => {
     const id = f?.fixture?.id ?? f?.id;
     if (!id) return;
@@ -615,11 +621,7 @@ function LockedFixtureCard({ f, locked = true, isLoggedIn, goPlans }) {
           >
             <div>
               <div className="text-xs text-slate-300">{item.label}</div>
-
-              {/* Bloqueado vs Desbloqueado */}
-              <div className="text-sm font-bold text-slate-100 mt-0.5">
-                {locked ? "—" : "Disponible"}
-              </div>
+              <div className="text-sm font-bold text-slate-100 mt-0.5">{locked ? "—" : "Disponible"}</div>
             </div>
 
             {locked ? <LockIcon /> : null}
@@ -636,9 +638,7 @@ function LockedFixtureCard({ f, locked = true, isLoggedIn, goPlans }) {
           .
         </div>
       ) : (
-        <div className="mt-3 text-xs text-slate-300">
-          Acceso activo: contenido desbloqueado para miembros.
-        </div>
+        <div className="mt-3 text-xs text-slate-300">Acceso activo: contenido desbloqueado para miembros.</div>
       )}
     </div>
   );
