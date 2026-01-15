@@ -517,7 +517,7 @@ function MatchLine({ f }) {
 
 function LockedFixtureCard({ f, locked = true, isLoggedIn, goPlans }) {
   const nav = useNavigate();
-
+  
   // ✅ DEFINIR TODO LO QUE USAS
   const { home, away } = fixtureTitleParts(f);
   const meta = fixtureMeta(f);
