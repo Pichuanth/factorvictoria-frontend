@@ -250,18 +250,14 @@ function isAllowedCompetition(countryName, leagueName) {
  * - Si no, usa { date, league, home, away } (esto es lo más estable)
  */
 const PARTIDAZOS_MANUAL = [
-  // Champions (20-01-2026)
-  { date: "2026-01-20", league: "Champions League", home: "Inter", away: "Arsenal" },
-  { date: "2026-01-20", league: "Champions League", home: "Tottenham", away: "Borussia" },
-  { date: "2026-01-20", league: "Champions League", home: "Real Madrid", away: "Monaco" },
-  { date: "2026-01-20", league: "Champions League", home: "Sporting", away: "Paris" },
-  { date: "2026-01-20", league: "Champions League", home: "Bayer" },
-  { date: "2026-01-20", league: "Champions League", home: "Napoli" },
-  { date: "2026-01-20", league: "Champions League", home: "ajax" },
-  { date: "2026-01-20", league: "Champions League", home: "club brugge" },
-  { date: "2026-01-20", league: "Champions League", home: "villarreal" },
-  { date: "2026-01-20", league: "Champions League", home: "manchester" },
-
+  { date: "2026-01-20", league: "Champions League", match: "Arsenal" },
+  { date: "2026-01-20", league: "Champions League", match: "Tottenham vs Borussia" },
+  { date: "2026-01-20", league: "Champions League", match: "Real Madrid" },
+  { date: "2026-01-20", league: "Champions League", match: "Sporting vs PSG" },
+  { date: "2026-01-20", league: "Champions League", match: "paris" },
+  { date: "2026-01-20", league: "Champions League", match: "monaco" },
+  { date: "2026-01-20", league: "Champions League", match: "Bayer" },
+  { date: "2026-01-20", league: "Champions League", match: "Napoli" },
 ];
 
 function manualPickDates() {
