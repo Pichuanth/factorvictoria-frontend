@@ -254,9 +254,13 @@ const PARTIDAZOS_MANUAL = [
   { date: "2026-01-20", league: "Champions League", home: "Inter", away: "Arsenal" },
   { date: "2026-01-20", league: "Champions League", home: "Tottenham", away: "Borussia" },
   { date: "2026-01-20", league: "Champions League", home: "Real Madrid", away: "Monaco" },
-  { date: "2026-01-20", league: "Champions League", home: "Sporting", away: "PSG" },
+  { date: "2026-01-20", league: "Champions League", home: "Sporting", away: "Paris" },
   { date: "2026-01-20", league: "Champions League", home: "Olympiacos", away: "Bayer" },
-  { date: "2026-01-20", league: "Champions League", home: "Kobenhavn", away: "Napoli" },
+  { date: "2026-01-20", league: "Champions League", home: "Napoli" },
+  { date: "2026-01-20", league: "Champions League", home: "ajax" },
+  { date: "2026-01-20", league: "Champions League", home: "club brugge" },
+  { date: "2026-01-20", league: "Champions League", home: "brujas" },
+
 ];
 
 function manualPickDates() {
@@ -599,7 +603,7 @@ function RecoWeeklyCard({ fixtures = [] }) {
       <div className="relative p-5 md:p-6">
         <div className="text-xs tracking-wide text-emerald-200/90 font-semibold">Factor Victoria recomienda</div>
         <div className="mt-1 text-lg md:text-xl font-bold text-slate-100">Partidazos de la semana</div>
-        <div className="mt-1 text-xs text-slate-300">Selección curada manualmente.</div>
+        <div className="mt-1 text-xs text-slate-300">Champions League.</div>
 
         <div className="mt-4 space-y-2">
           {picks.length === 0 ? (
@@ -1073,7 +1077,7 @@ export default function Fixtures() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-sm font-semibold">Partidazos bloqueados</div>
-              <div className="text-xs text-slate-300 mt-1">Solo 3 destacados para mostrar el valor de la membresía.</div>
+              <div className="text-xs text-slate-300 mt-1">Adquiere membresía.</div>
             </div>
 
             <Chip
@@ -1108,7 +1112,7 @@ export default function Fixtures() {
               <div className="text-sm font-semibold">Todos los partidos</div>
               <div className="text-xs text-slate-300 mt-1">Total (según tu filtro): {totalUserRange}</div>
             </div>
-            <div className="text-[11px] text-slate-400">Ligas importantes primero</div>
+            <div className="text-[11px] text-slate-400">Ligas importantes</div>
           </div>
 
           {totalUserRange === 0 && !loading ? (
