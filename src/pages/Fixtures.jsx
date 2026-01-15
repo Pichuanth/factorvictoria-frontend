@@ -360,13 +360,14 @@ function HudCard({
  * RECOMENDADO: 1 entrada = 1 partido (ideal fixtureId o texto "EquipoA vs EquipoB")
  */
 const PARTIDAZOS_MANUAL = [
-  { date: "2026-01-20", league: "Champions League", match: "Inter Milan vs Arsenal" },
+  { date: "2026-01-20", league: "Champions League", match: "Arsenal" },
   { date: "2026-01-20", league: "Champions League", match: "Tottenham vs Borussia" },
-  { date: "2026-01-20", league: "Champions League", match: "Real Madrid vs AS Monaco" },
+  { date: "2026-01-20", league: "Champions League", match: "Real Madrid" },
   { date: "2026-01-20", league: "Champions League", match: "Sporting vs PSG" },
   { date: "2026-01-20", league: "Champions League", match: "paris" },
-  { date: "2026-01-20", league: "Champions League", match: "Olympiacos vs Bayer" },
-  { date: "2026-01-20", league: "Champions League", match: "Kobenhavn vs Napoli" },
+  { date: "2026-01-20", league: "Champions League", match: "monaco" },
+  { date: "2026-01-20", league: "Champions League", match: "Bayer" },
+  { date: "2026-01-20", league: "Champions League", match: "Napoli" },
 ];
 
 function picksFromFixtures(fixtures) {
