@@ -144,6 +144,106 @@ function fixtureId(f) {
     f?.id ??
     `${f?.teams?.home?.name}-${f?.teams?.away?.name}-${f?.fixture?.date || f?.date || ""}`
   );
+
+  function isAllowedCompetition(countryName, leagueName) {
+  const c = norm(countryName);
+  const l = norm(leagueName);
+
+  // --------- BLOCKLIST por patrones (mata casi toda la basura) ---------
+  const bannedPatterns = [
+    "u23",
+    "u21",
+    "u20",
+    "u19",
+    "u18",
+    "youth",
+    "women",
+    "femin",
+    "reserve",
+    "reserves",
+    "development",
+    "professional development league",
+    "revelacao",
+    "friendly",
+    "friendlies",
+    "clubs friendly",
+    "state cup",
+    "youth cup",
+    "sao paulo youth",
+    "tercera division",
+    "tercera division rfef",
+    "serie c",
+    "serie d",
+    "liga 3",
+    "national league - south",
+    "national league",
+    "non league",
+    "istmian",
+    "southern central",
+    "southern south",
+    "efl trophy",
+    "coppa italia serie c",
+    "gamma ethniki",
+    // Brasil estaduales (si quieres cortar TODO lo estadual)
+    "paulista",
+    "carioca",
+    "mineiro",
+    "gaucho",
+    "pernambucano",
+    "cearense",
+    "capixaba",
+    "baiano",
+    "goiano",
+    "maranhense",
+    "matogrossense",
+    "potiguar",
+    "acreano",
+  ];
+
+  if (bannedPatterns.some((p) => l.includes(p))) return false;
+
+  // --------- WHITELIST: competiciones internacionales (sin country) ---------
+  const intlAllowed = [
+    "uefa champions league",
+    "champions league",
+    "uefa europa league",
+    "europa league",
+    "uefa europa conference league",
+    "conference league",
+  ];
+  if (intlAllowed.some((x) => l.includes(x))) return true;
+
+  // --------- WHITELIST: ligas por (country + league) ---------
+  // Ojo: usamos includes para tolerar variaciones
+  const allowedPairs = [
+    { country: "england", league: "premier league" },
+    { country: "spain", league: "la liga" },
+    { country: "italy", league: "serie a" },
+    { country: "germany", league: "bundesliga" },
+    { country: "france", league: "ligue 1" },
+
+    { country: "netherlands", league: "eredivisie" },
+    { country: "portugal", league: "primeira liga" },
+    { country: "scotland", league: "premiership" }, // scottish premiership
+    { country: "turkey", league: "super lig" },
+    { country: "switzerland", league: "super league" },
+    { country: "belgium", league: "pro league" },
+    { country: "austria", league: "bundesliga" },
+    { country: "denmark", league: "superliga" },
+    { country: "norway", league: "eliteserien" },
+    { country: "sweden", league: "allsvenskan" },
+
+    { country: "mexico", league: "liga mx" },
+    { country: "usa", league: "mls" }, // a veces viene "USA"
+    { country: "brazil", league: "serie a" }, // brasileirao
+    { country: "argentina", league: "primera" },
+    { country: "chile", league: "primera" },
+  ];
+
+  return allowedPairs.some(
+    (p) => c.includes(p.country) && l.includes(p.league)
+  );
+}
 }
 
 /* ------------------- Mini UI ------------------- */
@@ -742,7 +842,13 @@ export default function Fixtures() {
 
   // Orden general
   const fixturesSorted = useMemo(() => {
-    const arr = Array.isArray(fixtures) ? [...fixtures] : [];
+  const arr = Array.isArray(fixtures) ? [...fixtures] : [];
+
+  const filtered = arr.filter((f) => {
+    const country = f?.league?.country || f?.country || "";
+    const league = f?.league?.name || f?.league || "";
+    return isAllowedCompetition(country, league);
+  });
 
     arr.sort((a, b) => {
       const da = new Date(a?.fixture?.date || a?.date || 0).getTime();
