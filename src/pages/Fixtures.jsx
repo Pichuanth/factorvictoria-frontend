@@ -410,10 +410,10 @@ const PARTIDAZOS_MANUAL = [
   { date: "2026-01-20", league: "UEFA Champions League", home: "kairat" },
   { date: "2026-01-20", league: "UEFA Champions League", home: "Ajax" },
   { date: "2026-01-20", league: "UEFA Champions League", home: "Glimt" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "Bayer" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Bayer 04 Leverkusen" },
   { date: "2026-01-20", league: "UEFA Champions League", home: "Olympiacos" },
   { date: "2026-01-20", league: "UEFA Champions League", home: "Napoli" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "Kobenhavn" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Copenhague" },
   
 
   // Los que te faltan: aquí conviene fixtureId (por nombres “raros” o abreviaciones)
