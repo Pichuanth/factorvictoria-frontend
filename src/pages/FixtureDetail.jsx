@@ -10,37 +10,45 @@ const API_BASE =
 export default function FixtureDetail() {
   const { fixtureId } = useParams();
   const nav = useNavigate();
-  const { hasMembership } = useAuth();
+  const { isLoggedIn, user } = useAuth();
 
-  const canAccess = hasMembership;
-
-  const title = useMemo(() => `Fixture #${fixtureId}`, [fixtureId]);
+  // Regla simple: si está logueado, consideramos “con acceso”
+  // (Luego lo afinamos por plan real)
+  const canAccess = !!isLoggedIn;
 
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
-  const [stats, setStats] = useState(null);
+  const [payload, setPayload] = useState(null);
+
+  const title = useMemo(() => `Fixture #${fixtureId}`, [fixtureId]);
+
+  async function loadStats() {
+    setErr("");
+    setLoading(true);
+    try {
+      const url = `${API_BASE}/api/fixture/${fixtureId}/statistics`;
+      const r = await fetch(url);
+      const data = await r.json().catch(() => null);
+
+      if (!r.ok) {
+        setPayload(null);
+        setErr(`No se pudieron cargar las estadísticas. (HTTP ${r.status})`);
+        return;
+      }
+
+      setPayload(data);
+    } catch (e) {
+      setPayload(null);
+      setErr("No se pudieron cargar las estadísticas. (network)");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    if (!canAccess) return;
-
-    const run = async () => {
-      setErr("");
-      setLoading(true);
-      try {
-        const r = await fetch(`${API_BASE}/api/fixture/${fixtureId}/statistics`);
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const data = await r.json();
-        setStats(data?.statistics || []);
-      } catch (e) {
-        setErr("No se pudieron cargar las estadísticas.");
-        setStats(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    run();
-  }, [canAccess, fixtureId]);
+    if (canAccess) loadStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fixtureId, canAccess]);
 
   if (!canAccess) {
     return (
@@ -48,15 +56,15 @@ export default function FixtureDetail() {
         <div className="rounded-3xl border border-white/10 bg-slate-950/25 p-6">
           <div className="text-lg font-bold">Contenido PRO</div>
           <p className="text-slate-300 mt-2 text-sm">
-            Necesitas membresía para ver estadísticas avanzadas.
+            Inicia sesión para ver estadísticas avanzadas.
           </p>
           <button
             type="button"
-            onClick={() => nav("/#planes")}
+            onClick={() => nav("/login")}
             className="mt-4 px-6 py-3 rounded-full text-sm font-bold"
             style={{ backgroundColor: "#E6C464", color: "#0f172a" }}
           >
-            Ver planes
+            Iniciar sesión
           </button>
         </div>
       </div>
@@ -69,7 +77,11 @@ export default function FixtureDetail() {
         <div>
           <div className="text-xs text-slate-400">Estadísticas (PRO)</div>
           <div className="text-xl font-bold">{title}</div>
+          {user?.planId ? (
+            <div className="text-xs text-slate-400 mt-1">Plan: {user.planId}</div>
+          ) : null}
         </div>
+
         <button
           type="button"
           onClick={() => nav(-1)}
@@ -82,39 +94,31 @@ export default function FixtureDetail() {
       <div className="mt-5 rounded-3xl border border-white/10 bg-slate-950/25 p-6">
         <div className="text-sm font-semibold">Estado</div>
 
-        <div className="mt-2 text-xs text-slate-400">
-          fixtureId: <span className="text-slate-200 font-semibold">{fixtureId}</span>
+        <div className="mt-3 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={loadStats}
+            className="px-4 py-2 rounded-full text-sm border border-white/15 bg-white/5 hover:bg-white/10 transition"
+            disabled={loading}
+          >
+            {loading ? "Cargando..." : "Reintentar"}
+          </button>
+
+          <div className="text-xs text-slate-400">
+            fixtureId: <span className="text-slate-200 font-semibold">{fixtureId}</span>
+          </div>
         </div>
 
-        {loading ? (
-          <div className="mt-4 text-sm text-slate-300">Cargando estadísticas...</div>
-        ) : err ? (
-          <div className="mt-4 text-sm text-rose-300">{err}</div>
-        ) : !stats || stats.length === 0 ? (
-          <div className="mt-4 text-sm text-slate-300">
-            Aún no hay estadísticas disponibles para este partido (o no han sido publicadas).
-          </div>
+        {err ? <div className="mt-3 text-xs text-rose-300">{err}</div> : null}
+
+        {!err && payload ? (
+          <pre className="mt-4 text-[11px] leading-snug text-slate-200 whitespace-pre-wrap">
+            {JSON.stringify(payload, null, 2)}
+          </pre>
         ) : (
-          <div className="mt-4 space-y-4">
-            {stats.map((teamBlock) => (
-              <div key={teamBlock?.team?.id || teamBlock?.team?.name} className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-                <div className="text-sm font-bold">{teamBlock?.team?.name || "Equipo"}</div>
-
-                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {(teamBlock?.statistics || []).slice(0, 10).map((s, idx) => (
-                    <div key={`${s?.type}-${idx}`} className="flex items-center justify-between text-sm border border-white/5 rounded-xl px-3 py-2 bg-white/5">
-                      <div className="text-slate-300">{s?.type}</div>
-                      <div className="font-semibold text-slate-100">{String(s?.value ?? "—")}</div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-2 text-[11px] text-slate-400">
-                  Mostrando primeras 10 stats (luego afinamos: posesión, tiros, corners, faltas, tarjetas, xG si está).
-                </div>
-              </div>
-            ))}
-          </div>
+          <p className="text-slate-300 text-sm mt-3">
+            Aquí mostraremos: forma últimos 5, xG, tarjetas, corners, probabilidad, cuotas, etc.
+          </p>
         )}
       </div>
     </div>
