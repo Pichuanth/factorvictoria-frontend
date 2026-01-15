@@ -516,15 +516,12 @@ function MatchLine({ f }) {
 }
 
 function LockedFixtureCard({ f, locked = true, isLoggedIn, goPlans }) {
-  const { home, away } = fixtureTitleParts(f);
-  const meta = fixtureMeta(f);
-  const hLogo = teamLogo(f?.teams?.home);
-  const aLogo = teamLogo(f?.teams?.away);
+  const nav = useNavigate();
 
   const onStats = () => {
-    // aquí más adelante puedes navegar a una ruta real de stats si la creas
-    // nav(`/fixture/${f?.fixture?.id}`);
-    alert("Abrir estadísticas (PRO).");
+    const id = f?.fixture?.id ?? f?.id;
+    if (!id) return;
+    nav(`/fixture/${id}`);
   };
 
   const onAddParlay = () => {

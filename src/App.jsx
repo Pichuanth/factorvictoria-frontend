@@ -7,6 +7,7 @@ import Comparator from "./pages/Comparator";
 import Fixtures from "./pages/Fixtures";
 import Profile from "./pages/Profile";
 import { useAuth } from "./lib/auth";
+import FixtureDetail from "./pages/FixtureDetail";
 
 const GOLD = "#E6C464";
 
@@ -436,6 +437,7 @@ function AppInner() {
           <Route path="/app" element={<Comparator />} />
 
           <Route path="/fixture" element={<Fixtures />} />
+          <Route path="/fixture/:fixtureId" element={<FixtureDetail />} />
 
           <Route
             path="/perfil"
@@ -458,3 +460,4 @@ function AppInner() {
 export default function App() {
   return <AppInner />;
 }
+
