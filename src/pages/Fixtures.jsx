@@ -255,12 +255,13 @@ const PARTIDAZOS_MANUAL = [
   { date: "2026-01-20", league: "Champions League", home: "Tottenham", away: "Borussia" },
   { date: "2026-01-20", league: "Champions League", home: "Real Madrid", away: "Monaco" },
   { date: "2026-01-20", league: "Champions League", home: "Sporting", away: "Paris" },
-  { date: "2026-01-20", league: "Champions League", home: "Bayer" },
+  { date: "2026-01-20", league: "Champions League", home: "Bayer leverkusen" },
   { date: "2026-01-20", league: "Champions League", home: "Napoli" },
   { date: "2026-01-20", league: "Champions League", home: "ajax" },
-  { date: "2026-01-20", league: "Champions League", home: "club brugge" },
+  { date: "2026-01-20", league: "Champions League", home: "brugge" },
   { date: "2026-01-20", league: "Champions League", home: "villarreal" },
   { date: "2026-01-20", league: "Champions League", home: "manchester" },
+  { date: "2026-01-20", league: "Champions League", home: "city" },
 
 ];
 
