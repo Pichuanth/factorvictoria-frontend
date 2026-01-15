@@ -258,6 +258,9 @@ const PARTIDAZOS_MANUAL = [
   { date: "2026-01-20", league: "Champions League", match: "monaco" },
   { date: "2026-01-20", league: "Champions League", match: "Bayer" },
   { date: "2026-01-20", league: "Champions League", match: "Napoli" },
+  { date: "2026-01-20", league: "Champions League", match: "brugge" },
+  { date: "2026-01-20", league: "Champions League", match: "olympiacos" },
+  { date: "2026-01-20", league: "Champions League", match: "ajax" },
 ];
 
 function manualPickDates() {
