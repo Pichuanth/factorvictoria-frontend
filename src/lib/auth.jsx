@@ -54,12 +54,18 @@ export function AuthProvider({ children }) {
     };
 
     return {
-      user,
-      isLoggedIn: !!user,
-      getUser: () => user,
-      login,
-      logout,
-    };
+  user,
+  isLoggedIn: !!user,
+
+  // NUEVO: datos útiles para control de acceso
+  planId: user?.planId || null,
+  rank: Number.isFinite(user?.rank) ? user.rank : -1,
+  hasMembership: !!user?.planId && Number.isFinite(user?.rank),
+
+  getUser: () => user,
+  login,
+  logout,
+};
   }, [user]);
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;

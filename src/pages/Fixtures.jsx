@@ -515,11 +515,21 @@ function MatchLine({ f }) {
   );
 }
 
-function LockedFixtureCard({ f, isLoggedIn, goPlans }) {
+function LockedFixtureCard({ f, locked = true, isLoggedIn, goPlans }) {
   const { home, away } = fixtureTitleParts(f);
   const meta = fixtureMeta(f);
   const hLogo = teamLogo(f?.teams?.home);
   const aLogo = teamLogo(f?.teams?.away);
+
+  const onStats = () => {
+    // aquí más adelante puedes navegar a una ruta real de stats si la creas
+    // nav(`/fixture/${f?.fixture?.id}`);
+    alert("Abrir estadísticas (PRO).");
+  };
+
+  const onAddParlay = () => {
+    alert("Añadido a combinada (PRO).");
+  };
 
   return (
     <div
@@ -532,7 +542,11 @@ function LockedFixtureCard({ f, isLoggedIn, goPlans }) {
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 min-w-0">
-            {hLogo ? <img src={hLogo} alt="" aria-hidden="true" className="h-8 w-8 rounded-sm object-contain" /> : <div className="h-8 w-8 rounded-sm bg-white/5 border border-white/10" />}
+            {hLogo ? (
+              <img src={hLogo} alt="" aria-hidden="true" className="h-8 w-8 rounded-sm object-contain" />
+            ) : (
+              <div className="h-8 w-8 rounded-sm bg-white/5 border border-white/10" />
+            )}
 
             <div className="text-sm font-semibold text-slate-100 truncate">{safeTeamShort(home, 22)}</div>
 
@@ -542,7 +556,11 @@ function LockedFixtureCard({ f, isLoggedIn, goPlans }) {
 
             <div className="text-sm font-semibold text-slate-100 truncate">{safeTeamShort(away, 22)}</div>
 
-            {aLogo ? <img src={aLogo} alt="" aria-hidden="true" className="h-8 w-8 rounded-sm object-contain" /> : <div className="h-8 w-8 rounded-sm bg-white/5 border border-white/10" />}
+            {aLogo ? (
+              <img src={aLogo} alt="" aria-hidden="true" className="h-8 w-8 rounded-sm object-contain" />
+            ) : (
+              <div className="h-8 w-8 rounded-sm bg-white/5 border border-white/10" />
+            )}
           </div>
 
           <div className="mt-1 text-[11px] text-slate-400 truncate">
@@ -560,7 +578,7 @@ function LockedFixtureCard({ f, isLoggedIn, goPlans }) {
       <div className="mt-3 flex flex-col sm:flex-row gap-2">
         <button
           type="button"
-          onClick={() => (isLoggedIn ? alert("Aquí abrirás estadísticas (PRO).") : goPlans())}
+          onClick={locked ? goPlans : onStats}
           className="w-full sm:w-auto px-5 py-2.5 rounded-full text-sm font-semibold border transition"
           style={{
             borderColor: "rgba(76,201,240,0.28)",
@@ -574,7 +592,7 @@ function LockedFixtureCard({ f, isLoggedIn, goPlans }) {
 
         <button
           type="button"
-          onClick={() => (isLoggedIn ? alert("Añadir a combinada (PRO).") : goPlans())}
+          onClick={locked ? goPlans : onAddParlay}
           className="w-full sm:w-auto px-5 py-2.5 rounded-full text-sm font-semibold"
           style={{
             backgroundColor: GOLD,
@@ -600,14 +618,19 @@ function LockedFixtureCard({ f, isLoggedIn, goPlans }) {
           >
             <div>
               <div className="text-xs text-slate-300">{item.label}</div>
-              <div className="text-sm font-bold text-slate-100 mt-0.5">—</div>
+
+              {/* Bloqueado vs Desbloqueado */}
+              <div className="text-sm font-bold text-slate-100 mt-0.5">
+                {locked ? "—" : "Disponible"}
+              </div>
             </div>
-            <LockIcon />
+
+            {locked ? <LockIcon /> : null}
           </div>
         ))}
       </div>
 
-      {!isLoggedIn ? (
+      {locked ? (
         <div className="mt-3 text-xs text-slate-300">
           Nota: Este contenido está bloqueado.{" "}
           <button type="button" onClick={goPlans} className="underline font-semibold" style={{ color: GOLD }}>
@@ -615,7 +638,11 @@ function LockedFixtureCard({ f, isLoggedIn, goPlans }) {
           </button>
           .
         </div>
-      ) : null}
+      ) : (
+        <div className="mt-3 text-xs text-slate-300">
+          Acceso activo: contenido desbloqueado para miembros.
+        </div>
+      )}
     </div>
   );
 }
@@ -755,7 +782,9 @@ function GainSimulatorCard({ onGoPlans }) {
 
 /* ------------------- Page ------------------- */
 export default function Fixtures() {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, hasMembership } = useAuth();
+  const canAccess = hasMembership; 
+
   const nav = useNavigate();
 
   const today = useMemo(() => toYYYYMMDDLocal(new Date()), []);
@@ -1091,8 +1120,14 @@ export default function Fixtures() {
               </div>
             ) : (
               picksTop3.map((f) => (
-                <LockedFixtureCard key={fixtureId(f)} f={f} isLoggedIn={isLoggedIn} goPlans={goPlans} />
-              ))
+  <LockedFixtureCard
+    key={fixtureId(f)}
+    f={f}
+    locked={!canAccess}
+    isLoggedIn={isLoggedIn}
+    goPlans={goPlans}
+  />
+))
             )}
           </div>
         </div>
