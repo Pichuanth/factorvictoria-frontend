@@ -406,9 +406,15 @@ const PARTIDAZOS_MANUAL = [
   { date: "2026-01-20", league: "UEFA Champions League", home: "Villarreal", away: "Ajax" },
   { date: "2026-01-20", league: "UEFA Champions League", home: "Psg" },
   { date: "2026-01-20", league: "UEFA Champions League", home: "madrid" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "brugge" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "brujas" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "ajax" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "club brugge" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "kairat" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Ajax" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Glimt" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Bayer" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Olympiacos" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Napoli" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Kobenhavn" },
+  
 
   // Los que te faltan: aquí conviene fixtureId (por nombres “raros” o abreviaciones)
   // { fixtureId: 123456 }, // Bodo/Glimt vs Manchester City
