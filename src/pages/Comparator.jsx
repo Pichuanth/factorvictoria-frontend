@@ -335,9 +335,19 @@ function getMaxBoostFromPlan(planLabel) {
 function getPlanFeatures(planLabel) {
   const base = { giftPick: true, boosted: true };
 
-  if (planLabel === "MENSUAL") return { ...base, referees: false, marketValue: false, scorers: false, shooters: 0 };
-  if (planLabel === "TRIMESTRAL") return { ...base, referees: false, marketValue: false, scorers: false, shooters: 0 };
-  if (planLabel === "ANUAL") return { ...base, referees: true, marketValue: false, scorers: false, shooters: 5 };
+  if (planLabel === "MENSUAL") {
+    return { ...base, referees: false, marketValue: false, scorers: false, shooters: 0 };
+  }
+
+  if (planLabel === "TRIMESTRAL") {
+    return { ...base, referees: true, marketValue: false, scorers: false, shooters: 0 };
+  }
+
+  if (planLabel === "ANUAL") {
+    return { ...base, referees: true, marketValue: false, scorers: false, shooters: 5 };
+  }
+
+  // VITALICIO
   return { ...base, referees: true, marketValue: true, scorers: true, shooters: 10 };
 }
 
