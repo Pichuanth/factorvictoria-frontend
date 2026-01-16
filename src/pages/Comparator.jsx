@@ -15,6 +15,28 @@ function asset(path) {
   const clean = String(path || "").replace(/^\/+/, "");
   return `${base}${clean}`;
 }
+const PLAN_LABELS = {
+  basic: {
+    name: "Plan Inicio",
+    price: "$19.990",
+    boost: 10,
+  },
+  trimestral: {
+    name: "Plan Goleador",
+    price: "$44.990",
+    boost: 20,
+  },
+  anual: {
+    name: "Plan Campeón",
+    price: "$99.990",
+    boost: 50,
+  },
+  vitalicio: {
+    name: "Plan Leyenda",
+    price: "$249.990",
+    boost: 100,
+  },
+};
 
 /** Fondos (public/) */
 const BG_VISITOR = asset("hero-fondo-partidos.png");
@@ -316,39 +338,36 @@ function isMajorLeague(fx) {
 
 /* --------------------- Plan & Features --------------------- */
 
-function normalizePlanLabel(raw) {
-  const p = String(raw || "").toUpperCase();
-  if (p.includes("VITA")) return "VITALICIO";
-  if (p.includes("ANU")) return "ANUAL";
-  if (p.includes("TRI") || p.includes("3")) return "TRIMESTRAL";
-  if (p.includes("MES")) return "MENSUAL";
-  return "MENSUAL";
+/* --------------------- Plan & Features (CORREGIDO) --------------------- */
+
+// ✅ planId interno SIEMPRE: basic | trimestral | anual | vitalicio
+function normalizePlanId(raw) {
+  const p = String(raw || "").toLowerCase().trim();
+
+  if (["vitalicio", "leyenda", "legend", "lifetime"].some((k) => p.includes(k))) return "vitalicio";
+  if (["anual", "campeon", "campeón", "annual", "year"].some((k) => p.includes(k))) return "anual";
+  if (["trimestral", "goleador", "tri", "3", "4mes", "4 meses"].some((k) => p.includes(k))) return "trimestral";
+  if (["basic", "mensual", "inicio", "month"].some((k) => p.includes(k))) return "basic";
+
+  // default seguro
+  return "basic";
 }
 
-function getMaxBoostFromPlan(planLabel) {
-  if (planLabel === "VITALICIO") return 100;
-  if (planLabel === "ANUAL") return 50;
-  if (planLabel === "TRIMESTRAL") return 20;
-  return 10;
-}
-
-function getPlanFeatures(planLabel) {
+function getFeaturesByPlanId(planId) {
+  // Cuota regalo + cuotas potenciadas: SIEMPRE para miembros
   const base = { giftPick: true, boosted: true };
 
-  if (planLabel === "MENSUAL") {
-    return { ...base, referees: false, marketValue: false, scorers: false, shooters: 0 };
+  if (planId === "basic") {
+    return { ...base, referees: false, scorersValue: false, marketValue: false };
   }
-
-  if (planLabel === "TRIMESTRAL") {
-    return { ...base, referees: true, marketValue: false, scorers: false, shooters: 0 };
+  if (planId === "trimestral") {
+    return { ...base, referees: false, scorersValue: false, marketValue: false };
   }
-
-  if (planLabel === "ANUAL") {
-    return { ...base, referees: true, marketValue: false, scorers: false, shooters: 5 };
+  if (planId === "anual") {
+    return { ...base, referees: true, scorersValue: false, marketValue: false };
   }
-
-  // VITALICIO
-  return { ...base, referees: true, marketValue: true, scorers: true, shooters: 10 };
+  // vitalicio
+  return { ...base, referees: true, scorersValue: true, marketValue: true };
 }
 
 /* --------------------- UI helpers --------------------- */
@@ -1098,6 +1117,36 @@ function FixtureCard({ fx, isSelected, onToggle, onLoadOdds, oddsPack }) {
 }
 
 /* --------------------- componente principal --------------------- */
+function WelcomeProCard({ planInfo }) {
+  return (
+    <HudCard bg={BG_PROFILE_HUD} overlayVariant="casillas" className="mt-4" glow="gold">
+      <div className="p-5 md:p-6">
+        <div className="text-emerald-200/90 text-xs font-semibold tracking-wide">
+          Bienvenido a Factor Victoria PRO
+        </div>
+
+        <div className="mt-1 text-xl md:text-2xl font-bold text-slate-100">
+          {planInfo.name} activo
+        </div>
+
+        <div className="mt-2 text-sm text-slate-200 max-w-2xl">
+          Desde aquí generas combinadas automáticas y cuotas potenciadas.
+          Tu objetivo del plan es{" "}
+          <span className="font-bold text-emerald-200">x{planInfo.boost}</span>. Además, siempre tendrás una{" "}
+          <span className="font-bold">cuota regalo</span> (x1.5 a x3).
+        </div>
+
+        <div className="mt-2 text-xs text-slate-400">
+          Membresía {planInfo.price} · Factor Victoria
+        </div>
+
+        <div className="mt-3 text-xs text-slate-400">
+          Consejo: si no se alcanza la cuota objetivo con alta seguridad, agrega más partidos o usa “Generar con seleccionados”.
+        </div>
+      </div>
+    </HudCard>
+  );
+}
 
 export default function Comparator() {
   const { isLoggedIn, user } = useAuth();
@@ -1122,14 +1171,17 @@ export default function Comparator() {
   const [oddsByFixture, setOddsByFixture] = useState({});
   const oddsRef = useRef({});
 
-  // Plan / Features
-  const planLabel = useMemo(() => {
-    const raw = user?.planId || user?.plan?.id || user?.plan || user?.membership || "MENSUAL";
-    return normalizePlanLabel(raw);
-  }, [user]);
+  // Plan / Features (CORREGIDO)
+const planId = useMemo(() => {
+  const raw = user?.planId || user?.plan?.id || user?.plan || user?.membership || "basic";
+  return normalizePlanId(raw);
+}, [user]);
 
-  const maxBoost = useMemo(() => getMaxBoostFromPlan(planLabel), [planLabel]);
-  const features = useMemo(() => getPlanFeatures(planLabel), [planLabel]);
+const planInfo = useMemo(() => PLAN_LABELS[planId] || PLAN_LABELS.basic, [planId]);
+
+const maxBoost = planInfo.boost;
+
+const features = useMemo(() => getFeaturesByPlanId(planId), [planId]);
 
   // combinadas
   const [parlayResult, setParlayResult] = useState(null);
@@ -1396,8 +1448,9 @@ export default function Comparator() {
      ========================= */
 
   return (
-    <PageShell>
-      {/* 1) Filtros + Generar */}
+        <PageShell>
+        <WelcomeProCard planInfo={planInfo} />
+          {/* 1) Filtros + Generar */}
       <HudCard
         bg={BG_PROFILE_HUD}
         overlayVariant="casillas"
@@ -1485,7 +1538,7 @@ export default function Comparator() {
       <HudCard
   bg={null}                 // ✅ sin imagen
   bgColor="#132A23"         // ✅ Opción B: verde sólido premium
-  overlayVariant="verde"    // ✅ overlay plano (sin “centro claro”)
+  overlayVariant="casillasSharp"    // ✅ overlay plano (sin “centro claro se cambio de verde a casillasSharp”)
   className="mt-4"
   glow="gold"
 >
@@ -1599,7 +1652,7 @@ export default function Comparator() {
         <FeatureCard
           title="Goleadores / Remates / Value"
           badge="VIP"
-          locked={!(features.scorers || features.marketValue || features.shooters > 0)}
+          locked={!(features.scorersValue || features.marketValue)}
           lockText="Disponible en planes superiores (Anual/Vitalicio)."
         >
           <div className="text-xs text-slate-300">Aquí reactivaremos los módulos avanzados (goleadores, remates, value del mercado).</div>
@@ -1627,6 +1680,9 @@ export default function Comparator() {
 
       {/* 7) Calculadora */}
       <PriceCalculatorCard />
+      <div className="mt-8 text-center text-xs text-slate-500">
+  © {new Date().getFullYear()} Factor Victoria
+</div>
     </PageShell>
-  );
-}
+    );
+    }

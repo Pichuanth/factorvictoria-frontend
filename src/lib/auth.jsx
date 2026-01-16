@@ -1,7 +1,7 @@
 // src/lib/auth.jsx
 import React, { createContext, useContext, useMemo, useState } from "react";
 
-/** Orden/jerarquía de planes (0 = más bajo) */
+/** Jerarquía de planes */
 export const PLAN_RANK = {
   basic: 0,        // x10
   trimestral: 1,   // x20
@@ -9,15 +9,7 @@ export const PLAN_RANK = {
   vitalicio: 3,    // x100
 };
 
-/** Meta por plan */
-export const PLAN_TARGET = {
-  basic: 10,
-  trimestral: 20,
-  anual: 50,
-  vitalicio: 100,
-};
-
-/** Usuarios demo por plan (misma clave para todos) */
+/** Usuarios demo */
 const USERS = {
   "mensual@demo.cl": {
     email: "mensual@demo.cl",
@@ -79,21 +71,12 @@ export function AuthProvider({ children }) {
       } catch {}
     };
 
-    const planId = user?.planId || null;
-    const rank = Number.isFinite(user?.rank) ? user.rank : -1;
-
-    // En tu modo demo: si está logueado, lo tratamos como “con membresía”
-    const hasMembership = !!user;
-
     return {
       user,
       isLoggedIn: !!user,
-
-      // ✅ Útiles para bloquear/desbloquear módulos
-      planId,
-      rank,
-      hasMembership,
-
+      planId: user?.planId || null,
+      rank: Number.isFinite(user?.rank) ? user.rank : -1,
+      hasMembership: !!user, // demo = tiene membresía
       getUser: () => user,
       login,
       logout,
