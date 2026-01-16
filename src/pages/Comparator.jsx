@@ -15,27 +15,12 @@ function asset(path) {
   const clean = String(path || "").replace(/^\/+/, "");
   return `${base}${clean}`;
 }
+
 const PLAN_LABELS = {
-  basic: {
-    name: "Plan Inicio",
-    price: "$19.990",
-    boost: 10,
-  },
-  trimestral: {
-    name: "Plan Goleador",
-    price: "$44.990",
-    boost: 20,
-  },
-  anual: {
-    name: "Plan Campeón",
-    price: "$99.990",
-    boost: 50,
-  },
-  vitalicio: {
-    name: "Plan Leyenda",
-    price: "$249.990",
-    boost: 100,
-  },
+  basic: { name: "Plan Inicio", price: "$19.990", boost: 10 },
+  trimestral: { name: "Plan Goleador", price: "$44.990", boost: 20 },
+  anual: { name: "Plan Campeón", price: "$99.990", boost: 50 },
+  vitalicio: { name: "Plan Leyenda", price: "$249.990", boost: 100 },
 };
 
 /** Fondos (public/) */
@@ -46,11 +31,49 @@ const BG_DINERO = asset("hero.dinero.png");
 const BG_MANUAL = asset("hero-dorado-estadio.png");
 const BG_PARTIDAZOS = asset("partidazos-semana.png");
 const BG_GRAFICO_DORADO = asset("grafico-dorado.png");
-const BG_PASTO = asset("hero-pasto.png");
-const BG_ESTADIO_PAGE = asset("estadio-fondo.png");
-const BG_VERDE_GENERAR = asset("hero-verde-generar.png");
+
+/** Timezone oficial (igual que Fixtures) */
+const APP_TZ = "America/Santiago";
+
+/** Key de fecha del fixture en APP_TZ (YYYY-MM-DD) */
+function fixtureDateKey(f) {
+  const when = f?.fixture?.date || f?.date || "";
+  if (!when) return "";
+  const d = new Date(when);
+  if (Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+/** Hora del fixture en APP_TZ (HH:mm) */
+function fixtureTimeLabel(f) {
+  const when = f?.fixture?.date || f?.date || "";
+  if (!when) return "";
+  const d = new Date(when);
+  if (Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("es-CL", {
+    timeZone: APP_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(d);
+}
 
 /* --------------------- helpers --------------------- */
+function normStr(s) {
+  return String(s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+function includesNorm(haystack, needle) {
+  return normStr(haystack).includes(normStr(needle));
+}
 
 function toYYYYMMDD(d) {
   const pad = (n) => String(n).padStart(2, "0");
@@ -103,6 +126,182 @@ const COUNTRY_FLAG = {
   USA: "🇺🇸",
 };
 
+/* ------------------- Helpers de fecha/hora (para Partidazos) ------------------- */
+function fixtureDateKey(f) {
+  const when = f?.fixture?.date || f?.date || "";
+  if (!when) return "";
+  const d = new Date(when);
+  if (Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+function fixtureTimeLabel(f) {
+  const when = f?.fixture?.date || f?.date || "";
+  if (!when) return "";
+  const d = new Date(when);
+  if (Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("es-CL", {
+    timeZone: APP_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(d);
+}
+
+/* ------------------- Prioridades / filtro TOP (igual Fixtures) ------------------- */
+function countryPriority(countryName) {
+  const c = normStr(countryName);
+
+  if (c.includes("england") || c.includes("inglaterra")) return 0;
+  if (c.includes("spain") || c.includes("espana") || c.includes("españa")) return 1;
+  if (c.includes("france") || c.includes("francia")) return 2;
+  if (c.includes("italy") || c.includes("italia")) return 3;
+  if (c.includes("germany") || c.includes("alemania")) return 4;
+
+  if (c.includes("argentina")) return 5;
+  if (c.includes("chile")) return 6;
+  if (c.includes("portugal")) return 7;
+  if (c.includes("mexico") || c.includes("méxico")) return 8;
+  if (c.includes("usa")) return 9;
+  if (c.includes("brazil") || c.includes("brasil")) return 10;
+
+  return 50;
+}
+
+function leaguePriority(leagueName) {
+  const n = normStr(leagueName);
+
+  // UEFA
+  if (n.includes("uefa champions") || n.includes("champions league")) return 0;
+  if (n.includes("uefa europa") || n.includes("europa league")) return 1;
+  if (n.includes("uefa conference") || n.includes("conference league")) return 2;
+
+  // Big-5
+  if (n.includes("premier league")) return 3;
+  if (n.includes("la liga") || n.includes("laliga")) return 4;
+  if (n.includes("serie a")) return 5;
+  if (n.includes("bundesliga") && !n.includes("2.")) return 6;
+  if (n.includes("ligue 1")) return 7;
+
+  // América
+  if (n.includes("liga mx")) return 10;
+  if (n.includes("primera division") || n.includes("liga profesional")) return 11;
+  if (
+    n.includes("campeonato brasileiro") ||
+    n.includes("brasileirao") ||
+    (n.includes("serie a") && n.includes("brazil"))
+  )
+    return 12;
+  if (n.includes("primera") && n.includes("chile")) return 13;
+  if (n.includes("mls")) return 14;
+
+  return 50;
+}
+
+function isAllowedCompetition(countryName, leagueName) {
+  const c = normStr(countryName);
+  const l = normStr(leagueName);
+
+  const bannedPatterns = [
+    // youth / reservas
+    "u23",
+    "u22",
+    "u21",
+    "u20",
+    "u19",
+    "u18",
+    "u17",
+    "u16",
+    "youth",
+    "juvenil",
+    "reserves",
+    "reserve",
+    "b team",
+    " ii",
+    "development",
+    "professional development",
+    "premier league 2",
+    "premier league 2 division",
+
+    // women
+    "women",
+    "femenil",
+    "femenino",
+    "femin",
+    "wsl",
+
+    // friendlies
+    "friendly",
+    "friendlies",
+    "amistoso",
+
+    // ligas menores típicas
+    "non league",
+    "national league - south",
+    "national league - north",
+    "efl trophy",
+    "serie c",
+    "serie d",
+    "liga 3",
+    "tercera division",
+    "tercera division rfef",
+
+    // estaduales BR (ruido)
+    "paulista",
+    "paulista a2",
+    "baiano",
+    "goiano",
+    "cearense",
+    "pernambucano",
+    "matogrossense",
+    "maranhense",
+    "potiguar",
+    "acreano",
+  ];
+
+  if (bannedPatterns.some((p) => l.includes(p))) return false;
+
+  // Internacionales permitidas aunque country sea “World”
+  const intlAllowed = [
+    "uefa champions league",
+    "uefa europa league",
+    "uefa europa conference league",
+    "champions league",
+    "europa league",
+    "conference league",
+  ];
+  if (intlAllowed.some((x) => l.includes(x))) return true;
+
+  // Whitelist (top)
+  const allowedPairs = [
+    // Big 5
+    { country: "england", league: "premier league" },
+    { country: "spain", league: "la liga" },
+    { country: "italy", league: "serie a" },
+    { country: "germany", league: "bundesliga" },
+    { country: "france", league: "ligue 1" },
+
+    // Europa relevante
+    { country: "netherlands", league: "eredivisie" },
+    { country: "portugal", league: "primeira liga" },
+    { country: "scotland", league: "premiership" },
+
+    // América top
+    { country: "mexico", league: "liga mx" },
+    { country: "usa", league: "mls" },
+    { country: "brazil", league: "serie a" },
+    { country: "argentina", league: "primera" },
+    { country: "chile", league: "primera" },
+  ];
+
+  return allowedPairs.some((p) => c.includes(p.country) && l.includes(normStr(p.league)));
+}
+
+/* ------------------- League priority legacy (tuya) ------------------- */
 const IMPORTANT_LEAGUES = [
   "Premier League",
   "La Liga",
@@ -111,7 +310,6 @@ const IMPORTANT_LEAGUES = [
   "Ligue 1",
   "Primeira Liga",
   "Eredivisie",
-
   "FA Cup",
   "EFL Cup",
   "Copa del Rey",
@@ -120,7 +318,6 @@ const IMPORTANT_LEAGUES = [
   "Coupe de France",
   "Supercopa",
   "Super Cup",
-
   "UEFA Champions League",
   "UEFA Europa League",
   "UEFA Conference League",
@@ -129,7 +326,6 @@ const IMPORTANT_LEAGUES = [
   "Club World Cup",
   "World Cup",
   "Euro Championship",
-
   "Liga MX",
   "Brasileirão",
   "Copa do Brasil",
@@ -138,7 +334,6 @@ const IMPORTANT_LEAGUES = [
   "Copa Chile",
 ];
 
-// Prioridad para ordenar ligas
 function getLeaguePriority(leagueName = "", country = "") {
   const name = String(leagueName || "").toLowerCase();
   const countryLower = String(country || "").toLowerCase();
@@ -152,7 +347,128 @@ function getLeaguePriority(leagueName = "", country = "") {
 
   return 25;
 }
+// Prioridad menor = más importante (igual que Fixtures)
+function countryPriority(countryName) {
+  const c = normStr(countryName);
 
+  if (c.includes("england") || c.includes("inglaterra")) return 0;
+  if (c.includes("spain") || c.includes("espana") || c.includes("españa")) return 1;
+  if (c.includes("france") || c.includes("francia")) return 2;
+  if (c.includes("italy") || c.includes("italia")) return 3;
+  if (c.includes("germany") || c.includes("alemania")) return 4;
+
+  if (c.includes("argentina")) return 5;
+  if (c.includes("chile")) return 6;
+  if (c.includes("portugal")) return 7;
+  if (c.includes("mexico") || c.includes("méxico")) return 8;
+  if (c.includes("usa")) return 9;
+  if (c.includes("brazil") || c.includes("brasil")) return 10;
+
+  return 50;
+}
+
+function leaguePriority(leagueName) {
+  const n = normStr(leagueName);
+
+  // UEFA
+  if (n.includes("uefa champions") || n.includes("champions league")) return 0;
+  if (n.includes("uefa europa") || n.includes("europa league")) return 1;
+  if (n.includes("uefa conference") || n.includes("conference league")) return 2;
+
+  // Big-5
+  if (n.includes("premier league")) return 3;
+  if (n.includes("la liga") || n.includes("laliga")) return 4;
+  if (n.includes("serie a")) return 5;
+  if (n.includes("bundesliga") && !n.includes("2.")) return 6;
+  if (n.includes("ligue 1")) return 7;
+
+  // América
+  if (n.includes("liga mx")) return 10;
+  if (n.includes("primera division") || n.includes("liga profesional")) return 11; // Argentina
+  if (
+    n.includes("campeonato brasileiro") ||
+    n.includes("brasileirao") ||
+    (n.includes("serie a") && n.includes("brazil"))
+  ) return 12;
+  if (n.includes("primera") && n.includes("chile")) return 13;
+  if (n.includes("mls")) return 14;
+
+  return 50;
+}
+
+/** Filtro ligas TOP (whitelist + blocklist) */
+function isAllowedCompetition(countryName, leagueName) {
+  const c = normStr(countryName);
+  const l = normStr(leagueName);
+
+  // Bloquear subcategorías/ruido
+  const bannedPatterns = [
+    // youth / reservas
+    "u23","u22","u21","u20","u19","u18","u17","u16",
+    "youth","juvenil","reserves","reserve","b team"," ii",
+    "development","professional development",
+    "premier league 2","premier league 2 division",
+
+    // women
+    "women","femenil","femenino","femin","wsl",
+
+    // friendlies
+    "friendly","friendlies","amistoso",
+
+    // ligas menores típicas
+    "non league",
+    "national league - south",
+    "national league - north",
+    "efl trophy",
+    "serie c","serie d",
+    "liga 3",
+    "tercera division",
+    "tercera division rfef",
+
+    // estaduales BR (si quieres reducir ruido)
+    "paulista","paulista a2","baiano","goiano","cearense","pernambucano",
+    "matogrossense","maranhense","potiguar","acreano",
+  ];
+
+  if (bannedPatterns.some((p) => l.includes(p))) return false;
+
+  // Internacionales permitidas aunque country sea "World"
+  const intlAllowed = [
+    "uefa champions league",
+    "uefa europa league",
+    "uefa europa conference league",
+    "champions league",
+    "europa league",
+    "conference league",
+  ];
+  if (intlAllowed.some((x) => l.includes(x))) return true;
+
+  // Whitelist (top)
+  const allowedPairs = [
+    // Big 5
+    { country: "england", league: "premier league" },
+    { country: "spain", league: "la liga" },
+    { country: "italy", league: "serie a" },
+    { country: "germany", league: "bundesliga" },
+    { country: "france", league: "ligue 1" },
+
+    // Europa relevante
+    { country: "netherlands", league: "eredivisie" },
+    { country: "portugal", league: "primeira liga" },
+    { country: "scotland", league: "premiership" },
+
+    // América top
+    { country: "mexico", league: "liga mx" },
+    { country: "usa", league: "mls" },
+    { country: "brazil", league: "serie a" },
+    { country: "argentina", league: "primera" },
+    { country: "chile", league: "primera" },
+  ];
+
+  return allowedPairs.some((p) => c.includes(p.country) && l.includes(normStr(p.league)));
+}
+
+/* ------------------- Fixture getters ------------------- */
 function getFixtureId(f) {
   return (
     f.id ||
@@ -162,6 +478,13 @@ function getFixtureId(f) {
     f.fixture?.fixture_id ||
     `${f.league?.id || ""}-${f.timestamp || f.date || f.fixture?.date || ""}`
   );
+}
+
+function getHomeLogo(f) {
+  return f?.teams?.home?.logo || f?.homeLogo || f?.home_logo || null;
+}
+function getAwayLogo(f) {
+  return f?.teams?.away?.logo || f?.awayLogo || f?.away_logo || null;
 }
 
 function getLeagueName(f) {
@@ -239,107 +562,7 @@ function isYouthOrWomenOrReserve(fx) {
   return banned.some((p) => blob.includes(p));
 }
 
-/** ✅ Detecta 2ª/3ª/4ª y ligas “B”/reservas por nombre */
-function isLowerDivisionLeagueName(leagueName = "") {
-  const s = String(leagueName || "").toLowerCase();
-
-  const spainBanned = ["rfef", "primera rfef", "segunda rfef", "tercera rfef", "federacion", "federación"];
-
-  const genericBanned = [
-    "segunda",
-    "segunda división",
-    "segunda division",
-    "tercera",
-    "tercera división",
-    "tercera division",
-    "fourth",
-    "4th",
-    "reserve",
-    "reserves",
-    "b team",
-    " ii",
-    " u23",
-  ];
-
-  const leaguesBanned = ["serie b", "serie c", "ligue 2", "2. bundesliga", "3. liga", "league one", "league two", "championship"];
-
-  const banned = [...spainBanned, ...genericBanned, ...leaguesBanned];
-  return banned.some((k) => s.includes(k));
-}
-
-/** Solo ligas “top” y evita ligas desconocidas */
-function isMajorLeague(fx) {
-  const league = String(getLeagueName(fx) || "");
-  const s = league.toLowerCase();
-
-  if (isLowerDivisionLeagueName(league)) return false;
-
-  const bad = [
-    "u17",
-    "u18",
-    "u19",
-    "u20",
-    "u21",
-    "youth",
-    "reserve",
-    "reserves",
-    "friendly",
-    "women",
-    "femen",
-    "amateur",
-    "regional",
-    "state",
-    "non league",
-    "development",
-  ];
-  if (bad.some((k) => s.includes(k))) return false;
-
-  if (IMPORTANT_LEAGUES.some((x) => s.includes(String(x).toLowerCase()))) return true;
-
-  const okPatterns = [
-    "champions league",
-    "europa league",
-    "conference league",
-    "libertadores",
-    "sudamericana",
-
-    "copa del rey",
-    "fa cup",
-    "efl cup",
-    "dfb pokal",
-    "coppa italia",
-    "coupe de france",
-    "supercopa",
-    "super cup",
-    "cup",
-    "copa",
-
-    "premier league",
-    "la liga",
-    "serie a",
-    "bundesliga",
-    "ligue 1",
-    "primeira liga",
-    "eredivisie",
-    "liga mx",
-    "brasileirão",
-    "copa do brasil",
-    "copa argentina",
-    "copa chile",
-    "primera división",
-    "primera division",
-  ];
-
-  const englandNoise = ["isthmian", "northern", "southern", "npl", "vanarama", "trophy", "vase", "counties", "county"];
-  if (getCountryName(fx) === "England" && englandNoise.some((k) => s.includes(k))) return false;
-
-  return okPatterns.some((p) => s.includes(p));
-}
-
 /* --------------------- Plan & Features --------------------- */
-
-/* --------------------- Plan & Features (CORREGIDO) --------------------- */
-
 // ✅ planId interno SIEMPRE: basic | trimestral | anual | vitalicio
 function normalizePlanId(raw) {
   const p = String(raw || "").toLowerCase().trim();
@@ -349,45 +572,28 @@ function normalizePlanId(raw) {
   if (["trimestral", "goleador", "tri", "3", "4mes", "4 meses"].some((k) => p.includes(k))) return "trimestral";
   if (["basic", "mensual", "inicio", "month"].some((k) => p.includes(k))) return "basic";
 
-  // default seguro
   return "basic";
 }
 
 function getFeaturesByPlanId(planId) {
-  // Cuota regalo + cuotas potenciadas: SIEMPRE para miembros
   const base = { giftPick: true, boosted: true };
 
-  if (planId === "basic") {
-    return { ...base, referees: false, scorersValue: false, marketValue: false };
-  }
-  if (planId === "trimestral") {
-    return { ...base, referees: false, scorersValue: false, marketValue: false };
-  }
-  if (planId === "anual") {
-    return { ...base, referees: true, scorersValue: false, marketValue: false };
-  }
-  // vitalicio
+  if (planId === "basic") return { ...base, referees: false, scorersValue: false, marketValue: false };
+  if (planId === "trimestral") return { ...base, referees: false, scorersValue: false, marketValue: false };
+  if (planId === "anual") return { ...base, referees: true, scorersValue: false, marketValue: false };
+
   return { ...base, referees: true, scorersValue: true, marketValue: true };
 }
 
 /* --------------------- UI helpers --------------------- */
-
-/**
- * ✅ HudCard (estilo Perfil / “tarjeta flotante”)
- * - Borde neutro limpio
- * - Profundidad (sombra) para efecto flotante
- * - Glow dorado suave opcional
- * - Overlays + filtro de imagen (como Perfil)
- * - Permite bg (imagen) o bgColor (color sólido)
- */
 function HudCard({
   bg,
   bgColor,
   children,
   className = "",
   style = {},
-  overlayVariant = "casillas", // "casillas" | "casillasSharp" | "player"
-  glow = "gold", // "gold" | "none"
+  overlayVariant = "casillas",
+  glow = "gold",
   imgStyle = {},
 }) {
   const variants = {
@@ -399,7 +605,6 @@ function HudCard({
       ],
       imgFilter: "contrast(1.12) saturate(1.08) brightness(0.95)",
     },
-
     casillas: {
       overlays: [
         "linear-gradient(180deg, rgba(2,6,23,0.88) 0%, rgba(2,6,23,0.62) 38%, rgba(2,6,23,0.86) 100%)",
@@ -408,7 +613,6 @@ function HudCard({
       ],
       imgFilter: "contrast(1.10) saturate(1.06) brightness(0.96)",
     },
-
     casillasSharp: {
       overlays: [
         "linear-gradient(180deg, rgba(2,6,23,0.78) 0%, rgba(2,6,23,0.45) 42%, rgba(2,6,23,0.78) 100%)",
@@ -422,31 +626,20 @@ function HudCard({
   const v = variants[overlayVariant] || variants.casillas;
   const [o1, o2, o3] = v.overlays;
 
-  // Borde tipo Perfil
   const borderColor = "rgba(255,255,255,0.10)";
-
-  // Sombra + glow tipo “tarjeta flotante”
   const boxShadow =
     glow === "gold"
       ? [
           "0 0 0 1px rgba(255,255,255,0.03) inset",
-          "0 18px 60px rgba(0,0,0,0.55)",     // profundidad (flotante)
-          "0 0 85px rgba(230, 196, 100, 0.30)",  // glow dorado más notorio
-        ].join(", ")
-      : [
-          "0 0 0 1px rgba(255,255,255,0.30) inset",
           "0 18px 60px rgba(0,0,0,0.55)",
-        ].join(", ");
+          "0 0 85px rgba(230, 196, 100, 0.30)",
+        ].join(", ")
+      : ["0 0 0 1px rgba(255,255,255,0.30) inset", "0 18px 60px rgba(0,0,0,0.55)"].join(", ");
 
   return (
     <div
       className={`relative overflow-hidden rounded-3xl border bg-slate-950/25 backdrop-blur-md ${className}`}
-      style={{
-        borderColor,
-        boxShadow,
-        backgroundColor: bgColor || undefined,
-        ...style,
-      }}
+      style={{ borderColor, boxShadow, backgroundColor: bgColor || undefined, ...style }}
     >
       {bg ? (
         <img
@@ -465,6 +658,70 @@ function HudCard({
       <div className="relative">{children}</div>
     </div>
   );
+}
+
+/* ------------------- Partidazos manuales ------------------- */
+const PARTIDAZOS_MANUAL = [
+  // Champions (Martes 20-01-2026) — si no tienes fixtureId, usa date/league/home/away
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Inter", away: "Arsenal" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Tottenham", away: "Borussia Dortmund" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Monaco" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Sporting CP", away: "Paris" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Villarreal", away: "Ajax" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Psg" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "madrid" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "club brugge" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "kairat" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Ajax" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Glimt" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Bayer 04 Leverkusen" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Olympiacos" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Napoli" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Copenhague" },
+
+  // ✅ IDs estables (los que te faltaban)
+  { fixtureId: 1504664 }, // Bodo/Glimt vs Manchester City
+  { fixtureId: 1451134 }, // Olympiacos vs Bayer Leverkusen
+  { fixtureId: 1451132 }, // FC Copenhagen vs Napoli
+];
+
+function picksFromFixturesComparator(fixtures) {
+  const out = [];
+  const used = new Set();
+
+  for (const pick of PARTIDAZOS_MANUAL) {
+    const p = pick || {};
+    const wantedId = p.fixtureId;
+    let found = null;
+
+    if (wantedId) {
+      found = fixtures.find((f) => String(getFixtureId(f)) === String(wantedId));
+    } else {
+      found = fixtures.find((f) => {
+        const dKey = fixtureDateKey(f);
+        const league = getLeagueName(f);
+        const home = getHomeName(f);
+        const away = getAwayName(f);
+
+        if (p.date && dKey !== String(p.date)) return false;
+        if (p.league && !includesNorm(league || "", p.league)) return false;
+        if (p.home && !includesNorm(home || "", p.home)) return false;
+        if (p.away && !includesNorm(away || "", p.away)) return false;
+
+        return true;
+      });
+    }
+
+    if (found) {
+      const id = getFixtureId(found);
+      if (!used.has(id)) {
+        used.add(id);
+        out.push(found);
+      }
+    }
+  }
+
+  return out;
 }
 
 /** ✅ Wrapper layout */
@@ -502,52 +759,96 @@ function PageShell({ children }) {
   );
 }
 
-/* ------------------- Partidazos ------------------- */
+/* ------------------- Partidazos UI ------------------- */
+function PartidazoLine({ f }) {
+  const id = getFixtureId(f);
+  const home = getHomeName(f);
+  const away = getAwayName(f);
+  const league = getLeagueName(f);
+  const country = getCountryName(f);
 
-function PartidazosDeLaSemanaCard() {
+  const time = fixtureTimeLabel(f) || getKickoffTime(f) || "—";
+  const hLogo = getHomeLogo(f);
+  const aLogo = getAwayLogo(f);
+
   return (
-    <HudCard
-      bg={BG_VISITOR}
-      overlayVariant="player"
-      className="mt-6"
-      glow="gold"
-    >
-      <div className="p-4 md:p-6">
-        <div className="text-emerald-200/90 text-xs font-semibold tracking-wide">Factor Victoria recomienda</div>
-        <div className="mt-1 text-xl md:text-2xl font-bold text-slate-100">Partidazos de la semana</div>
-        <div className="mt-1 text-sm text-slate-200">Estos son los encuentros más atractivos para analizar.</div>
+    <div className="rounded-2xl border border-white/10 bg-slate-950/25 px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[11px] text-slate-400 truncate">
+            {league} {country ? `· ${country}` : ""}
+          </div>
 
-        <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/30 overflow-hidden">
-          <div className="relative w-full aspect-[16/9] md:aspect-[21/9]">
-            <img
-              src={BG_PARTIDAZOS}
-              alt="Partidazos de la semana"
-              className="absolute inset-0 w-full h-full object-cover object-center"
-              loading="lazy"
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-slate-950/10 via-slate-950/10 to-slate-950/35" />
+          <div className="mt-1 flex items-center gap-2 min-w-0">
+            {hLogo ? (
+              <img src={hLogo} alt="" aria-hidden="true" className="h-6 w-6 rounded-sm object-contain" />
+            ) : (
+              <div className="h-6 w-6 rounded-sm bg-white/5 border border-white/10" />
+            )}
+
+            <div className="text-sm font-semibold text-slate-100 truncate">{home}</div>
+
+            <div className="text-xs font-bold" style={{ color: "rgba(230,196,100,0.80)" }}>
+              vs
+            </div>
+
+            <div className="text-sm font-semibold text-slate-100 truncate">{away}</div>
+
+            {aLogo ? (
+              <img src={aLogo} alt="" aria-hidden="true" className="h-6 w-6 rounded-sm object-contain" />
+            ) : (
+              <div className="h-6 w-6 rounded-sm bg-white/5 border border-white/10" />
+            )}
           </div>
         </div>
 
-        <div className="mt-3 text-xs text-slate-400">Tip: Apuesta con datos, planificación y visión ganadora.</div>
+        <div className="shrink-0 text-xs px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-slate-200">
+          {time}
+        </div>
+      </div>
+
+      <div className="mt-2 text-[11px] text-slate-400">
+        fixtureId: <span className="text-slate-200 font-semibold">{String(id)}</span>
+      </div>
+    </div>
+  );
+}
+
+function RecoWeeklyCardComparator({ fixtures = [] }) {
+  const picks = useMemo(() => picksFromFixturesComparator(fixtures), [fixtures]);
+
+  return (
+    <HudCard bg={BG_PARTIDAZOS || BG_VISITOR} overlayVariant="casillasSharp" className="mt-4" glow="gold">
+      <div className="p-4 md:p-6">
+        <div className="text-emerald-200/90 text-xs font-semibold tracking-wide">Factor Victoria recomienda</div>
+        <div className="mt-1 text-xl md:text-2xl font-bold text-slate-100">Partidazos de la semana</div>
+        <div className="mt-1 text-sm text-slate-200">Selección curada manualmente (fixtureId o match por fecha/liga/equipos).</div>
+
+        <div className="mt-4 space-y-2">
+          {picks.length === 0 ? (
+            <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-slate-300">
+              Aún no hay coincidencias. Si estás generando otro rango de fechas, esos partidos podrían no estar cargados.
+            </div>
+          ) : (
+            picks.map((f) => <PartidazoLine key={String(getFixtureId(f))} f={f} />)
+          )}
+        </div>
+
+        <div className="mt-3 text-[11px] text-slate-400">
+          Edita <span className="font-semibold">PARTIDAZOS_MANUAL</span> para cambiar la selección.
+        </div>
       </div>
     </HudCard>
   );
 }
 
 /* ------------------- Visitante ------------------- */
-
 function VisitorBanner() {
   const nav = useNavigate();
   const goPlans = () => window.location.assign("/#planes");
 
   return (
-    <HudCard
-      bg={BG_VISITOR}
-      overlayVariant="player"
-      className="mt-4"
-      glow="gold"
-    >
+    <HudCard bg={BG_VISITOR} overlayVariant="player" className="mt-4" glow="gold">
       <div className="p-5 md:p-7">
         <div className="text-xs tracking-wide text-emerald-200/90 font-semibold">Modo visitante</div>
 
@@ -658,7 +959,6 @@ function VisitorEndingHero() {
 }
 
 /* ------------------- Simulador ------------------- */
-
 function formatMoney(value, currency) {
   const n = Number(value || 0);
   const safe = Number.isFinite(n) ? n : 0;
@@ -681,12 +981,7 @@ function GainSimulatorCard() {
   const potential = Number(stake || 0) * Number(mult || 1);
 
   return (
-    <HudCard
-      bg={BG_DINERO}
-      overlayVariant="casillas"
-      className="mt-6"
-      glow="gold"
-    >
+    <HudCard bg={BG_DINERO} overlayVariant="casillas" className="mt-6" glow="gold">
       <div className="p-5 md:p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -715,8 +1010,8 @@ function GainSimulatorCard() {
               value={formatMoney(stake, currency)}
               onChange={(e) => {
                 const digits = String(e.target.value || "").replace(/[^\d]/g, "");
-                const n = digits ? Number(digits) : 0;
-                setStake(n);
+                const n2 = digits ? Number(digits) : 0;
+                setStake(n2);
               }}
               className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 outline-none"
               placeholder={currency === "CLP" ? "$10.000" : "$100.00"}
@@ -759,7 +1054,6 @@ function GainSimulatorCard() {
 }
 
 /* ------------------- Manual Picks ------------------- */
-
 function ManualPicksSection() {
   const singles = [
     { label: "Barcelona doble oportunidad (1X2)", odd: 1.3, note: "Alta probabilidad" },
@@ -804,12 +1098,7 @@ function ManualPicksSection() {
 
   return (
     <section className="mt-6">
-      <HudCard
-        bg={BG_MANUAL}
-        overlayVariant="casillas"
-        glow="gold"
-        className="overflow-hidden"
-      >
+      <HudCard bg={BG_MANUAL} overlayVariant="casillas" glow="gold" className="overflow-hidden">
         <div className="p-4 md:p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card title="Partidos únicos" items={singles} />
@@ -823,7 +1112,6 @@ function ManualPicksSection() {
 }
 
 /* ------------------- Calculadora de precios ------------------- */
-
 function PriceCalculatorCard() {
   const [currency, setCurrency] = useState("CLP");
   const [stake, setStake] = useState(10000);
@@ -845,12 +1133,7 @@ function PriceCalculatorCard() {
   };
 
   return (
-    <HudCard
-      bg={BG_DINERO}
-      overlayVariant="casillas"
-      className="mt-6"
-      glow="gold"
-    >
+    <HudCard bg={BG_DINERO} overlayVariant="casillas" className="mt-6" glow="gold">
       <div className="p-5 md:p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -922,15 +1205,9 @@ function PriceCalculatorCard() {
 }
 
 /* ------------------- FeatureCard ------------------- */
-
 function FeatureCard({ title, badge, children, locked, lockText, bg }) {
   return (
-    <HudCard
-      bg={bg || BG_GRAFICO_DORADO}
-      overlayVariant="casillas"
-      glow="gold"
-      className="overflow-hidden"
-    >
+    <HudCard bg={bg || BG_GRAFICO_DORADO} overlayVariant="casillas" glow="gold" className="overflow-hidden">
       <div className="relative p-4 md:p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -964,9 +1241,8 @@ function FeatureCard({ title, badge, children, locked, lockText, bg }) {
   );
 }
 
-/* ------------------- FixtureCard ------------------- */
-
-function FixtureCard({ fx, isSelected, onToggle, onLoadOdds, oddsPack }) {
+/* ------------------- FixtureCard (compact) ------------------- */
+function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds }) {
   const id = getFixtureId(fx);
 
   const league = getLeagueName(fx);
@@ -976,147 +1252,96 @@ function FixtureCard({ fx, isSelected, onToggle, onLoadOdds, oddsPack }) {
   const away = getAwayName(fx);
   const time = getKickoffTime(fx);
 
-  const m1x2 = oddsPack?.markets?.["1X2"] || null;
-  const mou = oddsPack?.markets?.["OU_2_5"] || null;
-  const found = oddsPack?.found;
+  const homeLogo = getHomeLogo(fx);
+  const awayLogo = getAwayLogo(fx);
 
-  const hasOdds =
-    (m1x2 && (m1x2.home != null || m1x2.draw != null || m1x2.away != null)) ||
-    (mou && (mou.over != null || mou.under != null));
+  const [open, setOpen] = useState(false);
 
-  const formatOdd = (v) => {
-    const n = Number(v);
-    if (!Number.isFinite(n) || n <= 0) return "—";
-    return n.toFixed(n < 10 ? 2 : 1).replace(/\.0+$/, "");
-  };
-
-  const prob = (() => {
-    const h = Number(m1x2?.home);
-    const d = Number(m1x2?.draw);
-    const a = Number(m1x2?.away);
-    if (![h, d, a].every((x) => Number.isFinite(x) && x > 1.0001)) return null;
-
-    const ih = 1 / h;
-    const idd = 1 / d;
-    const ia = 1 / a;
-    const s = ih + idd + ia;
-
-    const ph = ih / s;
-    const pd = idd / s;
-    const pa = ia / s;
-
-    const best = Math.max(ph, pd, pa);
-    const label = best === ph ? "Local" : best === pd ? "Empate" : "Visita";
-    return { pct: Math.round(best * 100), label };
-  })();
-
-  // ✅ sin borde dorado: borde neutro + glow dorado suave/firme
   const borderColor = "rgba(255,255,255,0.08)";
-  const boxShadow = "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 42px rgba(230,196,100,0.18)";
+  const boxShadow = "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 26px rgba(230,196,100,0.12)";
 
   return (
-    <div
-      className="relative rounded-3xl border bg-slate-950/25 backdrop-blur-md p-5 md:p-6 overflow-hidden"
-      style={{ borderColor, boxShadow }}
-    >
-      <div className="absolute top-5 right-5">
-        <span
-          className={[
-            "inline-block w-5 h-5 rounded-full border",
-            isSelected
-              ? "border-emerald-400 bg-emerald-400 shadow-[0_0_14px_rgba(16,185,129,0.9)]"
-              : "border-white/10 bg-slate-950/40",
-          ].join(" ")}
-        />
-      </div>
-
-      <div className="text-xl md:text-2xl font-bold text-slate-100 pr-10">
-        {home} <span className="text-slate-400 font-semibold">vs</span> {away}
-      </div>
-
-      <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-300">
-        <span className="text-lg leading-none">{flagEmoji}</span>
-        <span className="font-medium">{countryName}</span>
-        <span className="text-slate-500">·</span>
-        <span className="truncate">{league}</span>
-        <span className="text-slate-500">·</span>
-        <span className="font-semibold">{time}</span>
-      </div>
-
-      <div className="mt-4 flex flex-col gap-2">
-        <button
-          type="button"
-          onClick={() => window.alert("En construcción: aquí irá la vista de estadísticas por partido.")}
-          className="w-full rounded-full px-5 py-3 text-sm font-semibold border border-white/10 bg-white/5 hover:bg-white/10 transition text-slate-100"
-        >
-          Ver estadísticas
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            onToggle(id);
-            onLoadOdds(id);
-          }}
-          className="w-full rounded-full px-5 py-3 text-sm font-bold"
-          style={{ backgroundColor: GOLD, color: "#0f172a" }}
-        >
-          {isSelected ? "Quitar de combinada" : "Añadir a combinada"}
-        </button>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-          <div className="text-xs text-slate-300 mb-2">1X2 / Goles</div>
-          {hasOdds ? (
-            <div className="text-sm text-slate-100 leading-snug">
-              {m1x2 ? (
-                <div className="font-semibold">
-                  1: {formatOdd(m1x2.home)} · X: {formatOdd(m1x2.draw)} · 2: {formatOdd(m1x2.away)}
-                </div>
-              ) : null}
-              {mou ? (
-                <div className="mt-1 text-emerald-200">
-                  O2.5: {formatOdd(mou.over)} · U2.5: {formatOdd(mou.under)}
-                </div>
-              ) : null}
+    <div className="rounded-2xl border bg-slate-950/25 backdrop-blur-md overflow-hidden" style={{ borderColor, boxShadow }}>
+      {/* fila compacta */}
+      <div className="p-3 md:p-4 flex flex-col md:flex-row md:items-center gap-3">
+        {/* equipos */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              {homeLogo ? (
+                <img src={homeLogo} alt={home} className="w-7 h-7 rounded-full bg-white/5 object-contain" />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-white/5" />
+              )}
+              <div className="truncate text-slate-100 font-semibold">{home}</div>
             </div>
-          ) : (
-            <div className="text-xs text-cyan-200 font-semibold">
-              {found === false ? "Sin cuotas (API)." : "Toca “Añadir a combinada” para cargar cuotas."}
-            </div>
-          )}
-        </div>
 
-        <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-          <div className="text-xs text-slate-300 mb-2 flex items-center justify-between">
-            <span>Prob.</span>
-            <span className="text-[11px] text-slate-500">simple</span>
+            <div className="text-slate-400 font-semibold">vs</div>
+
+            <div className="flex items-center gap-2 min-w-0">
+              {awayLogo ? (
+                <img src={awayLogo} alt={away} className="w-7 h-7 rounded-full bg-white/5 object-contain" />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-white/5" />
+              )}
+              <div className="truncate text-slate-100 font-semibold">{away}</div>
+            </div>
           </div>
-          {prob ? (
-            <div className="text-sm font-semibold text-slate-100">
-              {prob.pct}% <span className="text-slate-400 font-medium">{prob.label}</span>
-            </div>
-          ) : (
-            <div className="text-xs text-slate-400">—</div>
-          )}
+
+          <div className="mt-1 text-xs text-slate-300 flex flex-wrap items-center gap-2">
+            <span className="text-base leading-none">{flagEmoji}</span>
+            <span className="font-medium">{countryName}</span>
+            <span className="text-slate-500">·</span>
+            <span className="truncate">{league}</span>
+            <span className="text-slate-500">·</span>
+            <span className="font-semibold text-slate-200">{time}</span>
+          </div>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-          <div className="text-xs text-slate-300 mb-2">Tarjetas</div>
-          <div className="text-xs text-slate-400">En análisis</div>
-        </div>
+        {/* acciones */}
+        <div className="flex flex-col sm:flex-row gap-2">
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="rounded-full px-4 py-2 text-xs font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition text-slate-100"
+          >
+            {open ? "Ocultar estadísticas" : "Ver estadísticas"}
+          </button>
 
-        <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-          <div className="text-xs text-slate-300 mb-2">Corners</div>
-          <div className="text-xs text-slate-400">En análisis</div>
+          <button
+            type="button"
+            onClick={() => {
+              onToggle(id);
+              onLoadOdds(id);
+            }}
+            className="rounded-full px-4 py-2 text-xs font-bold"
+            style={{
+              backgroundColor: isSelected ? "rgba(16,185,129,0.18)" : "rgba(56,189,248,0.18)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              color: isSelected ? "rgba(167,243,208,0.95)" : "rgba(186,230,253,0.95)",
+            }}
+          >
+            {isSelected ? "Quitar" : "Añadir a combinada"}
+          </button>
         </div>
       </div>
+
+      {/* desplegable */}
+      {open ? (
+        <div className="px-3 md:px-4 pb-3 md:pb-4">
+          <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3 text-[11px] text-slate-300">
+            Estadísticas en despliegue. (Luego aquí cargamos: forma últimos 5, xG, tarjetas, corners, etc.)
+            <div className="mt-2 text-slate-400">
+              fixtureId: <span className="text-slate-200 font-semibold">{String(id)}</span>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
 
-/* --------------------- componente principal --------------------- */
+  /* --------------------- componente principal --------------------- */
 function WelcomeProCard({ planInfo }) {
   return (
     <HudCard bg={BG_PROFILE_HUD} overlayVariant="casillas" className="mt-4" glow="gold">
@@ -1391,30 +1616,50 @@ const features = useMemo(() => getFeaturesByPlanId(planId), [planId]);
         items = items.filter((fx) => selectedCountries.includes(getCountryName(fx)));
       }
 
-      const base = items.filter(isFutureFixture).filter((fx) => !isYouthOrWomenOrReserve(fx));
-      const major = base.filter(isMajorLeague);
-      const filtered = major.length >= 8 ? major : base;
+          const base = items
+        .filter(isFutureFixture)
+        .filter((fx) => !isYouthOrWomenOrReserve(fx));
 
-      const sorted = [...filtered].sort((a, b) => {
-        const prioA = getLeaguePriority(getLeagueName(a), getCountryName(a));
-        const prioB = getLeaguePriority(getLeagueName(b), getCountryName(b));
-        if (prioA !== prioB) return prioA - prioB;
+      // ✅ SOLO ligas importantes (igual que Fixtures)
+      const filteredTop = base.filter((fx) => {
+        const country = getCountryName(fx);
+        const league = getLeagueName(fx);
+        return isAllowedCompetition(country, league);
+      });
 
-        const tA = getKickoffTime(a) || "";
-        const tB = getKickoffTime(b) || "";
-        return tA.localeCompare(tB);
+      if (!filteredTop.length) {
+        setErr("No encontramos partidos de ligas TOP para ese rango. Prueba 7–14 días y sin filtro.");
+        setFixtures([]);
+        return;
+      }
+
+      const sorted = [...filteredTop].sort((a, b) => {
+        // ordena por fecha real primero
+        const da = new Date(a?.fixture?.date || a?.date || 0).getTime();
+        const db = new Date(b?.fixture?.date || b?.date || 0).getTime();
+        if (da !== db) return da - db;
+
+        // luego prioridad liga/país
+        const la = getLeagueName(a);
+        const lb = getLeagueName(b);
+        const pla = leaguePriority(la);
+        const plb = leaguePriority(lb);
+        if (pla !== plb) return pla - plb;
+
+        const ca = countryPriority(getCountryName(a));
+        const cb = countryPriority(getCountryName(b));
+        if (ca !== cb) return ca - cb;
+
+        // y finalmente hora
+        const ta = fixtureTimeLabel(a) || getKickoffTime(a) || "";
+        const tb = fixtureTimeLabel(b) || getKickoffTime(b) || "";
+        return ta.localeCompare(tb);
       });
 
       const LIMITED = sorted.slice(0, 140);
 
-      if (!LIMITED.length) {
-        setErr(
-          `No encontramos partidos para ese rango. API devolvió: ${itemsRaw.length} | base: ${base.length} | ligas top: ${major.length}. ` +
-            `Prueba con 7–14 días y sin filtro (q vacío).`
-        );
-        setFixtures([]);
-        return;
-      }
+      setFixtures(LIMITED);
+      setInfo(`API: ${itemsRaw.length} | base: ${base.length} | TOP: ${filteredTop.length} | mostrando: ${LIMITED.length}`);
 
       setFixtures(LIMITED);
       setInfo(`API: ${itemsRaw.length} | base: ${base.length} | top: ${major.length} | mostrando: ${LIMITED.length}`);
@@ -1532,7 +1777,7 @@ const features = useMemo(() => getFeaturesByPlanId(planId), [planId]);
       </HudCard>
 
       {/* 2) Partidazos */}
-      <PartidazosDeLaSemanaCard />
+      <RecoWeeklyCardComparator fixtures={fixtures} />
 
       {/* 3) LISTADO (con fondo pasto como antes) */}
       <HudCard
@@ -1546,7 +1791,7 @@ const features = useMemo(() => getFeaturesByPlanId(planId), [planId]);
         <section className="p-3 md:p-4">
           <div className="flex items-center justify-between px-2 py-2 text-[11px] md:text-xs text-slate-300 tracking-wide">
             <span className="uppercase">
-              Partidos encontrados: <span className="font-semibold text-slate-50">{fixtures.length}</span>
+              Partidos encontrados (COMPACT): {fixtures.length}
             </span>
             <span className="uppercase text-right">Usa “Añadir a combinada” para seleccionar y cargar cuotas.</span>
           </div>
@@ -1557,27 +1802,26 @@ const features = useMemo(() => getFeaturesByPlanId(planId), [planId]);
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
-              {fixtures.map((fx) => {
-                const id = getFixtureId(fx);
-                const isSelected = selectedIds.includes(id);
-                const oddsPack = oddsByFixture[id] || null;
+  {fixtures.map((fx) => {
+    const id = getFixtureId(fx);
+    const isSelected = selectedIds.includes(id);
 
-                return (
-                  <FixtureCard
-                    key={id}
-                    fx={fx}
-                    isSelected={isSelected}
-                    oddsPack={oddsPack}
-                    onToggle={(fixtureId) => {
-                      toggleFixtureSelection(fixtureId);
-                      setParlayResult(null);
-                      setParlayError("");
-                    }}
-                    onLoadOdds={(fixtureId) => ensureOdds(fixtureId)}
-                  />
-                );
-              })}
-            </div>
+    return (
+      <FixtureCardCompact
+        key={id}
+        fx={fx}
+        isSelected={isSelected}
+        onToggle={(fixtureId) => {
+          toggleFixtureSelection(fixtureId);
+          setParlayResult(null);
+          setParlayError("");
+        }}
+        onLoadOdds={(fixtureId) => ensureOdds(fixtureId)}
+      />
+    );
+  })}
+</div>
+
           )}
         </section>
       </HudCard>
@@ -1680,9 +1924,9 @@ const features = useMemo(() => getFeaturesByPlanId(planId), [planId]);
 
       {/* 7) Calculadora */}
       <PriceCalculatorCard />
-      <div className="mt-8 text-center text-xs text-slate-500">
-  © {new Date().getFullYear()} Factor Victoria
-</div>
+            <div className="mt-8 text-center text-xs text-slate-500">
+        © {new Date().getFullYear()} Factor Victoria
+      </div>
     </PageShell>
-    );
-    }
+  );
+}
