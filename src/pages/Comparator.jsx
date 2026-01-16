@@ -2,6 +2,8 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import PriceCalculatorCard from "../components/PriceCalculatorCard";
+
 
 const GOLD = "#E6C464";
 
@@ -1647,10 +1649,7 @@ export default function Comparator() {
       {/* 6) Simulador */}
       <GainSimulatorCard />
 
-      {/* 7) Calculadora */}
-      <PriceCalculatorCard />
-
-      {/* Resto de módulos los mantienes tal cual en tu archivo anterior.
+         {/* Resto de módulos los mantienes tal cual en tu archivo anterior.
           Si quieres, los vuelvo a pegar completos también, pero esto ya corrige:
           - Partidazos sin imagen
           - Lista verde premium
