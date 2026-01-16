@@ -423,6 +423,16 @@ function HudCard({
 const PARTIDAZOS_MANUAL = [
   { date: "2026-01-20", league: "UEFA Champions League", home: "Inter", away: "Arsenal" },
   { date: "2026-01-20", league: "UEFA Champions League", home: "Tottenham", away: "Borussia Dortmund" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Psg" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "madrid" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "club brugge" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "kairat" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Ajax" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Glimt" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Bayer 04 Leverkusen" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Olympiacos" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Napoli" },
+  { date: "2026-01-20", league: "UEFA Champions League", home: "Copenhague" },
 
   // ✅ IDs estables
   { fixtureId: 1504664 }, // Bodo/Glimt vs Manchester City
