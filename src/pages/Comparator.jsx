@@ -574,7 +574,56 @@ function PartidazoLine({ f }) {
 }
 
 function RecoWeeklyCardComparator({ fixtures = [], loading = false, error = "" }) {
-  const picks = useMemo(() => picksFromFixturesComparator(fixtures), [fixtures]);
+  const manual = useMemo(() => picksFromFixturesComparator(fixtures), [fixtures]);
+
+  const autoTop = useMemo(() => {
+    const arr = Array.isArray(fixtures) ? [...fixtures] : [];
+    // ya vienen filtrados TOP en weeklyFixtures, pero por seguridad:
+    const filtered = arr
+      .filter(isFutureFixture)
+      .filter((fx) => !isYouthOrWomenOrReserve(fx))
+      .filter((fx) => isAllowedCompetition(getCountryName(fx), getLeagueName(fx)));
+
+    filtered.sort((a, b) => {
+      const da = new Date(a?.fixture?.date || a?.date || 0).getTime();
+      const db = new Date(b?.fixture?.date || b?.date || 0).getTime();
+      if (da !== db) return da - db;
+
+      const pla = leaguePriority(getLeagueName(a));
+      const plb = leaguePriority(getLeagueName(b));
+      if (pla !== plb) return pla - plb;
+
+      const ca = countryPriority(getCountryName(a));
+      const cb = countryPriority(getCountryName(b));
+      if (ca !== cb) return ca - cb;
+
+      return String(getLeagueName(a)).localeCompare(String(getLeagueName(b)));
+    });
+
+    // Top 8 automático
+    return filtered.slice(0, 8);
+  }, [fixtures]);
+
+  // ✅ Merge: manual primero (pin), luego auto sin duplicados
+  const merged = useMemo(() => {
+    const out = [];
+    const seen = new Set();
+    for (const f of manual) {
+      const id = String(getFixtureId(f));
+      if (!seen.has(id)) {
+        seen.add(id);
+        out.push(f);
+      }
+    }
+    for (const f of autoTop) {
+      const id = String(getFixtureId(f));
+      if (!seen.has(id)) {
+        seen.add(id);
+        out.push(f);
+      }
+    }
+    return out.slice(0, 10); // 10 máximo total
+  }, [manual, autoTop]);
 
   return (
     <HudCard bg={null} bgColor="#132A23" overlayVariant="casillasSharp" className="mt-4" glow="gold">
@@ -582,7 +631,7 @@ function RecoWeeklyCardComparator({ fixtures = [], loading = false, error = "" }
         <div className="text-emerald-200/90 text-xs font-semibold tracking-wide">Factor Victoria recomienda</div>
         <div className="mt-1 text-xl md:text-2xl font-bold text-slate-100">Partidazos de la semana</div>
         <div className="mt-1 text-sm text-slate-200">
-          Selección curada manualmente (fixtureId o match por fecha/liga/equipos).
+          Pin manual + Top automático (prioridad Champions/Europa/Big5).
         </div>
 
         <div className="mt-4 space-y-2">
@@ -594,17 +643,17 @@ function RecoWeeklyCardComparator({ fixtures = [], loading = false, error = "" }
             <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-amber-300">
               {error}
             </div>
-          ) : picks.length === 0 ? (
+          ) : merged.length === 0 ? (
             <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-slate-300">
-              No hubo coincidencias con tu lista manual. Revisa <b>PARTIDAZOS_MANUAL</b> (fixtureId o nombres).
+              No encontramos partidos TOP en los próximos 7 días.
             </div>
           ) : (
-            picks.map((f) => <PartidazoLine key={String(getFixtureId(f))} f={f} />)
+            merged.map((f) => <PartidazoLine key={String(getFixtureId(f))} f={f} />)
           )}
         </div>
 
         <div className="mt-3 text-[11px] text-slate-400">
-          Edita <span className="font-semibold">PARTIDAZOS_MANUAL</span> para cambiar la selección.
+          Manual: <span className="font-semibold">PARTIDAZOS_MANUAL</span> (si coincide, se fija arriba).
         </div>
       </div>
     </HudCard>
@@ -742,79 +791,43 @@ function formatMoney(value, currency) {
   }).format(safe);
 }
 
-function GainSimulatorCard() {
-  const [currency, setCurrency] = useState("CLP");
+function PriceCalculatorCard() {
   const [stake, setStake] = useState(10000);
-  const [mult, setMult] = useState(10);
+  const [odd, setOdd] = useState(10);
 
-  const potential = Number(stake || 0) * Number(mult || 1);
+  const payout = Number(stake || 0) * Number(odd || 0);
 
   return (
-    <HudCard bg={BG_DINERO} overlayVariant="casillas" className="mt-6" glow="gold">
+    <HudCard bg={null} bgColor="#132A23" overlayVariant="casillasSharp" className="mt-6" glow="gold">
       <div className="p-5 md:p-6">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold text-slate-100">Simulador de ganancias</div>
-            <div className="text-xs text-slate-300 mt-1">Estima cuánto podrías obtener con cuotas potenciadas.</div>
-          </div>
-
-          <select
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value)}
-            className="rounded-full border border-white/10 bg-slate-950/30 px-3 py-2 text-xs text-slate-200 outline-none"
-          >
-            <option value="CLP">CLP</option>
-            <option value="USD">USD</option>
-            <option value="EUR">EUR</option>
-          </select>
-        </div>
+        <div className="text-sm font-semibold text-slate-100">Calculadora rápida</div>
+        <div className="text-xs text-slate-300 mt-1">Monto × cuota = retorno estimado (simple).</div>
 
         <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-            <div className="text-xs text-slate-300">Monto</div>
-
+            <div className="text-xs text-slate-300">Monto (CLP)</div>
             <input
-              type="text"
-              inputMode="numeric"
-              value={formatMoney(stake, currency)}
-              onChange={(e) => {
-                const digits = String(e.target.value || "").replace(/[^\d]/g, "");
-                const n2 = digits ? Number(digits) : 0;
-                setStake(n2);
-              }}
+              value={stake}
+              onChange={(e) => setStake(Number(String(e.target.value).replace(/[^\d]/g, "")) || 0)}
               className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 outline-none"
-              placeholder={currency === "CLP" ? "$10.000" : "$100.00"}
             />
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-            <div className="text-xs text-slate-300">Cuota potenciada</div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {[10, 20, 50, 100].map((x) => (
-                <button
-                  key={x}
-                  type="button"
-                  onClick={() => setMult(x)}
-                  className="px-3 py-2 rounded-full text-xs font-semibold border transition"
-                  style={{
-                    borderColor: "rgba(255,255,255,0.12)",
-                    background: mult === x ? "rgba(56,189,248,0.18)" : "rgba(2,6,23,0.25)",
-                    color: mult === x ? "rgba(186,230,253,0.95)" : "rgba(226,232,240,0.92)",
-                  }}
-                >
-                  x{x}
-                </button>
-              ))}
-            </div>
-            <div className="mt-2 text-[11px] text-slate-400">Para activar x20/x50/x100 necesitas membresía.</div>
+            <div className="text-xs text-slate-300">Cuota</div>
+            <input
+              value={odd}
+              onChange={(e) => setOdd(Number(String(e.target.value).replace(/[^\d.]/g, "")) || 0)}
+              className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 outline-none"
+            />
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-            <div className="text-xs text-slate-300">Resultado estimado</div>
-            <div className="mt-2 text-lg font-bold" style={{ color: "rgba(230,196,100,0.98)" }}>
-              {formatMoney(potential, currency)}
+            <div className="text-xs text-slate-300">Retorno</div>
+            <div className="mt-2 text-lg font-bold" style={{ color: GOLD }}>
+              {new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP" }).format(payout)}
             </div>
-            <div className="mt-1 text-[11px] text-slate-400">(Simulación simple: monto × multiplicador)</div>
+            <div className="mt-1 text-[11px] text-slate-400">No incluye comisión.</div>
           </div>
         </div>
       </div>
@@ -1642,8 +1655,7 @@ export default function Comparator() {
           - Partidazos sin imagen
           - Lista verde premium
           - Errores/duplicados que impedían aplicar cambios */}
-      <GainSimulatorCard />
-
+     
       <div className="mt-8 text-center text-xs text-slate-500">© {new Date().getFullYear()} Factor Victoria</div>
     </PageShell>
   );
