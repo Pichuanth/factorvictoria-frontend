@@ -9,7 +9,7 @@ export const PLAN_RANK = {
   vitalicio: 3,    // x100
 };
 
-/** Meta por plan (útil si la necesitas en otras vistas) */
+/** Meta por plan */
 export const PLAN_TARGET = {
   basic: 10,
   trimestral: 20,
@@ -19,11 +19,32 @@ export const PLAN_TARGET = {
 
 /** Usuarios demo por plan (misma clave para todos) */
 const USERS = {
-  "mensual@demo.cl":    { email: "mensual@demo.cl",    planId: "basic",     rank: PLAN_RANK.basic,     name: "Demo Mensual" },
-  "trimestral@demo.cl": { email: "trimestral@demo.cl", planId: "trimestral",rank: PLAN_RANK.trimestral,name: "Demo Trimestral" },
-  "anual@demo.cl":      { email: "anual@demo.cl",      planId: "anual",     rank: PLAN_RANK.anual,     name: "Demo Anual" },
-  "vitalicio@demo.cl":  { email: "vitalicio@demo.cl",  planId: "vitalicio", rank: PLAN_RANK.vitalicio, name: "Demo Vitalicio" },
+  "mensual@demo.cl": {
+    email: "mensual@demo.cl",
+    planId: "basic",
+    rank: PLAN_RANK.basic,
+    name: "Demo Mensual",
+  },
+  "trimestral@demo.cl": {
+    email: "trimestral@demo.cl",
+    planId: "trimestral",
+    rank: PLAN_RANK.trimestral,
+    name: "Demo Trimestral",
+  },
+  "anual@demo.cl": {
+    email: "anual@demo.cl",
+    planId: "anual",
+    rank: PLAN_RANK.anual,
+    name: "Demo Anual",
+  },
+  "vitalicio@demo.cl": {
+    email: "vitalicio@demo.cl",
+    planId: "vitalicio",
+    rank: PLAN_RANK.vitalicio,
+    name: "Demo Vitalicio",
+  },
 };
+
 const DEMO_PASS = "Factor1986?";
 
 const AuthCtx = createContext(null);
@@ -43,29 +64,40 @@ export function AuthProvider({ children }) {
       const key = String(email || "").trim().toLowerCase();
       const u = USERS[key];
       if (!u || pass !== DEMO_PASS) return false;
+
       setUser(u);
-      try { localStorage.setItem("fv:user", JSON.stringify(u)); } catch {}
+      try {
+        localStorage.setItem("fv:user", JSON.stringify(u));
+      } catch {}
       return true;
     };
 
     const logout = () => {
       setUser(null);
-      try { localStorage.removeItem("fv:user"); } catch {}
+      try {
+        localStorage.removeItem("fv:user");
+      } catch {}
     };
 
+    const planId = user?.planId || null;
+    const rank = Number.isFinite(user?.rank) ? user.rank : -1;
+
+    // En tu modo demo: si está logueado, lo tratamos como “con membresía”
+    const hasMembership = !!user;
+
     return {
-  user,
-  isLoggedIn: !!user,
+      user,
+      isLoggedIn: !!user,
 
-  // NUEVO: datos útiles para control de acceso
-  planId: user?.planId || null,
-  rank: Number.isFinite(user?.rank) ? user.rank : -1,
-  hasMembership: !!user?.planId && Number.isFinite(user?.rank),
+      // ✅ Útiles para bloquear/desbloquear módulos
+      planId,
+      rank,
+      hasMembership,
 
-  getUser: () => user,
-  login,
-  logout,
-};
+      getUser: () => user,
+      login,
+      logout,
+    };
   }, [user]);
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
