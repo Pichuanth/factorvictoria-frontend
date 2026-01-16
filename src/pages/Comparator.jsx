@@ -51,6 +51,11 @@ function toYYYYMMDD(d) {
   const pad = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
+function addDaysYYYYMMDD(baseYYYYMMDD, days) {
+  const d = new Date(`${baseYYYYMMDD}T00:00:00`);
+  d.setDate(d.getDate() + Number(days || 0));
+  return toYYYYMMDD(d);
+}
 
 function stripDiacritics(s) {
   return String(s || "")
@@ -568,18 +573,11 @@ function PartidazoLine({ f }) {
   );
 }
 
-function RecoWeeklyCardComparator({ fixtures = [] }) {
+function RecoWeeklyCardComparator({ fixtures = [], loading = false, error = "" }) {
   const picks = useMemo(() => picksFromFixturesComparator(fixtures), [fixtures]);
 
-  // ✅ CAMBIO 1: SIN IMAGEN (verde premium como Partidos)
   return (
-    <HudCard
-      bg={null}
-      bgColor="#132A23"
-      overlayVariant="casillasSharp"
-      className="mt-4"
-      glow="gold"
-    >
+    <HudCard bg={null} bgColor="#132A23" overlayVariant="casillasSharp" className="mt-4" glow="gold">
       <div className="p-4 md:p-6">
         <div className="text-emerald-200/90 text-xs font-semibold tracking-wide">Factor Victoria recomienda</div>
         <div className="mt-1 text-xl md:text-2xl font-bold text-slate-100">Partidazos de la semana</div>
@@ -588,9 +586,17 @@ function RecoWeeklyCardComparator({ fixtures = [] }) {
         </div>
 
         <div className="mt-4 space-y-2">
-          {picks.length === 0 ? (
+          {loading ? (
             <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-slate-300">
-              Aún no hay coincidencias. Si estás generando otro rango de fechas, esos partidos podrían no estar cargados.
+              Cargando partidazos…
+            </div>
+          ) : error ? (
+            <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-amber-300">
+              {error}
+            </div>
+          ) : picks.length === 0 ? (
+            <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-slate-300">
+              No hubo coincidencias con tu lista manual. Revisa <b>PARTIDAZOS_MANUAL</b> (fixtureId o nombres).
             </div>
           ) : (
             picks.map((f) => <PartidazoLine key={String(getFixtureId(f))} f={f} />)
@@ -1048,6 +1054,11 @@ export default function Comparator() {
   const [fixtures, setFixtures] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
 
+  // ✅ Partidazos (lista curada) independiente del botón "Generar"
+  const [weeklyLoading, setWeeklyLoading] = useState(false);
+  const [weeklyErr, setWeeklyErr] = useState("");
+  const [weeklyFixtures, setWeeklyFixtures] = useState([]);
+
   // ✅ Multi-país
   const [selectedCountries, setSelectedCountries] = useState([]);
 
@@ -1089,6 +1100,74 @@ export default function Comparator() {
     const en = normalizeCountryQuery(countryEs) || countryEs;
     setSelectedCountries((prev) => (prev.includes(en) ? prev.filter((x) => x !== en) : [...prev, en]));
   }
+  useEffect(() => {
+    let alive = true;
+
+    async function loadWeekly() {
+      setWeeklyErr("");
+      setWeeklyLoading(true);
+
+      try {
+        const fromW = toYYYYMMDD(new Date());
+        const toW = addDaysYYYYMMDD(fromW, 7);
+
+        const params = new URLSearchParams();
+        params.set("from", fromW);
+        params.set("to", toW);
+
+        // puedes dejar sin country para que traiga todo,
+        // y el filtro TOP se encarga de depurar.
+        const res = await fetch(`${API_BASE}/api/fixtures?${params.toString()}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+
+        const itemsRaw =
+          (Array.isArray(data?.items) && data.items) ||
+          (Array.isArray(data?.response) && data.response) ||
+          (Array.isArray(data?.fixtures) && data.fixtures) ||
+          [];
+
+        const base = itemsRaw
+          .filter(isFutureFixture)
+          .filter((fx) => !isYouthOrWomenOrReserve(fx));
+
+        const filteredTop = base.filter((fx) => isAllowedCompetition(getCountryName(fx), getLeagueName(fx)));
+
+        const sorted = [...filteredTop].sort((a, b) => {
+          const da = new Date(a?.fixture?.date || a?.date || 0).getTime();
+          const db = new Date(b?.fixture?.date || b?.date || 0).getTime();
+          if (da !== db) return da - db;
+
+          const pla = leaguePriority(getLeagueName(a));
+          const plb = leaguePriority(getLeagueName(b));
+          if (pla !== plb) return pla - plb;
+
+          const ca = countryPriority(getCountryName(a));
+          const cb = countryPriority(getCountryName(b));
+          if (ca !== cb) return ca - cb;
+
+          const ta = fixtureTimeLabel(a) || getKickoffTime(a) || "";
+          const tb = fixtureTimeLabel(b) || getKickoffTime(b) || "";
+          return ta.localeCompare(tb);
+        });
+
+        if (!alive) return;
+        setWeeklyFixtures(sorted.slice(0, 220));
+      } catch (e) {
+        if (!alive) return;
+        setWeeklyErr(String(e?.message || e));
+      } finally {
+        if (!alive) return;
+        setWeeklyLoading(false);
+      }
+    }
+
+    loadWeekly();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   function toggleFixtureSelection(id) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -1412,7 +1491,11 @@ export default function Comparator() {
       </HudCard>
 
       {/* 2) Partidazos */}
-      <RecoWeeklyCardComparator fixtures={fixtures} />
+      <RecoWeeklyCardComparator
+  fixtures={weeklyFixtures}
+  loading={weeklyLoading}
+  error={weeklyErr}
+/>
 
       {/* 3) LISTADO (verde sólido premium) */}
       <HudCard
@@ -1456,6 +1539,103 @@ export default function Comparator() {
           )}
         </section>
       </HudCard>
+      {/* 4) MÓDULOS premium */}
+      <section className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <FeatureCard title="Cuota segura (regalo)" badge="Alta probabilidad" locked={!features.giftPick}>
+          <div className="text-xs text-slate-300">Aquí mostrarás tu pick seguro del día (manual o generado).</div>
+          <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/30 p-3">
+            <div className="text-sm font-semibold text-slate-100">Ejemplo</div>
+            <div className="text-xs text-slate-300 mt-1">Under 3.5 goles · cuota x1.40</div>
+          </div>
+        </FeatureCard>
+
+        <FeatureCard title="Cuotas potenciadas" badge={`Hasta x${maxBoost}`} locked={!features.boosted}>
+          <div className="text-xs text-slate-300">Arma una combinada automática o con partidos seleccionados.</div>
+
+          <div className="mt-3 flex flex-col sm:flex-row gap-2">
+            <button
+              type="button"
+              onClick={handleAutoParlay}
+              className="px-4 py-2 rounded-full text-xs font-bold"
+              style={{ backgroundColor: GOLD, color: "#0f172a" }}
+            >
+              Generar combinada automática
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSelectedParlay}
+              className="px-4 py-2 rounded-full text-xs font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition"
+            >
+              Generar con seleccionados ({selectedCount})
+            </button>
+          </div>
+
+          {parlayError ? <div className="mt-3 text-xs text-amber-300">{parlayError}</div> : null}
+
+          {parlayResult ? (
+            <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/30 p-3">
+              <div className="text-xs text-slate-300">
+                Modo: <span className="text-slate-100 font-semibold">{parlayResult.mode}</span>
+              </div>
+              <div className="mt-1 text-sm font-bold text-emerald-200">
+                Cuota final: x{parlayResult.finalOdd}{" "}
+                <span className="text-xs font-semibold text-slate-300">(objetivo x{parlayResult.target})</span>
+              </div>
+
+              <div className="mt-1 text-[11px] text-slate-400">
+                Partidos: {parlayResult.games} · En FV buscamos picks individuales de alta probabilidad (80–90%+ por selección).
+              </div>
+            </div>
+          ) : null}
+        </FeatureCard>
+
+        <FeatureCard title="Árbitros tarjeteros" badge="Tarjetas" locked={!features.referees} lockText="Disponible desde Plan Anual.">
+          <div className="text-xs text-slate-300">Ranking de árbitros con más tarjetas (por rango de fechas y país).</div>
+
+          {refLoading ? <div className="mt-3 text-xs text-slate-300">Cargando árbitros…</div> : null}
+          {refErr ? <div className="mt-3 text-xs text-amber-300">{refErr}</div> : null}
+
+          {refData ? (
+            <pre className="mt-3 text-[11px] leading-snug text-slate-200 bg-slate-950/30 border border-white/10 rounded-xl p-3 overflow-auto">
+              {JSON.stringify(refData, null, 2)}
+            </pre>
+          ) : (
+            <div className="mt-3 text-[11px] text-slate-400">Cuando el backend esté listo, aquí mostramos el top de árbitros.</div>
+          )}
+        </FeatureCard>
+
+        <FeatureCard
+          title="Goleadores / Remates / Value"
+          badge="VIP"
+          locked={!(features.scorersValue || features.marketValue)}
+          lockText="Disponible en planes superiores (Anual/Vitalicio)."
+        >
+          <div className="text-xs text-slate-300">Aquí reactivaremos los módulos avanzados (goleadores, remates, value del mercado).</div>
+        </FeatureCard>
+
+        <FeatureCard title="Cuota desfase del mercado" badge="Value" locked={!features.marketValue} lockText="Disponible desde Plan Vitalicio.">
+          <div className="text-xs text-slate-300">Detecta cuotas con posible valor (desfase entre tu estimación y el mercado).</div>
+
+          <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/30 p-3">
+            <div className="text-sm font-semibold text-slate-100">Ejemplo</div>
+            <div className="text-xs text-slate-300 mt-1">
+              “Local gana” mercado x2.10 · FV estimado x1.85 → posible value.
+            </div>
+          </div>
+
+          <div className="mt-2 text-[11px] text-slate-400">Módulo en construcción: luego lo conectamos a cuotas reales + rating FV.</div>
+        </FeatureCard>
+      </section>
+
+      {/* 5) Manual Picks */}
+      <ManualPicksSection />
+
+      {/* 6) Simulador */}
+      <GainSimulatorCard />
+
+      {/* 7) Calculadora */}
+      <PriceCalculatorCard />
 
       {/* Resto de módulos los mantienes tal cual en tu archivo anterior.
           Si quieres, los vuelvo a pegar completos también, pero esto ya corrige:
