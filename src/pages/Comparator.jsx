@@ -1659,9 +1659,6 @@ const features = useMemo(() => getFeaturesByPlanId(planId), [planId]);
       const LIMITED = sorted.slice(0, 140);
 
       setFixtures(LIMITED);
-      setInfo(`API: ${itemsRaw.length} | base: ${base.length} | TOP: ${filteredTop.length} | mostrando: ${LIMITED.length}`);
-
-      setFixtures(LIMITED);
       setInfo(`API: ${itemsRaw.length} | base: ${base.length} | top: ${major.length} | mostrando: ${LIMITED.length}`);
 
       if (features.referees) {
