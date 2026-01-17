@@ -1006,9 +1006,9 @@ function WelcomeProCard({ planInfo }) {
 
         <div className="px-5 pb-4 text-sm text-slate-300 leading-relaxed">
   
-  Este es el punto donde apostar deja de ser intuición y pasa a ser   
+  Este es el punto donde apostar deja de ser intuición y pasa a ser "estrategia"  
   <span className="font-semibold text-emerald-300">
-      “estrategia”.
+  
   </span>.
 </div>
     </div>
