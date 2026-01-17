@@ -1004,7 +1004,7 @@ function WelcomeProCard({ planInfo }) {
 
        {/*<div className="mt-2 text-xs text-slate-400"> //Membresía {planInfo.price} · Factor Victoria</div> */}
 
-        <div className="absolute bottom-4 left-5 right-5 text-xs text-slate-400">
+        <div className="px-5 pb-4 text-xs text-slate-400">
         Consejo: si no se alcanza la cuota objetivo con alta seguridad, agrega más partidos o usa
         <span className="font-semibold text-slate-300"> “Generar con seleccionados”</span>.
       </div>
