@@ -997,12 +997,12 @@ function WelcomeProCard({ planInfo }) {
         <div className="mt-1 text-xl md:text-2xl font-bold text-slate-100">{planInfo.name} activo</div>
 
         <div className="mt-2 text-sm text-slate-200 max-w-2xl">
-          Desde aquí generas combinadas automáticas y cuotas potenciadas. Tu objetivo del plan es{" "}
+          Tu objetivo del plan es{" "}
           <span className="font-bold text-emerald-200">x{planInfo.boost}</span>. Además, siempre tendrás una{" "}
           <span className="font-bold">cuota regalo</span> (x1.5 a x3).
         </div>
 
-        <div className="mt-2 text-xs text-slate-400">Membresía {planInfo.price} · Factor Victoria</div>
+        <div className="mt-2 text-xs text-slate-400"> //Membresía {planInfo.price} · Factor Victoria</div>//
 
         <div className="mt-3 text-xs text-slate-400">
           Consejo: si no se alcanza la cuota objetivo con alta seguridad, agrega más partidos o usa “Generar con seleccionados”.
