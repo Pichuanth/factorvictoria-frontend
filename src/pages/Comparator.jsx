@@ -1006,9 +1006,9 @@ function WelcomeProCard({ planInfo }) {
 
         <div className="px-5 pb-4 text-sm text-slate-300 leading-relaxed">
   Desde aquí accedes a combinadas inteligentes, cuotas potenciadas y decisiones basadas en datos reales. Este es el punto donde apostar 
-  deja de ser intuición y pasa a ser 
+  deja de ser intuición y pasa a ser.  
   <span className="font-semibold text-emerald-300">
-    “estrategia”
+     “estrategia”
   </span>.
 </div>
     </div>
