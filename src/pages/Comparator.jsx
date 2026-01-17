@@ -1607,10 +1607,10 @@ if (!isLoggedIn) {
       <ManualPicksSection />
 
       {/* 6) Simulador */}
-      <Simulator />
+<Simulator bg={BG_DINERO} />
 
-      {/* 7) Calculadora rápida */}
-<PriceCalculatorCard />
+{/* 7) Calculadora */}
+<PriceCalculatorCard bg={BG_DINERO} />
 
          {/* Resto de módulos los mantienes tal cual en tu archivo anterior.
           Si quieres, los vuelvo a pegar completos también, pero esto ya corrige:
