@@ -33,6 +33,8 @@ const BG_PROFILE_HUD = asset("hero-profile-hud.png");
 const BG_DINERO = asset("hero.dinero.png");
 const BG_MANUAL = asset("hero-dorado-estadio.png");
 const BG_GRAFICO_DORADO = asset("grafico-dorado.png");
+const BG_BIENVENIDO = asset("hero-bienvenido.png");
+
 
 /** Timezone oficial (igual que Fixtures) */
 const APP_TZ = "America/Santiago";
@@ -988,7 +990,7 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds }) {
 /* --------------------- componente principal --------------------- */
 function WelcomeProCard({ planInfo }) {
   return (
-    <HudCard bg={BG_PROFILE_HUD} overlayVariant="casillas" className="mt-4" glow="gold">
+    <HudCard bg={BG_BIENVENIDO} overlayVariant="casillas" className="mt-4" glow="gold">
       <div className="p-5 md:p-6">
         <div className="text-emerald-200/90 text-xs font-semibold tracking-wide">Bienvenido a Factor Victoria PRO</div>
 
