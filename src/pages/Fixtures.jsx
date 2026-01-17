@@ -14,7 +14,10 @@ const API_BASE =
 const BG_JUGADOR = "/hero-profile-hud.png";
 const BG_12000 = "/hero-12000.png";
 const BG_PARTIDAZOS = "/hero-fondo-partidos.png";
-const BG_DINERO = "/hero.dinero.png";
+const BG_DINERO = (import.meta.env.BASE_URL || "/") + "hero.dinero.png";
+
+// donde renderizas el simulador:
+<Simulator bg={BG_DINERO} />
 
 /** Timezone “oficial” de la app */
 const APP_TZ = "America/Santiago";
