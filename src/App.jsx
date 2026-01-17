@@ -8,6 +8,15 @@ import Fixtures from "./pages/Fixtures";
 import Profile from "./pages/Profile";
 import { useAuth } from "./lib/auth";
 import FixtureDetail from "./pages/FixtureDetail";
+import GiftsCarousel from "../components/GiftsCarousel";
+
+// si ya tienes asset() en Home.jsx, usa ese. Si no, agrega:
+const asset = (p) => `${import.meta.env.BASE_URL}${p.startsWith("/") ? p.slice(1) : p}`;
+
+const IMG_MEDALLA = asset("hero-medalla.jpeg");
+const IMG_BOTA = asset("hero-botagoleador.jpeg");
+const IMG_TROFEO = asset("hero-trofeo.jpeg");
+const BG_USUARIOS_INICIO = asset("hero-usuarios-inicio.png");
 
 const GOLD = "#E6C464";
 
@@ -35,7 +44,7 @@ function Home() {
       sub: "+1 Mes de Regalo 🎁",
       bullets: [
         "4 meses modo Profesional",
-        "Trofeo Goleador Edición Limitada",
+        "Medalla Conmemorativa Oficial",
         "Guía de estrategia y gestión de banca",
         "1 Estrategia VIP incluida",
         "Cuotas x1.5 a x3 de regalo",
@@ -236,6 +245,13 @@ function Home() {
             })}
           </div>
         </section>
+<GiftsCarousel
+  items={[
+    { id: "medalla", src: IMG_MEDALLA, title: "Medalla Factor Victoria", note: "Incluida en planes seleccionados." },
+    { id: "bota", src: IMG_BOTA, title: "Trofeo Bota Goleadora", note: "Beneficio físico según tu membresía." },
+    { id: "trofeo", src: IMG_TROFEO, title: "Trofeo Conmemorativo", note: "Edición especial para miembros." },
+  ]}
+/>
 
         {/* Confianza / social proof */}
         <div className="mt-10 rounded-3xl border border-white/10 bg-white/5 px-5 py-4 md:px-7 md:py-5">
