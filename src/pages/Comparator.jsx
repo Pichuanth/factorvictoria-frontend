@@ -2,8 +2,9 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import Simulator from "../components/Simulator";
+// import Pricing from "../components/Pricing";
 import PriceCalculatorCard from "../components/PriceCalculatorCard";
-
 
 const GOLD = "#E6C464";
 
@@ -793,50 +794,6 @@ function formatMoney(value, currency) {
   }).format(safe);
 }
 
-function PriceCalculatorCard() {
-  const [stake, setStake] = useState(10000);
-  const [odd, setOdd] = useState(10);
-
-  const payout = Number(stake || 0) * Number(odd || 0);
-
-  return (
-    <HudCard bg={null} bgColor="#132A23" overlayVariant="casillasSharp" className="mt-6" glow="gold">
-      <div className="p-5 md:p-6">
-        <div className="text-sm font-semibold text-slate-100">Calculadora rápida</div>
-        <div className="text-xs text-slate-300 mt-1">Monto × cuota = retorno estimado (simple).</div>
-
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-            <div className="text-xs text-slate-300">Monto (CLP)</div>
-            <input
-              value={stake}
-              onChange={(e) => setStake(Number(String(e.target.value).replace(/[^\d]/g, "")) || 0)}
-              className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 outline-none"
-            />
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-            <div className="text-xs text-slate-300">Cuota</div>
-            <input
-              value={odd}
-              onChange={(e) => setOdd(Number(String(e.target.value).replace(/[^\d.]/g, "")) || 0)}
-              className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-slate-100 outline-none"
-            />
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-            <div className="text-xs text-slate-300">Retorno</div>
-            <div className="mt-2 text-lg font-bold" style={{ color: GOLD }}>
-              {new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP" }).format(payout)}
-            </div>
-            <div className="mt-1 text-[11px] text-slate-400">No incluye comisión.</div>
-          </div>
-        </div>
-      </div>
-    </HudCard>
-  );
-}
-
 /* ------------------- Manual Picks ------------------- */
 function ManualPicksSection() {
   const singles = [
@@ -1415,12 +1372,14 @@ export default function Comparator() {
   if (!isLoggedIn) {
     return (
       <PageShell>
-        <VisitorBanner />
-        <VisitorPlansGrid />
-        <GainSimulatorCard />
-        <VisitorEndingHero />
-      </PageShell>
-    );
+  <VisitorBanner />
+  <VisitorPlansGrid />
+  <ManualPicksSection />
+<Simulator />
+<PriceCalculatorCard />
+<VisitorEndingHero />
+</PageShell>
+  );
   }
 
   /* =========================
@@ -1647,7 +1606,7 @@ export default function Comparator() {
       <ManualPicksSection />
 
       {/* 6) Simulador */}
-      <GainSimulatorCard />
+      <Simulator />
 
          {/* Resto de módulos los mantienes tal cual en tu archivo anterior.
           Si quieres, los vuelvo a pegar completos también, pero esto ya corrige:
