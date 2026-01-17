@@ -991,7 +991,7 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds }) {
 function WelcomeProCard({ planInfo }) {
   return (
     <HudCard bg={BG_BIENVENIDO} overlayVariant="casillas" className="mt-4 min-h-[260px] md:min-h-[300px]" glow="gold">
-      <div className="p-5 md:p-6 pb-14">
+      <div className="p-5 md:p-6 pb-30">
         <div className="text-emerald-200/90 text-xs font-semibold tracking-wide">Bienvenido a Factor Victoria PRO</div>
 
         <div className="mt-1 text-xl md:text-2xl font-bold text-slate-100">{planInfo.name} activo</div>
