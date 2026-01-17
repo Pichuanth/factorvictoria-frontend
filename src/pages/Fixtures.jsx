@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import Simulator from "../components/Simulator";
 
 const GOLD = "#E6C464";
 
@@ -1239,7 +1240,7 @@ function PartidazoLine({ f }) {
       </HudCard>
 
       {/* Simulador */}
-      <GainSimulatorCard onGoPlans={goPlans} />
+      <Simulator />
 
       {/* CTA final */}
       <HudCard bg={BG_12000} overlayVariant="player" className="mt-4" glow="gold" imgStyle={{ objectPosition: "70% 22%" }}>

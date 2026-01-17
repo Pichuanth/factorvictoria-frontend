@@ -1366,23 +1366,7 @@ export default function Comparator() {
     }
   }
 
-  /* =========================
-      VISITANTE (NO LOGUEADO)
-     ========================= */
-  if (!isLoggedIn) {
-    return (
-      <PageShell>
-  <VisitorBanner />
-  <VisitorPlansGrid />
-  <ManualPicksSection />
-<Simulator />
-<PriceCalculatorCard />
-<VisitorEndingHero />
-</PageShell>
-  );
-  }
-
-  /* =========================
+   /* =========================
       LOGUEADO (COMPARADOR)
      ========================= */
   return (
@@ -1607,6 +1591,9 @@ export default function Comparator() {
 
       {/* 6) Simulador */}
       <Simulator />
+
+      {/* 7) Calculadora rápida */}
+<PriceCalculatorCard />
 
          {/* Resto de módulos los mantienes tal cual en tu archivo anterior.
           Si quieres, los vuelvo a pegar completos también, pero esto ya corrige:
