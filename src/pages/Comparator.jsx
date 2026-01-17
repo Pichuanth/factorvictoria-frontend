@@ -1366,6 +1366,23 @@ export default function Comparator() {
     }
   }
 
+  /* =========================
+      VISITANTE (NO LOGUEADO)
+     ========================= */
+if (!isLoggedIn) {
+  return (
+    <PageShell>
+      <VisitorBanner />
+      <VisitorPlansGrid />
+
+      <Simulator bg={BG_DINERO} />
+      <PriceCalculatorCard bg={BG_DINERO} />
+
+      <VisitorEndingHero />
+    </PageShell>
+  );
+}
+
    /* =========================
       LOGUEADO (COMPARADOR)
      ========================= */
