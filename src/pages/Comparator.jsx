@@ -1002,7 +1002,7 @@ function WelcomeProCard({ planInfo }) {
           <span className="font-bold">cuota regalo</span> (x1.5 a x3).
         </div>
 
-        <div className="mt-2 text-xs text-slate-400"> //Membresía {planInfo.price} · Factor Victoria</div>//
+       /*<div className="mt-2 text-xs text-slate-400"> //Membresía {planInfo.price} · Factor Victoria</div> */
 
         <div className="mt-3 text-xs text-slate-400">
           Consejo: si no se alcanza la cuota objetivo con alta seguridad, agrega más partidos o usa “Generar con seleccionados”.
