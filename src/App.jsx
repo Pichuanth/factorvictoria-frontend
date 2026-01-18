@@ -279,16 +279,15 @@ function Home() {
     />
   </div>
 
-  {/* Texto */}
+  {/* Texto*/}
   <div className="px-5 py-4 md:px-7 md:py-5">
     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
       <div>
-        <div className="text-sm md:text-base font-semibold">+12.000 usuarios activos</div>
+        <div className="text-sm md:text-base font-semibold">{/* Texto*/}</div>
         <div className="text-sm text-slate-300 mt-1">
-          Miles de usuarios confían en nuestros datos, simulador y picks para apostar con ventaja.
-          ¿Y tú, qué esperas para unirte a la comunidad?
+          {/* Texto*/}
         </div>
-      </div>
+      </div> 
 
       <div className="flex items-center gap-2">
         <span className="inline-flex items-center px-3 py-1.5 rounded-full text-[12px] bg-emerald-500/10 text-emerald-200 border border-emerald-500/20">
