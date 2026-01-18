@@ -8,7 +8,7 @@ import Fixtures from "./pages/Fixtures";
 import Profile from "./pages/Profile";
 import { useAuth } from "./lib/auth";
 import FixtureDetail from "./pages/FixtureDetail";
-import GiftsCarousel from "../components/GiftsCarousel";
+import GiftsCarousel from "./components/GiftsCarousel";
 
 // si ya tienes asset() en Home.jsx, usa ese. Si no, agrega:
 const asset = (p) => `${import.meta.env.BASE_URL}${p.startsWith("/") ? p.slice(1) : p}`;
