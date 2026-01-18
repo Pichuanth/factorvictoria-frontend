@@ -245,19 +245,12 @@ function Home() {
             })}
           </div>
         </section>
-<GiftsCarousel
-  items={[
-    { id: "medalla", src: IMG_MEDALLA, title: "Medalla Factor Victoria", note: "Incluida en planes seleccionados." },
-    { id: "bota", src: IMG_BOTA, title: "Trofeo Bota Goleadora", note: "Beneficio físico según tu membresía." },
-    { id: "trofeo", src: IMG_TROFEO, title: "Trofeo Conmemorativo", note: "Edición especial para miembros." },
-  ]}
-/>
+
 {/* Carrusel de regalos (bajo planes y sobre +12.000) */}
 <section className="mt-10">
   <GiftsCarousel
-    hideHeader={false}
-    title="Regalos por membresía"
-    subtitle="Algunos planes incluyen regalo físico. Desliza para verlos."
+    title={null}
+    subtitle={null}
     items={[
       {
         id: "medalla",
@@ -281,40 +274,17 @@ function Home() {
   />
 </section>
 
-{/* Confianza / social proof */}
+{/* Confianza / social proof (solo imagen) */}
 <section className="mt-10 rounded-3xl border border-white/10 overflow-hidden bg-white/5">
-  {/* Imagen */}
   <div className="h-[180px] md:h-[240px]">
     <img
       src={BG_USUARIOS_INICIO}
-      alt="+12.000 usuarios activos"
+      alt="Usuarios activos Factor Victoria"
       className="w-full h-full object-cover object-center"
+      loading="lazy"
     />
   </div>
-
-  {/* Texto */}
-  <div className="px-5 py-4 md:px-7 md:py-5">
-    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-      <div>
-        <div className="text-sm md:text-base font-semibold">+12.000 usuarios activos</div>
-        <div className="text-sm text-slate-300 mt-1">
-          Miles de usuarios confían en nuestros datos, simulador y picks para apostar con ventaja.
-          ¿Y tú, qué esperas para unirte a la comunidad?
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <span className="inline-flex items-center px-3 py-1.5 rounded-full text-[12px] bg-emerald-500/10 text-emerald-200 border border-emerald-500/20">
-          Resultados en tiempo real
-        </span>
-        <span className="inline-flex items-center px-3 py-1.5 rounded-full text-[12px] bg-yellow-500/10 text-yellow-200 border border-yellow-500/20">
-          Planes premium
-        </span>
-      </div>
-    </div>
-  </div>
 </section>
-
 
         {/* Simulador */}
         <section className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-5 md:p-7">

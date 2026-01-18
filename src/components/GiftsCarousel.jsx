@@ -2,22 +2,23 @@ import React from "react";
 
 export default function GiftsCarousel({
   items = [],
-  title = "Regalos por membresía",
-  subtitle = "Desliza para ver los beneficios físicos incluidos en algunos planes.",
-  hideHeader = false, // si lo pones true, no muestra title/subtitle
+  title = null,
+  subtitle = null,
 }) {
   return (
     <section className="mt-6">
-      {!hideHeader && (title || subtitle) ? (
-        <div className="px-1">
-          {title ? (
+      {(title || subtitle) && (
+        <div className="px-1 mb-2">
+          {title && (
             <div className="text-slate-100 font-bold text-lg">{title}</div>
-          ) : null}
-          {subtitle ? (
-            <div className="text-slate-300/80 text-sm mt-1">{subtitle}</div>
-          ) : null}
+          )}
+          {subtitle && (
+            <div className="text-slate-300/80 text-sm mt-1">
+              {subtitle}
+            </div>
+          )}
         </div>
-      ) : null}
+      )}
 
       <div className="mt-4 flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2">
         {items.map((it) => (
@@ -28,21 +29,20 @@ export default function GiftsCarousel({
             <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5">
               <img
                 src={it.src}
-                alt={it.alt || it.title || "Regalo Factor Victoria"}
+                alt={it.alt || it.title}
                 className="w-full h-56 sm:h-64 object-cover"
                 loading="lazy"
               />
-
-              {(it.title || it.note) ? (
-                <div className="p-4">
-                  {it.title ? (
-                    <div className="text-slate-100 font-semibold">{it.title}</div>
-                  ) : null}
-                  {it.note ? (
-                    <div className="text-slate-300/80 text-sm mt-1">{it.note}</div>
-                  ) : null}
+              <div className="p-4">
+                <div className="text-slate-100 font-semibold">
+                  {it.title}
                 </div>
-              ) : null}
+                {it.note && (
+                  <div className="text-slate-300/80 text-sm mt-1">
+                    {it.note}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         ))}
