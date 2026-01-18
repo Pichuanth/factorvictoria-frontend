@@ -276,7 +276,7 @@ function Home() {
 
 {/* Confianza / social proof (solo imagen) */}
 <section className="mt-10 rounded-3xl border border-white/10 overflow-hidden bg-white/5">
-  <div className="h-[180px] md:h-[240px]">
+  <div className="h-[210px] sm:h-[230px] md:h-[240px]">
     <img
       src={BG_USUARIOS_INICIO}
       alt="Usuarios activos Factor Victoria"
@@ -383,7 +383,7 @@ function Home() {
             <img
               src="/hero-players.png"
               alt="Factor Victoria"
-              className="w-full h-full object-cover object-center"
+              className="w-full h-full object-cover object-bottom"
             />
           </div>
 
