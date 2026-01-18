@@ -291,10 +291,10 @@ function Home() {
 
       <div className="flex items-center gap-2">
         <span className="inline-flex items-center px-3 py-1.5 rounded-full text-[12px] bg-emerald-500/10 text-emerald-200 border border-emerald-500/20">
-          {/* Texto con contorno*/}
+          Resultados en tiempo real
         </span>
         <span className="inline-flex items-center px-3 py-1.5 rounded-full text-[12px] bg-yellow-500/10 text-yellow-200 border border-yellow-500/20">
-          {/* Texto con contorno*/}
+        Planes premium
         </span>
       </div>
     </div>
