@@ -4,13 +4,20 @@ export default function GiftsCarousel({
   items = [],
   title = "Regalos por membresía",
   subtitle = "Desliza para ver los beneficios físicos incluidos en algunos planes.",
+  hideHeader = false, // si lo pones true, no muestra title/subtitle
 }) {
   return (
     <section className="mt-6">
-      <div className="px-1">
-        <div className="text-slate-100 font-bold text-lg">{title}</div>
-        <div className="text-slate-300/80 text-sm mt-1">{subtitle}</div>
-      </div>
+      {!hideHeader && (title || subtitle) ? (
+        <div className="px-1">
+          {title ? (
+            <div className="text-slate-100 font-bold text-lg">{title}</div>
+          ) : null}
+          {subtitle ? (
+            <div className="text-slate-300/80 text-sm mt-1">{subtitle}</div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="mt-4 flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2">
         {items.map((it) => (
@@ -21,22 +28,26 @@ export default function GiftsCarousel({
             <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5">
               <img
                 src={it.src}
-                alt={it.alt || it.title}
+                alt={it.alt || it.title || "Regalo Factor Victoria"}
                 className="w-full h-56 sm:h-64 object-cover"
                 loading="lazy"
               />
-              <div className="p-4">
-                <div className="text-slate-100 font-semibold">{it.title}</div>
-                {it.note ? (
-                  <div className="text-slate-300/80 text-sm mt-1">{it.note}</div>
-                ) : null}
-              </div>
+
+              {(it.title || it.note) ? (
+                <div className="p-4">
+                  {it.title ? (
+                    <div className="text-slate-100 font-semibold">{it.title}</div>
+                  ) : null}
+                  {it.note ? (
+                    <div className="text-slate-300/80 text-sm mt-1">{it.note}</div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </div>
         ))}
       </div>
 
-      {/* hint visual */}
       <div className="text-xs text-slate-400 mt-2 px-1">
         Tip: desliza horizontalmente para ver los 3 productos.
       </div>
