@@ -261,7 +261,7 @@ function Home() {
     <img
       src={BG_USUARIOS_INICIO}
       alt="Usuarios activos Factor Victoria"
-      className="w-full h-full object-cover object-[50%_28%]"
+      className="w-full h-full object-cover object-[50%_25%]"
       loading="lazy"
     />
   </div>
@@ -364,7 +364,7 @@ function Home() {
             <img
               src="/hero-players.png"
               alt="Factor Victoria"
-              className="w-full h-full object-cover object-[80%_10%]"
+              className="w-full h-full object-cover object-[50%_30%]"
               loading="lazy"
             />
           </div>
