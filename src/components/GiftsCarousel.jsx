@@ -9,7 +9,7 @@ export default function GiftsCarousel({
   return (
     <section className="mt-10">
       {showHeader && (title || subtitle) ? (
-        <div className="px-1">
+        <div className="px-1 mb-4">
           {title ? (
             <div className="text-slate-100 font-bold text-lg">{title}</div>
           ) : null}
@@ -19,7 +19,7 @@ export default function GiftsCarousel({
         </div>
       ) : null}
 
-      <div className="mt-4 flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2">
+      <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2">
         {items.map((it) => (
           <div
             key={it.id}

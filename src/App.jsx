@@ -245,6 +245,15 @@ function Home() {
             })}
           </div>
         </section>
+<GiftsCarousel
+  title="Regalos por membresía"
+  subtitle="Desliza para ver los beneficios físicos incluidos en algunos planes."
+  items={[
+    { id: "medalla", src: IMG_MEDALLA, title: "Medalla Factor Victoria", note: "Incluida en planes seleccionados." },
+    { id: "bota", src: IMG_BOTA, title: "Trofeo Bota Goleadora", note: "Beneficio físico según tu membresía." },
+    { id: "trofeo", src: IMG_TROFEO, title: "Trofeo Conmemorativo", note: "Edición especial para miembros." },
+  ]}
+/>
 
 {/* Carrusel de regalos (bajo planes y sobre +12.000) */}
 <section className="mt-10">
