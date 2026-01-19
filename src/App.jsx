@@ -255,34 +255,6 @@ function Home() {
   ]}
 />
 
-{/* Carrusel de regalos (bajo planes y sobre +12.000) */}
-<section className="mt-10">
-  <GiftsCarousel
-    title={null}
-    subtitle={null}
-    items={[
-      {
-        id: "medalla",
-        src: IMG_MEDALLA,
-        title: "Medalla Factor Victoria",
-        note: "Incluida en planes seleccionados.",
-      },
-      {
-        id: "bota",
-        src: IMG_BOTA,
-        title: "Trofeo Bota Goleadora",
-        note: "Beneficio físico según tu membresía.",
-      },
-      {
-        id: "trofeo",
-        src: IMG_TROFEO,
-        title: "Trofeo Conmemorativo",
-        note: "Edición especial para miembros.",
-      },
-    ]}
-  />
-</section>
-
 {/* Confianza / social proof (solo imagen) */}
 <section className="mt-10 rounded-3xl border border-white/10 overflow-hidden bg-white/5">
   <div className="h-[210px] sm:h-[230px] md:h-[240px]">
