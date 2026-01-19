@@ -261,7 +261,7 @@ function Home() {
     <img
       src={BG_USUARIOS_INICIO}
       alt="Usuarios activos Factor Victoria"
-      className="w-full h-full object-cover object-[50%_30%]"
+      className="w-full h-full object-cover object-[50%_28%]"
       loading="lazy"
     />
   </div>
@@ -360,11 +360,11 @@ function Home() {
             </p>
           </div>
 
-          <div className="w-full h-[260px] md:h-[360px] lg:h-[420px] bg-slate-950 overflow-hidden">
+          <div className="w-full h-[360px] md:h-[360px] lg:h-[420px] overflow-hidden">
             <img
               src="/hero-players.png"
               alt="Factor Victoria"
-              className="w-full h-full object-contain object-center"
+              className="w-full h-full object-cover object-[center_top]"
               loading="lazy"
             />
           </div>
