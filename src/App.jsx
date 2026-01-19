@@ -360,7 +360,7 @@ function Home() {
             </p>
           </div>
 
-          <div className="w-full h-[300px] md:h-[340px] lg:h-[400px] overflow-hidden">
+          <div className="w-full h-[300px] md:h-[300px] lg:h-[400px] overflow-hidden">
             <img
               src="/hero-players.png"
               alt="Factor Victoria"
