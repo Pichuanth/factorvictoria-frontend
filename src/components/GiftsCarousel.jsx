@@ -44,7 +44,7 @@ export default function GiftsCarousel({
       </div>
 
       <div className="text-xs text-slate-400 mt-2 px-1">
-        Tip: desliza horizontalmente para ver los 3 productos.
+        {/* texto bajo medalla y trofeos */}
       </div>
     </section>
   );

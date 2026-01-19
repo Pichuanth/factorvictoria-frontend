@@ -250,14 +250,14 @@ function Home() {
   subtitle="Desliza para ver los beneficios físicos incluidos en algunos planes."
   items={[
     { id: "medalla", src: IMG_MEDALLA, title: "Medalla Factor Victoria", note: "Incluida en planes seleccionados." },
-    { id: "bota", src: IMG_BOTA, title: "Trofeo Bota Goleadora", note: "Beneficio físico según tu membresía." },
-    { id: "trofeo", src: IMG_TROFEO, title: "Trofeo Conmemorativo", note: "Edición especial para miembros." },
+    { id: "bota", src: IMG_BOTA, title: "Trofeo Goleador Elite", note: "Beneficio físico según tu membresía." },
+    { id: "trofeo", src: IMG_TROFEO, title: "Trofeo Conmemorativo", note: "Edición especial para miembros leyenda." },
   ]}
 />
 
 {/* Confianza / social proof (solo imagen) */}
 <section className="mt-10 rounded-3xl border border-white/10 overflow-hidden bg-white/5">
-  <div className="h-[210px] sm:h-[230px] md:h-[240px]">
+  <div className="h-[180px] sm:h-[240px] md:h-[300px] bg-slate-950/40">
     <img
       src={BG_USUARIOS_INICIO}
       alt="Usuarios activos Factor Victoria"
@@ -364,7 +364,8 @@ function Home() {
             <img
               src="/hero-players.png"
               alt="Factor Victoria"
-              className="w-full h-full object-cover object-bottom"
+              className="w-full h-full object-contain object-center"
+              loading="lazy"
             />
           </div>
 
