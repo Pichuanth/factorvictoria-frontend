@@ -1243,7 +1243,11 @@ function PartidazoLine({ f }) {
       </HudCard>
 
       {/* Simulador */}
-      <Simulator />
+<Simulator
+  bg={BG_DINERO}
+  overlayVariant="casillasSharp"
+  imgStyle={{ objectPosition: "60% 35%" }}
+/>
 
       {/* CTA final */}
       <HudCard bg={BG_12000} overlayVariant="player" className="mt-4" glow="gold" imgStyle={{ objectPosition: "70% 22%" }}>
