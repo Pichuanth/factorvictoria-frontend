@@ -364,7 +364,7 @@ function Home() {
             <img
               src="/hero-players.png"
               alt="Factor Victoria"
-              className="w-full h-full object-cover object-[center_top]"
+              className="w-full h-full object-cover object-[50%_10%]"
               loading="lazy"
             />
           </div>
