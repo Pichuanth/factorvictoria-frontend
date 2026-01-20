@@ -1136,9 +1136,7 @@ const oddsRef = useRef({});
     setSelectedCountries((prev) => (prev.includes(en) ? prev.filter((x) => x !== en) : [...prev, en]));
   }
   useEffect(() => {
-    let alive = true;
-useEffect(() => {
-  let cancelled = false;
+  let alive = true;
 
   async function loadReferees() {
     try {
@@ -1154,146 +1152,99 @@ useEffect(() => {
         return `${yyyy}-${mm}-${dd}`;
       };
 
-      const from = ymd(now);
-      const toDate = new Date(now);
-      toDate.setDate(toDate.getDate() + 2);
-      const to = ymd(toDate);
+      const fromR = ymd(now);
+      const toD = new Date(now);
+      toD.setDate(toD.getDate() + 2);
+      const toR = ymd(toD);
 
-      const params = new URLSearchParams({ from, to });
-      // opcional: country
-      // params.set("country", "Italy");
+      const params = new URLSearchParams({ from: fromR, to: toR });
+      // params.set("country", "Italy"); // opcional
 
       const res = await fetch(`${API_BASE}/api/referees/cards?${params.toString()}`);
       const data = await res.json().catch(() => null);
 
-      if (!res.ok) {
-        throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
-      }
+      if (!res.ok) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
 
-      if (!cancelled) setRefData(data);
+      if (!alive) return;
+      setRefData(data);
     } catch (e) {
-      if (!cancelled) setRefErr(String(e?.message || e));
+      if (!alive) return;
+      setRefErr(String(e?.message || e));
     } finally {
-      if (!cancelled) setRefLoading(false);
-    }
-  }
-
-  loadReferees();
-
-  return () => {
-    cancelled = true;
-  };
-}, [API_BASE]);
-
-    async function loadWeekly() {
-      setWeeklyErr("");
-      setWeeklyLoading(true);
-
-      try {
-        const fromW = toYYYYMMDD(new Date());
-        const toW = addDaysYYYYMMDD(fromW, 7);
-
-        const params = new URLSearchParams();
-        params.set("from", fromW);
-        params.set("to", toW);
-
-        // puedes dejar sin country para que traiga todo,
-        // y el filtro TOP se encarga de depurar.
-        const res = await fetch(`${API_BASE}/api/fixtures?${params.toString()}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-        const data = await res.json();
-
-        const itemsRaw =
-          (Array.isArray(data?.items) && data.items) ||
-          (Array.isArray(data?.response) && data.response) ||
-          (Array.isArray(data?.fixtures) && data.fixtures) ||
-          [];
-
-        const base = itemsRaw
-          .filter(isFutureFixture)
-          .filter((fx) => !isYouthOrWomenOrReserve(fx));
-
-        const filteredTop = base.filter((fx) => isAllowedCompetition(getCountryName(fx), getLeagueName(fx)));
-
-        const sorted = [...filteredTop].sort((a, b) => {
-          const da = new Date(a?.fixture?.date || a?.date || 0).getTime();
-          const db = new Date(b?.fixture?.date || b?.date || 0).getTime();
-          if (da !== db) return da - db;
-
-          const pla = leaguePriority(getLeagueName(a));
-          const plb = leaguePriority(getLeagueName(b));
-          if (pla !== plb) return pla - plb;
-
-          const ca = countryPriority(getCountryName(a));
-          const cb = countryPriority(getCountryName(b));
-          if (ca !== cb) return ca - cb;
-
-          const ta = fixtureTimeLabel(a) || getKickoffTime(a) || "";
-          const tb = fixtureTimeLabel(b) || getKickoffTime(b) || "";
-          return ta.localeCompare(tb);
-        });
-
-        if (!alive) return;
-        setWeeklyFixtures(sorted.slice(0, 220));
-      } catch (e) {
-        if (!alive) return;
-        setWeeklyErr(String(e?.message || e));
-      } finally {
-        if (!alive) return;
-        setWeeklyLoading(false);
-      }
-    }
-
-    loadWeekly();
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  function toggleFixtureSelection(id) {
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  }
-
-  const selectedCount = selectedIds.length;
-
-  const ensureOdds = useCallback(async (fixtureId) => {
-  if (!fixtureId) return;
-  if (oddsRef.current[fixtureId]) return;
-
-  setOddsLoadingByFixture((p) => ({ ...p, [fixtureId]: true }));
-
-  try {
-    const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(fixtureId)}`);
-    const data = res.ok ? await res.json() : null;
-
-    const pack = {
-      found: !!data?.found,
-      bookmaker: data?.bookmaker || null,
-      markets: data?.markets || {},
-      fetchedAt: Date.now(),
-    };
-
-    oddsRef.current[fixtureId] = pack;
-    setOddsByFixture((prev) => ({ ...prev, [fixtureId]: pack }));
-  } catch {
-    oddsRef.current[fixtureId] = { found: false, markets: {}, fetchedAt: Date.now() };
-    setOddsByFixture((prev) => ({ ...prev, [fixtureId]: oddsRef.current[fixtureId] }));
-  } finally {
-    setOddsLoadingByFixture((p) => ({ ...p, [fixtureId]: false }));
-  }
-}, [API_BASE]);
-
-  const loadReferees = useCallback(async () => {
-    try {
-      setRefErr("");
-      setRefLoading(true);
-      setRefData(null);
-      setRefErr("Módulo en construcción: falta crear /api/referees/cards en el backend.");
-    } finally {
+      if (!alive) return;
       setRefLoading(false);
     }
-  }, []);
+  }
+
+  async function loadWeekly() {
+    setWeeklyErr("");
+    setWeeklyLoading(true);
+
+    try {
+      const fromW = toYYYYMMDD(new Date());
+      const toW = addDaysYYYYMMDD(fromW, 7);
+
+      const params = new URLSearchParams();
+      params.set("from", fromW);
+      params.set("to", toW);
+
+      const res = await fetch(`${API_BASE}/api/fixtures?${params.toString()}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const data = await res.json();
+
+      const itemsRaw =
+        (Array.isArray(data?.items) && data.items) ||
+        (Array.isArray(data?.response) && data.response) ||
+        (Array.isArray(data?.fixtures) && data.fixtures) ||
+        [];
+
+      const base = itemsRaw
+        .filter(isFutureFixture)
+        .filter((fx) => !isYouthOrWomenOrReserve(fx));
+
+      const filteredTop = base.filter((fx) => isAllowedCompetition(getCountryName(fx), getLeagueName(fx)));
+
+      const sorted = [...filteredTop].sort((a, b) => {
+        const da = new Date(a?.fixture?.date || a?.date || 0).getTime();
+        const db = new Date(b?.fixture?.date || b?.date || 0).getTime();
+        if (da !== db) return da - db;
+
+        const pla = leaguePriority(getLeagueName(a));
+        const plb = leaguePriority(getLeagueName(b));
+        if (pla !== plb) return pla - plb;
+
+        const ca = countryPriority(getCountryName(a));
+        const cb = countryPriority(getCountryName(b));
+        if (ca !== cb) return ca - cb;
+
+        const ta = fixtureTimeLabel(a) || getKickoffTime(a) || "";
+        const tb = fixtureTimeLabel(b) || getKickoffTime(b) || "";
+        return ta.localeCompare(tb);
+      });
+
+      if (!alive) return;
+      setWeeklyFixtures(sorted.slice(0, 220));
+    } catch (e) {
+      if (!alive) return;
+      setWeeklyErr(String(e?.message || e));
+    } finally {
+      if (!alive) return;
+      setWeeklyLoading(false);
+    }
+  }
+
+  // carga inicial (solo al montar)
+  loadWeekly();
+
+  // solo carga árbitros si el plan lo permite (evita llamadas innecesarias)
+  if (features.referees) loadReferees();
+
+  return () => {
+    alive = false;
+  };
+  // OJO: incluimos features.referees para que si cambia el plan, cargue árbitros.
+}, [API_BASE, features.referees]);
 
   function fakeOddForFixture(fx) {
     const id = getFixtureId(fx);
@@ -1538,8 +1489,7 @@ function bestSafePickFromOdds(fx, oddsPack) {
       setFixtures(LIMITED);
       setInfo(`API: ${itemsRaw.length} | base: ${base.length} | TOP: ${filteredTop.length} | mostrando: ${LIMITED.length}`);
 
-      if (features.referees) await loadReferees();
-    } catch (e2) {
+   } catch (e2) {
       setErr(String(e2?.message || e2));
     } finally {
       setLoading(false);
