@@ -1085,6 +1085,7 @@ export default function Comparator() {
 
   const [fixtures, setFixtures] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
+  const selectedCount = selectedIds.length;
 
   // ✅ Partidazos (lista curada) independiente del botón "Generar"
   const [weeklyLoading, setWeeklyLoading] = useState(false);
