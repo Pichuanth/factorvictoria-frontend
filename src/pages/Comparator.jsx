@@ -1062,9 +1062,10 @@ function WelcomeProCard({ planInfo }) {
           <span className="font-bold">cuota regalo</span> (x1.5 a x3). */}
         </div>
 
-        <div className="mt-3 text-sm text-slate-300 leading-relaxed">
-          Este es el punto donde apostar deja de ser intuición y pasa a ser “Estrategia”.
-        </div>
+        <div className="px-5 pb-4 text-sm text-slate-300 leading-relaxed">
+  Este es el punto donde apostar deja de ser intuición y pasa a ser{" "}
+  <span className="font-semibold text-emerald-300">Estrategia</span>.
+</div>
       </div>
     </HudCard>
   );
