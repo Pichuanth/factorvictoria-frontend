@@ -12,6 +12,34 @@ const API_BASE =
   (import.meta.env.VITE_API_BASE || "").replace(/\/$/, "") ||
   "https://factorvictoria-backend.vercel.app";
 
+  function pickLines(valuesObj, wantedKeys = []) {
+  const src = valuesObj || {};
+  const out = {};
+  for (const k of wantedKeys) if (src[k]) out[k] = src[k];
+  return out;
+}
+
+function MarketRow({ title, values }) {
+  const entries = values ? Object.entries(values) : [];
+  return (
+    <div className="rounded-lg border border-white/10 bg-slate-950/40 p-2">
+      <div className="text-[10px] uppercase tracking-wide text-slate-400">{title}</div>
+      {entries.length === 0 ? (
+        <div className="mt-1 text-slate-500">No disponible</div>
+      ) : (
+        <div className="mt-1 flex flex-wrap gap-2">
+          {entries.slice(0, 6).map(([k, odd]) => (
+            <div key={k} className="px-2 py-1 rounded-full border border-white/10 bg-white/5 text-slate-200">
+              <span className="text-slate-300">{k}</span>{" "}
+              <span className="font-semibold text-emerald-200">x{Number(odd).toFixed(2)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** ✅ Helper: rutas a public que funcionan también en /app (Vite BASE_URL) */
 function asset(path) {
   const base = import.meta.env.BASE_URL || "/";
@@ -892,7 +920,7 @@ function FeatureCard({ title, badge, children, locked, lockText, bg }) {
 }
 
 /* ------------------- FixtureCard (compact) ------------------- */
-function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds }) {
+function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, oddsPack, oddsLoading }) {
   const id = getFixtureId(fx);
 
   const league = getLeagueName(fx);
@@ -975,9 +1003,37 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds }) {
 
       {open ? (
         <div className="px-3 md:px-4 pb-3 md:pb-4">
-          <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3 text-[11px] text-slate-300">
-            Estadísticas en despliegue. (Luego aquí cargamos: forma últimos 5, xG, tarjetas, corners, etc.)
-            <div className="mt-2 text-slate-400">
+          <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3 text-[11px] text-slate-200">
+            <div className="flex items-center justify-between">
+              <div className="text-slate-300">Odds (MVP)</div>
+              {oddsLoading ? <div className="text-slate-400">Cargando…</div> : null}
+            </div>
+
+            {!oddsPack ? (
+              <div className="mt-2 text-slate-400">Presiona “Añadir a combinada” para cargar odds.</div>
+            ) : !oddsPack.found ? (
+              <div className="mt-2 text-amber-300">No hay odds disponibles para este partido.</div>
+            ) : (
+              <div className="mt-2 space-y-2">
+                <MarketRow title="1X2" values={oddsPack?.markets?.["1X2"]} />
+                <MarketRow title="Doble oportunidad" values={oddsPack?.markets?.["1X"]} />
+                <MarketRow
+                  title="Goles O/U"
+                  values={pickLines(oddsPack?.markets?.["OU"], ["Over 1.5", "Under 3.5", "Over 2.5", "Under 2.5"])}
+                />
+                <MarketRow title="BTTS" values={oddsPack?.markets?.["BTTS"]} />
+                <MarketRow
+                  title="Tarjetas O/U"
+                  values={pickLines(oddsPack?.markets?.["CARDS_OU"], ["Over 3.5", "Under 3.5", "Over 4.5", "Under 4.5"])}
+                />
+                <MarketRow
+                  title="Corners O/U"
+                  values={pickLines(oddsPack?.markets?.["CORNERS_OU"], ["Over 8.5", "Under 8.5", "Over 9.5", "Under 9.5"])}
+                />
+              </div>
+            )}
+
+            <div className="mt-3 text-slate-500">
               fixtureId: <span className="text-slate-200 font-semibold">{String(id)}</span>
             </div>
           </div>
@@ -1042,7 +1098,8 @@ export default function Comparator() {
 
   // odds cache
   const [oddsByFixture, setOddsByFixture] = useState({});
-  const oddsRef = useRef({});
+const [oddsLoadingByFixture, setOddsLoadingByFixture] = useState({});
+const oddsRef = useRef({});
 
   const planId = useMemo(() => {
     const raw = user?.planId || user?.plan?.id || user?.plan || user?.membership || "basic";
@@ -1058,9 +1115,9 @@ export default function Comparator() {
   const [parlayError, setParlayError] = useState("");
 
   // referees module
-  const [refData, setRefData] = useState(null);
   const [refLoading, setRefLoading] = useState(false);
   const [refErr, setRefErr] = useState("");
+  const [refData, setRefData] = useState(null);
 
   useEffect(() => {
     const urlDate = searchParams.get("date");
@@ -1080,6 +1137,53 @@ export default function Comparator() {
   }
   useEffect(() => {
     let alive = true;
+useEffect(() => {
+  let cancelled = false;
+
+  async function loadReferees() {
+    try {
+      setRefErr("");
+      setRefLoading(true);
+
+      // rango simple: hoy -> hoy+2
+      const now = new Date();
+      const ymd = (d) => {
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd}`;
+      };
+
+      const from = ymd(now);
+      const toDate = new Date(now);
+      toDate.setDate(toDate.getDate() + 2);
+      const to = ymd(toDate);
+
+      const params = new URLSearchParams({ from, to });
+      // opcional: country
+      // params.set("country", "Italy");
+
+      const res = await fetch(`${API_BASE}/api/referees/cards?${params.toString()}`);
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
+      }
+
+      if (!cancelled) setRefData(data);
+    } catch (e) {
+      if (!cancelled) setRefErr(String(e?.message || e));
+    } finally {
+      if (!cancelled) setRefLoading(false);
+    }
+  }
+
+  loadReferees();
+
+  return () => {
+    cancelled = true;
+  };
+}, [API_BASE]);
 
     async function loadWeekly() {
       setWeeklyErr("");
@@ -1154,31 +1258,31 @@ export default function Comparator() {
   const selectedCount = selectedIds.length;
 
   const ensureOdds = useCallback(async (fixtureId) => {
-    if (!fixtureId) return;
-    if (oddsRef.current[fixtureId]) return;
+  if (!fixtureId) return;
+  if (oddsRef.current[fixtureId]) return;
 
-    try {
-      const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(fixtureId)}`);
-      if (!res.ok) {
-        oddsRef.current[fixtureId] = { found: false, markets: {} };
-        setOddsByFixture((prev) => ({ ...prev, [fixtureId]: oddsRef.current[fixtureId] }));
-        return;
-      }
+  setOddsLoadingByFixture((p) => ({ ...p, [fixtureId]: true }));
 
-      const data = await res.json();
+  try {
+    const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(fixtureId)}`);
+    const data = res.ok ? await res.json() : null;
 
-      const pack = {
-        found: !!data?.found,
-        markets: data?.markets || {},
-        fetchedAt: Date.now(),
-      };
+    const pack = {
+      found: !!data?.found,
+      bookmaker: data?.bookmaker || null,
+      markets: data?.markets || {},
+      fetchedAt: Date.now(),
+    };
 
-      oddsRef.current[fixtureId] = pack;
-      setOddsByFixture((prev) => ({ ...prev, [fixtureId]: pack }));
-    } catch {
-      // silencio
-    }
-  }, []);
+    oddsRef.current[fixtureId] = pack;
+    setOddsByFixture((prev) => ({ ...prev, [fixtureId]: pack }));
+  } catch {
+    oddsRef.current[fixtureId] = { found: false, markets: {}, fetchedAt: Date.now() };
+    setOddsByFixture((prev) => ({ ...prev, [fixtureId]: oddsRef.current[fixtureId] }));
+  } finally {
+    setOddsLoadingByFixture((p) => ({ ...p, [fixtureId]: false }));
+  }
+}, [API_BASE]);
 
   const loadReferees = useCallback(async () => {
     try {
@@ -1199,82 +1303,152 @@ export default function Comparator() {
     const base = 1.2 + (hash % 26) / 10;
     return Number(base.toFixed(2));
   }
+function bestSafePickFromOdds(fx, oddsPack) {
+  if (!oddsPack?.found) return null;
 
-  function buildComboSuggestion(fixturesPool, maxBoostArg) {
-    if (!Array.isArray(fixturesPool) || fixturesPool.length === 0) return null;
+  const markets = oddsPack.markets || {};
+  const candidates = [];
 
-    const picks = [];
-    let product = 1;
+  const toNum = (x) => {
+    const n = Number(x);
+    return Number.isFinite(n) ? n : null;
+  };
 
-    for (const fx of fixturesPool) {
-      const odd = fakeOddForFixture(fx);
-      if (product * odd > maxBoostArg * 1.35) continue;
+  const push = (marketKey, selectionKey, odd) => {
+    const o = toNum(odd);
+    if (!o) return;
+    if (o < 1.10 || o > 1.60) return; // rango MVP seguro
 
-      product *= odd;
-      picks.push({ id: getFixtureId(fx), label: `${getHomeName(fx)} vs ${getAwayName(fx)}`, odd });
+    candidates.push({
+      fixtureId: getFixtureId(fx),
+      label: `${getHomeName(fx)} vs ${getAwayName(fx)} · ${marketKey}: ${selectionKey}`,
+      market: marketKey,
+      selection: selectionKey,
+      odd: o,
+      impliedProb: 1 / o,
+    });
+  };
 
-      if (picks.length >= 12) break;
-      if (product >= maxBoostArg * 0.8) break;
-    }
+  const dc = markets["1X"] || {};
+  if (dc["1X"]) push("DC", "1X", dc["1X"]);
+  if (dc["X2"]) push("DC", "X2", dc["X2"]);
 
-    if (!picks.length) return null;
+  const ou = markets["OU"] || {};
+  if (ou["Over 1.5"]) push("OU", "Over 1.5", ou["Over 1.5"]);
+  if (ou["Under 3.5"]) push("OU", "Under 3.5", ou["Under 3.5"]);
+  if (ou["Under 4.5"]) push("OU", "Under 4.5", ou["Under 4.5"]);
 
-    const finalOdd = Number(product.toFixed(2));
-    const impliedProb = Number(((1 / finalOdd) * 100).toFixed(1));
-    const reachedTarget = finalOdd >= maxBoostArg * 0.8;
+  const btts = markets["BTTS"] || {};
+  if (btts["No"]) push("BTTS", "No", btts["No"]);
 
-    return { games: picks.length, finalOdd, target: maxBoostArg, impliedProb, reachedTarget };
+  const mw = markets["1X2"] || {};
+  if (mw["Home"]) push("1X2", "Home", mw["Home"]);
+  if (mw["Away"]) push("1X2", "Away", mw["Away"]);
+
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => b.impliedProb - a.impliedProb); // más seguro primero
+  return candidates[0];
+}
+
+  function buildRealParlay(fixturesPool, oddsByFixtureArg, targetOdd) {
+  const picks = [];
+  let product = 1;
+
+  const sorted = [...fixturesPool].sort((a, b) => {
+    // prioridad: fixtures que ya tengan odds cargadas
+    const ia = getFixtureId(a);
+    const ib = getFixtureId(b);
+    const ha = oddsByFixtureArg[ia]?.found ? 1 : 0;
+    const hb = oddsByFixtureArg[ib]?.found ? 1 : 0;
+    return hb - ha;
+  });
+
+  for (const fx of sorted) {
+    const id = getFixtureId(fx);
+    const pack = oddsByFixtureArg[id];
+    const pick = bestSafePickFromOdds(fx, pack);
+    if (!pick) continue;
+
+    if (product * pick.odd > targetOdd * 1.25) continue;
+
+    product *= pick.odd;
+    picks.push(pick);
+
+    if (picks.length >= 12) break;
+    if (product >= targetOdd * 0.85) break;
   }
+
+  if (!picks.length) return null;
+
+  const finalOdd = Number(product.toFixed(2));
+  const impliedProb = Number(((1 / finalOdd) * 100).toFixed(1));
+  const reachedTarget = finalOdd >= targetOdd * 0.85;
+
+  return {
+    games: picks.length,
+    finalOdd,
+    target: targetOdd,
+    impliedProb,
+    picks,
+    reachedTarget,
+  };
+}
 
   async function handleAutoParlay() {
-    setParlayError("");
-    setParlayResult(null);
+  setParlayError("");
+  setParlayResult(null);
 
-    if (!fixtures.length) {
-      setParlayError("Genera primero partidos con el botón de arriba.");
-      return;
-    }
-
-    fixtures
-      .slice(0, 10)
-      .map(getFixtureId)
-      .filter(Boolean)
-      .forEach((id) => ensureOdds(id));
-
-    const suggestion = buildComboSuggestion(fixtures, maxBoost);
-    if (!suggestion) {
-      setParlayError("No pudimos armar una combinada razonable con los partidos cargados. Prueba con otro rango de fechas.");
-      return;
-    }
-
-    setParlayResult({ mode: "auto", ...suggestion });
+  if (!fixtures.length) {
+    setParlayError("Genera primero partidos con el botón de arriba.");
+    return;
   }
+
+  // precarga odds (mejor secuencial para no saturar)
+  const ids = fixtures.slice(0, 18).map(getFixtureId).filter(Boolean);
+  for (const id of ids) {
+    // eslint-disable-next-line no-await-in-loop
+    await ensureOdds(id);
+  }
+
+  const suggestion = buildRealParlay(fixtures, oddsRef.current, maxBoost);
+  if (!suggestion) {
+    setParlayError("No pudimos armar combinada con odds reales (faltan mercados disponibles). Prueba con más partidos.");
+    return;
+  }
+
+  setParlayResult({ mode: "auto", ...suggestion });
+}
 
   async function handleSelectedParlay() {
-    setParlayError("");
-    setParlayResult(null);
+  setParlayError("");
+  setParlayResult(null);
 
-    if (!fixtures.length) {
-      setParlayError("Genera primero partidos con el botón de arriba.");
-      return;
-    }
-
-    if (selectedCount < 2) {
-      setParlayError("Selecciona al menos 2 partidos de la lista superior.");
-      return;
-    }
-
-    const pool = fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)));
-    pool.map(getFixtureId).filter(Boolean).forEach((id) => ensureOdds(id));
-
-    const suggestion = buildComboSuggestion(pool, maxBoost);
-    if (!suggestion) {
-      setParlayError("Con esta combinación no pudimos llegar a una cuota interesante. Prueba agregando más partidos.");
-      return;
-    }
-
-    setParlayResult({ mode: "selected", ...suggestion });
+  if (!fixtures.length) {
+    setParlayError("Genera primero partidos con el botón de arriba.");
+    return;
   }
+
+  if (selectedCount < 2) {
+    setParlayError("Selecciona al menos 2 partidos de la lista superior.");
+    return;
+  }
+
+  const pool = fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)));
+  const ids = pool.map(getFixtureId).filter(Boolean);
+
+  for (const id of ids) {
+    // eslint-disable-next-line no-await-in-loop
+    await ensureOdds(id);
+  }
+
+  const suggestion = buildRealParlay(pool, oddsRef.current, maxBoost);
+  if (!suggestion) {
+    setParlayError("No pudimos armar combinada con estos seleccionados (odds/mercados insuficientes). Agrega más partidos.");
+    return;
+  }
+
+  setParlayResult({ mode: "selected", ...suggestion });
+}
 
   async function handleGenerate(e) {
     e?.preventDefault?.();
@@ -1501,20 +1675,24 @@ if (!isLoggedIn) {
               {fixtures.map((fx) => {
                 const id = getFixtureId(fx);
                 const isSelected = selectedIds.includes(id);
+const oddsPack = oddsByFixture[id];
+const oddsLoading = !!oddsLoadingByFixture[id];
 
                 return (
-                  <FixtureCardCompact
-                    key={id}
-                    fx={fx}
-                    isSelected={isSelected}
-                    onToggle={(fixtureId) => {
-                      toggleFixtureSelection(fixtureId);
-                      setParlayResult(null);
-                      setParlayError("");
-                    }}
-                    onLoadOdds={(fixtureId) => ensureOdds(fixtureId)}
-                  />
-                );
+  <FixtureCardCompact
+    key={id}
+    fx={fx}
+    isSelected={isSelected}
+    oddsPack={oddsPack}
+    oddsLoading={oddsLoading}
+    onToggle={(fixtureId) => {
+      toggleFixtureSelection(fixtureId);
+      setParlayResult(null);
+      setParlayError("");
+    }}
+    onLoadOdds={(fixtureId) => ensureOdds(fixtureId)}
+  />
+);
               })}
             </div>
           )}
@@ -1578,12 +1756,43 @@ if (!isLoggedIn) {
           {refErr ? <div className="mt-3 text-xs text-amber-300">{refErr}</div> : null}
 
           {refData ? (
-            <pre className="mt-3 text-[11px] leading-snug text-slate-200 bg-slate-950/30 border border-white/10 rounded-xl p-3 overflow-auto">
-              {JSON.stringify(refData, null, 2)}
-            </pre>
-          ) : (
-            <div className="mt-3 text-[11px] text-slate-400">Cuando el backend esté listo, aquí mostramos el top de árbitros.</div>
-          )}
+  <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/30 p-3">
+    <div className="text-xs text-slate-300">
+      Rango: <span className="text-slate-100 font-semibold">{refData.query?.from}</span> →{" "}
+      <span className="text-slate-100 font-semibold">{refData.query?.to}</span>
+      {refData.query?.country ? (
+        <>
+          {" "}· País: <span className="text-slate-100 font-semibold">{refData.query.country}</span>
+        </>
+      ) : null}
+    </div>
+
+    {refData.recommended ? (
+      <div className="mt-2 text-sm text-slate-100">
+        <div className="font-semibold text-emerald-200">Recomendado</div>
+        <div className="mt-1">
+          Árbitro: <span className="font-semibold">{refData.recommended.referee?.name}</span>{" "}
+          <span className="text-xs text-slate-400">(prom. {refData.recommended.referee?.avgCards} tarjetas)</span>
+        </div>
+        <div className="text-xs text-slate-300 mt-1">
+          Partido: {refData.recommended.fixture?.teams?.home?.name} vs {refData.recommended.fixture?.teams?.away?.name}
+        </div>
+      </div>
+    ) : (
+      <div className="mt-2 text-xs text-amber-200">
+        {refData.message || "Sin recomendación aún para este rango."}
+      </div>
+    )}
+
+    <div className="mt-2 text-[11px] text-slate-400">
+      Árbitros top: {Array.isArray(refData.topReferees) ? refData.topReferees.length : 0} · Fixtures revisados:{" "}
+      {refData.fixturesScanned ?? 0}
+    </div>
+  </div>
+) : (
+  <div className="mt-3 text-[11px] text-slate-400">Cuando el backend esté listo, aquí mostramos el top de árbitros.</div>
+)}
+
         </FeatureCard>
 
         <FeatureCard
@@ -1612,8 +1821,8 @@ if (!isLoggedIn) {
       {/* 5) Manual Picks */}
       <ManualPicksSection />
 
-      {/* 6) Simulador */}
-<Simulator bg={BG_DINERO} />
+      {/* 6) Simulador 
+<Simulator bg={BG_DINERO} /> */}
 
 {/* 7) Calculadora */}
 <PriceCalculatorCard bg={BG_DINERO} />
