@@ -1125,47 +1125,34 @@ function toggleFixtureSelection(id) {
 }
 
 // Cargar odds de un fixture (con cache)
-const ensureOdds = useCallback(
-  async (fixtureId) => {
-    if (!fixtureId) return;
+const ensureOdds = useCallback(async (fixtureId) => {
+  const id = String(fixtureId);
+  if (!id) return;
 
-    const key = String(fixtureId);
+  // si ya tenemos odds, no repetimos
+  if (oddsRef.current[id]?.found || oddsByFixture[id]?.found) return;
 
-    // si ya tengo odds (o ya sé que no hay), no vuelvo a pedir
-    if (oddsRef.current[key]) return;
+  try {
+    setOddsLoadingByFixture((prev) => ({ ...prev, [id]: true }));
 
-    // evita doble llamada si ya está cargando
-    setOddsLoadingByFixture((prev) => {
-      if (prev[key]) return prev;
-      return { ...prev, [key]: true };
-    });
+    const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(id)}`);
+    const data = await res.json().catch(() => null);
 
-    try {
-      const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(key)}`);
-      const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(data?.error || data?.message || `HTTP ${res.status}`);
 
-      if (!res.ok) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
+    // ✅ guardar SIEMPRE con key string
+    oddsRef.current[id] = data;
 
-      oddsRef.current[key] = data || { fixtureId: key, found: false };
-
-      setOddsByFixture((prev) => ({
-        ...prev,
-        [key]: oddsRef.current[key],
-      }));
-    } catch (e) {
-      // guardamos “no encontrado” para no spamear el endpoint
-      oddsRef.current[key] = { fixtureId: key, found: false, error: String(e?.message || e) };
-
-      setOddsByFixture((prev) => ({
-        ...prev,
-        [key]: oddsRef.current[key],
-      }));
-    } finally {
-      setOddsLoadingByFixture((prev) => ({ ...prev, [key]: false }));
-    }
-  },
-  [API_BASE]
-);
+    setOddsByFixture((prev) => ({ ...prev, [id]: data }));
+  } catch (e) {
+    // guarda un "pack" para que el UI no quede eternamente en "presiona añadir"
+    const errPack = { fixtureId: id, found: false, error: String(e?.message || e) };
+    oddsRef.current[id] = errPack;
+    setOddsByFixture((prev) => ({ ...prev, [id]: errPack }));
+  } finally {
+    setOddsLoadingByFixture((prev) => ({ ...prev, [id]: false }));
+  }
+}, [API_BASE, oddsByFixture]);
 
   useEffect(() => {
     const urlDate = searchParams.get("date");
@@ -1432,7 +1419,7 @@ function bestSafePickFromOdds(fx, oddsPack) {
     return;
   }
 
-  const pool = fixtures.filter((fx) => selectedIds.includes(String(getFixtureId(fx))));
+  const pool = fixtures.filter((fx) => selectedIds.includes(fxId(fx)));
   const ids = pool.map(getFixtureId).filter(Boolean);
 
   for (const id of ids) {
@@ -1669,30 +1656,30 @@ if (!isLoggedIn) {
               Genera partidos para verlos aquí con el formato profesional.
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4">
-              {fixtures.map((fx) => {
-               const id = String(getFixtureId(fx));
-               const isSelected = selectedIds.includes(id);
-               const oddsPack = oddsByFixture[id];
-               const oddsLoading = !!oddsLoadingByFixture[id];
+            <div className="grid grid-cols-1 gap-4">              
+{fixtures.map((fx) => {
+  const id = fxId(fx); // ✅ string siempre
+  const isSelected = selectedIds.includes(id);
+  const oddsPack = oddsByFixture[id];
+  const oddsLoading = !!oddsLoadingByFixture[id];
 
+  return (
+    <FixtureCardCompact
+      key={id}
+      fx={fx}
+      isSelected={isSelected}
+      oddsPack={oddsPack}
+      oddsLoading={oddsLoading}
+      onToggle={(fixtureId) => {
+        toggleFixtureSelection(fixtureId); // fixtureId llega string si tú lo envías string
+        setParlayResult(null);
+        setParlayError("");
+      }}
+      onLoadOdds={(fixtureId) => ensureOdds(fixtureId)}
+    />
+  );
+})}
 
-                return (
-  <FixtureCardCompact
-    key={id}
-    fx={fx}
-    isSelected={isSelected}
-    oddsPack={oddsPack}
-    oddsLoading={oddsLoading}
-    onToggle={(fixtureId) => {
-      toggleFixtureSelection(fixtureId);
-      setParlayResult(null);
-      setParlayError("");
-    }}
-    onLoadOdds={(fixtureId) => ensureOdds(fixtureId)}
-  />
-);
-              })}
             </div>
           )}
         </section>
