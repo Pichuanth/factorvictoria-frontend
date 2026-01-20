@@ -1119,6 +1119,54 @@ const oddsRef = useRef({});
   const [refErr, setRefErr] = useState("");
   const [refData, setRefData] = useState(null);
 
+  // Selección de fixtures para combinada
+function toggleFixtureSelection(id) {
+  setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+}
+
+// Cargar odds de un fixture (con cache)
+const ensureOdds = useCallback(
+  async (fixtureId) => {
+    if (!fixtureId) return;
+
+    const key = String(fixtureId);
+
+    // si ya tengo odds (o ya sé que no hay), no vuelvo a pedir
+    if (oddsRef.current[key]) return;
+
+    // evita doble llamada si ya está cargando
+    setOddsLoadingByFixture((prev) => {
+      if (prev[key]) return prev;
+      return { ...prev, [key]: true };
+    });
+
+    try {
+      const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(key)}`);
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
+
+      oddsRef.current[key] = data || { fixtureId: key, found: false };
+
+      setOddsByFixture((prev) => ({
+        ...prev,
+        [key]: oddsRef.current[key],
+      }));
+    } catch (e) {
+      // guardamos “no encontrado” para no spamear el endpoint
+      oddsRef.current[key] = { fixtureId: key, found: false, error: String(e?.message || e) };
+
+      setOddsByFixture((prev) => ({
+        ...prev,
+        [key]: oddsRef.current[key],
+      }));
+    } finally {
+      setOddsLoadingByFixture((prev) => ({ ...prev, [key]: false }));
+    }
+  },
+  [API_BASE]
+);
+
   useEffect(() => {
     const urlDate = searchParams.get("date");
     const urlQ = searchParams.get("q");
@@ -1137,44 +1185,6 @@ const oddsRef = useRef({});
   }
   useEffect(() => {
   let alive = true;
-
-  async function loadReferees() {
-    try {
-      setRefErr("");
-      setRefLoading(true);
-
-      // rango simple: hoy -> hoy+2
-      const now = new Date();
-      const ymd = (d) => {
-        const yyyy = d.getFullYear();
-        const mm = String(d.getMonth() + 1).padStart(2, "0");
-        const dd = String(d.getDate()).padStart(2, "0");
-        return `${yyyy}-${mm}-${dd}`;
-      };
-
-      const fromR = ymd(now);
-      const toD = new Date(now);
-      toD.setDate(toD.getDate() + 2);
-      const toR = ymd(toD);
-
-      const params = new URLSearchParams({ from: fromR, to: toR });
-      // params.set("country", "Italy"); // opcional
-
-      const res = await fetch(`${API_BASE}/api/referees/cards?${params.toString()}`);
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
-
-      if (!alive) return;
-      setRefData(data);
-    } catch (e) {
-      if (!alive) return;
-      setRefErr(String(e?.message || e));
-    } finally {
-      if (!alive) return;
-      setRefLoading(false);
-    }
-  }
 
   async function loadWeekly() {
     setWeeklyErr("");
@@ -1203,7 +1213,9 @@ const oddsRef = useRef({});
         .filter(isFutureFixture)
         .filter((fx) => !isYouthOrWomenOrReserve(fx));
 
-      const filteredTop = base.filter((fx) => isAllowedCompetition(getCountryName(fx), getLeagueName(fx)));
+      const filteredTop = base.filter((fx) =>
+        isAllowedCompetition(getCountryName(fx), getLeagueName(fx))
+      );
 
       const sorted = [...filteredTop].sort((a, b) => {
         const da = new Date(a?.fixture?.date || a?.date || 0).getTime();
@@ -1234,16 +1246,52 @@ const oddsRef = useRef({});
     }
   }
 
-  // carga inicial (solo al montar)
+  async function loadReferees() {
+    // OJO: NO dejes que un 500 rompa la página, solo mostramos error
+    try {
+      setRefErr("");
+      setRefLoading(true);
+
+      const now = new Date();
+      const ymd = (d) => {
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd}`;
+      };
+
+      const fromR = ymd(now);
+      const toD = new Date(now);
+      toD.setDate(toD.getDate() + 2);
+      const toR = ymd(toD);
+
+      const params = new URLSearchParams({ from: fromR, to: toR });
+
+      const res = await fetch(`${API_BASE}/api/referees/cards?${params.toString()}`);
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
+
+      if (!alive) return;
+      setRefData(data);
+    } catch (e) {
+      if (!alive) return;
+      setRefErr(String(e?.message || e));
+    } finally {
+      if (!alive) return;
+      setRefLoading(false);
+    }
+  }
+
+  // carga inicial
   loadWeekly();
 
-  // solo carga árbitros si el plan lo permite (evita llamadas innecesarias)
+  // solo si el plan lo permite
   if (features.referees) loadReferees();
 
   return () => {
     alive = false;
   };
-  // OJO: incluimos features.referees para que si cambia el plan, cargue árbitros.
 }, [API_BASE, features.referees]);
 
   function fakeOddForFixture(fx) {
@@ -1384,7 +1432,7 @@ function bestSafePickFromOdds(fx, oddsPack) {
     return;
   }
 
-  const pool = fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)));
+  const pool = fixtures.filter((fx) => selectedIds.includes(String(getFixtureId(fx))));
   const ids = pool.map(getFixtureId).filter(Boolean);
 
   for (const id of ids) {
@@ -1623,10 +1671,11 @@ if (!isLoggedIn) {
           ) : (
             <div className="grid grid-cols-1 gap-4">
               {fixtures.map((fx) => {
-                const id = getFixtureId(fx);
-                const isSelected = selectedIds.includes(id);
-const oddsPack = oddsByFixture[id];
-const oddsLoading = !!oddsLoadingByFixture[id];
+               const id = String(getFixtureId(fx));
+               const isSelected = selectedIds.includes(id);
+               const oddsPack = oddsByFixture[id];
+               const oddsLoading = !!oddsLoadingByFixture[id];
+
 
                 return (
   <FixtureCardCompact
