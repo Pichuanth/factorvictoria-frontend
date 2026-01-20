@@ -1048,26 +1048,24 @@ function WelcomeProCard({ planInfo }) {
   return (
     <HudCard bg={BG_BIENVENIDO} overlayVariant="casillas" className="mt-4" glow="gold">
       <div className="p-5 md:p-6">
-        <div className="text-emerald-200/90 text-xs font-semibold tracking-wide">Bienvenido a Factor Victoria PRO</div>
-
-        <div className="mt-1 text-xl md:text-2xl font-bold text-slate-100">{planInfo.name} activo</div>
-
-        <div className="mt-2 text-sm text-slate-200 max-w-2xl">
-          {/*Tu objetivo del plan es{" "}
-          <span className="font-bold text-emerald-200">x{planInfo.boost}</span>. Además, siempre tendrás una{" "}
-          <span className="font-bold">cuota regalo</span> (x1.5 a x3).*/}
+        <div className="text-emerald-200/90 text-xs font-semibold tracking-wide">
+          Bienvenido a Factor Victoria PRO
         </div>
 
-       {/*<div className="mt-2 text-xs text-slate-400"> //Membresía {planInfo.price} · Factor Victoria</div> */}
+        <div className="mt-1 text-xl md:text-2xl font-bold text-slate-100">
+          {planInfo.name} activo
+        </div>
 
-        <div className="px-5 pb-4 text-sm text-slate-300 leading-relaxed">
-  
-  Este es el punto donde apostar deja de ser intuición y pasa a ser "Estrategia"
-  <span className="font-semibold text-emerald-300">
-  
-  </span>.
-</div>
-    </div>
+        <div className="mt-2 text-sm text-slate-200 max-w-2xl">
+          {/* Tu objetivo del plan es{" "}
+          <span className="font-bold text-emerald-200">x{planInfo.boost}</span>. Además, siempre tendrás una{" "}
+          <span className="font-bold">cuota regalo</span> (x1.5 a x3). */}
+        </div>
+
+        <div className="mt-3 text-sm text-slate-300 leading-relaxed">
+          Este es el punto donde apostar deja de ser intuición y pasa a ser “Estrategia”.
+        </div>
+      </div>
     </HudCard>
   );
 }
