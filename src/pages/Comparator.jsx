@@ -293,6 +293,8 @@ function getFixtureId(f) {
     `${f.league?.id || ""}-${f.timestamp || f.date || f.fixture?.date || ""}`
   );
 }
+// ✅ ID estable SIEMPRE string (evita mismatches number/string)
+const fxId = (fxOrId) => String(typeof fxOrId === "object" ? getFixtureId(fxOrId) : fxOrId);
 
 function getHomeLogo(f) {
   return f?.teams?.home?.logo || f?.homeLogo || f?.home_logo || null;
@@ -929,6 +931,7 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, oddsPack, od
   const home = getHomeName(fx);
   const away = getAwayName(fx);
   const time = fixtureTimeLabel(fx) || getKickoffTime(fx);
+  const fxId = (fxOrId) => String(typeof fxOrId === "object" ? getFixtureId(fxOrId) : fxOrId);
 
   const homeLogo = getHomeLogo(fx);
   const awayLogo = getAwayLogo(fx);
@@ -1086,7 +1089,11 @@ export default function Comparator() {
 
   const [fixtures, setFixtures] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
-  const selectedCount = selectedIds.length;
+const selectedCount = selectedIds.length;
+const toggleFixtureSelection = useCallback((fxOrId) => {
+  const id = fxId(fxOrId);
+  setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+}, []);
 
   // ✅ Partidazos (lista curada) independiente del botón "Generar"
   const [weeklyLoading, setWeeklyLoading] = useState(false);
@@ -1126,33 +1133,31 @@ function toggleFixtureSelection(id) {
 
 // Cargar odds de un fixture (con cache)
 const ensureOdds = useCallback(async (fixtureId) => {
-  const id = String(fixtureId);
+  const id = String(fixtureId || "");
   if (!id) return;
 
-  // si ya tenemos odds, no repetimos
-  if (oddsRef.current[id]?.found || oddsByFixture[id]?.found) return;
+  // evita duplicar llamadas
+  if (oddsRef.current[id]?.found || oddsLoadingByFixture[id]) return;
+
+  setOddsLoadingByFixture((p) => ({ ...p, [id]: true }));
 
   try {
-    setOddsLoadingByFixture((prev) => ({ ...prev, [id]: true }));
-
     const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(id)}`);
     const data = await res.json().catch(() => null);
 
-    if (!res.ok) throw new Error(data?.error || data?.message || `HTTP ${res.status}`);
+    if (!res.ok) throw new Error(data?.error || data?.note || `HTTP ${res.status}`);
 
-    // ✅ guardar SIEMPRE con key string
     oddsRef.current[id] = data;
-
-    setOddsByFixture((prev) => ({ ...prev, [id]: data }));
+    setOddsByFixture((p) => ({ ...p, [id]: data }));
   } catch (e) {
-    // guarda un "pack" para que el UI no quede eternamente en "presiona añadir"
-    const errPack = { fixtureId: id, found: false, error: String(e?.message || e) };
-    oddsRef.current[id] = errPack;
-    setOddsByFixture((prev) => ({ ...prev, [id]: errPack }));
+    // si falla, guarda algo para que deje de decir "presiona añadir..."
+    const fallback = { found: false, markets: {}, note: String(e?.message || e) };
+    oddsRef.current[id] = fallback;
+    setOddsByFixture((p) => ({ ...p, [id]: fallback }));
   } finally {
-    setOddsLoadingByFixture((prev) => ({ ...prev, [id]: false }));
+    setOddsLoadingByFixture((p) => ({ ...p, [id]: false }));
   }
-}, [API_BASE, oddsByFixture]);
+}, [API_BASE, oddsLoadingByFixture]);
 
   useEffect(() => {
     const urlDate = searchParams.get("date");
@@ -1270,15 +1275,14 @@ const ensureOdds = useCallback(async (fixtureId) => {
     }
   }
 
-  // carga inicial
-  loadWeekly();
+  // carga inicial (solo al montar)
+loadWeekly();
 
-  // solo si el plan lo permite
-  if (features.referees) loadReferees();
+// solo carga árbitros...
+if (features.referees) loadReferees();
 
-  return () => {
-    alive = false;
-  };
+return () => { alive = false; };
+// ...
 }, [API_BASE, features.referees]);
 
   function fakeOddForFixture(fx) {
@@ -1306,7 +1310,7 @@ function bestSafePickFromOdds(fx, oddsPack) {
     if (o < 1.10 || o > 1.60) return; // rango MVP seguro
 
     candidates.push({
-      fixtureId: getFixtureId(fx),
+      fixtureId: fxId(fx),
       label: `${getHomeName(fx)} vs ${getAwayName(fx)} · ${marketKey}: ${selectionKey}`,
       market: marketKey,
       selection: selectionKey,
@@ -1341,16 +1345,15 @@ function bestSafePickFromOdds(fx, oddsPack) {
   let product = 1;
 
   const sorted = [...fixturesPool].sort((a, b) => {
-    // prioridad: fixtures que ya tengan odds cargadas
-    const ia = getFixtureId(a);
-    const ib = getFixtureId(b);
+    const ia = fxId(a);
+    const ib = fxId(b);
     const ha = oddsByFixtureArg[ia]?.found ? 1 : 0;
     const hb = oddsByFixtureArg[ib]?.found ? 1 : 0;
     return hb - ha;
   });
 
   for (const fx of sorted) {
-    const id = getFixtureId(fx);
+    const id = fxId(fx);
     const pack = oddsByFixtureArg[id];
     const pick = bestSafePickFromOdds(fx, pack);
     if (!pick) continue;
@@ -1366,17 +1369,13 @@ function bestSafePickFromOdds(fx, oddsPack) {
 
   if (!picks.length) return null;
 
-  const finalOdd = Number(product.toFixed(2));
-  const impliedProb = Number(((1 / finalOdd) * 100).toFixed(1));
-  const reachedTarget = finalOdd >= targetOdd * 0.85;
-
   return {
     games: picks.length,
-    finalOdd,
+    finalOdd: Number(product.toFixed(2)),
     target: targetOdd,
-    impliedProb,
+    impliedProb: Number(((1 / product) * 100).toFixed(1)),
     picks,
-    reachedTarget,
+    reachedTarget: product >= targetOdd * 0.85,
   };
 }
 
@@ -1658,7 +1657,7 @@ if (!isLoggedIn) {
           ) : (
             <div className="grid grid-cols-1 gap-4">              
 {fixtures.map((fx) => {
-  const id = fxId(fx); // ✅ string siempre
+  const id = fxId(fx);
   const isSelected = selectedIds.includes(id);
   const oddsPack = oddsByFixture[id];
   const oddsLoading = !!oddsLoadingByFixture[id];
@@ -1670,12 +1669,12 @@ if (!isLoggedIn) {
       isSelected={isSelected}
       oddsPack={oddsPack}
       oddsLoading={oddsLoading}
-      onToggle={(fixtureId) => {
-        toggleFixtureSelection(fixtureId); // fixtureId llega string si tú lo envías string
+      onToggle={() => {
+        toggleFixtureSelection(fx);   // o toggleFixtureSelection(id), pero consistente
         setParlayResult(null);
         setParlayError("");
       }}
-      onLoadOdds={(fixtureId) => ensureOdds(fixtureId)}
+      onLoadOdds={() => ensureOdds(id)}
     />
   );
 })}
