@@ -923,7 +923,6 @@ function FeatureCard({ title, badge, children, locked, lockText, bg }) {
 }
 
 /* ------------------- FixtureCard (compact) ------------------- */
-/* ------------------- FixtureCard (compact) ------------------- */
 function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, oddsPack, oddsLoading }) {
   const id = fxId(fx);
 
@@ -932,7 +931,7 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, oddsPack, od
   const flagEmoji = COUNTRY_FLAG[countryName] || (countryName === "World" ? "🌍" : "🏳️");
   const home = getHomeName(fx);
   const away = getAwayName(fx);
-  const time = fixtureTimeLabel(fx) || getKickoffTime(fx);
+  const time = fixtureTimeLabel(fx) || getKickoffTime(fx) || "--:--";
 
   const homeLogo = getHomeLogo(fx);
   const awayLogo = getAwayLogo(fx);
@@ -952,11 +951,7 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, oddsPack, od
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 min-w-0">
               {homeLogo ? (
-                <img
-                  src={homeLogo}
-                  alt={home}
-                  className="w-7 h-7 rounded-full bg-white/5 object-contain"
-                />
+                <img src={homeLogo} alt={home} className="w-7 h-7 rounded-full bg-white/5 object-contain" />
               ) : (
                 <div className="w-7 h-7 rounded-full bg-white/5" />
               )}
@@ -967,11 +962,7 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, oddsPack, od
 
             <div className="flex items-center gap-2 min-w-0">
               {awayLogo ? (
-                <img
-                  src={awayLogo}
-                  alt={away}
-                  className="w-7 h-7 rounded-full bg-white/5 object-contain"
-                />
+                <img src={awayLogo} alt={away} className="w-7 h-7 rounded-full bg-white/5 object-contain" />
               ) : (
                 <div className="w-7 h-7 rounded-full bg-white/5" />
               )}
@@ -985,7 +976,7 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, oddsPack, od
             <span className="text-slate-500">·</span>
             <span className="truncate">{league}</span>
             <span className="text-slate-500">·</span>
-            <span className="font-semibold text-slate-200">{time || "--:--"}</span>
+            <span className="font-semibold text-slate-200">{time}</span>
           </div>
         </div>
 
@@ -1001,10 +992,8 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, oddsPack, od
           <button
             type="button"
             onClick={() => {
-              // ✅ aquí SIEMPRE pasa el objeto "fx"
-              // porque toggleFixtureSelection y ensureOdds pueden recibir objeto o id
-              onToggle(fx);
-              onLoadOdds(fx);
+              onToggle(fx);     // ✅ pasa objeto
+              onLoadOdds(fx);   // ✅ pasa objeto
             }}
             className="rounded-full px-4 py-2 text-xs font-bold"
             style={{
@@ -1027,43 +1016,21 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, oddsPack, od
             </div>
 
             {!oddsPack ? (
-              <div className="mt-2 text-slate-400">
-                Presiona “Añadir a combinada” para cargar odds.
-              </div>
+              <div className="mt-2 text-slate-400">Presiona “Añadir a combinada” para cargar odds.</div>
             ) : !oddsPack.found ? (
-              <div className="mt-2 text-amber-300">No hay odds disponibles para este partido.</div>
+              <div className="mt-2 text-amber-300">
+                No hay odds disponibles para este partido.
+                {oddsPack.note ? <div className="mt-1 text-slate-400">{String(oddsPack.note)}</div> : null}
+              </div>
             ) : (
               <div className="mt-2 space-y-2">
                 <MarketRow title="1X2" values={oddsPack?.markets?.["1X2"]} />
                 <MarketRow title="Doble oportunidad" values={oddsPack?.markets?.["1X"]} />
                 <MarketRow
                   title="Goles O/U"
-                  values={pickLines(oddsPack?.markets?.["OU"], [
-                    "Over 1.5",
-                    "Under 3.5",
-                    "Over 2.5",
-                    "Under 2.5",
-                  ])}
+                  values={pickLines(oddsPack?.markets?.["OU"], ["Over 1.5", "Under 3.5", "Over 2.5", "Under 2.5"])}
                 />
                 <MarketRow title="BTTS" values={oddsPack?.markets?.["BTTS"]} />
-                <MarketRow
-                  title="Tarjetas O/U"
-                  values={pickLines(oddsPack?.markets?.["CARDS_OU"], [
-                    "Over 3.5",
-                    "Under 3.5",
-                    "Over 4.5",
-                    "Under 4.5",
-                  ])}
-                />
-                <MarketRow
-                  title="Corners O/U"
-                  values={pickLines(oddsPack?.markets?.["CORNERS_OU"], [
-                    "Over 8.5",
-                    "Under 8.5",
-                    "Over 9.5",
-                    "Under 9.5",
-                  ])}
-                />
               </div>
             )}
 
@@ -1701,11 +1668,11 @@ if (!isLoggedIn) {
       oddsPack={oddsPack}
       oddsLoading={oddsLoading}
       onToggle={(fxObj) => {
-        toggleFixtureSelection(fxObj);   // ✅ le pasamos el objeto, consistente
+        toggleFixtureSelection(fxObj);
         setParlayResult(null);
         setParlayError("");
       }}
-      onLoadOdds={(fxObj) => ensureOdds(fxId(fxObj))} // ✅ carga por id string
+      onLoadOdds={(fxObj) => ensureOdds(fxId(fxObj))}
     />
   );
 })}
