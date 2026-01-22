@@ -293,7 +293,7 @@ function getFixtureId(f) {
     `${f.league?.id || ""}-${f.timestamp || f.date || f.fixture?.date || ""}`
   );
 }
-// ✅ ID estable SIEMPRE string (evita mismatches number/string)
+// ✅ ID estable SIEMPRE como string (para evitar mismatches)
 const fxId = (fxOrId) => String(typeof fxOrId === "object" ? getFixtureId(fxOrId) : fxOrId);
 
 function getHomeLogo(f) {
@@ -931,8 +931,7 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, oddsPack, od
   const home = getHomeName(fx);
   const away = getAwayName(fx);
   const time = fixtureTimeLabel(fx) || getKickoffTime(fx);
-  const fxId = (fxOrId) => String(typeof fxOrId === "object" ? getFixtureId(fxOrId) : fxOrId);
-
+  
   const homeLogo = getHomeLogo(fx);
   const awayLogo = getAwayLogo(fx);
 
@@ -1125,11 +1124,6 @@ const oddsRef = useRef({});
   const [refLoading, setRefLoading] = useState(false);
   const [refErr, setRefErr] = useState("");
   const [refData, setRefData] = useState(null);
-
-  // Selección de fixtures para combinada
-function toggleFixtureSelection(id) {
-  setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-}
 
 // Cargar odds de un fixture (con cache)
 const ensureOdds = useCallback(async (fixtureId) => {
@@ -1662,6 +1656,7 @@ if (!isLoggedIn) {
   const oddsPack = oddsByFixture[id];
   const oddsLoading = !!oddsLoadingByFixture[id];
 
+
   return (
     <FixtureCardCompact
       key={id}
@@ -1670,14 +1665,13 @@ if (!isLoggedIn) {
       oddsPack={oddsPack}
       oddsLoading={oddsLoading}
       onToggle={() => {
-        toggleFixtureSelection(fx);   // o toggleFixtureSelection(id), pero consistente
         setParlayResult(null);
         setParlayError("");
       }}
       onLoadOdds={() => ensureOdds(id)}
     />
   );
-})}
+})}  
 
             </div>
           )}
