@@ -923,6 +923,7 @@ function FeatureCard({ title, badge, children, locked, lockText, bg }) {
 }
 
 /* ------------------- FixtureCard (compact) ------------------- */
+/* ------------------- FixtureCard (compact) ------------------- */
 function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, oddsPack, oddsLoading }) {
   const id = fxId(fx);
 
@@ -932,7 +933,7 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, oddsPack, od
   const home = getHomeName(fx);
   const away = getAwayName(fx);
   const time = fixtureTimeLabel(fx) || getKickoffTime(fx);
-  
+
   const homeLogo = getHomeLogo(fx);
   const awayLogo = getAwayLogo(fx);
 
@@ -942,13 +943,20 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, oddsPack, od
   const boxShadow = "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 26px rgba(230,196,100,0.12)";
 
   return (
-    <div className="rounded-2xl border bg-slate-950/25 backdrop-blur-md overflow-hidden" style={{ borderColor, boxShadow }}>
+    <div
+      className="rounded-2xl border bg-slate-950/25 backdrop-blur-md overflow-hidden"
+      style={{ borderColor, boxShadow }}
+    >
       <div className="p-3 md:p-4 flex flex-col md:flex-row md:items-center gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 min-w-0">
               {homeLogo ? (
-                <img src={homeLogo} alt={home} className="w-7 h-7 rounded-full bg-white/5 object-contain" />
+                <img
+                  src={homeLogo}
+                  alt={home}
+                  className="w-7 h-7 rounded-full bg-white/5 object-contain"
+                />
               ) : (
                 <div className="w-7 h-7 rounded-full bg-white/5" />
               )}
@@ -959,7 +967,11 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, oddsPack, od
 
             <div className="flex items-center gap-2 min-w-0">
               {awayLogo ? (
-                <img src={awayLogo} alt={away} className="w-7 h-7 rounded-full bg-white/5 object-contain" />
+                <img
+                  src={awayLogo}
+                  alt={away}
+                  className="w-7 h-7 rounded-full bg-white/5 object-contain"
+                />
               ) : (
                 <div className="w-7 h-7 rounded-full bg-white/5" />
               )}
@@ -987,20 +999,22 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, oddsPack, od
           </button>
 
           <button
-  type="button"
-  onClick={() => {
-    onToggle(fx);     // <- usa el objeto (toggleFixtureSelection lo convierte a id)
-    onLoadOdds(id);   // <- carga odds por id
-  }}
-  className="rounded-full px-4 py-2 text-xs font-bold"
-  style={{
-    backgroundColor: isSelected ? "rgba(16,185,129,0.18)" : "rgba(56,189,248,0.18)",
-    border: "1px solid rgba(255,255,255,0.12)",
-    color: isSelected ? "rgba(167,243,208,0.95)" : "rgba(186,230,253,0.95)",
-  }}
->
-  {isSelected ? "Quitar" : "Añadir a combinada"}
-</button>
+            type="button"
+            onClick={() => {
+              // ✅ aquí SIEMPRE pasa el objeto "fx"
+              // porque toggleFixtureSelection y ensureOdds pueden recibir objeto o id
+              onToggle(fx);
+              onLoadOdds(fx);
+            }}
+            className="rounded-full px-4 py-2 text-xs font-bold"
+            style={{
+              backgroundColor: isSelected ? "rgba(16,185,129,0.18)" : "rgba(56,189,248,0.18)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              color: isSelected ? "rgba(167,243,208,0.95)" : "rgba(186,230,253,0.95)",
+            }}
+          >
+            {isSelected ? "Quitar" : "Añadir a combinada"}
+          </button>
         </div>
       </div>
 
@@ -1013,7 +1027,9 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, oddsPack, od
             </div>
 
             {!oddsPack ? (
-              <div className="mt-2 text-slate-400">Presiona “Añadir a combinada” para cargar odds.</div>
+              <div className="mt-2 text-slate-400">
+                Presiona “Añadir a combinada” para cargar odds.
+              </div>
             ) : !oddsPack.found ? (
               <div className="mt-2 text-amber-300">No hay odds disponibles para este partido.</div>
             ) : (
@@ -1022,16 +1038,31 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, oddsPack, od
                 <MarketRow title="Doble oportunidad" values={oddsPack?.markets?.["1X"]} />
                 <MarketRow
                   title="Goles O/U"
-                  values={pickLines(oddsPack?.markets?.["OU"], ["Over 1.5", "Under 3.5", "Over 2.5", "Under 2.5"])}
+                  values={pickLines(oddsPack?.markets?.["OU"], [
+                    "Over 1.5",
+                    "Under 3.5",
+                    "Over 2.5",
+                    "Under 2.5",
+                  ])}
                 />
                 <MarketRow title="BTTS" values={oddsPack?.markets?.["BTTS"]} />
                 <MarketRow
                   title="Tarjetas O/U"
-                  values={pickLines(oddsPack?.markets?.["CARDS_OU"], ["Over 3.5", "Under 3.5", "Over 4.5", "Under 4.5"])}
+                  values={pickLines(oddsPack?.markets?.["CARDS_OU"], [
+                    "Over 3.5",
+                    "Under 3.5",
+                    "Over 4.5",
+                    "Under 4.5",
+                  ])}
                 />
                 <MarketRow
                   title="Corners O/U"
-                  values={pickLines(oddsPack?.markets?.["CORNERS_OU"], ["Over 8.5", "Under 8.5", "Over 9.5", "Under 9.5"])}
+                  values={pickLines(oddsPack?.markets?.["CORNERS_OU"], [
+                    "Over 8.5",
+                    "Under 8.5",
+                    "Over 9.5",
+                    "Under 9.5",
+                  ])}
                 />
               </div>
             )}
@@ -1089,15 +1120,16 @@ export default function Comparator() {
 
   const [fixtures, setFixtures] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
+
   const selectedCount = selectedIds.length;
 
+// ✅ toggle único y estable (sirve si le pasas fx o id)
   const toggleFixtureSelection = useCallback((fxOrId) => {
   const id = fxId(fxOrId);
   setSelectedIds((prev) =>
     prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
   );
 }, []);
-
 
   // ✅ Partidazos (lista curada) independiente del botón "Generar"
   const [weeklyLoading, setWeeklyLoading] = useState(false);
@@ -1656,7 +1688,7 @@ if (!isLoggedIn) {
           ) : (
             <div className="grid grid-cols-1 gap-4">              
 {fixtures.map((fx) => {
-  const id = fxId(fx);                 // <- string estable
+  const id = fxId(fx);
   const isSelected = selectedIds.includes(id);
   const oddsPack = oddsByFixture[id];
   const oddsLoading = !!oddsLoadingByFixture[id];
@@ -1668,8 +1700,12 @@ if (!isLoggedIn) {
       isSelected={isSelected}
       oddsPack={oddsPack}
       oddsLoading={oddsLoading}
-      onToggle={toggleFixtureSelection}
-      onLoadOdds={ensureOdds}
+      onToggle={(fxObj) => {
+        toggleFixtureSelection(fxObj);   // ✅ le pasamos el objeto, consistente
+        setParlayResult(null);
+        setParlayError("");
+      }}
+      onLoadOdds={(fxObj) => ensureOdds(fxId(fxObj))} // ✅ carga por id string
     />
   );
 })}
