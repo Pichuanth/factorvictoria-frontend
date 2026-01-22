@@ -330,6 +330,9 @@ function getKickoffTime(f) {
   return f.time || f.hour || "--:--";
 }
 
+// ✅ ID estable SIEMPRE como string (para evitar mismatches)
+const fxId = (fxOrId) => String(typeof fxOrId === "object" ? getFixtureId(fxOrId) : fxOrId);
+
 /** FUTUROS */
 function isFutureFixture(fx) {
   const now = Date.now();
@@ -921,7 +924,7 @@ function FeatureCard({ title, badge, children, locked, lockText, bg }) {
 
 /* ------------------- FixtureCard (compact) ------------------- */
 function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, oddsPack, oddsLoading }) {
-  const id = getFixtureId(fx);
+  const id = fxId(fx);
 
   const league = getLeagueName(fx);
   const countryName = getCountryName(fx);
@@ -984,20 +987,20 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, oddsPack, od
           </button>
 
           <button
-            type="button"
-            onClick={() => {
-              onToggle(id);
-              onLoadOdds(id);
-            }}
-            className="rounded-full px-4 py-2 text-xs font-bold"
-            style={{
-              backgroundColor: isSelected ? "rgba(16,185,129,0.18)" : "rgba(56,189,248,0.18)",
-              border: "1px solid rgba(255,255,255,0.12)",
-              color: isSelected ? "rgba(167,243,208,0.95)" : "rgba(186,230,253,0.95)",
-            }}
-          >
-            {isSelected ? "Quitar" : "Añadir a combinada"}
-          </button>
+  type="button"
+  onClick={() => {
+    onToggle(fx);     // <- usa el objeto (toggleFixtureSelection lo convierte a id)
+    onLoadOdds(id);   // <- carga odds por id
+  }}
+  className="rounded-full px-4 py-2 text-xs font-bold"
+  style={{
+    backgroundColor: isSelected ? "rgba(16,185,129,0.18)" : "rgba(56,189,248,0.18)",
+    border: "1px solid rgba(255,255,255,0.12)",
+    color: isSelected ? "rgba(167,243,208,0.95)" : "rgba(186,230,253,0.95)",
+  }}
+>
+  {isSelected ? "Quitar" : "Añadir a combinada"}
+</button>
         </div>
       </div>
 
@@ -1086,13 +1089,15 @@ export default function Comparator() {
 
   const [fixtures, setFixtures] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
-const selectedCount = selectedIds.length;
-const toggleFixtureSelection = useCallback((fxOrId) => {
-  const id = fxId(fxOrId); // SIEMPRE string
+  const selectedCount = selectedIds.length;
+
+  const toggleFixtureSelection = useCallback((fxOrId) => {
+  const id = fxId(fxOrId);
   setSelectedIds((prev) =>
     prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
   );
 }, []);
+
 
   // ✅ Partidazos (lista curada) independiente del botón "Generar"
   const [weeklyLoading, setWeeklyLoading] = useState(false);
@@ -1651,7 +1656,7 @@ if (!isLoggedIn) {
           ) : (
             <div className="grid grid-cols-1 gap-4">              
 {fixtures.map((fx) => {
-  const id = fxId(fx);
+  const id = fxId(fx);                 // <- string estable
   const isSelected = selectedIds.includes(id);
   const oddsPack = oddsByFixture[id];
   const oddsLoading = !!oddsLoadingByFixture[id];
@@ -1663,12 +1668,8 @@ if (!isLoggedIn) {
       isSelected={isSelected}
       oddsPack={oddsPack}
       oddsLoading={oddsLoading}
-      onToggle={() => {
-        toggleFixtureSelection(id);
-        setParlayResult(null);
-        setParlayError("");
-      }}
-      onLoadOdds={() => ensureOdds(id)}
+      onToggle={toggleFixtureSelection}
+      onLoadOdds={ensureOdds}
     />
   );
 })}
