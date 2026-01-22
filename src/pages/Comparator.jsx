@@ -293,8 +293,6 @@ function getFixtureId(f) {
     `${f.league?.id || ""}-${f.timestamp || f.date || f.fixture?.date || ""}`
   );
 }
-// ✅ ID estable SIEMPRE como string (para evitar mismatches)
-const fxId = (fxOrId) => String(typeof fxOrId === "object" ? getFixtureId(fxOrId) : fxOrId);
 
 function getHomeLogo(f) {
   return f?.teams?.home?.logo || f?.homeLogo || f?.home_logo || null;
@@ -1090,8 +1088,10 @@ export default function Comparator() {
   const [selectedIds, setSelectedIds] = useState([]);
 const selectedCount = selectedIds.length;
 const toggleFixtureSelection = useCallback((fxOrId) => {
-  const id = fxId(fxOrId);
-  setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const id = fxId(fxOrId); // SIEMPRE string
+  setSelectedIds((prev) =>
+    prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+  );
 }, []);
 
   // ✅ Partidazos (lista curada) independiente del botón "Generar"
@@ -1280,7 +1280,7 @@ return () => { alive = false; };
 }, [API_BASE, features.referees]);
 
   function fakeOddForFixture(fx) {
-    const id = getFixtureId(fx);
+    const id = fxId(fx);
     const key = String(id || getHomeName(fx) + getAwayName(fx));
     let hash = 0;
     for (let i = 0; i < key.length; i++) hash = (hash + key.charCodeAt(i) * (i + 7)) % 1000;
@@ -1656,7 +1656,6 @@ if (!isLoggedIn) {
   const oddsPack = oddsByFixture[id];
   const oddsLoading = !!oddsLoadingByFixture[id];
 
-
   return (
     <FixtureCardCompact
       key={id}
@@ -1665,13 +1664,14 @@ if (!isLoggedIn) {
       oddsPack={oddsPack}
       oddsLoading={oddsLoading}
       onToggle={() => {
+        toggleFixtureSelection(id);
         setParlayResult(null);
         setParlayError("");
       }}
       onLoadOdds={() => ensureOdds(id)}
     />
   );
-})}  
+})}
 
             </div>
           )}
