@@ -66,6 +66,27 @@ const BG_BIENVENIDO = asset("hero-bienvenido.png");
 
 /** Timezone oficial (igual que Fixtures) */
 const APP_TZ = "America/Santiago";
+function toYYYYMMDD(d) {
+  const dt = d instanceof Date ? d : new Date(d);
+  const yyyy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+// si quieres el "hoy" consistente con Chile:
+function todayYYYYMMDDinTZ(tz = "America/Santiago") {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const y = parts.find(p => p.type === "year")?.value;
+  const m = parts.find(p => p.type === "month")?.value;
+  const d = parts.find(p => p.type === "day")?.value;
+  return `${y}-${m}-${d}`;
+}
 
 /* --------------------- helpers base --------------------- */
 function addDaysYYYYMMDD(ymd, days) {
@@ -167,7 +188,7 @@ function leaguePriority(leagueName) {
   const n = normStr(leagueName);
 
   // Ej: si quieres mandar “CAF/AFC/CONCACAF” al final:
-  if (n.includes("caf") || n.includes("afc") || n.includes("concacaf")) return 80;
+  if (n.includes("caf") || n.includes("afc") || n.includes("concacaf")) return 50;
 
   // UEFA
   if (n.includes("uefa champions") || n.includes("champions league")) return 0;
