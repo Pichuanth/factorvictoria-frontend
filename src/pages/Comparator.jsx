@@ -178,7 +178,8 @@ function leaguePriority(leagueName) {
     (n.includes("serie a") && n.includes("brazil"))
   )
     return 12;
-  if (n.includes("primera") && n.includes("chile")) return 13;
+  if (n.includes("primera mercado libre") && n.includes("chile")) return 13;
+  if (n.includes("super copa") && n.includes("chile")) return 13;
   if (n.includes("mls")) return 14;
 
   return 50;
@@ -433,12 +434,12 @@ function HudCard({
 const PARTIDAZOS_MANUAL = [
   { date: "2026-01-20", league: "UEFA Champions League", home: "Inter", away: "Arsenal" },
   { date: "2026-01-20", league: "UEFA Champions League", home: "Tottenham", away: "Borussia Dortmund" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "Psg" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "madrid" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "club brugge" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "kairat" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "Ajax" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "Glimt" },
+  { date: "2026-01-25", league: "super copa", home: "catolica" },
+  { date: "2026-01-25", league: "super copa", home: "coquimbo" },
+  { date: "2026-01-25", league: "La liga", home: "fc barcelona" },
+  { date: "2026-01-20", league: "La liga", home: "at madrid" },
+  { date: "2026-01-20", league: "premier League", home: "manchester" },
+  { date: "2026-01-20", league: "premier league", home: "arsenal" },
   { date: "2026-01-20", league: "UEFA Champions League", home: "Bayer 04 Leverkusen" },
   { date: "2026-01-20", league: "UEFA Champions League", home: "Olympiacos" },
   { date: "2026-01-20", league: "UEFA Champions League", home: "Napoli" },
