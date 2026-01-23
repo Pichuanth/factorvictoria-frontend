@@ -223,6 +223,11 @@ function isAllowedCompetition(countryName, leagueName) {
     "youth","juvenil","reserves","reserve","b team"," ii",
     "development","professional development",
     "premier league 2","premier league 2 division",
+    "2. bundesliga",
+  "bundesliga 2",
+  "la liga 2",
+  "laliga2",
+  "championship",
 
     // women
     "women","femenil","femenino","femin","wsl",
@@ -253,8 +258,7 @@ function isAllowedCompetition(countryName, leagueName) {
   "uefa europa league",
   "uefa europa conference league",
 ];
-
-  if (intlAllowed.some((x) => l.includes(x))) return true;
+if (intlAllowed.some((x) => l.includes(x))) return true;
 
   // Whitelist (top)
   const allowedPairs = [
