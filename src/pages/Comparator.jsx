@@ -189,6 +189,7 @@ function leaguePriority(leagueName) {
   if (n.includes("uefa champions") || n.includes("champions league")) return 0;
   if (n.includes("uefa europa") || n.includes("europa league")) return 1;
   if (n.includes("uefa conference") || n.includes("conference league")) return 2;
+  if (l.includes("caf") || l.includes("afc") || l.includes("concacaf")) return false;
 
   // Big-5
   if (n.includes("premier league")) return 3;
@@ -248,13 +249,11 @@ function isAllowedCompetition(countryName, leagueName) {
 
   // Internacionales permitidas aunque country sea "World"
   const intlAllowed = [
-    "uefa champions league",
-    "uefa europa league",
-    "uefa europa conference league",
-    "champions league",
-    "europa league",
-    "conference league",
-  ];
+  "uefa champions league",
+  "uefa europa league",
+  "uefa europa conference league",
+];
+
   if (intlAllowed.some((x) => l.includes(x))) return true;
 
   // Whitelist (top)
@@ -1007,38 +1006,42 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, oddsPack, od
       </div>
 
       {open ? (
-        <div className="px-3 md:px-4 pb-3 md:pb-4">
-          <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3 text-[11px] text-slate-200">
-            <div className="flex items-center justify-between">
-              <div className="text-slate-300">Odds (MVP)</div>
-              {oddsLoading ? <div className="text-slate-400">Cargando…</div> : null}
-            </div>
+  <div className="px-3 md:px-4 pb-3 md:pb-4">
+    <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3 text-[11px] text-slate-300">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <div>
+          <div className="text-slate-400">Estado</div>
+          <div className="text-slate-100 font-semibold">{fx?.fixture?.status?.long || "—"}</div>
+        </div>
 
-            {!oddsPack ? (
-              <div className="mt-2 text-slate-400">Presiona “Añadir a combinada” para cargar odds.</div>
-            ) : !oddsPack.found ? (
-              <div className="mt-2 text-amber-300">
-                No hay odds disponibles para este partido.
-                {oddsPack.note ? <div className="mt-1 text-slate-400">{String(oddsPack.note)}</div> : null}
-              </div>
-            ) : (
-              <div className="mt-2 space-y-2">
-                <MarketRow title="1X2" values={oddsPack?.markets?.["1X2"]} />
-                <MarketRow title="Doble oportunidad" values={oddsPack?.markets?.["1X"]} />
-                <MarketRow
-                  title="Goles O/U"
-                  values={pickLines(oddsPack?.markets?.["OU"], ["Over 1.5", "Under 3.5", "Over 2.5", "Under 2.5"])}
-                />
-                <MarketRow title="BTTS" values={oddsPack?.markets?.["BTTS"]} />
-              </div>
-            )}
+        <div>
+          <div className="text-slate-400">Árbitro</div>
+          <div className="text-slate-100 font-semibold">{fx?.fixture?.referee || "—"}</div>
+        </div>
 
-            <div className="mt-3 text-slate-500">
-              fixtureId: <span className="text-slate-200 font-semibold">{String(id)}</span>
-            </div>
+        <div>
+          <div className="text-slate-400">Estadio</div>
+          <div className="text-slate-100 font-semibold">
+            {fx?.fixture?.venue?.name ? `${fx.fixture.venue.name}${fx.fixture.venue.city ? ` · ${fx.fixture.venue.city}` : ""}` : "—"}
           </div>
         </div>
-      ) : null}
+
+        <div>
+          <div className="text-slate-400">Marcador</div>
+          <div className="text-slate-100 font-semibold">
+            {typeof fx?.goals?.home === "number" && typeof fx?.goals?.away === "number"
+              ? `${fx.goals.home} - ${fx.goals.away}`
+              : "—"}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 text-slate-400">
+        fixtureId: <span className="text-slate-200 font-semibold">{String(id)}</span>
+      </div>
+    </div>
+  </div>
+) : null}
     </div>
   );
 }
