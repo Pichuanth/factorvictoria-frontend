@@ -68,33 +68,60 @@ const BG_BIENVENIDO = asset("hero-bienvenido.png");
 const APP_TZ = "America/Santiago";
 
 /* --------------------- helpers base --------------------- */
-function normStr(s) {
-  return String(s || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim();
+function addDaysYYYYMMDD(ymd, days) {
+  const [y, m, d] = String(ymd).split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + Number(days || 0)));
+  const yyyy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getUTCDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
-function includesNorm(haystack, needle) {
-  return normStr(haystack).includes(normStr(needle));
-}
+module.exports = async (req, res) => {
+  // ...
+  const from = req.query.from;
+  const to = req.query.to;
 
-function toYYYYMMDD(d) {
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-function addDaysYYYYMMDD(baseYYYYMMDD, days) {
-  const d = new Date(`${baseYYYYMMDD}T00:00:00`);
-  d.setDate(d.getDate() + Number(days || 0));
-  return toYYYYMMDD(d);
-}
+  // Validación simple (sin Date Z)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+    return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD" });
+  }
 
-function stripDiacritics(s) {
-  return String(s || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
+  // Calcula días por UTC estable (sin timezone drift)
+  const start = new Date(from + "T00:00:00");
+  const end = new Date(to + "T00:00:00");
+  const dayMs = 86400000;
+  const days = Math.floor((end - start) / dayMs) + 1;
+
+  if (days > 14) return res.status(400).json({ error: "Range too large. Use max 14 days per request." });
+
+  const all = [];
+  for (let i = 0; i < days; i++) {
+    const dateStr = addDaysYYYYMMDD(from, i);
+
+    const url = new URL(`https://${host}/fixtures`);
+url.searchParams.set("date", dateStr);
+url.searchParams.set("timezone", "America/Santiago"); // ✅ clave para no correrte un día
+if (country) url.searchParams.set("country", String(country));
+
+    const r = await fetch(url.toString(), {
+      headers: {
+        "x-apisports-key": key,
+        "x-rapidapi-host": host,
+      },
+    });
+
+    const data = await r.json().catch(() => null);
+    if (!r.ok) {
+      return res.status(200).json({ items: [], note: `API-SPORTS error ${r.status} on date=${dateStr}`, raw: data });
+    }
+
+    const response = Array.isArray(data?.response) ? data.response : [];
+    all.push(...response);
+  }
+
+  // ...
+};
 
 /* ------------------- Helpers de fecha/hora (APP_TZ) ------------------- */
 function fixtureDateKey(f) {
@@ -200,7 +227,11 @@ function leaguePriority(leagueName) {
 
   // América
   if (n.includes("liga mx")) return 10;
-  if (n.includes("primera division") || n.includes("liga profesional")) return 11; // Argentina
+  if (n.includes("primera división argentina") || n.includes("liga profesional")) return 11; // Argentina
+   if (n.includes("Liga de primera") || n.includes("liga de primera mercado libre")) return 11; // Chile
+   if (n.includes("copa chile") || n.includes("copa chile")) return 11; // Chile
+   if (n.includes("super copa") || n.includes("super copa")) return 11; // Chile
+   if (n.includes("Liga BetPlay Dimayor") || n.includes("Liga BetPlay Dimayor")) return 11; // Colombia
   if (
     n.includes("campeonato brasileiro") ||
     n.includes("brasileirao") ||
@@ -1012,37 +1043,41 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, oddsPack, od
       {open ? (
   <div className="px-3 md:px-4 pb-3 md:pb-4">
     <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3 text-[11px] text-slate-300">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-        <div>
-          <div className="text-slate-400">Estado</div>
-          <div className="text-slate-100 font-semibold">{fx?.fixture?.status?.long || "—"}</div>
-        </div>
-
-        <div>
-          <div className="text-slate-400">Árbitro</div>
-          <div className="text-slate-100 font-semibold">{fx?.fixture?.referee || "—"}</div>
-        </div>
-
-        <div>
-          <div className="text-slate-400">Estadio</div>
-          <div className="text-slate-100 font-semibold">
-            {fx?.fixture?.venue?.name ? `${fx.fixture.venue.name}${fx.fixture.venue.city ? ` · ${fx.fixture.venue.city}` : ""}` : "—"}
-          </div>
-        </div>
-
-        <div>
-          <div className="text-slate-400">Marcador</div>
-          <div className="text-slate-100 font-semibold">
-            {typeof fx?.goals?.home === "number" && typeof fx?.goals?.away === "number"
-              ? `${fx.goals.home} - ${fx.goals.away}`
-              : "—"}
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-3 text-slate-400">
+      <div className="text-slate-200 font-semibold">Datos del partido</div>
+      <div className="mt-1 text-slate-400">
         fixtureId: <span className="text-slate-200 font-semibold">{String(id)}</span>
       </div>
+
+      <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+        <div>
+          <span className="text-slate-400">Fecha:</span>{" "}
+          <span className="text-slate-200">{fixtureDateKey(fx)} {fixtureTimeLabel(fx)}</span>
+        </div>
+        <div>
+          <span className="text-slate-400">Estadio:</span>{" "}
+          <span className="text-slate-200">{fx?.fixture?.venue?.name || "—"}</span>
+        </div>
+        <div>
+          <span className="text-slate-400">Ciudad:</span>{" "}
+          <span className="text-slate-200">{fx?.fixture?.venue?.city || "—"}</span>
+        </div>
+        <div>
+          <span className="text-slate-400">Árbitro:</span>{" "}
+          <span className="text-slate-200">{fx?.fixture?.referee || "—"}</span>
+        </div>
+      </div>
+
+      {/* Odds MVP si existen */}
+      {oddsByFixture?.[id]?.found ? (
+        <div className="mt-3">
+          <div className="text-slate-200 font-semibold">Odds (MVP)</div>
+          <pre className="mt-1 overflow-auto text-[10px] text-slate-200 bg-slate-950/40 border border-white/10 rounded-lg p-2">
+            {JSON.stringify(oddsByFixture[id].markets || {}, null, 2)}
+          </pre>
+        </div>
+      ) : (
+        <div className="mt-3 text-slate-400">Odds: no cargadas / no disponibles.</div>
+      )}
     </div>
   </div>
 ) : null}
@@ -1281,6 +1316,8 @@ const ensureOdds = useCallback(async (fixtureId) => {
 
   // carga inicial (solo al montar)
 loadWeekly();
+const fromW = todayYYYYMMDDinTZ(APP_TZ);
+const toW = addDaysYYYYMMDD(fromW, 7);
 
 // solo carga árbitros...
 if (features.referees) loadReferees();
@@ -1288,6 +1325,43 @@ if (features.referees) loadReferees();
 return () => { alive = false; };
 // ...
 }, [API_BASE, features.referees]);
+function oddForFixture(fx) {
+  const id = getFixtureId(fx);
+  const pack = oddsByFixture?.[id];
+
+  // Si hay odds MVP reales, úsales primero
+  if (pack?.found && pack?.markets) {
+    const m = pack.markets;
+
+    // Prioridad: 1X2 -> DC -> OU_25 -> BTTS
+    const o1x2 = m["1X2"];
+    if (o1x2) {
+      const candidates = [o1x2.home, o1x2.draw, o1x2.away].filter((x) => Number(x) > 1.01);
+      if (candidates.length) return Math.min(...candidates); // conservador
+    }
+
+    const dc = m.DC;
+    if (dc) {
+      const candidates = [dc.home_draw, dc.home_away, dc.draw_away].filter((x) => Number(x) > 1.01);
+      if (candidates.length) return Math.min(...candidates);
+    }
+
+    const ou = m.OU_25;
+    if (ou) {
+      const candidates = [ou.under, ou.over].filter((x) => Number(x) > 1.01);
+      if (candidates.length) return Math.min(...candidates);
+    }
+
+    const btts = m.BTTS;
+    if (btts) {
+      const candidates = [btts.no, btts.yes].filter((x) => Number(x) > 1.01);
+      if (candidates.length) return Math.min(...candidates);
+    }
+  }
+
+  // Fallback: “simulada” para que el botón de combinada siempre funcione
+  return fakeOddForFixture(fx);
+}
 
   function fakeOddForFixture(fx) {
     const id = fxId(fx);
@@ -1435,6 +1509,24 @@ function bestSafePickFromOdds(fx, oddsPack) {
     setParlayError("No pudimos armar combinada con estos seleccionados (odds/mercados insuficientes). Agrega más partidos.");
     return;
   }
+
+  setParlayResult({ mode: "selected", ...suggestion });
+}
+async function handleSelectedParlay() {
+  setParlayError("");
+  setParlayResult(null);
+
+  if (!fixtures.length) return setParlayError("Genera primero partidos con el botón de arriba.");
+  if (selectedCount < 2) return setParlayError("Selecciona al menos 2 partidos de la lista superior.");
+
+  const pool = fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)));
+
+  // ✅ Esperar odds
+  const ids = pool.map(getFixtureId).filter(Boolean);
+  await Promise.all(ids.map((id) => ensureOdds(id)));
+
+  const suggestion = buildComboSuggestion(pool, maxBoost);
+  if (!suggestion) return setParlayError("No pudimos armar combinada con estos seleccionados. Agrega más partidos.");
 
   setParlayResult({ mode: "selected", ...suggestion });
 }
