@@ -69,17 +69,17 @@ function stripDiacritics(s) {
 }
 
 /* ------------------- Helpers de fecha/hora (APP_TZ) ------------------- */
-function fixtureDateKey(f) {
+function fixtureDateLabel(f) {
   const when = f?.fixture?.date || f?.date || "";
   if (!when) return "";
   const d = new Date(when);
   if (Number.isNaN(d.getTime())) return "";
-  return new Intl.DateTimeFormat("en-CA", {
+  return new Intl.DateTimeFormat("es-CL", {
     timeZone: APP_TZ,
-    year: "numeric",
-    month: "2-digit",
     day: "2-digit",
-  }).format(d);
+    month: "2-digit",
+    year: "numeric",
+  }).format(d); // ej: 23-01-2026 (dependiendo del navegador puede ser 23-01-2026 o 23/01/2026)
 }
 
 function fixtureTimeLabel(f) {
@@ -903,7 +903,9 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds }) {
   const flagEmoji = COUNTRY_FLAG[countryName] || (countryName === "World" ? "🌍" : "🏳️");
   const home = getHomeName(fx);
   const away = getAwayName(fx);
+  const date = fixtureDateLabel(fx) || fixtureDateKey(fx);
   const time = fixtureTimeLabel(fx) || getKickoffTime(fx);
+  const whenLabel = date ? `${date} · ${time || "--:--"}` : (time || "--:--");
 
   const homeLogo = getHomeLogo(fx);
   const awayLogo = getAwayLogo(fx);
@@ -945,7 +947,7 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds }) {
             <span className="text-slate-500">·</span>
             <span className="truncate">{league}</span>
             <span className="text-slate-500">·</span>
-            <span className="font-semibold text-slate-200">{time || "--:--"}</span>
+            <span className="font-semibold text-slate-200">{whenLabel}</span>
           </div>
         </div>
 
@@ -1404,13 +1406,26 @@ if (!isLoggedIn) {
         <div className="p-4 md:p-6">
           <form onSubmit={handleGenerate} className="flex flex-col md:flex-row md:items-end gap-3 items-stretch">
             <div className="flex-1">
-              <label className="block text-xs text-slate-400 mb-1">Desde</label>
-              <input
-                type="date"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-                className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
-              />
+              <label htmlFor="qFilter" className="block text-xs text-slate-400 mb-1">
+  Filtro (país / liga / equipo)
+</label>
+<input
+  id="qFilter"
+  name="qFilter"
+  placeholder="Ej: Chile, La Liga, Colo Colo, Premier League..."
+  value={q}
+  onChange={(e) => setQ(e.target.value)}
+  className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
+/>
+
+<input
+  id="fromDate"
+  name="fromDate"
+  type="date"
+  value={from}
+  onChange={(e) => setFrom(e.target.value)}
+  className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
+/>
             </div>
 
             <div className="flex-1">
