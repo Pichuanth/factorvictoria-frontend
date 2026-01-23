@@ -77,52 +77,6 @@ function addDaysYYYYMMDD(ymd, days) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-module.exports = async (req, res) => {
-  // ...
-  const from = req.query.from;
-  const to = req.query.to;
-
-  // Validación simple (sin Date Z)
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
-    return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD" });
-  }
-
-  // Calcula días por UTC estable (sin timezone drift)
-  const start = new Date(from + "T00:00:00");
-  const end = new Date(to + "T00:00:00");
-  const dayMs = 86400000;
-  const days = Math.floor((end - start) / dayMs) + 1;
-
-  if (days > 14) return res.status(400).json({ error: "Range too large. Use max 14 days per request." });
-
-  const all = [];
-  for (let i = 0; i < days; i++) {
-    const dateStr = addDaysYYYYMMDD(from, i);
-
-    const url = new URL(`https://${host}/fixtures`);
-url.searchParams.set("date", dateStr);
-url.searchParams.set("timezone", "America/Santiago"); // ✅ clave para no correrte un día
-if (country) url.searchParams.set("country", String(country));
-
-    const r = await fetch(url.toString(), {
-      headers: {
-        "x-apisports-key": key,
-        "x-rapidapi-host": host,
-      },
-    });
-
-    const data = await r.json().catch(() => null);
-    if (!r.ok) {
-      return res.status(200).json({ items: [], note: `API-SPORTS error ${r.status} on date=${dateStr}`, raw: data });
-    }
-
-    const response = Array.isArray(data?.response) ? data.response : [];
-    all.push(...response);
-  }
-
-  // ...
-};
-
 /* ------------------- Helpers de fecha/hora (APP_TZ) ------------------- */
 function fixtureDateKey(f) {
   const when = f?.fixture?.date || f?.date || "";
@@ -212,11 +166,13 @@ function countryPriority(countryName) {
 function leaguePriority(leagueName) {
   const n = normStr(leagueName);
 
+  // Ej: si quieres mandar “CAF/AFC/CONCACAF” al final:
+  if (n.includes("caf") || n.includes("afc") || n.includes("concacaf")) return 80;
+
   // UEFA
   if (n.includes("uefa champions") || n.includes("champions league")) return 0;
   if (n.includes("uefa europa") || n.includes("europa league")) return 1;
   if (n.includes("uefa conference") || n.includes("conference league")) return 2;
-  if (l.includes("caf") || l.includes("afc") || l.includes("concacaf")) return false;
 
   // Big-5
   if (n.includes("premier league")) return 3;
@@ -225,7 +181,7 @@ function leaguePriority(leagueName) {
   if (n.includes("bundesliga") && !n.includes("2.")) return 6;
   if (n.includes("ligue 1")) return 7;
 
-  // América
+ // América
   if (n.includes("liga mx")) return 10;
   if (n.includes("primera división argentina") || n.includes("liga profesional")) return 11; // Argentina
    if (n.includes("Liga de primera") || n.includes("liga de primera mercado libre")) return 11; // Chile
@@ -1374,7 +1330,7 @@ function oddForFixture(fx) {
 function bestSafePickFromOdds(fx, oddsPack) {
   if (!oddsPack?.found) return null;
 
-  const markets = oddsPack.markets || {};
+  const m = oddsPack.markets || {};
   const candidates = [];
 
   const toNum = (x) => {
@@ -1397,24 +1353,38 @@ function bestSafePickFromOdds(fx, oddsPack) {
     });
   };
 
-  const dc = markets["1X"] || {};
-  if (dc["1X"]) push("DC", "1X", dc["1X"]);
-  if (dc["X2"]) push("DC", "X2", dc["X2"]);
+  // DC
+  const dc = m.DC;
+  if (dc) {
+    push("DC", "Home/Draw", dc.home_draw);
+    push("DC", "Home/Away", dc.home_away);
+    push("DC", "Draw/Away", dc.draw_away);
+  }
 
-  const ou = markets["OU"] || {};
-  if (ou["Over 1.5"]) push("OU", "Over 1.5", ou["Over 1.5"]);
-  if (ou["Under 3.5"]) push("OU", "Under 3.5", ou["Under 3.5"]);
-  if (ou["Under 4.5"]) push("OU", "Under 4.5", ou["Under 4.5"]);
+  // OU 2.5
+  const ou = m.OU_25;
+  if (ou) {
+    push("OU_25", "Under 2.5", ou.under);
+    push("OU_25", "Over 2.5", ou.over);
+  }
 
-  const btts = markets["BTTS"] || {};
-  if (btts["No"]) push("BTTS", "No", btts["No"]);
+  // BTTS
+  const btts = m.BTTS;
+  if (btts) {
+    push("BTTS", "No", btts.no);
+    push("BTTS", "Yes", btts.yes);
+  }
 
-  const mw = markets["1X2"] || {};
-  if (mw["Home"]) push("1X2", "Home", mw["Home"]);
-  if (mw["Away"]) push("1X2", "Away", mw["Away"]);
+  // 1X2 (conservador: normalmente Home/Draw/Away es más riesgoso, pero lo dejamos)
+  const one = m["1X2"];
+  if (one) {
+    push("1X2", "Home", one.home);
+    push("1X2", "Draw", one.draw);
+    push("1X2", "Away", one.away);
+  }
 
   if (!candidates.length) return null;
-  candidates.sort((a, b) => b.impliedProb - a.impliedProb); // más seguro primero
+  candidates.sort((a, b) => b.impliedProb - a.impliedProb);
   return candidates[0];
 }
 
@@ -1457,30 +1427,7 @@ function bestSafePickFromOdds(fx, oddsPack) {
   };
 }
 
-  async function handleAutoParlay() {
-  setParlayError("");
-  setParlayResult(null);
-
-  if (!fixtures.length) {
-    setParlayError("Genera primero partidos con el botón de arriba.");
-    return;
-  }
-
-  // precarga odds (mejor secuencial para no saturar)
-  const ids = fixtures.slice(0, 18).map(getFixtureId).filter(Boolean);
-  for (const id of ids) {
-    // eslint-disable-next-line no-await-in-loop
-    await ensureOdds(id);
-  }
-
-  const suggestion = buildRealParlay(fixtures, oddsRef.current, maxBoost);
-  if (!suggestion) {
-    setParlayError("No pudimos armar combinada con odds reales (faltan mercados disponibles). Prueba con más partidos.");
-    return;
-  }
-
-  setParlayResult({ mode: "auto", ...suggestion });
-}
+const suggestion = buildRealParlay(pool, oddsRef.current, maxBoost);
 
   async function handleSelectedParlay() {
   setParlayError("");
