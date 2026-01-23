@@ -461,9 +461,9 @@ function HudCard({
 
 /* ------------------- Partidazos manuales ------------------- */
 const PARTIDAZOS_MANUAL = [
-  { date: "2026-01-22", league: "Europa League", home: "Interfc porto", away: "viktoria plzen" },
-  { date: "2026-01-22", league: "Uuropa League", home: "Aston villa" },
-  { date: "2026-01-23", league: "serie A", home: "inter de mialan", away: "pisa" },
+  { date: "2026-01-23", league: "supercopa de chile", home: "CDUC catolica", away: "coquimbo" },
+  { date: "2026-01-23", league: "La liga", home: "barcelona" },
+  { date: "2026-01-23", league: "serie A", home: "atalanta", away: "parma" },
   { date: "2026-01-20", league: "UEFA Champions League", home: "cl" },
   { date: "2026-01-20", league: "UEFA Champions League", home: "kairat" },
   { date: "2026-01-20", league: "UEFA Champions League", home: "Ajax" },
