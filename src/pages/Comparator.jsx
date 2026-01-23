@@ -150,6 +150,7 @@ function countryPriority(countryName) {
   if (c.includes("mexico") || c.includes("méxico")) return 8;
   if (c.includes("usa")) return 9;
   if (c.includes("brazil") || c.includes("brasil")) return 10;
+  if (c.includes("colombia") || c.includes("colombia")) return 10;
 
   return 50;
 }
@@ -178,8 +179,8 @@ function leaguePriority(leagueName) {
     (n.includes("serie a") && n.includes("brazil"))
   )
     return 12;
-  if (n.includes("primera mercado libre") && n.includes("chile")) return 13;
-  if (n.includes("super copa") && n.includes("chile")) return 13;
+  if (n.includes("liga de primera mercado libre") && n.includes("chile")) return 13;
+  if (n.includes("super copa") && n.includes("chile")) return 11;
   if (n.includes("mls")) return 14;
 
   return 50;
@@ -227,6 +228,7 @@ function isAllowedCompetition(countryName, leagueName) {
     "champions league",
     "europa league",
     "conference league",
+    "super copa",
   ];
   if (intlAllowed.some((x) => l.includes(x))) return true;
 
@@ -249,7 +251,7 @@ function isAllowedCompetition(countryName, leagueName) {
     { country: "usa", league: "mls" },
     { country: "brazil", league: "serie a" },
     { country: "argentina", league: "primera" },
-    { country: "chile", league: "primera" },
+    { country: "chile", league: "liga de primera mercado libre" },
   ];
 
   return allowedPairs.some((p) => c.includes(p.country) && l.includes(normStr(p.league)));
@@ -1613,8 +1615,8 @@ if (!isLoggedIn) {
       {/* 5) Manual Picks */}
       <ManualPicksSection />
 
-      {/* 6) Simulador */}
-<Simulator bg={BG_DINERO} />
+      {/* 6) Simulador 
+<Simulator bg={BG_DINERO} />*/}
 
 {/* 7) Calculadora */}
 <PriceCalculatorCard bg={BG_DINERO} />
