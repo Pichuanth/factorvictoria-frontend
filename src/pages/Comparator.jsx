@@ -534,7 +534,11 @@ function PartidazoLine({ f }) {
   const league = getLeagueName(f);
   const country = getCountryName(f);
 
+  // ✅ fecha (YYYY-MM-DD) + hora (HH:mm) en APP_TZ
+  const date = fixtureDateKey(f); // ya considera America/Santiago
   const time = fixtureTimeLabel(f) || getKickoffTime(f) || "—";
+  const whenLabel = date ? `${date} · ${time}` : time;
+
   const hLogo = getHomeLogo(f);
   const aLogo = getAwayLogo(f);
 
@@ -569,8 +573,9 @@ function PartidazoLine({ f }) {
           </div>
         </div>
 
+        {/* ✅ Aquí ahora va fecha + hora */}
         <div className="shrink-0 text-xs px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-slate-200">
-          {time}
+          {whenLabel}
         </div>
       </div>
 
