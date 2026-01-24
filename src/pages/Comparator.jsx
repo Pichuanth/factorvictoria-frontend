@@ -69,17 +69,17 @@ function stripDiacritics(s) {
 }
 
 /* ------------------- Helpers de fecha/hora (APP_TZ) ------------------- */
-function fixtureDateLabel(f) {
+function fixtureDateKey(f) {
   const when = f?.fixture?.date || f?.date || "";
   if (!when) return "";
   const d = new Date(when);
   if (Number.isNaN(d.getTime())) return "";
-  return new Intl.DateTimeFormat("es-CL", {
+  return new Intl.DateTimeFormat("en-CA", {
     timeZone: APP_TZ,
-    day: "2-digit",
-    month: "2-digit",
     year: "numeric",
-  }).format(d); // ej: 23-01-2026 (dependiendo del navegador puede ser 23-01-2026 o 23/01/2026)
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d); // "2026-01-23"
 }
 
 function fixtureTimeLabel(f) {
