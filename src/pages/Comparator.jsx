@@ -82,16 +82,17 @@ function fixtureDateKey(f) {
   }).format(d); // "2026-01-23"
 }
 
-function fixtureTimeLabel(f) {
+function fixtureDateLabel(f) {
   const when = f?.fixture?.date || f?.date || "";
   if (!when) return "";
   const d = new Date(when);
   if (Number.isNaN(d.getTime())) return "";
   return new Intl.DateTimeFormat("es-CL", {
     timeZone: APP_TZ,
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(d); // ej: 23-01-2026 o 23/01/2026 según navegador
 }
 
 /* ------------------- País alias ------------------- */
