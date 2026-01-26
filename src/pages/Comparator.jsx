@@ -89,7 +89,8 @@ function fixtureDateLabel(f) {
   if (!when) return "";
   const d = new Date(when);
   if (Number.isNaN(d.getTime())) return "";
-  // dd-mm-aaaa (estilo Chile)
+
+  // Formato móvil-friendly: 26-01-2026
   return new Intl.DateTimeFormat("es-CL", {
     timeZone: APP_TZ,
     day: "2-digit",
@@ -550,8 +551,8 @@ function PartidazoLine({ f }) {
   const away = getAwayName(f);
   const league = getLeagueName(f);
   const country = getCountryName(f);
+  const flagEmoji = COUNTRY_FLAG[country] || (country === "World" ? "🌍" : "🏳️");
 
-  // ✅ FECHA + HORA (APP_TZ)
   const date = fixtureDateLabel(f) || fixtureDateKey(f);
   const time = fixtureTimeLabel(f) || getKickoffTime(f) || "—";
   const whenLabel = date ? `${date} · ${time}` : time;
@@ -561,43 +562,35 @@ function PartidazoLine({ f }) {
 
   return (
     <div className="rounded-2xl border border-white/10 bg-slate-950/25 px-4 py-3">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        {/* Línea equipos */}
         <div className="min-w-0">
-          <div className="text-[11px] text-slate-400 truncate">
-            {league} {country ? `· ${country}` : ""}
-          </div>
-
-          <div className="mt-1 flex items-center gap-2 min-w-0">
-            {hLogo ? (
-              <img src={hLogo} alt="" aria-hidden="true" className="h-6 w-6 rounded-sm object-contain" />
-            ) : (
-              <div className="h-6 w-6 rounded-sm bg-white/5 border border-white/10" />
-            )}
-
+          <div className="flex items-center gap-2 min-w-0">
+            {hLogo ? <img src={hLogo} alt="" className="h-6 w-6 rounded-sm object-contain" /> : <div className="h-6 w-6 rounded-sm bg-white/5 border border-white/10" />}
             <div className="text-sm font-semibold text-slate-100 truncate">{home}</div>
 
-            <div className="text-xs font-bold" style={{ color: "rgba(230,196,100,0.80)" }}>
-              vs
-            </div>
+            <div className="text-xs font-bold shrink-0" style={{ color: "rgba(230,196,100,0.80)" }}>vs</div>
 
             <div className="text-sm font-semibold text-slate-100 truncate">{away}</div>
-
-            {aLogo ? (
-              <img src={aLogo} alt="" aria-hidden="true" className="h-6 w-6 rounded-sm object-contain" />
-            ) : (
-              <div className="h-6 w-6 rounded-sm bg-white/5 border border-white/10" />
-            )}
+            {aLogo ? <img src={aLogo} alt="" className="h-6 w-6 rounded-sm object-contain" /> : <div className="h-6 w-6 rounded-sm bg-white/5 border border-white/10" />}
           </div>
         </div>
 
-        {/* ✅ FECHA + HORA */}
-        <div className="shrink-0 text-xs px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-slate-200">
+        {/* Fecha/hora: en móvil cae abajo, en desktop queda a la derecha */}
+        <div className="shrink-0 text-xs px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-slate-200 w-fit">
           {whenLabel}
         </div>
       </div>
 
-      <div className="mt-2 text-[11px] text-slate-400">
-        fixtureId: <span className="text-slate-200 font-semibold">{String(id)}</span>
+      {/* Línea meta (reemplaza fixtureId) */}
+      <div className="mt-2 text-[11px] text-slate-400 flex items-center gap-2">
+        <span className="text-base leading-none">{flagEmoji}</span>
+        <span className="text-slate-200 font-semibold">{country}</span>
+        <span className="text-slate-500">·</span>
+        <span className="truncate">{league}</span>
+
+        {/* Si quieres mantener el fixtureId, déjalo súper discreto: */}
+        {/* <span className="ml-auto text-slate-500">#{String(id)}</span> */}
       </div>
     </div>
   );
@@ -634,25 +627,12 @@ function RecoWeeklyCardComparator({ fixtures = [], loading = false, error = "" }
     return filtered.slice(0, 8);
   }, [fixtures]);
 
-  // ✅ Merge: manual primero (pin), luego auto sin duplicados
-  const merged = useMemo(() => {
-    const out = [];
-    const seen = new Set();
-    for (const f of manual) {
-      const id = String(getFixtureId(f));
-      if (!seen.has(id)) {
-        seen.add(id);
-        out.push(f);
-      }
-    }
-    for (const f of autoTop) {
-      const id = String(getFixtureId(f));
-      if (!seen.has(id)) {
-        seen.add(id);
-        out.push(f);
-      }
-    }
-    return out.slice(0, 10); // 10 máximo total
+  // ✅ manual primero: si existe, SOLO manual. Si no existe, auto.
+  const list = useMemo(() => {
+    if (manual.length > 0) return manual.slice(0, 10);
+
+    // fallback automático
+    return autoTop.slice(0, 10);
   }, [manual, autoTop]);
 
   return (
@@ -673,12 +653,12 @@ function RecoWeeklyCardComparator({ fixtures = [], loading = false, error = "" }
             <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-amber-300">
               {error}
             </div>
-          ) : merged.length === 0 ? (
+          ) : list.length === 0 ? (
             <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-slate-300">
               No encontramos partidos TOP en los próximos 7 días.
             </div>
           ) : (
-            merged.map((f) => <PartidazoLine key={String(getFixtureId(f))} f={f} />)
+            list.map((f) => <PartidazoLine key={String(getFixtureId(f))} f={f} />)
           )}
         </div>
 
@@ -824,7 +804,7 @@ function formatMoney(value, currency) {
 /* ------------------- Manual Picks ------------------- */
 function ManualPicksSection() {
   const singles = [
-    { label: "Barcelona doble oportunidad (1X2)", odd: 1.3, note: "Alta probabilidad" },
+    { label: "Arsenal gana (1X)", odd: 1.3, note: "Alta probabilidad" },
     { label: "Real Madrid (handicap+4)", odd: 1.1, note: "Conservador" },
   ];
 
