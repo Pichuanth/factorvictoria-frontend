@@ -552,7 +552,7 @@ function PartidazoLine({ f }) {
   const country = getCountryName(f);
 
   // ✅ FECHA + HORA (APP_TZ)
-  const date = fixtureDateLabel(f) || fixtureDateKey(f); // fallback si falla el formato
+  const date = fixtureDateLabel(f) || fixtureDateKey(f);
   const time = fixtureTimeLabel(f) || getKickoffTime(f) || "—";
   const whenLabel = date ? `${date} · ${time}` : time;
 
