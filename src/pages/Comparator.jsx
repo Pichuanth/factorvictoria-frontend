@@ -645,22 +645,22 @@ function RecoWeeklyCardComparator({ fixtures = [], loading = false, error = "" }
         </div>
 
         <div className="mt-4 space-y-2">
-          {loading ? (
-            <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-slate-300">
-              Cargando partidazos…
-            </div>
-          ) : error ? (
-            <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-amber-300">
-              {error}
-            </div>
-          ) : list.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-slate-300">
-              No encontramos partidos TOP en los próximos 7 días.
-            </div>
-          ) : (
-            list.map((f) => <PartidazoLine key={String(getFixtureId(f))} f={f} />)
-          )}
-        </div>
+  {loading ? (
+    <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-slate-300">
+      Cargando partidazos…
+    </div>
+  ) : error ? (
+    <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-amber-300">
+      {error}
+    </div>
+  ) : list.length === 0 ? (
+    <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-slate-300">
+      Aún no hay coincidencias (revisa texto/fecha/liga o usa fixtureId).
+    </div>
+  ) : (
+    list.map((f) => <PartidazoLine key={String(getFixtureId(f))} f={f} />)
+  )}
+</div>
 
         <div className="mt-3 text-[11px] text-slate-400">
           Partidos: <span className="font-semibold">Champions League</span>
