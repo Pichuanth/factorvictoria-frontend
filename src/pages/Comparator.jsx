@@ -1378,6 +1378,9 @@ export default function Comparator() {
       setLoading(false);
     }
   }
+setGeneratedOk(true);
+if (okTimerRef.current) clearTimeout(okTimerRef.current);
+okTimerRef.current = setTimeout(() => setGeneratedOk(false), 2500);
 
   /* =========================
       VISITANTE (NO LOGUEADO)
@@ -1452,15 +1455,20 @@ if (!isLoggedIn) {
 
             <div>
               <button
-                type="submit"
-                disabled={loading}
-                className="w-full rounded-2xl font-semibold px-4 py-2 mt-4 md:mt-0 disabled:opacity-60 disabled:cursor-not-allowed"
-                style={{ backgroundColor: GOLD, color: "#0f172a" }}
-              >
-                {loading ? "Generando..." : "Generar"}
-              </button>
+  type="submit"
+  disabled={loading}
+  className="w-full rounded-2xl font-semibold px-4 py-2 mt-4 md:mt-0 disabled:opacity-60 disabled:cursor-not-allowed transition"
+  style={{
+    backgroundColor: loading ? "rgba(230,196,100,0.65)" : (generatedOk ? "rgba(16,185,129,0.55)" : GOLD),
+    color: "#0f172a",
+  }}
+>
+  {loading ? "Generando..." : (generatedOk ? "Listo ✓" : "Generar")}
+</button>
             </div>
           </form>
+const [generatedOk, setGeneratedOk] = useState(false);
+const okTimerRef = useRef(null);
 
           <div className="mt-3 flex flex-wrap gap-2">
             {quickCountries.map((c) => {
