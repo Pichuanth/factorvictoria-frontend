@@ -1,9 +1,8 @@
 // src/pages/Fixtures.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import Simulator from "../components/Simulator";
-import React, { useMemo, useState, useEffect, useRef } from "react";
 import RecoWeeklyCard from "../components/RecoWeeklyCard";
 
 

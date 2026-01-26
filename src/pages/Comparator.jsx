@@ -5,6 +5,7 @@ import { useAuth } from "../lib/auth";
 import Simulator from "../components/Simulator";
 // import Pricing from "../components/Pricing";
 import PriceCalculatorCard from "../components/PriceCalculatorCard";
+import RecoWeeklyCard from "../components/RecoWeeklyCard";
 
 const GOLD = "#E6C464";
 
@@ -1035,6 +1036,14 @@ export default function Comparator() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
+  const [generatedOk, setGeneratedOk] = useState(false);
+const okTimerRef = useRef(null);
+
+useEffect(() => {
+  return () => {
+    if (okTimerRef.current) clearTimeout(okTimerRef.current);
+  };
+}, []);
 
   const [fixtures, setFixtures] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -1370,6 +1379,9 @@ export default function Comparator() {
 
       setFixtures(LIMITED);
       setInfo(`API: ${itemsRaw.length} | base: ${base.length} | TOP: ${filteredTop.length} | mostrando: ${LIMITED.length}`);
+      setGeneratedOk(true);
+if (okTimerRef.current) clearTimeout(okTimerRef.current);
+okTimerRef.current = setTimeout(() => setGeneratedOk(false), 2500);
 
       if (features.referees) await loadReferees();
     } catch (e2) {
@@ -1500,10 +1512,12 @@ const okTimerRef = useRef(null);
       </HudCard>
 
       {/* 2) Partidazos */}
-      <RecoWeeklyCardComparator
+      <RecoWeeklyCard
+  HudCard={HudCard}
   fixtures={weeklyFixtures}
   loading={weeklyLoading}
   error={weeklyErr}
+  picksFromFixtures={picksFromFixturesComparator}
 />
 
       {/* 3) LISTADO (verde sólido premium) */}
