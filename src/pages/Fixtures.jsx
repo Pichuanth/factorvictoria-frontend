@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import Simulator from "../components/Simulator";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 
 const GOLD = "#E6C464";
 
@@ -648,18 +649,59 @@ function LockedFixtureCard({ f, locked = true, isLoggedIn, goPlans }) {
   );
 }
 
-function RecoWeeklyCard({ fixtures = [] }) {
+function RecoWeeklyCard({ fixtures = [], loading = false, error = "" }) {
   const picks = useMemo(() => picksFromFixtures(fixtures), [fixtures]);
 
-  return (
+  // ✅ NUEVO: aviso de estado (listo / sin resultados)
+  const [notice, setNotice] = useState("");
+  const prevLoadingRef = useRef(false);
+
+  useEffect(() => {
+    const prev = prevLoadingRef.current;
+    prevLoadingRef.current = loading;
+
+    // Cuando termina de cargar (true -> false)
+    if (prev && !loading) {
+      if (error) {
+        setNotice("Ocurrió un error al cargar partidazos.");
+      } else if (picks.length > 0) {
+        setNotice(`Listo: ${picks.length} partidazo${picks.length === 1 ? "" : "s"} cargado${picks.length === 1 ? "" : "s"}.`);
+      } else {
+        setNotice("Listo: no encontramos partidazos para el rango.");
+      }
+
+      // se borra solo
+      const t = setTimeout(() => setNotice(""), 3200);
+      return () => clearTimeout(t);
+    }
+  }, [loading, error, picks.length]);
+
+  // ...tu return sigue abajo
+
+    return (
     <HudCard bg={BG_PARTIDAZOS} overlayVariant="casillasSharp" glow="gold">
       <div className="relative p-5 md:p-6">
         <div className="text-xs tracking-wide text-emerald-200/90 font-semibold">Factor Victoria recomienda</div>
         <div className="mt-1 text-lg md:text-xl font-bold text-slate-100">Partidazos de la semana</div>
         <div className="mt-1 text-xs text-slate-300">Selección curada manualmente.</div>
 
+        {/* ✅ NUEVO: aviso (Listo / Error / Sin resultados) */}
+        {notice ? (
+          <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-emerald-200">
+            {notice}
+          </div>
+        ) : null}
+
         <div className="mt-4 space-y-2">
-          {picks.length === 0 ? (
+          {loading ? (
+            <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-slate-300">
+              Cargando partidazos…
+            </div>
+          ) : error ? (
+            <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-amber-300">
+              {error}
+            </div>
+          ) : picks.length === 0 ? (
             <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-slate-300">
               Aún no hay coincidencias (revisa texto/fecha/liga o usa fixtureId).
             </div>
