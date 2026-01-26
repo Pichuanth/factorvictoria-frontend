@@ -69,6 +69,7 @@ function stripDiacritics(s) {
 }
 
 /* ------------------- Helpers de fecha/hora (APP_TZ) ------------------- */
+/* ------------------- Helpers de fecha/hora (APP_TZ) ------------------- */
 function fixtureDateKey(f) {
   const when = f?.fixture?.date || f?.date || "";
   if (!when) return "";
@@ -82,17 +83,32 @@ function fixtureDateKey(f) {
   }).format(d); // "2026-01-23"
 }
 
+// ✅ ESTA TE FALTA (la estás usando)
 function fixtureDateLabel(f) {
+  const when = f?.fixture?.date || f?.date || "";
+  if (!when) return "";
+  const d = new Date(when);
+  if (Number.isNaN(d.getTime())) return "";
+  // dd-mm-aaaa (estilo Chile)
+  return new Intl.DateTimeFormat("es-CL", {
+    timeZone: APP_TZ,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(d);
+}
+
+// ✅ Asegúrate que exista EXACTAMENTE con este nombre
+function fixtureTimeLabel(f) {
   const when = f?.fixture?.date || f?.date || "";
   if (!when) return "";
   const d = new Date(when);
   if (Number.isNaN(d.getTime())) return "";
   return new Intl.DateTimeFormat("es-CL", {
     timeZone: APP_TZ,
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(d); // ej: 23-01-2026 o 23/01/2026 según navegador
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(d);
 }
 
 /* ------------------- País alias ------------------- */
@@ -435,18 +451,18 @@ function HudCard({
 
 /* ------------------- Partidazos manuales ------------------- */
 const PARTIDAZOS_MANUAL = [
-  { date: "2026-01-20", league: "UEFA Champions League", home: "Inter", away: "Arsenal" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "Tottenham", away: "Borussia Dortmund" },
-  { date: "2026-01-25", league: "super copa", home: "cduc católica" },
-  { date: "2026-01-25", league: "super copa", home: "coquimbo unido" },
-  { date: "2026-01-25", league: "La liga", home: "fc barcelona" },
-  { date: "2026-01-25", league: "La liga", home: "at madrid" },
-  { date: "2026-01-25", league: "premier League", home: "manchester" },
-  { date: "2026-01-25", league: "premier league", home: "arsenal" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "Bayer 04 Leverkusen" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "Olympiacos" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "Napoli" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "Copenhague" },
+  { date: "2026-01-26", league: "UEFA Champions League", home: "Arsenal", away: "FC kairat" },
+  { date: "2026-01-26", league: "UEFA Champions League", home: "paris", away: "newcastle" },
+  { date: "2026-01-26", league: "UEFA Champions League", home: "bayer" },
+  { date: "2026-01-26", league: "UEFA Champions League", home: "napoli" },
+  { date: "2026-01-26", league: "UEFA Champions League", home: "fc barcelona" },
+  { date: "2026-01-26", league: "UEFA Champions League", home: "real madrid" },
+  { date: "2026-01-26", league: "premier League", home: "manchester" },
+  { date: "2026-01-26", league: "premier league", home: "liverpool" },
+  { date: "2026-01-26", league: "UEFA Champions League", home: "Bayer 04 Leverkusen" },
+  { date: "2026-01-26", league: "UEFA Champions League", home: "Olympiacos" },
+  { date: "2026-01-26", league: "UEFA Champions League", home: "inter" },
+  { date: "2026-01-26", league: "UEFA Champions League", home: "Copenhague" },
 
   // ✅ IDs estables
   { fixtureId: 1504664 }, // Bodo/Glimt vs Manchester City
