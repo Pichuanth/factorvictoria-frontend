@@ -456,14 +456,14 @@ const PARTIDAZOS_MANUAL = [
   { date: "2026-01-28", league: "UEFA Champions League", home: "paris", away: "newcastle" },
   { date: "2026-01-28", league: "UEFA Champions League", home: "atletico" },
   { date: "2026-01-28", league: "UEFA Champions League", home: "napoli" },
-  { date: "2026-01-28", league: "UEFA Champions League", home: "fc barcelona" },
-  { date: "2026-01-28", league: "UEFA Champions League", home: "real madrid" },
-  { date: "2026-01-28", league: "premier League", home: "manchester" },
-  { date: "2026-01-28", league: "premier league", home: "liverpool" },
-  { date: "2026-01-28", league: "UEFA Champions League", home: "Bayer 04 Leverkusen" },
-  { date: "2026-01-28", league: "UEFA Champions League", home: "Olympiacos" },
-  { date: "2026-01-28", league: "UEFA Champions League", home: "inter" },
-  { date: "2026-01-28", league: "UEFA Champions League", home: "Copenhague" },
+  { date: "2026-01-28", league: "UEFA Champions League", home: "barcelona", away: "København" },
+  { date: "2026-01-28", league: "UEFA Champions League", home: "Benfica", away: "madrid" },
+  { date: "2026-01-28", league: "UEFA Champions League", home: "Manchester city", away: "galatasaray" },
+  { date: "2026-01-28", league: "UEFA Champions League", home: "borusia", away: "inter" },
+  { date: "2026-01-28", league: "UEFA Champions League", home: "club brugge", away: "marseille" },
+  { date: "2026-01-28", league: "UEFA Champions League", home: "atalanta" },
+  { date: "2026-01-28", league: "UEFA Champions League", home: "Pafos" },
+  { date: "2026-01-28", league: "UEFA Champions League", home: "Juventus" },
 
   // ✅ IDs estables
   { fixtureId: 1504664 }, // Bodo/Glimt vs Manchester City
