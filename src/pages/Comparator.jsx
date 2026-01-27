@@ -1034,11 +1034,12 @@ export default function Comparator() {
   const [q, setQ] = useState("");
 
   const [loading, setLoading] = useState(false);
-  const [generatedOk, setGeneratedOk] = useState(false);
-const okTimerRef = useRef(null);
-
+  
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
+
+  const [generatedOk, setGeneratedOk] = useState(false);
+  const okTimerRef = useRef(null);
 
 useEffect(() => {
   return () => {
@@ -1420,68 +1421,60 @@ if (!isLoggedIn) {
       <HudCard bg={BG_PROFILE_HUD} overlayVariant="casillas" className="mt-4" glow="gold">
         <div className="p-4 md:p-6">
           <form onSubmit={handleGenerate} className="flex flex-col md:flex-row md:items-end gap-3 items-stretch">
-            <div className="flex-1">
-              <label htmlFor="qFilter" className="block text-xs text-slate-400 mb-1">
-  Filtro (país / liga / equipo)
-</label>
-<input
-  id="qFilter"
-  name="qFilter"
-  placeholder="Ej: Chile, La Liga, Colo Colo, Premier League..."
-  value={q}
-  onChange={(e) => setQ(e.target.value)}
-  className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
-/>
+  <div className="flex-1">
+    <label htmlFor="fromDate" className="block text-xs text-slate-400 mb-1">Desde</label>
+    <input
+      id="fromDate"
+      name="fromDate"
+      type="date"
+      value={from}
+      onChange={(e) => setFrom(e.target.value)}
+      className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
+    />
+  </div>
 
-<input
-  id="fromDate"
-  name="fromDate"
-  type="date"
-  value={from}
-  onChange={(e) => setFrom(e.target.value)}
-  className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
-/>
-            </div>
+  <div className="flex-1">
+    <label htmlFor="toDate" className="block text-xs text-slate-400 mb-1">Hasta</label>
+    <input
+      id="toDate"
+      name="toDate"
+      type="date"
+      value={to}
+      onChange={(e) => setTo(e.target.value)}
+      className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
+    />
+  </div>
 
-            <div className="flex-1">
-              <label className="block text-xs text-slate-400 mb-1">Hasta</label>
-              <input
-                type="date"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-                className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
-              />
-            </div>
+  <div className="flex-[2]">
+    <label htmlFor="qFilter" className="block text-xs text-slate-400 mb-1">Filtro (país / liga / equipo)</label>
+    <input
+      id="qFilter"
+      name="qFilter"
+      placeholder="Ej: Chile, La Liga, Colo Colo, Premier League..."
+      value={q}
+      onChange={(e) => setQ(e.target.value)}
+      className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
+    />
+  </div>
 
-            <div className="flex-[2]">
-              <label className="block text-xs text-slate-400 mb-1">Filtro (país / liga / equipo)</label>
-              <input
-                placeholder="Ej: Chile, La Liga, Colo Colo, Premier League..."
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
-              />
-            </div>
-
-            <div>
-              <button
-  type="submit"
-  disabled={loading}
-  className="w-full rounded-2xl font-semibold px-4 py-2 mt-4 md:mt-0 disabled:opacity-60 disabled:cursor-not-allowed transition"
-  style={{
-    backgroundColor: loading
-      ? "rgba(230,196,100,0.65)"
-      : generatedOk
-      ? "rgba(16,185,129,0.55)"
-      : GOLD,
-    color: "#0f172a",
-  }}
->
-  {loading ? "Generando..." : generatedOk ? "Listo ✓" : "Generar"}
-</button>
-
-            </div>
-          </form>
+  <div>
+    <button
+      type="submit"
+      disabled={loading}
+      className="w-full rounded-2xl font-semibold px-4 py-2 mt-4 md:mt-0 disabled:opacity-60 disabled:cursor-not-allowed transition"
+      style={{
+        backgroundColor: loading
+          ? "rgba(230,196,100,0.65)"
+          : generatedOk
+          ? "rgba(16,185,129,0.55)"
+          : GOLD,
+        color: "#0f172a",
+      }}
+    >
+      {loading ? "Generando..." : generatedOk ? "Listo ✓" : "Generar"}
+    </button>
+  </div>
+</form>
 
           <div className="mt-3 flex flex-wrap gap-2">
             {quickCountries.map((c) => {
@@ -1511,8 +1504,6 @@ if (!isLoggedIn) {
           {!err && info && <div className="mt-3 text-xs text-slate-300/80">{info}</div>}
         </div>
       </HudCard>
-const [generatedOk, setGeneratedOk] = useState(false);
-const okTimerRef = useRef(null);
 
       {/* 2) Partidazos */}
       <RecoWeeklyCard
