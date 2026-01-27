@@ -790,7 +790,7 @@ function ManualPicksSection() {
 
   const players = [
     { label: "Raphinha +1.5 remates", odd: 2.8, note: "Si es titular" },
-    { label: "Fermin Lopez tarjeta amarilla", odd: 2.88, note: "Tendencia" },
+    { label: "Raúl Asencio 0.5 faltas concedidas", odd: 1.45, note: "Tendencia" },
   ];
 
   function Card({ title, items }) {

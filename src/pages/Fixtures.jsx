@@ -3,8 +3,6 @@ import React, { useMemo, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import Simulator from "../components/Simulator";
-import RecoWeeklyCard from "../components/RecoWeeklyCard";
-
 
 const GOLD = "#E6C464";
 
@@ -17,9 +15,6 @@ const BG_JUGADOR = "/hero-profile-hud.png";
 const BG_12000 = "/hero-12000.png";
 const BG_PARTIDAZOS = "/hero-fondo-partidos.png";
 const BG_DINERO = (import.meta.env.BASE_URL || "/") + "hero.dinero.png";
-
-// donde renderizas el simulador:
-<Simulator bg={BG_DINERO} />
 
 /** Timezone “oficial” de la app */
 const APP_TZ = "America/Santiago";
@@ -883,59 +878,6 @@ export default function Fixtures() {
         setErr("Rango de fechas inválido.");
         return;
       }
-function PartidazoLine({ f }) {
-  const id = getFixtureId(f);
-  const home = getHomeName(f);
-  const away = getAwayName(f);
-  const league = getLeagueName(f);
-  const country = getCountryName(f);
-  const time = getKickoffTime(f);
-
-  const hLogo = getHomeLogo(f);
-  const aLogo = getAwayLogo(f);
-
-  return (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/25 px-4 py-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-[11px] text-slate-400 truncate">
-            {league} {country ? `· ${country}` : ""}
-          </div>
-
-          <div className="mt-1 flex items-center gap-2 min-w-0">
-            {hLogo ? (
-              <img src={hLogo} alt="" aria-hidden="true" className="h-6 w-6 rounded-sm object-contain" />
-            ) : (
-              <div className="h-6 w-6 rounded-sm bg-white/5 border border-white/10" />
-            )}
-
-            <div className="text-sm font-semibold text-slate-100 truncate">{home}</div>
-
-            <div className="text-xs font-bold" style={{ color: "rgba(230,196,100,0.80)" }}>
-              vs
-            </div>
-
-            <div className="text-sm font-semibold text-slate-100 truncate">{away}</div>
-
-            {aLogo ? (
-              <img src={aLogo} alt="" aria-hidden="true" className="h-6 w-6 rounded-sm object-contain" />
-            ) : (
-              <div className="h-6 w-6 rounded-sm bg-white/5 border border-white/10" />
-            )}
-          </div>
-        </div>
-
-        <div className="shrink-0 text-xs px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-slate-200">
-          {time || "—"}
-        </div>
-      </div>
-
-      <div className="mt-2 text-[11px] text-slate-400">
-        fixtureId: <span className="text-slate-200 font-semibold">{String(id)}</span>
-      </div>
-    </div>
-  );
-}
 
       // traer fechas de PARTIDAZOS aunque no estén en el rango
       const extra = manualPickDates().filter((d) => !dates.includes(d));
