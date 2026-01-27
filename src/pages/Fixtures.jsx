@@ -907,8 +907,9 @@ export default function Fixtures() {
 
       setFixtures([...map.values()]);
     } catch (e) {
-      setErr("No se pudieron cargar los partidos. Intenta nuevamente.");
-      setFixtures([]);
+     console.error("❌ Error cargando fixtures:", e);
+     setErr(String(e?.message || e || "No se pudieron cargar los partidos."));
+     setFixtures([]);
     } finally {
       setLoading(false);
     }
@@ -1139,7 +1140,7 @@ export default function Fixtures() {
 
       {/* 1) Partidazos de la semana */}
       <div className="mt-4">
-        <RecoWeeklyCard fixtures={fixturesSorted} />
+        <RecoWeeklyCard fixtures={fixturesSorted} loading={loading} error={err} />
       </div>
 
       {/* 2) Partidazos bloqueados (top 3) */}
