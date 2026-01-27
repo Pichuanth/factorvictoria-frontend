@@ -1033,11 +1033,10 @@ export default function Comparator() {
   const [to, setTo] = useState(toYYYYMMDD(today));
   const [q, setQ] = useState("");
 
-  const [loading, setLoading] = useState(false);
-  
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
 
+  const [loading, setLoading] = useState(false);
   const [generatedOk, setGeneratedOk] = useState(false);
   const okTimerRef = useRef(null);
 
@@ -1046,6 +1045,7 @@ useEffect(() => {
     if (okTimerRef.current) clearTimeout(okTimerRef.current);
   };
 }, []);
+
 
   const [fixtures, setFixtures] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -1380,12 +1380,14 @@ useEffect(() => {
       const LIMITED = sorted.slice(0, 140);
 
       setFixtures(LIMITED);
-      setInfo(`API: ${itemsRaw.length} | base: ${base.length} | TOP: ${filteredTop.length} | mostrando: ${LIMITED.length}`);
-      setGeneratedOk(true);
+     setInfo(`API: ${itemsRaw.length} | base: ${base.length} | TOP: ${filteredTop.length} | mostrando: ${LIMITED.length}`);
+
+     setGeneratedOk(true);
      if (okTimerRef.current) clearTimeout(okTimerRef.current);
      okTimerRef.current = setTimeout(() => setGeneratedOk(false), 2500);
 
-      if (features.referees) await loadReferees();
+     if (features.referees) await loadReferees();
+
     } catch (e2) {
       setErr(String(e2?.message || e2));
     } finally {
@@ -1421,6 +1423,20 @@ if (!isLoggedIn) {
       <HudCard bg={BG_PROFILE_HUD} overlayVariant="casillas" className="mt-4" glow="gold">
         <div className="p-4 md:p-6">
           <form onSubmit={handleGenerate} className="flex flex-col md:flex-row md:items-end gap-3 items-stretch">
+  <div className="flex-[2]">
+    <label htmlFor="qFilter" className="block text-xs text-slate-400 mb-1">
+      Filtro (país / liga / equipo)
+    </label>
+    <input
+      id="qFilter"
+      name="qFilter"
+      placeholder="Ej: Chile, La Liga, Colo Colo, Premier League..."
+      value={q}
+      onChange={(e) => setQ(e.target.value)}
+      className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
+    />
+  </div>
+
   <div className="flex-1">
     <label htmlFor="fromDate" className="block text-xs text-slate-400 mb-1">Desde</label>
     <input
@@ -1441,18 +1457,6 @@ if (!isLoggedIn) {
       type="date"
       value={to}
       onChange={(e) => setTo(e.target.value)}
-      className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
-    />
-  </div>
-
-  <div className="flex-[2]">
-    <label htmlFor="qFilter" className="block text-xs text-slate-400 mb-1">Filtro (país / liga / equipo)</label>
-    <input
-      id="qFilter"
-      name="qFilter"
-      placeholder="Ej: Chile, La Liga, Colo Colo, Premier League..."
-      value={q}
-      onChange={(e) => setQ(e.target.value)}
       className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
     />
   </div>
