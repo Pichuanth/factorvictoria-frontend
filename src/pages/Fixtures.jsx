@@ -858,8 +858,22 @@ export default function Fixtures() {
 
     const url = `${API_BASE}/api/fixtures?${params.toString()}`;
     const r = await fetch(url);
-    if (!r.ok) throw new Error(`Error ${r.status}`);
-    const data = await r.json();
+const raw = await r.text();
+
+let data;
+try {
+  data = raw ? JSON.parse(raw) : null;
+} catch {
+  data = raw;
+}
+
+if (!r.ok) {
+  const msg =
+    (data && (data.error || data.message)) ||
+    (typeof data === "string" ? data : "") ||
+    `Error ${r.status}`;
+  throw new Error(msg);
+}
 
     const list = data?.fixtures || data?.response || data?.data || data || [];
     return Array.isArray(list) ? list : [];
@@ -1141,6 +1155,7 @@ export default function Fixtures() {
       {/* 1) Partidazos de la semana */}
       <div className="mt-4">
         <RecoWeeklyCard fixtures={fixturesSorted} loading={loading} error={err} />
+
       </div>
 
       {/* 2) Partidazos bloqueados (top 3) */}
