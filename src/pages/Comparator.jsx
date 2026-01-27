@@ -1381,7 +1381,6 @@ useEffect(() => {
       setFixtures(LIMITED);
       setInfo(`API: ${itemsRaw.length} | base: ${base.length} | TOP: ${filteredTop.length} | mostrando: ${LIMITED.length}`);
       setGeneratedOk(true);
-     setGeneratedOk(true);
      if (okTimerRef.current) clearTimeout(okTimerRef.current);
      okTimerRef.current = setTimeout(() => setGeneratedOk(false), 2500);
 
@@ -1392,9 +1391,6 @@ useEffect(() => {
       setLoading(false);
     }
   }
-setGeneratedOk(true);
-if (okTimerRef.current) clearTimeout(okTimerRef.current);
-okTimerRef.current = setTimeout(() => setGeneratedOk(false), 2500);
 
   /* =========================
       VISITANTE (NO LOGUEADO)
@@ -1486,8 +1482,6 @@ if (!isLoggedIn) {
 
             </div>
           </form>
-const [generatedOk, setGeneratedOk] = useState(false);
-const okTimerRef = useRef(null);
 
           <div className="mt-3 flex flex-wrap gap-2">
             {quickCountries.map((c) => {
@@ -1517,6 +1511,8 @@ const okTimerRef = useRef(null);
           {!err && info && <div className="mt-3 text-xs text-slate-300/80">{info}</div>}
         </div>
       </HudCard>
+const [generatedOk, setGeneratedOk] = useState(false);
+const okTimerRef = useRef(null);
 
       {/* 2) Partidazos */}
       <RecoWeeklyCard
