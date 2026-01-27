@@ -3,7 +3,6 @@ import React, { useMemo, useState, useEffect, useCallback, useRef } from "react"
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import Simulator from "../components/Simulator";
-// import Pricing from "../components/Pricing";
 import PriceCalculatorCard from "../components/PriceCalculatorCard";
 import RecoWeeklyCard from "../components/RecoWeeklyCard";
 
@@ -31,11 +30,10 @@ const PLAN_LABELS = {
 const BG_VISITOR = asset("hero-fondo-partidos.png");
 const BG_END = asset("hero-12000.png");
 const BG_PROFILE_HUD = asset("hero-profile-hud.png");
-const BG_DINERO = asset("hero.dinero.png");
+const BG_DINERO = asset("hero.dinero.png"); // si tu archivo real es hero-dinero.png, cámbialo aquí
 const BG_MANUAL = asset("hero-dorado-estadio.png");
 const BG_GRAFICO_DORADO = asset("grafico-dorado.png");
 const BG_BIENVENIDO = asset("hero-bienvenido.png");
-
 
 /** Timezone oficial (igual que Fixtures) */
 const APP_TZ = "America/Santiago";
@@ -70,7 +68,6 @@ function stripDiacritics(s) {
 }
 
 /* ------------------- Helpers de fecha/hora (APP_TZ) ------------------- */
-/* ------------------- Helpers de fecha/hora (APP_TZ) ------------------- */
 function fixtureDateKey(f) {
   const when = f?.fixture?.date || f?.date || "";
   if (!when) return "";
@@ -81,17 +78,14 @@ function fixtureDateKey(f) {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(d); // "2026-01-23"
+  }).format(d);
 }
 
-// ✅ ESTA TE FALTA (la estás usando)
 function fixtureDateLabel(f) {
   const when = f?.fixture?.date || f?.date || "";
   if (!when) return "";
   const d = new Date(when);
   if (Number.isNaN(d.getTime())) return "";
-
-  // Formato móvil-friendly: 26-01-2026
   return new Intl.DateTimeFormat("es-CL", {
     timeZone: APP_TZ,
     day: "2-digit",
@@ -100,7 +94,6 @@ function fixtureDateLabel(f) {
   }).format(d);
 }
 
-// ✅ Asegúrate que exista EXACTAMENTE con este nombre
 function fixtureTimeLabel(f) {
   const when = f?.fixture?.date || f?.date || "";
   if (!when) return "";
@@ -169,7 +162,7 @@ function countryPriority(countryName) {
   if (c.includes("mexico") || c.includes("méxico")) return 8;
   if (c.includes("usa")) return 9;
   if (c.includes("brazil") || c.includes("brasil")) return 10;
-  if (c.includes("colombia") || c.includes("colombia")) return 10;
+  if (c.includes("colombia")) return 11;
 
   return 50;
 }
@@ -210,19 +203,12 @@ function isAllowedCompetition(countryName, leagueName) {
   const l = normStr(leagueName);
 
   const bannedPatterns = [
-    // youth / reservas
     "u23","u22","u21","u20","u19","u18","u17","u16",
     "youth","juvenil","reserves","reserve","b team"," ii",
     "development","professional development",
     "premier league 2","premier league 2 division",
-
-    // women
     "women","femenil","femenino","femin","wsl",
-
-    // friendlies
     "friendly","friendlies","amistoso",
-
-    // ligas menores típicas
     "non league",
     "national league - south",
     "national league - north",
@@ -231,15 +217,11 @@ function isAllowedCompetition(countryName, leagueName) {
     "liga 3",
     "tercera division",
     "tercera division rfef",
-
-    // estaduales BR
     "paulista","paulista a2","baiano","goiano","cearense","pernambucano",
     "matogrossense","maranhense","potiguar","acreano",
   ];
-
   if (bannedPatterns.some((p) => l.includes(p))) return false;
 
-  // Internacionales permitidas aunque country sea "World"
   const intlAllowed = [
     "uefa champions league",
     "uefa europa league",
@@ -251,21 +233,15 @@ function isAllowedCompetition(countryName, leagueName) {
   ];
   if (intlAllowed.some((x) => l.includes(x))) return true;
 
-  // Whitelist (top)
   const allowedPairs = [
-    // Big 5
     { country: "england", league: "premier league" },
     { country: "spain", league: "la liga" },
     { country: "italy", league: "serie a" },
     { country: "germany", league: "bundesliga" },
     { country: "france", league: "ligue 1" },
-
-    // Europa relevante
     { country: "netherlands", league: "eredivisie" },
     { country: "portugal", league: "primeira liga" },
     { country: "scotland", league: "premiership" },
-
-    // América top
     { country: "mexico", league: "liga mx" },
     { country: "usa", league: "mls" },
     { country: "brazil", league: "serie a" },
@@ -279,12 +255,12 @@ function isAllowedCompetition(countryName, leagueName) {
 /* ------------------- Fixture getters ------------------- */
 function getFixtureId(f) {
   return (
-    f.id ||
-    f.fixtureId ||
-    f.fixture_id ||
-    f.fixture?.id ||
-    f.fixture?.fixture_id ||
-    `${f.league?.id || ""}-${f.timestamp || f.date || f.fixture?.date || ""}`
+    f?.id ||
+    f?.fixtureId ||
+    f?.fixture_id ||
+    f?.fixture?.id ||
+    f?.fixture?.fixture_id ||
+    `${f?.league?.id || ""}-${f?.timestamp || f?.date || f?.fixture?.date || ""}`
   );
 }
 
@@ -296,23 +272,23 @@ function getAwayLogo(f) {
 }
 
 function getLeagueName(f) {
-  return f.league?.name || f.leagueName || f.league_name || f.competition || "Liga desconocida";
+  return f?.league?.name || f?.leagueName || f?.league_name || f?.competition || "Liga desconocida";
 }
 
 function getCountryName(f) {
-  return f.league?.country || f.country || f.country_name || f.location || "World";
+  return f?.league?.country || f?.country || f?.country_name || f?.location || "World";
 }
 
 function getHomeName(f) {
-  return f.homeTeam || f.home_name || f.localTeam || f.team_home || f.teams?.home?.name || "Local";
+  return f?.homeTeam || f?.home_name || f?.localTeam || f?.team_home || f?.teams?.home?.name || "Local";
 }
 
 function getAwayName(f) {
-  return f.awayTeam || f.away_name || f.visitTeam || f.team_away || f.teams?.away?.name || "Visita";
+  return f?.awayTeam || f?.away_name || f?.visitTeam || f?.team_away || f?.teams?.away?.name || "Visita";
 }
 
 function getKickoffTime(f) {
-  const iso = f.date || f.fixture?.date;
+  const iso = f?.date || f?.fixture?.date;
   if (typeof iso === "string" && iso.includes("T")) {
     const d = new Date(iso);
     if (!Number.isNaN(d.getTime())) {
@@ -321,20 +297,20 @@ function getKickoffTime(f) {
       return `${hh}:${mm}`;
     }
   }
-  return f.time || f.hour || "--:--";
+  return f?.time || f?.hour || "--:--";
 }
 
 /** FUTUROS */
 function isFutureFixture(fx) {
   const now = Date.now();
 
-  const ts = fx.timestamp || fx.fixture?.timestamp || null;
+  const ts = fx?.timestamp || fx?.fixture?.timestamp || null;
   if (ts) {
     const ms = Number(ts) * 1000;
     if (!Number.isNaN(ms)) return ms > now;
   }
 
-  const iso = fx.date || fx.fixture?.date || null;
+  const iso = fx?.date || fx?.fixture?.date || null;
   if (iso) {
     const d = new Date(iso);
     if (!Number.isNaN(d.getTime())) return d.getTime() > now;
@@ -465,11 +441,9 @@ const PARTIDAZOS_MANUAL = [
   { date: "2026-01-28", league: "UEFA Champions League", home: "atalanta" },
   { date: "2026-01-28", league: "UEFA Champions League", home: "Pafos" },
   { date: "2026-01-28", league: "UEFA Champions League", home: "Juventus" },
-
-  // ✅ IDs estables
-  { fixtureId: 1504664 }, // Bodo/Glimt vs Manchester City
-  { fixtureId: 1451134 }, // Olympiacos vs Bayer Leverkusen
-  { fixtureId: 1451132 }, // FC Copenhagen vs Napoli
+  { fixtureId: 1504664 },
+  { fixtureId: 1451134 },
+  { fixtureId: 1451132 },
 ];
 
 function picksFromFixturesComparator(fixtures) {
@@ -542,132 +516,6 @@ function PageShell({ children }) {
 
       {children}
     </div>
-  );
-}
-
-/* ------------------- Partidazos UI ------------------- */
-function PartidazoLine({ f }) {
-  const id = getFixtureId(f);
-  const home = getHomeName(f);
-  const away = getAwayName(f);
-  const league = getLeagueName(f);
-  const country = getCountryName(f);
-  const flagEmoji = COUNTRY_FLAG[country] || (country === "World" ? "🌍" : "🏳️");
-
-  const date = fixtureDateLabel(f) || fixtureDateKey(f);
-  const time = fixtureTimeLabel(f) || getKickoffTime(f) || "—";
-  const whenLabel = date ? `${date} · ${time}` : time;
-
-  const hLogo = getHomeLogo(f);
-  const aLogo = getAwayLogo(f);
-
-  return (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/25 px-4 py-3">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        {/* Línea equipos */}
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 min-w-0">
-            {hLogo ? <img src={hLogo} alt="" className="h-6 w-6 rounded-sm object-contain" /> : <div className="h-6 w-6 rounded-sm bg-white/5 border border-white/10" />}
-            <div className="text-sm font-semibold text-slate-100 truncate">{home}</div>
-
-            <div className="text-xs font-bold shrink-0" style={{ color: "rgba(230,196,100,0.80)" }}>vs</div>
-
-            <div className="text-sm font-semibold text-slate-100 truncate">{away}</div>
-            {aLogo ? <img src={aLogo} alt="" className="h-6 w-6 rounded-sm object-contain" /> : <div className="h-6 w-6 rounded-sm bg-white/5 border border-white/10" />}
-          </div>
-        </div>
-
-        {/* Fecha/hora: en móvil cae abajo, en desktop queda a la derecha */}
-        <div className="shrink-0 text-xs px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-slate-200 w-fit">
-          {whenLabel}
-        </div>
-      </div>
-
-      {/* Línea meta (reemplaza fixtureId) */}
-      <div className="mt-2 text-[11px] text-slate-400 flex items-center gap-2">
-        <span className="text-base leading-none">{flagEmoji}</span>
-        <span className="text-slate-200 font-semibold">{country}</span>
-        <span className="text-slate-500">·</span>
-        <span className="truncate">{league}</span>
-
-        {/* Si quieres mantener el fixtureId, déjalo súper discreto: */}
-        {/* <span className="ml-auto text-slate-500">#{String(id)}</span> */}
-      </div>
-    </div>
-  );
-}
-
-function RecoWeeklyCardComparator({ fixtures = [], loading = false, error = "" }) {
-  const manual = useMemo(() => picksFromFixturesComparator(fixtures), [fixtures]);
-
-  const autoTop = useMemo(() => {
-    const arr = Array.isArray(fixtures) ? [...fixtures] : [];
-    // ya vienen filtrados TOP en weeklyFixtures, pero por seguridad:
-    const filtered = arr
-      .filter(isFutureFixture)
-      .filter((fx) => !isYouthOrWomenOrReserve(fx))
-      .filter((fx) => isAllowedCompetition(getCountryName(fx), getLeagueName(fx)));
-
-    filtered.sort((a, b) => {
-      const da = new Date(a?.fixture?.date || a?.date || 0).getTime();
-      const db = new Date(b?.fixture?.date || b?.date || 0).getTime();
-      if (da !== db) return da - db;
-
-      const pla = leaguePriority(getLeagueName(a));
-      const plb = leaguePriority(getLeagueName(b));
-      if (pla !== plb) return pla - plb;
-
-      const ca = countryPriority(getCountryName(a));
-      const cb = countryPriority(getCountryName(b));
-      if (ca !== cb) return ca - cb;
-
-      return String(getLeagueName(a)).localeCompare(String(getLeagueName(b)));
-    });
-
-    // Top 8 automático
-    return filtered.slice(0, 8);
-  }, [fixtures]);
-
-  // ✅ manual primero: si existe, SOLO manual. Si no existe, auto.
-  const list = useMemo(() => {
-    if (manual.length > 0) return manual.slice(0, 10);
-
-    // fallback automático
-    return autoTop.slice(0, 10);
-  }, [manual, autoTop]);
-
-  return (
-    <HudCard bg={null} bgColor="#132A23" overlayVariant="casillasSharp" className="mt-4" glow="gold">
-      <div className="p-4 md:p-6">
-        <div className="text-emerald-200/90 text-xs font-semibold tracking-wide">Factor Victoria recomienda</div>
-        <div className="mt-1 text-xl md:text-2xl font-bold text-slate-100">Partidazos de la semana</div>
-        <div className="mt-1 text-sm text-slate-200">
-          Pin manual + Top automático.
-        </div>
-
-        <div className="mt-4 space-y-2">
-  {loading ? (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-slate-300">
-      Cargando partidazos…
-    </div>
-  ) : error ? (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-amber-300">
-      {error}
-    </div>
-  ) : list.length === 0 ? (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-slate-300">
-      Aún no hay coincidencias (revisa texto/fecha/liga o usa fixtureId).
-    </div>
-  ) : (
-    list.map((f) => <PartidazoLine key={String(getFixtureId(f))} f={f} />)
-  )}
-</div>
-
-        <div className="mt-3 text-[11px] text-slate-400">
-          Partidos: <span className="font-semibold">Champions League</span>
-        </div>
-      </div>
-    </HudCard>
   );
 }
 
