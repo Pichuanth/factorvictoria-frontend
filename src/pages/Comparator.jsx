@@ -30,7 +30,7 @@ const PLAN_LABELS = {
 const BG_VISITOR = asset("hero-fondo-partidos.png");
 const BG_END = asset("hero-12000.png");
 const BG_PROFILE_HUD = asset("hero-profile-hud.png");
-const BG_DINERO = asset("hero.dinero.png"); // si tu archivo real es hero-dinero.png, cámbialo aquí
+const BG_DINERO = asset("hero.dinero.png"); // verifica que exista EXACTO en /public
 const BG_MANUAL = asset("hero-dorado-estadio.png");
 const BG_GRAFICO_DORADO = asset("grafico-dorado.png");
 const BG_BIENVENIDO = asset("hero-bienvenido.png");
@@ -55,6 +55,7 @@ function toYYYYMMDD(d) {
   const pad = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
+
 function addDaysYYYYMMDD(baseYYYYMMDD, days) {
   const d = new Date(`${baseYYYYMMDD}T00:00:00`);
   d.setDate(d.getDate() + Number(days || 0));
@@ -131,7 +132,7 @@ function normalizeCountryQuery(q) {
   return COUNTRY_ALIAS[key] || null;
 }
 
-// Emojis de banderas
+/* Emojis banderas */
 const COUNTRY_FLAG = {
   Chile: "🇨🇱",
   Argentina: "🇦🇷",
@@ -149,7 +150,6 @@ const COUNTRY_FLAG = {
 /* ------------------- Prioridades / filtro TOP ------------------- */
 function countryPriority(countryName) {
   const c = normStr(countryName);
-
   if (c.includes("england") || c.includes("inglaterra")) return 0;
   if (c.includes("spain") || c.includes("espana") || c.includes("españa")) return 1;
   if (c.includes("france") || c.includes("francia")) return 2;
@@ -162,7 +162,6 @@ function countryPriority(countryName) {
   if (c.includes("mexico") || c.includes("méxico")) return 8;
   if (c.includes("usa")) return 9;
   if (c.includes("brazil") || c.includes("brasil")) return 10;
-  if (c.includes("colombia")) return 11;
 
   return 50;
 }
@@ -184,15 +183,7 @@ function leaguePriority(leagueName) {
 
   // América
   if (n.includes("liga mx")) return 10;
-  if (n.includes("primera division") || n.includes("liga profesional")) return 11; // Argentina
-  if (
-    n.includes("campeonato brasileiro") ||
-    n.includes("brasileirao") ||
-    (n.includes("serie a") && n.includes("brazil"))
-  )
-    return 12;
-  if (n.includes("liga de primera mercado libre") && n.includes("chile")) return 13;
-  if (n.includes("super copa") && n.includes("chile")) return 11;
+  if (n.includes("primera division") || n.includes("liga profesional")) return 11;
   if (n.includes("mls")) return 14;
 
   return 50;
@@ -239,9 +230,7 @@ function isAllowedCompetition(countryName, leagueName) {
     { country: "italy", league: "serie a" },
     { country: "germany", league: "bundesliga" },
     { country: "france", league: "ligue 1" },
-    { country: "netherlands", league: "eredivisie" },
     { country: "portugal", league: "primeira liga" },
-    { country: "scotland", league: "premiership" },
     { country: "mexico", league: "liga mx" },
     { country: "usa", league: "mls" },
     { country: "brazil", league: "serie a" },
@@ -326,6 +315,7 @@ function isYouthOrWomenOrReserve(fx) {
     "u17","u18","u19","u20","u21","u23",
     "reserves","reserve","youth","juvenil","sub-","sub ",
     " women","womens","femen"," fem"," w "," ii"," b ",
+    "friendly","amistoso",
   ];
   return banned.some((p) => blob.includes(p));
 }
@@ -336,7 +326,7 @@ function normalizePlanId(raw) {
 
   if (["vitalicio", "leyenda", "legend", "lifetime"].some((k) => p.includes(k))) return "vitalicio";
   if (["anual", "campeon", "campeón", "annual", "year"].some((k) => p.includes(k))) return "anual";
-  if (["trimestral", "goleador", "tri", "3", "4mes", "4 meses"].some((k) => p.includes(k))) return "trimestral";
+  if (["trimestral", "goleador", "tri", "3"].some((k) => p.includes(k))) return "trimestral";
   if (["basic", "mensual", "inicio", "month"].some((k) => p.includes(k))) return "basic";
 
   return "basic";
@@ -344,11 +334,9 @@ function normalizePlanId(raw) {
 
 function getFeaturesByPlanId(planId) {
   const base = { giftPick: true, boosted: true };
-
   if (planId === "basic") return { ...base, referees: false, scorersValue: false, marketValue: false };
   if (planId === "trimestral") return { ...base, referees: false, scorersValue: false, marketValue: false };
   if (planId === "anual") return { ...base, referees: true, scorersValue: false, marketValue: false };
-
   return { ...base, referees: true, scorersValue: true, marketValue: true };
 }
 
@@ -441,6 +429,8 @@ const PARTIDAZOS_MANUAL = [
   { date: "2026-01-28", league: "UEFA Champions League", home: "atalanta" },
   { date: "2026-01-28", league: "UEFA Champions League", home: "Pafos" },
   { date: "2026-01-28", league: "UEFA Champions League", home: "Juventus" },
+
+  // ✅ IDs estables
   { fixtureId: 1504664 },
   { fixtureId: 1451134 },
   { fixtureId: 1451132 },
@@ -534,8 +524,8 @@ function VisitorBanner() {
         </div>
 
         <div className="mt-2 text-sm text-slate-200 max-w-2xl">
-          Activa tu plan para desbloquear el comparador profesional (cuotas potenciadas, combinada automática y módulos premium).
-          Si ya tienes membresía, inicia sesión.
+          Activa tu plan para desbloquear el comparador profesional (cuotas potenciadas, combinada automática y módulos
+          premium). Si ya tienes membresía, inicia sesión.
         </div>
 
         <div className="mt-4 flex flex-col sm:flex-row gap-2">
@@ -635,19 +625,155 @@ function VisitorEndingHero() {
   );
 }
 
-/* ------------------- Simulador ------------------- */
-function formatMoney(value, currency) {
-  const n = Number(value || 0);
-  const safe = Number.isFinite(n) ? n : 0;
-  const decimals = currency === "CLP" ? 0 : 2;
-  const locale = currency === "CLP" ? "es-CL" : "en-US";
+/* --------------------- componente principal --------------------- */
+function WelcomeProCard({ planInfo }) {
+  return (
+    <HudCard bg={BG_BIENVENIDO} overlayVariant="casillas" className="mt-4" glow="gold">
+      <div className="p-5 md:p-6">
+        <div className="text-emerald-200/90 text-xs font-semibold tracking-wide">Bienvenido a Factor Victoria PRO</div>
+        <div className="mt-1 text-xl md:text-2xl font-bold text-slate-100">{planInfo.name} activo</div>
 
-  return new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency,
-    maximumFractionDigits: decimals,
-    minimumFractionDigits: decimals,
-  }).format(safe);
+        <div className="mt-3 text-sm text-slate-300 leading-relaxed">
+          Este es el punto donde apostar deja de ser intuición y pasa a ser <span className="font-semibold">estrategia</span>.
+        </div>
+      </div>
+    </HudCard>
+  );
+}
+
+/* ------------------- FixtureCard (compact) ------------------- */
+function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds }) {
+  const id = getFixtureId(fx);
+
+  const league = getLeagueName(fx);
+  const countryName = getCountryName(fx);
+  const flagEmoji = COUNTRY_FLAG[countryName] || (countryName === "World" ? "🌍" : "🏳️");
+  const home = getHomeName(fx);
+  const away = getAwayName(fx);
+  const date = fixtureDateLabel(fx) || fixtureDateKey(fx);
+  const time = fixtureTimeLabel(fx) || getKickoffTime(fx);
+  const whenLabel = date ? `${date} · ${time || "--:--"}` : time || "--:--";
+
+  const homeLogo = getHomeLogo(fx);
+  const awayLogo = getAwayLogo(fx);
+
+  const [open, setOpen] = useState(false);
+
+  const borderColor = "rgba(255,255,255,0.08)";
+  const boxShadow = "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 26px rgba(230,196,100,0.12)";
+
+  return (
+    <div className="rounded-2xl border bg-slate-950/25 backdrop-blur-md overflow-hidden" style={{ borderColor, boxShadow }}>
+      <div className="p-3 md:p-4 flex flex-col md:flex-row md:items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              {homeLogo ? (
+                <img src={homeLogo} alt={home} className="w-7 h-7 rounded-full bg-white/5 object-contain" />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-white/5" />
+              )}
+              <div className="truncate text-slate-100 font-semibold">{home}</div>
+            </div>
+
+            <div className="text-slate-400 font-semibold">vs</div>
+
+            <div className="flex items-center gap-2 min-w-0">
+              {awayLogo ? (
+                <img src={awayLogo} alt={away} className="w-7 h-7 rounded-full bg-white/5 object-contain" />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-white/5" />
+              )}
+              <div className="truncate text-slate-100 font-semibold">{away}</div>
+            </div>
+          </div>
+
+          <div className="mt-1 text-xs text-slate-300 flex flex-wrap items-center gap-2">
+            <span className="text-base leading-none">{flagEmoji}</span>
+            <span className="font-medium">{countryName}</span>
+            <span className="text-slate-500">·</span>
+            <span className="truncate">{league}</span>
+            <span className="text-slate-500">·</span>
+            <span className="font-semibold text-slate-200">{whenLabel}</span>
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-2">
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="rounded-full px-4 py-2 text-xs font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition text-slate-100"
+          >
+            {open ? "Ocultar estadísticas" : "Ver estadísticas"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              onToggle?.(id);
+              onLoadOdds?.(id);
+            }}
+            className="rounded-full px-4 py-2 text-xs font-bold"
+            style={{
+              backgroundColor: isSelected ? "rgba(16,185,129,0.18)" : "rgba(56,189,248,0.18)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              color: isSelected ? "rgba(167,243,208,0.95)" : "rgba(186,230,253,0.95)",
+            }}
+          >
+            {isSelected ? "Quitar" : "Añadir a combinada"}
+          </button>
+        </div>
+      </div>
+
+      {open ? (
+        <div className="px-3 md:px-4 pb-3 md:pb-4">
+          <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3 text-[11px] text-slate-300">
+            Estadísticas en despliegue. (Luego aquí cargamos: forma últimos 5, xG, tarjetas, corners, etc.)
+            <div className="mt-2 text-slate-400">
+              fixtureId: <span className="text-slate-200 font-semibold">{String(id)}</span>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/* ------------------- FeatureCard ------------------- */
+function FeatureCard({ title, badge, children, locked, lockText, bg }) {
+  return (
+    <HudCard bg={bg || BG_GRAFICO_DORADO} overlayVariant="casillas" glow="gold" className="overflow-hidden">
+      <div className="relative p-4 md:p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-sm md:text-base font-semibold text-emerald-400">{title}</div>
+            {badge ? (
+              <div className="mt-1 inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/5 border border-white/10 text-slate-200">
+                {badge}
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="mt-3">{children}</div>
+
+        {locked ? (
+          <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-[2px] flex items-center justify-center p-4">
+            <div className="max-w-sm text-center">
+              <div className="text-sm font-semibold text-slate-50">Bloqueado por plan</div>
+              <div className="mt-1 text-xs text-slate-300">{lockText || "Disponible en planes superiores."}</div>
+              <Link
+                to="/#planes"
+                className="inline-flex mt-3 items-center justify-center rounded-xl px-3 py-2 text-xs font-semibold border border-yellow-400/60 bg-yellow-500/10 text-yellow-200"
+              >
+                Ver planes
+              </Link>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </HudCard>
+  );
 }
 
 /* ------------------- Manual Picks ------------------- */
@@ -708,170 +834,6 @@ function ManualPicksSection() {
   );
 }
 
-/* ------------------- FeatureCard ------------------- */
-function FeatureCard({ title, badge, children, locked, lockText, bg }) {
-  return (
-    <HudCard bg={bg || BG_GRAFICO_DORADO} overlayVariant="casillas" glow="gold" className="overflow-hidden">
-      <div className="relative p-4 md:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-sm md:text-base font-semibold text-emerald-400">{title}</div>
-            {badge ? (
-              <div className="mt-1 inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/5 border border-white/10 text-slate-200">
-                {badge}
-              </div>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="mt-3">{children}</div>
-
-        {locked ? (
-          <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-[2px] flex items-center justify-center p-4">
-            <div className="max-w-sm text-center">
-              <div className="text-sm font-semibold text-slate-50">Bloqueado por plan</div>
-              <div className="mt-1 text-xs text-slate-300">{lockText || "Disponible en planes superiores."}</div>
-              <Link
-                to="/#planes"
-                className="inline-flex mt-3 items-center justify-center rounded-xl px-3 py-2 text-xs font-semibold border border-yellow-400/60 bg-yellow-500/10 text-yellow-200"
-              >
-                Ver planes
-              </Link>
-            </div>
-          </div>
-        ) : null}
-      </div>
-    </HudCard>
-  );
-}
-
-/* ------------------- FixtureCard (compact) ------------------- */
-function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds }) {
-  const id = getFixtureId(fx);
-
-  const league = getLeagueName(fx);
-  const countryName = getCountryName(fx);
-  const flagEmoji = COUNTRY_FLAG[countryName] || (countryName === "World" ? "🌍" : "🏳️");
-  const home = getHomeName(fx);
-  const away = getAwayName(fx);
-  const date = fixtureDateLabel(fx) || fixtureDateKey(fx);
-  const time = fixtureTimeLabel(fx) || getKickoffTime(fx);
-  const whenLabel = date ? `${date} · ${time || "--:--"}` : (time || "--:--");
-
-  const homeLogo = getHomeLogo(fx);
-  const awayLogo = getAwayLogo(fx);
-
-  const [open, setOpen] = useState(false);
-
-  const borderColor = "rgba(255,255,255,0.08)";
-  const boxShadow = "0 0 0 1px rgba(255,255,255,0.03) inset, 0 0 26px rgba(230,196,100,0.12)";
-
-  return (
-    <div className="rounded-2xl border bg-slate-950/25 backdrop-blur-md overflow-hidden" style={{ borderColor, boxShadow }}>
-      <div className="p-3 md:p-4 flex flex-col md:flex-row md:items-center gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 min-w-0">
-              {homeLogo ? (
-                <img src={homeLogo} alt={home} className="w-7 h-7 rounded-full bg-white/5 object-contain" />
-              ) : (
-                <div className="w-7 h-7 rounded-full bg-white/5" />
-              )}
-              <div className="truncate text-slate-100 font-semibold">{home}</div>
-            </div>
-
-            <div className="text-slate-400 font-semibold">vs</div>
-
-            <div className="flex items-center gap-2 min-w-0">
-              {awayLogo ? (
-                <img src={awayLogo} alt={away} className="w-7 h-7 rounded-full bg-white/5 object-contain" />
-              ) : (
-                <div className="w-7 h-7 rounded-full bg-white/5" />
-              )}
-              <div className="truncate text-slate-100 font-semibold">{away}</div>
-            </div>
-          </div>
-
-          <div className="mt-1 text-xs text-slate-300 flex flex-wrap items-center gap-2">
-            <span className="text-base leading-none">{flagEmoji}</span>
-            <span className="font-medium">{countryName}</span>
-            <span className="text-slate-500">·</span>
-            <span className="truncate">{league}</span>
-            <span className="text-slate-500">·</span>
-            <span className="font-semibold text-slate-200">{whenLabel}</span>
-          </div>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-2">
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            className="rounded-full px-4 py-2 text-xs font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition text-slate-100"
-          >
-            {open ? "Ocultar estadísticas" : "Ver estadísticas"}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              onToggle(id);
-              onLoadOdds(id);
-            }}
-            className="rounded-full px-4 py-2 text-xs font-bold"
-            style={{
-              backgroundColor: isSelected ? "rgba(16,185,129,0.18)" : "rgba(56,189,248,0.18)",
-              border: "1px solid rgba(255,255,255,0.12)",
-              color: isSelected ? "rgba(167,243,208,0.95)" : "rgba(186,230,253,0.95)",
-            }}
-          >
-            {isSelected ? "Quitar" : "Añadir a combinada"}
-          </button>
-        </div>
-      </div>
-
-      {open ? (
-        <div className="px-3 md:px-4 pb-3 md:pb-4">
-          <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3 text-[11px] text-slate-300">
-            Estadísticas en despliegue. (Luego aquí cargamos: forma últimos 5, xG, tarjetas, corners, etc.)
-            <div className="mt-2 text-slate-400">
-              fixtureId: <span className="text-slate-200 font-semibold">{String(id)}</span>
-            </div>
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-/* --------------------- componente principal --------------------- */
-function WelcomeProCard({ planInfo }) {
-  return (
-    <HudCard bg={BG_BIENVENIDO} overlayVariant="casillas" className="mt-4" glow="gold">
-      <div className="p-5 md:p-6">
-        <div className="text-emerald-200/90 text-xs font-semibold tracking-wide">Bienvenido a Factor Victoria PRO</div>
-
-        <div className="mt-1 text-xl md:text-2xl font-bold text-slate-100">{planInfo.name} activo</div>
-
-        <div className="mt-2 text-sm text-slate-200 max-w-2xl">
-          {/*Tu objetivo del plan es{" "}
-          <span className="font-bold text-emerald-200">x{planInfo.boost}</span>. Además, siempre tendrás una{" "}
-          <span className="font-bold">cuota regalo</span> (x1.5 a x3).*/}
-        </div>
-
-       {/*<div className="mt-2 text-xs text-slate-400"> //Membresía {planInfo.price} · Factor Victoria</div> */}
-
-        <div className="px-5 pb-4 text-sm text-slate-300 leading-relaxed">
-  
-  Este es el punto donde apostar deja de ser intuición y pasa a ser "Estrategia"
-  <span className="font-semibold text-emerald-300">
-  
-  </span>.
-</div>
-    </div>
-    </HudCard>
-  );
-}
-
 export default function Comparator() {
   const { isLoggedIn, user } = useAuth();
   const [searchParams] = useSearchParams();
@@ -888,17 +850,16 @@ export default function Comparator() {
   const [generatedOk, setGeneratedOk] = useState(false);
   const okTimerRef = useRef(null);
 
-useEffect(() => {
-  return () => {
-    if (okTimerRef.current) clearTimeout(okTimerRef.current);
-  };
-}, []);
-
+  useEffect(() => {
+    return () => {
+      if (okTimerRef.current) clearTimeout(okTimerRef.current);
+    };
+  }, []);
 
   const [fixtures, setFixtures] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
 
-  // ✅ Partidazos (lista curada) independiente del botón "Generar"
+  // ✅ Partidazos semanal
   const [weeklyLoading, setWeeklyLoading] = useState(false);
   const [weeklyErr, setWeeklyErr] = useState("");
   const [weeklyFixtures, setWeeklyFixtures] = useState([]);
@@ -944,6 +905,8 @@ useEffect(() => {
     const en = normalizeCountryQuery(countryEs) || countryEs;
     setSelectedCountries((prev) => (prev.includes(en) ? prev.filter((x) => x !== en) : [...prev, en]));
   }
+
+  // ✅ cargar weekly al montar
   useEffect(() => {
     let alive = true;
 
@@ -959,8 +922,6 @@ useEffect(() => {
         params.set("from", fromW);
         params.set("to", toW);
 
-        // puedes dejar sin country para que traiga todo,
-        // y el filtro TOP se encarga de depurar.
         const res = await fetch(`${API_BASE}/api/fixtures?${params.toString()}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
@@ -1032,7 +993,6 @@ useEffect(() => {
       }
 
       const data = await res.json();
-
       const pack = {
         found: !!data?.found,
         markets: data?.markets || {},
@@ -1228,14 +1188,13 @@ useEffect(() => {
       const LIMITED = sorted.slice(0, 140);
 
       setFixtures(LIMITED);
-     setInfo(`API: ${itemsRaw.length} | base: ${base.length} | TOP: ${filteredTop.length} | mostrando: ${LIMITED.length}`);
+      setInfo(`API: ${itemsRaw.length} | base: ${base.length} | TOP: ${filteredTop.length} | mostrando: ${LIMITED.length}`);
 
-     setGeneratedOk(true);
-     if (okTimerRef.current) clearTimeout(okTimerRef.current);
-     okTimerRef.current = setTimeout(() => setGeneratedOk(false), 2500);
+      setGeneratedOk(true);
+      if (okTimerRef.current) clearTimeout(okTimerRef.current);
+      okTimerRef.current = setTimeout(() => setGeneratedOk(false), 2500);
 
-     if (features.referees) await loadReferees();
-
+      if (features.referees) await loadReferees();
     } catch (e2) {
       setErr(String(e2?.message || e2));
     } finally {
@@ -1246,21 +1205,21 @@ useEffect(() => {
   /* =========================
       VISITANTE (NO LOGUEADO)
      ========================= */
-if (!isLoggedIn) {
-  return (
-    <PageShell>
-      <VisitorBanner />
-      <VisitorPlansGrid />
+  if (!isLoggedIn) {
+    return (
+      <PageShell>
+        <VisitorBanner />
+        <VisitorPlansGrid />
 
-      <Simulator bg={BG_DINERO} />
-      <PriceCalculatorCard bg={BG_DINERO} />
+        <Simulator bg={BG_DINERO} />
+        <PriceCalculatorCard bg={BG_DINERO} />
 
-      <VisitorEndingHero />
-    </PageShell>
-  );
-}
+        <VisitorEndingHero />
+      </PageShell>
+    );
+  }
 
-   /* =========================
+  /* =========================
       LOGUEADO (COMPARADOR)
      ========================= */
   return (
@@ -1271,62 +1230,66 @@ if (!isLoggedIn) {
       <HudCard bg={BG_PROFILE_HUD} overlayVariant="casillas" className="mt-4" glow="gold">
         <div className="p-4 md:p-6">
           <form onSubmit={handleGenerate} className="flex flex-col md:flex-row md:items-end gap-3 items-stretch">
-  <div className="flex-[2]">
-    <label htmlFor="qFilter" className="block text-xs text-slate-400 mb-1">
-      Filtro (país / liga / equipo)
-    </label>
-    <input
-      id="qFilter"
-      name="qFilter"
-      placeholder="Ej: Chile, La Liga, Colo Colo, Premier League..."
-      value={q}
-      onChange={(e) => setQ(e.target.value)}
-      className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
-    />
-  </div>
+            <div className="flex-[2]">
+              <label htmlFor="qFilter" className="block text-xs text-slate-400 mb-1">
+                Filtro (país / liga / equipo)
+              </label>
+              <input
+                id="qFilter"
+                name="qFilter"
+                placeholder="Ej: Chile, La Liga, Colo Colo, Premier League..."
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
+              />
+            </div>
 
-  <div className="flex-1">
-    <label htmlFor="fromDate" className="block text-xs text-slate-400 mb-1">Desde</label>
-    <input
-      id="fromDate"
-      name="fromDate"
-      type="date"
-      value={from}
-      onChange={(e) => setFrom(e.target.value)}
-      className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
-    />
-  </div>
+            <div className="flex-1">
+              <label htmlFor="fromDate" className="block text-xs text-slate-400 mb-1">
+                Desde
+              </label>
+              <input
+                id="fromDate"
+                name="fromDate"
+                type="date"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+                className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
+              />
+            </div>
 
-  <div className="flex-1">
-    <label htmlFor="toDate" className="block text-xs text-slate-400 mb-1">Hasta</label>
-    <input
-      id="toDate"
-      name="toDate"
-      type="date"
-      value={to}
-      onChange={(e) => setTo(e.target.value)}
-      className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
-    />
-  </div>
+            <div className="flex-1">
+              <label htmlFor="toDate" className="block text-xs text-slate-400 mb-1">
+                Hasta
+              </label>
+              <input
+                id="toDate"
+                name="toDate"
+                type="date"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                className="w-full rounded-xl bg-white/10 text-white px-3 py-2 border border-white/10"
+              />
+            </div>
 
-  <div>
-    <button
-      type="submit"
-      disabled={loading}
-      className="w-full rounded-2xl font-semibold px-4 py-2 mt-4 md:mt-0 disabled:opacity-60 disabled:cursor-not-allowed transition"
-      style={{
-        backgroundColor: loading
-          ? "rgba(230,196,100,0.65)"
-          : generatedOk
-          ? "rgba(16,185,129,0.55)"
-          : GOLD,
-        color: "#0f172a",
-      }}
-    >
-      {loading ? "Generando..." : generatedOk ? "Listo ✓" : "Generar"}
-    </button>
-  </div>
-</form>
+            <div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full rounded-2xl font-semibold px-4 py-2 mt-4 md:mt-0 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                style={{
+                  backgroundColor: loading
+                    ? "rgba(230,196,100,0.65)"
+                    : generatedOk
+                    ? "rgba(16,185,129,0.55)"
+                    : GOLD,
+                  color: "#0f172a",
+                }}
+              >
+                {loading ? "Generando..." : generatedOk ? "Listo ✓" : "Generar"}
+              </button>
+            </div>
+          </form>
 
           <div className="mt-3 flex flex-wrap gap-2">
             {quickCountries.map((c) => {
@@ -1359,21 +1322,15 @@ if (!isLoggedIn) {
 
       {/* 2) Partidazos */}
       <RecoWeeklyCard
-  HudCard={HudCard}
-  fixtures={weeklyFixtures}
-  loading={weeklyLoading}
-  error={weeklyErr}
-  picksFromFixtures={picksFromFixturesComparator}
-/>
+        HudCard={HudCard}
+        fixtures={weeklyFixtures}
+        loading={weeklyLoading}
+        error={weeklyErr}
+        picksFromFixtures={picksFromFixturesComparator}
+      />
 
-      {/* 3) LISTADO (verde sólido premium) */}
-      <HudCard
-        bg={null}
-        bgColor="#132A23"
-        overlayVariant="casillasSharp"
-        className="mt-4"
-        glow="gold"
-      >
+      {/* 3) LISTADO */}
+      <HudCard bg={null} bgColor="#132A23" overlayVariant="casillasSharp" className="mt-4" glow="gold">
         <section className="p-3 md:p-4">
           <div className="flex items-center justify-between px-2 py-2 text-[11px] md:text-xs text-slate-300 tracking-wide">
             <span className="uppercase">Partidos encontrados (COMPACT): {fixtures.length}</span>
@@ -1392,7 +1349,7 @@ if (!isLoggedIn) {
 
                 return (
                   <FixtureCardCompact
-                    key={id}
+                    key={String(id)}
                     fx={fx}
                     isSelected={isSelected}
                     onToggle={(fixtureId) => {
@@ -1408,6 +1365,7 @@ if (!isLoggedIn) {
           )}
         </section>
       </HudCard>
+
       {/* 4) MÓDULOS premium */}
       <section className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
         <FeatureCard title="Cuota segura (regalo)" badge="Alta probabilidad" locked={!features.giftPick}>
@@ -1500,18 +1458,9 @@ if (!isLoggedIn) {
       {/* 5) Manual Picks */}
       <ManualPicksSection />
 
-      {/* 6) Simulador 
-<Simulator bg={BG_DINERO} />*/}
+      {/* 7) Calculadora */}
+      <PriceCalculatorCard bg={BG_DINERO} />
 
-{/* 7) Calculadora */}
-<PriceCalculatorCard bg={BG_DINERO} />
-
-         {/* Resto de módulos los mantienes tal cual en tu archivo anterior.
-          Si quieres, los vuelvo a pegar completos también, pero esto ya corrige:
-          - Partidazos sin imagen
-          - Lista verde premium
-          - Errores/duplicados que impedían aplicar cambios */}
-     
       <div className="mt-8 text-center text-xs text-slate-500">© {new Date().getFullYear()} Factor Victoria</div>
     </PageShell>
   );
