@@ -429,11 +429,14 @@ const PARTIDAZOS_MANUAL = [
   { date: "2026-01-28", league: "UEFA Champions League", home: "atalanta" },
   { date: "2026-01-28", league: "UEFA Champions League", home: "Pafos" },
   { date: "2026-01-28", league: "UEFA Champions League", home: "Juventus" },
+  { date: "2026-01-28", league: "UEFA Champions League", home: "Liverpool", away: "qarabag fk" },
 
   // ✅ IDs estables
   { fixtureId: 1504664 },
   { fixtureId: 1451134 },
   { fixtureId: 1451132 },
+  { fixtureId: 1451161 }, // fc barcelona champions 28-01-2026
+  { fixtureId: 1451162 }, // Benfica vs madrid  28-01-2026
 ];
 
 function picksFromFixturesComparator(fixtures) {
@@ -1286,7 +1289,7 @@ export default function Comparator() {
                   color: "#0f172a",
                 }}
               >
-                {loading ? "Generando..." : generatedOk ? "Listo ✓" : "Generar"}
+                {loading ? "Generando..." : generatedOk ? "Listo" : "Generar"}
               </button>
             </div>
           </form>

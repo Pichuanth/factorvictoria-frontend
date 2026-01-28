@@ -412,6 +412,7 @@ const PARTIDAZOS_MANUAL = [
   { date: "2026-01-28", league: "UEFA Champions League", home: "atalanta" },
   { date: "2026-01-28", league: "UEFA Champions League", home: "Pafos" },
   { date: "2026-01-28", league: "UEFA Champions League", home: "Juventus" },
+  { date: "2026-01-28", league: "UEFA Champions League", home: "Liverpool", away: "qarabag fk" },
 
    // Los que te faltan: aquí conviene fixtureId (por nombres “raros” o abreviaciones)
   { fixtureId: 1451161 }, // fc barcelona champions 28-01-2026
