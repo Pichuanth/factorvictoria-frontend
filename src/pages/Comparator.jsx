@@ -5,6 +5,7 @@ import { useAuth } from "../lib/auth";
 import Simulator from "../components/Simulator";
 import PriceCalculatorCard from "../components/PriceCalculatorCard";
 import RecoWeeklyCard from "../components/RecoWeeklyCard";
+import { buildCandidatePicks, pickSafe, buildParlay, buildValueList } from "../lib/fvModel";
 
 const GOLD = "#E6C464";
 
@@ -645,7 +646,7 @@ function WelcomeProCard({ planInfo }) {
 }
 
 /* ------------------- FixtureCard (compact) ------------------- */
-function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds }) {
+function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats, fvPack, fvLoading }) {
   const id = getFixtureId(fx);
 
   const league = getLeagueName(fx);
@@ -704,7 +705,13 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds }) {
         <div className="flex flex-col sm:flex-row gap-2">
           <button
             type="button"
-            onClick={() => setOpen((v) => !v)}
+            onClick={() => {
+              setOpen((v) => {
+                const next = !v;
+                if (next) onLoadStats?.(id);
+                return next;
+              });
+            }}
             className="rounded-full px-4 py-2 text-xs font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition text-slate-100"
           >
             {open ? "Ocultar estadísticas" : "Ver estadísticas"}
@@ -731,10 +738,62 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds }) {
       {open ? (
         <div className="px-3 md:px-4 pb-3 md:pb-4">
           <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3 text-[11px] text-slate-300">
-            Estadísticas en despliegue. (Luego aquí cargamos: forma últimos 5, xG, tarjetas, corners, etc.)
-            <div className="mt-2 text-slate-400">
-              fixtureId: <span className="text-slate-200 font-semibold">{String(id)}</span>
-            </div>
+            {fvLoading ? (
+  <div className="text-[11px] text-slate-300">Cargando estadísticas reales…</div>
+) : fvPack ? (
+  <div className="text-[11px] text-slate-300 leading-relaxed">
+    <div className="flex flex-wrap gap-x-4 gap-y-1">
+      <div>
+        <span className="text-slate-400">Forma local:</span>{" "}
+        <span className="text-slate-100 font-semibold">{fvPack?.last5?.home?.form || "--"}</span>
+      </div>
+      <div>
+        <span className="text-slate-400">Forma visita:</span>{" "}
+        <span className="text-slate-100 font-semibold">{fvPack?.last5?.away?.form || "--"}</span>
+      </div>
+      <div>
+        <span className="text-slate-400">GF/GA local:</span>{" "}
+        <span className="text-slate-100 font-semibold">
+          {fvPack?.last5?.home?.gf ?? "-"} / {fvPack?.last5?.home?.ga ?? "-"}
+        </span>
+      </div>
+      <div>
+        <span className="text-slate-400">GF/GA visita:</span>{" "}
+        <span className="text-slate-100 font-semibold">
+          {fvPack?.last5?.away?.gf ?? "-"} / {fvPack?.last5?.away?.ga ?? "-"}
+        </span>
+      </div>
+      <div>
+        <span className="text-slate-400">Corners prom:</span>{" "}
+        <span className="text-slate-100 font-semibold">
+          {fvPack?.last5?.home?.avgCorners ?? "-"} / {fvPack?.last5?.away?.avgCorners ?? "-"}
+        </span>
+      </div>
+      <div>
+        <span className="text-slate-400">Tarjetas prom:</span>{" "}
+        <span className="text-slate-100 font-semibold">
+          {fvPack?.last5?.home?.avgCards ?? "-"} / {fvPack?.last5?.away?.avgCards ?? "-"}
+        </span>
+      </div>
+      <div>
+        <span className="text-slate-400">λ goles (FV):</span>{" "}
+        <span className="text-emerald-200 font-semibold">
+          {fvPack?.model?.lambdaHome ?? "-"} + {fvPack?.model?.lambdaAway ?? "-"} = {fvPack?.model?.lambdaTotal ?? "-"}
+        </span>
+      </div>
+    </div>
+    <div className="mt-2 text-slate-400">
+      fixtureId: <span className="text-slate-200 font-semibold">{String(id)}</span>
+    </div>
+  </div>
+) : (
+  <div className="text-[11px] text-slate-400">
+    Sin estadísticas aún (o no disponibles). Igual podemos estimar con heurísticas.
+    <div className="mt-2">
+      fixtureId: <span className="text-slate-200 font-semibold">{String(id)}</span>
+     </div>
+              </div>
+            )}
           </div>
         </div>
       ) : null}
@@ -874,6 +933,11 @@ export default function Comparator() {
   const [oddsByFixture, setOddsByFixture] = useState({});
   const oddsRef = useRef({});
 
+  // FV pack cache (stats + modelo + markets)
+  const [fvPackByFixture, setFvPackByFixture] = useState({});
+  const [fvLoadingByFixture, setFvLoadingByFixture] = useState({});
+  const fvRef = useRef({});
+
   const planId = useMemo(() => {
     const raw = user?.planId || user?.plan?.id || user?.plan || user?.membership || "basic";
     return normalizePlanId(raw);
@@ -886,6 +950,7 @@ export default function Comparator() {
   // combinadas
   const [parlayResult, setParlayResult] = useState(null);
   const [parlayError, setParlayError] = useState("");
+  const [fvOutput, setFvOutput] = useState(null);
 
   // referees module
   const [refData, setRefData] = useState(null);
@@ -1007,18 +1072,57 @@ export default function Comparator() {
     } catch {
       // silencio
     }
+const ensureFvPack = useCallback(async (fixtureId) => {
+  if (!fixtureId) return;
+  if (fvRef.current[fixtureId]) return;
+
+  try {
+    setFvLoadingByFixture((prev) => ({ ...prev, [fixtureId]: true }));
+    const res = await fetch(`${API_BASE}/api/fixture/${encodeURIComponent(fixtureId)}/fvpack`);
+    if (!res.ok) {
+      fvRef.current[fixtureId] = null;
+      setFvPackByFixture((prev) => ({ ...prev, [fixtureId]: null }));
+      return;
+    }
+    const data = await res.json();
+    fvRef.current[fixtureId] = data;
+    setFvPackByFixture((prev) => ({ ...prev, [fixtureId]: data }));
+  } catch {
+    fvRef.current[fixtureId] = null;
+    setFvPackByFixture((prev) => ({ ...prev, [fixtureId]: null }));
+  } finally {
+    setFvLoadingByFixture((prev) => ({ ...prev, [fixtureId]: false }));
+  }
+}, []);
+
   }, []);
 
-  const loadReferees = useCallback(async () => {
+  
+const loadReferees = useCallback(async () => {
     try {
       setRefErr("");
       setRefLoading(true);
       setRefData(null);
-      setRefErr("Módulo en construcción: falta crear /api/referees/cards en el backend.");
+
+      // MVP: usa el endpoint existente. Más adelante rankeamos con estadísticas de tarjetas.
+      const params = new URLSearchParams();
+      params.set("from", from);
+      params.set("to", to);
+
+      // si hay un país seleccionado, tomamos el primero
+      const country = (selectedCountries || []).filter(Boolean)[0];
+      if (country) params.set("country", country);
+
+      const res = await fetch(`${API_BASE}/api/referees/cards?${params.toString()}`);
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setRefData(data);
+    } catch (e) {
+      setRefErr(String(e?.message || e));
     } finally {
       setRefLoading(false);
     }
-  }, []);
+  }, [from, to, selectedCountries]);
 
   function fakeOddForFixture(fx) {
     const id = getFixtureId(fx);
@@ -1055,31 +1159,110 @@ export default function Comparator() {
     return { games: picks.length, finalOdd, target: maxBoostArg, impliedProb, reachedTarget };
   }
 
-  async function handleAutoParlay() {
+  
+async function handleAutoParlay() {
     setParlayError("");
     setParlayResult(null);
+    setFvOutput(null);
 
     if (!fixtures.length) {
       setParlayError("Genera primero partidos con el botón de arriba.");
       return;
     }
 
-    fixtures
-      .slice(0, 10)
-      .map(getFixtureId)
-      .filter(Boolean)
-      .forEach((id) => ensureOdds(id));
+    // Auto: toma un pool inicial (más adelante: ranking FV, ligas top, etc.)
+    const pool = fixtures.slice(0, 14);
 
-    const suggestion = buildComboSuggestion(fixtures, maxBoost);
-    if (!suggestion) {
-      setParlayError("No pudimos armar una combinada razonable con los partidos cargados. Prueba con otro rango de fechas.");
+    const ids = pool.map(getFixtureId).filter(Boolean);
+
+    // Pre-carga stats+odds
+    await Promise.all(ids.map((id) => Promise.all([ensureFvPack(id), ensureOdds(id)])));
+
+    const candidatesByFixture = {};
+    for (const fx of pool) {
+      const id = getFixtureId(fx);
+      if (!id) continue;
+
+      const pack = fvPackByFixture[id] || fvRef.current[id] || null;
+      const markets = pack?.markets || oddsByFixture[id]?.markets || {};
+
+      candidatesByFixture[id] = buildCandidatePicks({ fixture: fx, pack: pack || {}, markets });
+    }
+
+    const safe = pickSafe(candidatesByFixture);
+
+    const targets = [10, 20, 50, 100].filter((t) => t <= maxBoost);
+    const parlays = targets
+      .map((t) => buildParlay({ candidatesByFixture, target: t, cap: maxBoost }))
+      .filter(Boolean);
+
+    const valueList = buildValueList(candidatesByFixture, 0.06);
+
+    if (!safe && !parlays.length) {
+      setParlayError("No pudimos armar picks con stats/odds disponibles. Prueba con otro rango o liga.");
       return;
     }
 
-    setParlayResult({ mode: "auto", ...suggestion });
+    setFvOutput({ mode: "auto", safe, parlays, valueList, candidatesByFixture });
+
+    if (parlays[0]) {
+      setParlayResult({ mode: "auto", ...parlays[0] });
+    }
   }
 
   async function handleSelectedParlay() {
+    setParlayError("");
+    setParlayResult(null);
+    setFvOutput(null);
+
+    if (!fixtures.length) {
+      setParlayError("Genera primero partidos con el botón de arriba.");
+      return;
+    }
+
+    if (selectedCount < 2) {
+      setParlayError("Selecciona al menos 2 partidos de la lista superior.");
+      return;
+    }
+
+    const pool = fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)));
+    const ids = pool.map(getFixtureId).filter(Boolean);
+
+    await Promise.all(ids.map((id) => Promise.all([ensureFvPack(id), ensureOdds(id)])));
+
+    const candidatesByFixture = {};
+    for (const fx of pool) {
+      const id = getFixtureId(fx);
+      if (!id) continue;
+
+      const pack = fvPackByFixture[id] || fvRef.current[id] || null;
+      const markets = pack?.markets || oddsByFixture[id]?.markets || {};
+
+      candidatesByFixture[id] = buildCandidatePicks({ fixture: fx, pack: pack || {}, markets });
+    }
+
+    const safe = pickSafe(candidatesByFixture);
+
+    const targets = [10, 20, 50, 100].filter((t) => t <= maxBoost);
+    const parlays = targets
+      .map((t) => buildParlay({ candidatesByFixture, target: t, cap: maxBoost }))
+      .filter(Boolean);
+
+    const valueList = buildValueList(candidatesByFixture, 0.06);
+
+    if (!safe && !parlays.length) {
+      setParlayError("Con esta selección no pudimos generar picks. Prueba agregando más partidos o usando Auto.");
+      return;
+    }
+
+    setFvOutput({ mode: "selected", safe, parlays, valueList, candidatesByFixture });
+
+    if (parlays[0]) {
+      setParlayResult({ mode: "selected", ...parlays[0] });
+    }
+  }
+
+  async function handleGenerate() {
     setParlayError("");
     setParlayResult(null);
 
@@ -1116,6 +1299,7 @@ export default function Comparator() {
     oddsRef.current = {};
     setParlayResult(null);
     setParlayError("");
+    setFvOutput(null);
 
     setRefData(null);
     setRefErr("");
@@ -1359,8 +1543,13 @@ export default function Comparator() {
                       toggleFixtureSelection(fixtureId);
                       setParlayResult(null);
                       setParlayError("");
+                      setFvOutput(null);
                     }}
                     onLoadOdds={(fixtureId) => ensureOdds(fixtureId)}
+                    onLoadStats={(fixtureId) => ensureFvPack(fixtureId)}
+                    fvPack={fvPackByFixture[id] || null}
+                    fvLoading={!!fvLoadingByFixture[id]}
+                  
                   />
                 );
               })}
@@ -1372,11 +1561,29 @@ export default function Comparator() {
       {/* 4) MÓDULOS premium */}
       <section className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
         <FeatureCard title="Cuota segura (regalo)" badge="Alta probabilidad" locked={!features.giftPick}>
-          <div className="text-xs text-slate-300">Aquí mostrarás tu pick seguro del día (manual o generado).</div>
-          <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/30 p-3">
-            <div className="text-sm font-semibold text-slate-100">Ejemplo</div>
-            <div className="text-xs text-slate-300 mt-1">Under 3.5 goles · cuota x1.40</div>
-          </div>
+          <div className="text-xs text-slate-300">
+  Pick con mayor probabilidad (FV). Si hay cuota de mercado, la mostramos; si no, usamos FV.
+</div>
+
+{fvOutput?.safe ? (
+  <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/30 p-3">
+    <div className="text-sm font-semibold text-slate-100">{fvOutput.safe.label}</div>
+    <div className="text-xs text-slate-300 mt-1">
+      {fvOutput.safe.home} vs {fvOutput.safe.away}
+    </div>
+    <div className="mt-2 text-xs text-slate-300">
+      Prob FV: <span className="text-emerald-200 font-semibold">{Math.round(fvOutput.safe.prob * 100)}%</span>{" "}
+      · Cuota FV justa: <span className="text-slate-100 font-semibold">x{fvOutput.safe.fvOdd}</span>
+      {fvOutput.safe.marketOdd ? (
+        <>
+          {" "}· Mercado: <span className="text-slate-100 font-semibold">x{fvOutput.safe.marketOdd}</span>
+        </>
+      ) : null}
+    </div>
+  </div>
+) : (
+  <div className="mt-3 text-[11px] text-slate-400">Genera una combinada para que aparezca aquí.</div>
+)}
         </FeatureCard>
 
         <FeatureCard title="Cuotas potenciadas" badge={`Hasta x${maxBoost}`} locked={!features.boosted}>
@@ -1403,21 +1610,42 @@ export default function Comparator() {
 
           {parlayError ? <div className="mt-3 text-xs text-amber-300">{parlayError}</div> : null}
 
-          {parlayResult ? (
-            <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/30 p-3">
-              <div className="text-xs text-slate-300">
-                Modo: <span className="text-slate-100 font-semibold">{parlayResult.mode}</span>
-              </div>
-              <div className="mt-1 text-sm font-bold text-emerald-200">
-                Cuota final: x{parlayResult.finalOdd}{" "}
-                <span className="text-xs font-semibold text-slate-300">(objetivo x{parlayResult.target})</span>
-              </div>
+          {fvOutput?.parlays?.length ? (
+  <div className="mt-3 space-y-3">
+    {fvOutput.parlays.map((p) => (
+      <div key={String(p.target)} className="rounded-xl border border-white/10 bg-slate-950/30 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="text-xs text-slate-300">
+            Objetivo: <span className="text-slate-100 font-semibold">x{p.target}</span>{" "}
+            <span className="text-slate-500">·</span>{" "}
+            Cap plan: <span className="text-slate-100 font-semibold">x{p.cap}</span>
+          </div>
+          <div className="text-sm font-bold text-emerald-200">Cuota final: x{p.finalOdd}</div>
+        </div>
 
-              <div className="mt-1 text-[11px] text-slate-400">
-                Partidos: {parlayResult.games} · En FV buscamos picks individuales de alta probabilidad (80–90%+ por selección).
-              </div>
+        <div className="mt-1 text-[11px] text-slate-400">
+          Legs: {p.games} · Prob implícita aprox: {(p.impliedProb * 100).toFixed(1)}%
+          {!p.reached ? <span className="text-amber-300"> · (no alcanzó el objetivo, sube partidos)</span> : null}
+        </div>
+
+        <div className="mt-2 space-y-1">
+          {p.legs.map((leg, idx) => (
+            <div key={`${leg.fixtureId}-${idx}`} className="text-[11px] text-slate-300">
+              <span className="text-slate-500">#{idx + 1}</span>{" "}
+              <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
+              <span className="text-slate-500">·</span>{" "}
+              {leg.home} vs {leg.away}{" "}
+              <span className="text-slate-500">·</span>{" "}
+              Odd: <span className="text-slate-100 font-semibold">x{leg.usedOdd}</span>{" "}
+              <span className="text-slate-500">·</span>{" "}
+              Prob FV: <span className="text-emerald-200 font-semibold">{Math.round(leg.prob * 100)}%</span>
             </div>
-          ) : null}
+          ))}
+        </div>
+      </div>
+    ))}
+  </div>
+) : null}
         </FeatureCard>
 
         <FeatureCard title="Árbitros tarjeteros" badge="Tarjetas" locked={!features.referees} lockText="Disponible desde Plan Anual.">
@@ -1447,14 +1675,29 @@ export default function Comparator() {
         <FeatureCard title="Cuota desfase del mercado" badge="Value" locked={!features.marketValue} lockText="Disponible desde Plan Vitalicio.">
           <div className="text-xs text-slate-300">Detecta cuotas con posible valor (desfase entre tu estimación y el mercado).</div>
 
-          <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/30 p-3">
-            <div className="text-sm font-semibold text-slate-100">Ejemplo</div>
-            <div className="text-xs text-slate-300 mt-1">
-              “Local gana” mercado x2.10 · FV estimado x1.85 → posible value.
-            </div>
-          </div>
-
-          <div className="mt-2 text-[11px] text-slate-400">Módulo en construcción: luego lo conectamos a cuotas reales + rating FV.</div>
+          {fvOutput?.valueList?.length ? (
+  <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/30 p-3">
+    <div className="text-sm font-semibold text-slate-100">Value (desfase mercado vs FV)</div>
+    <div className="mt-2 space-y-1">
+      {fvOutput.valueList.map((v, idx) => (
+        <div key={`${v.fixtureId}-${idx}`} className="text-[11px] text-slate-300">
+          <span className="text-amber-200 font-semibold">{(v.valueEdge * 100).toFixed(0)}%</span>{" "}
+          <span className="text-slate-500">·</span>{" "}
+          {v.home} vs {v.away}{" "}
+          <span className="text-slate-500">·</span>{" "}
+          <span className="text-slate-100 font-semibold">{v.label}</span>{" "}
+          <span className="text-slate-500">·</span>{" "}
+          Mercado x<span className="text-slate-100 font-semibold">{v.marketOdd}</span>{" "}
+          FV justa x<span className="text-slate-100 font-semibold">{v.fvOdd}</span>
+        </div>
+      ))}
+    </div>
+  </div>
+) : (
+  <div className="mt-3 text-[11px] text-slate-400">
+    Genera una combinada para buscar value (si la API entrega odds para esos fixtures).
+  </div>
+)}
         </FeatureCard>
       </section>
 
