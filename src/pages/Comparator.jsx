@@ -646,6 +646,7 @@ function WelcomeProCard({ planInfo }) {
 }
 
 /* ------------------- FixtureCard (compact) ------------------- */
+/* ------------------- FixtureCard (compact) ------------------- */
 function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats, fvPack, fvLoading, fvErr }) {
   const id = getFixtureId(fx);
 
@@ -735,7 +736,7 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
         </div>
       </div>
 
-           {open ? (
+      {open ? (
         <div className="px-3 md:px-4 pb-3 md:pb-4">
           <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3 text-[11px] text-slate-300">
             {fvLoading ? (
@@ -778,8 +779,7 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
                   <div>
                     <span className="text-slate-400">λ goles (FV):</span>{" "}
                     <span className="text-emerald-200 font-semibold">
-                      {fvPack?.model?.lambdaHome ?? "-"} + {fvPack?.model?.lambdaAway ?? "-"} ={" "}
-                      {fvPack?.model?.lambdaTotal ?? "-"}
+                      {fvPack?.model?.lambdaHome ?? "-"} + {fvPack?.model?.lambdaAway ?? "-"} = {fvPack?.model?.lambdaTotal ?? "-"}
                     </span>
                   </div>
                 </div>
@@ -797,9 +797,7 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
               </div>
             )}
 
-            {fvErr ? (
-              <div className="mt-2 text-amber-300">Error stats: {fvErr}</div>
-            ) : null}
+            {fvErr ? <div className="mt-2 text-amber-300">Error stats: {fvErr}</div> : null}
           </div>
         </div>
       ) : null}
@@ -1056,32 +1054,37 @@ export default function Comparator() {
   const selectedCount = selectedIds.length;
 
   // odds cache
-const ensureOdds = useCallback(async (fixtureId) => {
-  if (!fixtureId) return;
-  if (oddsRef.current[fixtureId]) return;
+// odds cache
+const ensureOdds = useCallback(
+  async (fixtureId) => {
+    if (!fixtureId) return;
+    if (oddsRef.current[fixtureId]) return;
 
-  try {
-    const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(fixtureId)}`);
-    if (!res.ok) {
-      const pack = { found: false, markets: {}, fetchedAt: Date.now() };
+    try {
+      const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(fixtureId)}`);
+      if (!res.ok) {
+        oddsRef.current[fixtureId] = { found: false, markets: {} };
+        setOddsByFixture((prev) => ({ ...prev, [fixtureId]: oddsRef.current[fixtureId] }));
+        return;
+      }
+
+      const data = await res.json();
+      const pack = {
+        found: !!data?.found,
+        markets: data?.markets || {},
+        fetchedAt: Date.now(),
+      };
+
       oddsRef.current[fixtureId] = pack;
       setOddsByFixture((prev) => ({ ...prev, [fixtureId]: pack }));
-      return;
+    } catch (e) {
+      // silencio (pero cerramos bien el try/catch)
+      oddsRef.current[fixtureId] = { found: false, markets: {} };
+      setOddsByFixture((prev) => ({ ...prev, [fixtureId]: oddsRef.current[fixtureId] }));
     }
-
-    const data = await res.json();
-    const pack = {
-      found: !!data?.found,
-      markets: data?.markets || {},
-      fetchedAt: Date.now(),
-    };
-
-    oddsRef.current[fixtureId] = pack;
-    setOddsByFixture((prev) => ({ ...prev, [fixtureId]: pack }));
-  } catch (e) {
-    // silencio (o console.warn)
-  }
-}, []);
+  },
+  [API_BASE]
+);
 
 // FV pack cache (stats + modelo + markets)
 const ensureFvPack = useCallback(
@@ -1097,6 +1100,7 @@ const ensureFvPack = useCallback(
     try {
       const res = await fetch(`${API_BASE}/api/fixture/${encodeURIComponent(fixtureId)}/fvpack`);
       if (!res.ok) throw new Error(`fvpack ${res.status}`);
+
       const data = await res.json();
 
       fvRef.current[fixtureId] = data;
@@ -1189,16 +1193,10 @@ const ensureFvPack = useCallback(
       return;
     }
 
-    // Auto: toma un pool inicial (más adelante: ranking FV, ligas top, etc.)
     const pool = fixtures.slice(0, 14);
     const ids = pool.map(getFixtureId).filter(Boolean);
 
-    console.log("[FV] auto pool", pool.length, "ids", ids.length);
-
-    // Pre-carga stats + odds
     await Promise.all(ids.map((id) => Promise.all([ensureFvPack(id), ensureOdds(id)])));
-
-    console.log("[FV] auto preload done");
 
     const candidatesByFixture = {};
     for (const fx of pool) {
@@ -1214,9 +1212,7 @@ const ensureFvPack = useCallback(
     const safe = pickSafe(candidatesByFixture);
 
     const targets = [10, 20, 50, 100].filter((t) => t <= maxBoost);
-    const parlays = targets
-      .map((t) => buildParlay({ candidatesByFixture, target: t, cap: maxBoost }))
-      .filter(Boolean);
+    const parlays = targets.map((t) => buildParlay({ candidatesByFixture, target: t, cap: maxBoost })).filter(Boolean);
 
     const valueList = buildValueList(candidatesByFixture, 0.06);
 
@@ -1227,11 +1223,64 @@ const ensureFvPack = useCallback(
 
     setFvOutput({ mode: "auto", safe, parlays, valueList, candidatesByFixture });
 
-    if (parlays[0]) {
-      setParlayResult({ mode: "auto", ...parlays[0] });
-    }
+    if (parlays[0]) setParlayResult({ mode: "auto", ...parlays[0] });
   } catch (e) {
     console.error("[FV] auto error", e);
+    setParlayError(String(e?.message || e));
+  }
+}
+
+async function handleSelectedParlay() {
+  console.log("[FV] selected click");
+
+  setParlayError("");
+  setParlayResult(null);
+  setFvOutput(null);
+
+  try {
+    if (!fixtures.length) {
+      setParlayError("Genera primero partidos con el botón de arriba.");
+      return;
+    }
+
+    if (selectedCount < 2) {
+      setParlayError("Selecciona al menos 2 partidos de la lista superior.");
+      return;
+    }
+
+    const pool = fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)));
+    const ids = pool.map(getFixtureId).filter(Boolean);
+
+    await Promise.all(ids.map((id) => Promise.all([ensureFvPack(id), ensureOdds(id)])));
+
+    const candidatesByFixture = {};
+    for (const fx of pool) {
+      const id = getFixtureId(fx);
+      if (!id) continue;
+
+      const pack = fvPackByFixture[id] || fvRef.current[id] || null;
+      const markets = pack?.markets || oddsByFixture[id]?.markets || {};
+
+      candidatesByFixture[id] = buildCandidatePicks({ fixture: fx, pack: pack || {}, markets });
+    }
+
+    const safe = pickSafe(candidatesByFixture);
+
+    const targets = [10, 20, 50, 100].filter((t) => t <= maxBoost);
+    const parlays = targets.map((t) => buildParlay({ candidatesByFixture, target: t, cap: maxBoost })).filter(Boolean);
+
+    const valueList = buildValueList(candidatesByFixture, 0.06);
+
+    if (!safe && !parlays.length) {
+      setParlayError("Con esta selección no pudimos generar picks. Prueba agregando más partidos o usando Auto.");
+      return;
+    }
+
+    setFvOutput({ mode: "selected", safe, parlays, valueList, candidatesByFixture });
+
+    if (parlays[0]) setParlayResult({ mode: "selected", ...parlays[0] });
+  } catch (e) {
+    console.error("[FV] selected error", e);
     setParlayError(String(e?.message || e));
   }
 }
@@ -1449,7 +1498,7 @@ const ensureFvPack = useCallback(
       {/* 1) Filtros + Generar */}
       <HudCard bg={BG_PROFILE_HUD} overlayVariant="casillas" className="mt-4" glow="gold">
         <div className="p-4 md:p-6">
-          <form onSubmit={handleGenerate} className="flex flex-col md:flex-row md:items-end gap-3 items-stretch">
+          <form onSubmit={handleLoadFixtures} className="flex flex-col md:flex-row md:items-end gap-3 items-stretch">
             <div className="flex-[2]">
               <label htmlFor="qFilter" className="block text-xs text-slate-400 mb-1">
                 Filtro (país / liga / equipo)
