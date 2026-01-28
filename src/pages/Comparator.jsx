@@ -646,7 +646,7 @@ function WelcomeProCard({ planInfo }) {
 }
 
 /* ------------------- FixtureCard (compact) ------------------- */
-function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats, fvPack, fvLoading }) {
+function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats, fvPack, fvLoading, fvErr }) {
   const id = getFixtureId(fx);
 
   const league = getLeagueName(fx);
@@ -785,13 +785,12 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
     <div className="mt-2 text-slate-400">
       fixtureId: <span className="text-slate-200 font-semibold">{String(id)}</span>
     </div>
-  </div>
+      </div>
 ) : (
   <div className="text-[11px] text-slate-400">
     Sin estadísticas aún (o no disponibles). Igual podemos estimar con heurísticas.
     <div className="mt-2">
-      fixtureId: <span className="text-slate-200 font-semibold">{String(id)}</span>
-     </div>
+         </div>
               </div>
             )}
           </div>
@@ -800,6 +799,11 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
     </div>
   );
 }
+{fvErr ? (
+  <div className="mt-2 text-amber-300">
+    Error stats: {fvErr}
+  </div>
+) : null}
 
 /* ------------------- FeatureCard ------------------- */
 function FeatureCard({ title, badge, children, locked, lockText, bg }) {
@@ -937,6 +941,7 @@ export default function Comparator() {
   const [fvPackByFixture, setFvPackByFixture] = useState({});
   const [fvLoadingByFixture, setFvLoadingByFixture] = useState({});
   const fvRef = useRef({});
+  const [fvErrByFixture, setFvErrByFixture] = useState({});
 
   const planId = useMemo(() => {
     const raw = user?.planId || user?.plan?.id || user?.plan || user?.membership || "basic";
@@ -1073,27 +1078,32 @@ export default function Comparator() {
       // silencio
     }
 const ensureFvPack = useCallback(async (fixtureId) => {
-  if (!fixtureId) return;
-  if (fvRef.current[fixtureId]) return;
+  if (!fixtureId) return null;
+
+  // cache rápido
+  if (fvRef.current[fixtureId]) return fvRef.current[fixtureId];
+
+  setFvLoadingByFixture((m) => ({ ...m, [fixtureId]: true }));
+  setFvErrByFixture((m) => ({ ...m, [fixtureId]: null }));
 
   try {
-    setFvLoadingByFixture((prev) => ({ ...prev, [fixtureId]: true }));
     const res = await fetch(`${API_BASE}/api/fixture/${encodeURIComponent(fixtureId)}/fvpack`);
-    if (!res.ok) {
-      fvRef.current[fixtureId] = null;
-      setFvPackByFixture((prev) => ({ ...prev, [fixtureId]: null }));
-      return;
-    }
+    if (!res.ok) throw new Error(`fvpack ${res.status}`);
     const data = await res.json();
+
     fvRef.current[fixtureId] = data;
-    setFvPackByFixture((prev) => ({ ...prev, [fixtureId]: data }));
-  } catch {
+    setFvPackByFixture((m) => ({ ...m, [fixtureId]: data }));
+    return data;
+  } catch (e) {
+    console.error("ensureFvPack error", fixtureId, e);
+    setFvErrByFixture((m) => ({ ...m, [fixtureId]: String(e?.message || e) }));
     fvRef.current[fixtureId] = null;
-    setFvPackByFixture((prev) => ({ ...prev, [fixtureId]: null }));
+    setFvPackByFixture((m) => ({ ...m, [fixtureId]: null }));
+    return null;
   } finally {
-    setFvLoadingByFixture((prev) => ({ ...prev, [fixtureId]: false }));
+    setFvLoadingByFixture((m) => ({ ...m, [fixtureId]: false }));
   }
-}, []);
+}, [API_BASE]);
 
   }, []);
 
@@ -1161,10 +1171,13 @@ const loadReferees = useCallback(async () => {
 
   
 async function handleAutoParlay() {
-    setParlayError("");
-    setParlayResult(null);
-    setFvOutput(null);
+  console.log("[FV] auto click");
 
+  setParlayError("");
+  setParlayResult(null);
+  setFvOutput(null);
+
+  try {
     if (!fixtures.length) {
       setParlayError("Genera primero partidos con el botón de arriba.");
       return;
@@ -1172,11 +1185,14 @@ async function handleAutoParlay() {
 
     // Auto: toma un pool inicial (más adelante: ranking FV, ligas top, etc.)
     const pool = fixtures.slice(0, 14);
-
     const ids = pool.map(getFixtureId).filter(Boolean);
 
-    // Pre-carga stats+odds
+    console.log("[FV] auto pool", pool.length, "ids", ids.length);
+
+    // Pre-carga stats + odds
     await Promise.all(ids.map((id) => Promise.all([ensureFvPack(id), ensureOdds(id)])));
+
+    console.log("[FV] auto preload done");
 
     const candidatesByFixture = {};
     for (const fx of pool) {
@@ -1208,13 +1224,20 @@ async function handleAutoParlay() {
     if (parlays[0]) {
       setParlayResult({ mode: "auto", ...parlays[0] });
     }
+  } catch (e) {
+    console.error("[FV] auto error", e);
+    setParlayError(String(e?.message || e));
   }
+}
 
   async function handleSelectedParlay() {
-    setParlayError("");
-    setParlayResult(null);
-    setFvOutput(null);
+  console.log("[FV] selected click");
 
+  setParlayError("");
+  setParlayResult(null);
+  setFvOutput(null);
+
+  try {
     if (!fixtures.length) {
       setParlayError("Genera primero partidos con el botón de arriba.");
       return;
@@ -1260,7 +1283,11 @@ async function handleAutoParlay() {
     if (parlays[0]) {
       setParlayResult({ mode: "selected", ...parlays[0] });
     }
+  } catch (e) {
+    console.error("[FV] selected error", e);
+    setParlayError(String(e?.message || e));
   }
+}
 
   async function handleGenerate() {
     setParlayError("");
@@ -1549,6 +1576,7 @@ async function handleAutoParlay() {
                     onLoadStats={(fixtureId) => ensureFvPack(fixtureId)}
                     fvPack={fvPackByFixture[id] || null}
                     fvLoading={!!fvLoadingByFixture[id]}
+                    fvErr={fvErrByFixture[id] || null}
                   
                   />
                 );
@@ -1654,13 +1682,20 @@ async function handleAutoParlay() {
           {refLoading ? <div className="mt-3 text-xs text-slate-300">Cargando árbitros…</div> : null}
           {refErr ? <div className="mt-3 text-xs text-amber-300">{refErr}</div> : null}
 
-          {refData ? (
-            <pre className="mt-3 text-[11px] leading-snug text-slate-200 bg-slate-950/30 border border-white/10 rounded-xl p-3 overflow-auto">
-              {JSON.stringify(refData, null, 2)}
-            </pre>
-          ) : (
-            <div className="mt-3 text-[11px] text-slate-400">Cuando el backend esté listo, aquí mostramos el top de árbitros.</div>
-          )}
+          {refData?.topReferees?.length ? (
+  <ul className="mt-3 space-y-2">
+    {refData.topReferees.slice(0, 5).map((r) => (
+      <li key={r.id} className="text-slate-200">
+        {r.name} — <span className="text-emerald-200 font-semibold">{r.avgCards}</span> tarjetas/partido
+      </li>
+    ))}
+  </ul>
+) : (
+  <div className="mt-3 text-xs text-slate-400">
+    Aún sin ranking (fixturesScanned: {refData?.fixturesScanned ?? 0}). Endpoint OK.
+  </div>
+)}
+
         </FeatureCard>
 
         <FeatureCard
