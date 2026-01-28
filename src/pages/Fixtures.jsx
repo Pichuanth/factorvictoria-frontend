@@ -417,7 +417,7 @@ const PARTIDAZOS_MANUAL = [
    // Los que te faltan: aquí conviene fixtureId (por nombres “raros” o abreviaciones)
   { fixtureId: 1451161 }, // fc barcelona champions 28-01-2026
   { fixtureId: 1451162 }, // Benfica vs madrid  28-01-2026
-  { fixtureId: 1234567 }, // id antigua
+  { fixtureId: 1451159 }, // Arsenal 28-01-2026
   // { fixtureId: 123459 }, // id antigua
   { date: "2026-01-28", fixtureId: 1514365 }
 
@@ -826,16 +826,14 @@ export default function Fixtures() {
   const nav = useNavigate();
 
   const today = useMemo(() => toYYYYMMDDLocal(new Date()), []);
-  const [fromDate, setFromDate] = useState(today);
-  const [toDate, setToDate] = useState(today);
-  const [filterText, setFilterText] = useState("");
-
-  function addDaysYMD(ymd, days) {
-  const d = parseYMDLocal(ymd);
-  if (!d) return ymd;
-  d.setDate(d.getDate() + Number(days || 0));
+const tomorrow = useMemo(() => {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
   return toYYYYMMDDLocal(d);
-}
+}, []);
+
+const [fromDate, setFromDate] = useState(today);
+const [toDate, setToDate] = useState(tomorrow);
 
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
