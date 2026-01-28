@@ -735,75 +735,77 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
         </div>
       </div>
 
-      {open ? (
+           {open ? (
         <div className="px-3 md:px-4 pb-3 md:pb-4">
           <div className="rounded-xl border border-white/10 bg-slate-950/30 p-3 text-[11px] text-slate-300">
             {fvLoading ? (
-  <div className="text-[11px] text-slate-300">Cargando estadísticas reales…</div>
-) : fvPack ? (
-  <div className="text-[11px] text-slate-300 leading-relaxed">
-    <div className="flex flex-wrap gap-x-4 gap-y-1">
-      <div>
-        <span className="text-slate-400">Forma local:</span>{" "}
-        <span className="text-slate-100 font-semibold">{fvPack?.last5?.home?.form || "--"}</span>
-      </div>
-      <div>
-        <span className="text-slate-400">Forma visita:</span>{" "}
-        <span className="text-slate-100 font-semibold">{fvPack?.last5?.away?.form || "--"}</span>
-      </div>
-      <div>
-        <span className="text-slate-400">GF/GA local:</span>{" "}
-        <span className="text-slate-100 font-semibold">
-          {fvPack?.last5?.home?.gf ?? "-"} / {fvPack?.last5?.home?.ga ?? "-"}
-        </span>
-      </div>
-      <div>
-        <span className="text-slate-400">GF/GA visita:</span>{" "}
-        <span className="text-slate-100 font-semibold">
-          {fvPack?.last5?.away?.gf ?? "-"} / {fvPack?.last5?.away?.ga ?? "-"}
-        </span>
-      </div>
-      <div>
-        <span className="text-slate-400">Corners prom:</span>{" "}
-        <span className="text-slate-100 font-semibold">
-          {fvPack?.last5?.home?.avgCorners ?? "-"} / {fvPack?.last5?.away?.avgCorners ?? "-"}
-        </span>
-      </div>
-      <div>
-        <span className="text-slate-400">Tarjetas prom:</span>{" "}
-        <span className="text-slate-100 font-semibold">
-          {fvPack?.last5?.home?.avgCards ?? "-"} / {fvPack?.last5?.away?.avgCards ?? "-"}
-        </span>
-      </div>
-      <div>
-        <span className="text-slate-400">λ goles (FV):</span>{" "}
-        <span className="text-emerald-200 font-semibold">
-          {fvPack?.model?.lambdaHome ?? "-"} + {fvPack?.model?.lambdaAway ?? "-"} = {fvPack?.model?.lambdaTotal ?? "-"}
-        </span>
-      </div>
-    </div>
-    <div className="mt-2 text-slate-400">
-      fixtureId: <span className="text-slate-200 font-semibold">{String(id)}</span>
-    </div>
-      </div>
-) : (
-  <div className="text-[11px] text-slate-400">
-    Sin estadísticas aún (o no disponibles). Igual podemos estimar con heurísticas.
-    <div className="mt-2">
-         </div>
+              <div className="text-[11px] text-slate-300">Cargando estadísticas reales…</div>
+            ) : fvPack ? (
+              <div className="text-[11px] text-slate-300 leading-relaxed">
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  <div>
+                    <span className="text-slate-400">Forma local:</span>{" "}
+                    <span className="text-slate-100 font-semibold">{fvPack?.last5?.home?.form || "--"}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Forma visita:</span>{" "}
+                    <span className="text-slate-100 font-semibold">{fvPack?.last5?.away?.form || "--"}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">GF/GA local:</span>{" "}
+                    <span className="text-slate-100 font-semibold">
+                      {fvPack?.last5?.home?.gf ?? "-"} / {fvPack?.last5?.home?.ga ?? "-"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">GF/GA visita:</span>{" "}
+                    <span className="text-slate-100 font-semibold">
+                      {fvPack?.last5?.away?.gf ?? "-"} / {fvPack?.last5?.away?.ga ?? "-"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Corners prom:</span>{" "}
+                    <span className="text-slate-100 font-semibold">
+                      {fvPack?.last5?.home?.avgCorners ?? "-"} / {fvPack?.last5?.away?.avgCorners ?? "-"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Tarjetas prom:</span>{" "}
+                    <span className="text-slate-100 font-semibold">
+                      {fvPack?.last5?.home?.avgCards ?? "-"} / {fvPack?.last5?.away?.avgCards ?? "-"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">λ goles (FV):</span>{" "}
+                    <span className="text-emerald-200 font-semibold">
+                      {fvPack?.model?.lambdaHome ?? "-"} + {fvPack?.model?.lambdaAway ?? "-"} ={" "}
+                      {fvPack?.model?.lambdaTotal ?? "-"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-2 text-slate-400">
+                  fixtureId: <span className="text-slate-200 font-semibold">{String(id)}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="text-[11px] text-slate-400">
+                Sin estadísticas aún (o no disponibles). Igual podemos estimar con heurísticas.
+                <div className="mt-2 text-slate-400">
+                  fixtureId: <span className="text-slate-200 font-semibold">{String(id)}</span>
+                </div>
               </div>
             )}
+
+            {fvErr ? (
+              <div className="mt-2 text-amber-300">Error stats: {fvErr}</div>
+            ) : null}
           </div>
         </div>
       ) : null}
     </div>
   );
 }
-{fvErr ? (
-  <div className="mt-2 text-amber-300">
-    Error stats: {fvErr}
-  </div>
-) : null}
 
 /* ------------------- FeatureCard ------------------- */
 function FeatureCard({ title, badge, children, locked, lockText, bg }) {
@@ -1053,62 +1055,67 @@ export default function Comparator() {
 
   const selectedCount = selectedIds.length;
 
-  const ensureOdds = useCallback(async (fixtureId) => {
-    if (!fixtureId) return;
-    if (oddsRef.current[fixtureId]) return;
-
-    try {
-      const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(fixtureId)}`);
-      if (!res.ok) {
-        oddsRef.current[fixtureId] = { found: false, markets: {} };
-        setOddsByFixture((prev) => ({ ...prev, [fixtureId]: oddsRef.current[fixtureId] }));
-        return;
-      }
-
-      const data = await res.json();
-      const pack = {
-        found: !!data?.found,
-        markets: data?.markets || {},
-        fetchedAt: Date.now(),
-      };
-
-      oddsRef.current[fixtureId] = pack;
-      setOddsByFixture((prev) => ({ ...prev, [fixtureId]: pack }));
-    } catch {
-      // silencio
-    }
-const ensureFvPack = useCallback(async (fixtureId) => {
-  if (!fixtureId) return null;
-
-  // cache rápido
-  if (fvRef.current[fixtureId]) return fvRef.current[fixtureId];
-
-  setFvLoadingByFixture((m) => ({ ...m, [fixtureId]: true }));
-  setFvErrByFixture((m) => ({ ...m, [fixtureId]: null }));
+  // odds cache
+const ensureOdds = useCallback(async (fixtureId) => {
+  if (!fixtureId) return;
+  if (oddsRef.current[fixtureId]) return;
 
   try {
-    const res = await fetch(`${API_BASE}/api/fixture/${encodeURIComponent(fixtureId)}/fvpack`);
-    if (!res.ok) throw new Error(`fvpack ${res.status}`);
+    const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(fixtureId)}`);
+    if (!res.ok) {
+      const pack = { found: false, markets: {}, fetchedAt: Date.now() };
+      oddsRef.current[fixtureId] = pack;
+      setOddsByFixture((prev) => ({ ...prev, [fixtureId]: pack }));
+      return;
+    }
+
     const data = await res.json();
+    const pack = {
+      found: !!data?.found,
+      markets: data?.markets || {},
+      fetchedAt: Date.now(),
+    };
 
-    fvRef.current[fixtureId] = data;
-    setFvPackByFixture((m) => ({ ...m, [fixtureId]: data }));
-    return data;
+    oddsRef.current[fixtureId] = pack;
+    setOddsByFixture((prev) => ({ ...prev, [fixtureId]: pack }));
   } catch (e) {
-    console.error("ensureFvPack error", fixtureId, e);
-    setFvErrByFixture((m) => ({ ...m, [fixtureId]: String(e?.message || e) }));
-    fvRef.current[fixtureId] = null;
-    setFvPackByFixture((m) => ({ ...m, [fixtureId]: null }));
-    return null;
-  } finally {
-    setFvLoadingByFixture((m) => ({ ...m, [fixtureId]: false }));
+    // silencio (o console.warn)
   }
-}, [API_BASE]);
+}, []);
 
-  }, []);
+// FV pack cache (stats + modelo + markets)
+const ensureFvPack = useCallback(
+  async (fixtureId) => {
+    if (!fixtureId) return null;
 
-  
-const loadReferees = useCallback(async () => {
+    // cache rápido
+    if (fvRef.current[fixtureId]) return fvRef.current[fixtureId];
+
+    setFvLoadingByFixture((m) => ({ ...m, [fixtureId]: true }));
+    setFvErrByFixture((m) => ({ ...m, [fixtureId]: null }));
+
+    try {
+      const res = await fetch(`${API_BASE}/api/fixture/${encodeURIComponent(fixtureId)}/fvpack`);
+      if (!res.ok) throw new Error(`fvpack ${res.status}`);
+      const data = await res.json();
+
+      fvRef.current[fixtureId] = data;
+      setFvPackByFixture((m) => ({ ...m, [fixtureId]: data }));
+      return data;
+    } catch (e) {
+      console.error("ensureFvPack error", fixtureId, e);
+      setFvErrByFixture((m) => ({ ...m, [fixtureId]: String(e?.message || e) }));
+      fvRef.current[fixtureId] = null;
+      setFvPackByFixture((m) => ({ ...m, [fixtureId]: null }));
+      return null;
+    } finally {
+      setFvLoadingByFixture((m) => ({ ...m, [fixtureId]: false }));
+    }
+  },
+  [API_BASE]
+);
+
+    const loadReferees = useCallback(async () => {
     try {
       setRefErr("");
       setRefLoading(true);
@@ -1169,8 +1176,7 @@ const loadReferees = useCallback(async () => {
     return { games: picks.length, finalOdd, target: maxBoostArg, impliedProb, reachedTarget };
   }
 
-  
-async function handleAutoParlay() {
+  async function handleAutoParlay() {
   console.log("[FV] auto click");
 
   setParlayError("");
@@ -1315,7 +1321,7 @@ async function handleAutoParlay() {
     setParlayResult({ mode: "selected", ...suggestion });
   }
 
-  async function handleGenerate(e) {
+  async function handleLoadFixtures(e) {
     e?.preventDefault?.();
 
     setErr("");
@@ -1563,22 +1569,22 @@ async function handleAutoParlay() {
 
                 return (
                   <FixtureCardCompact
-                    key={String(id)}
-                    fx={fx}
-                    isSelected={isSelected}
-                    onToggle={(fixtureId) => {
-                      toggleFixtureSelection(fixtureId);
-                      setParlayResult(null);
-                      setParlayError("");
-                      setFvOutput(null);
-                    }}
-                    onLoadOdds={(fixtureId) => ensureOdds(fixtureId)}
-                    onLoadStats={(fixtureId) => ensureFvPack(fixtureId)}
-                    fvPack={fvPackByFixture[id] || null}
-                    fvLoading={!!fvLoadingByFixture[id]}
-                    fvErr={fvErrByFixture[id] || null}
-                  
-                  />
+  key={String(id)}
+  fx={fx}
+  isSelected={isSelected}
+  onToggle={(fixtureId) => {
+    toggleFixtureSelection(fixtureId);
+    setParlayResult(null);
+    setParlayError("");
+    setFvOutput(null);
+  }}
+  onLoadOdds={(fixtureId) => ensureOdds(fixtureId)}
+  onLoadStats={(fixtureId) => ensureFvPack(fixtureId)}
+  fvPack={fvPackByFixture[id] || null}
+  fvLoading={!!fvLoadingByFixture[id]}
+  fvErr={fvErrByFixture?.[id] || null}
+/>
+
                 );
               })}
             </div>
