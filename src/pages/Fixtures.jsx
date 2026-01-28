@@ -1,5 +1,5 @@
 // src/pages/Fixtures.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import Simulator from "../components/Simulator";
@@ -15,9 +15,6 @@ const BG_JUGADOR = "/hero-profile-hud.png";
 const BG_12000 = "/hero-12000.png";
 const BG_PARTIDAZOS = "/hero-fondo-partidos.png";
 const BG_DINERO = (import.meta.env.BASE_URL || "/") + "hero.dinero.png";
-
-// donde renderizas el simulador:
-<Simulator bg={BG_DINERO} />
 
 /** Timezone “oficial” de la app */
 const APP_TZ = "America/Santiago";
@@ -415,13 +412,14 @@ const PARTIDAZOS_MANUAL = [
   { date: "2026-01-28", league: "UEFA Champions League", home: "atalanta" },
   { date: "2026-01-28", league: "UEFA Champions League", home: "Pafos" },
   { date: "2026-01-28", league: "UEFA Champions League", home: "Juventus" },
-  
 
-  // Los que te faltan: aquí conviene fixtureId (por nombres “raros” o abreviaciones)
-  { fixtureId: 1504664 }, // Bodo/Glimt vs Manchester City
-  { fixtureId: 1451134 }, // Olympiacos vs Bayer Leverkusen
-  { fixtureId: 1451132 }, // FC Copenhagen vs Napoli
-  // { fixtureId: 123459 }, // FC Kairat vs Club Brugge
+   // Los que te faltan: aquí conviene fixtureId (por nombres “raros” o abreviaciones)
+  { fixtureId: 1451161 }, // fc barcelona champions 28-01-2026
+  { fixtureId: 1451162 }, // Benfica vs madrid  28-01-2026
+  { fixtureId: 1234567 }, // id antigua
+  // { fixtureId: 123459 }, // id antigua
+  { date: "2026-01-28", fixtureId: 1514365 }
+
 ];
 
 function manualPickDates() {
@@ -490,7 +488,7 @@ function MatchLine({ f }) {
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[11px] text-slate-400 truncate">
-            {dKey} · {meta.league || "Liga"} {meta.country ? `· ${meta.country}` : ""}
+            {dKey} • {meta.league || "Liga"} {meta.country ? `• ${meta.country}` : ""}
           </div>
 
           <div className="mt-1 flex items-center gap-2 min-w-0">
@@ -568,8 +566,8 @@ function LockedFixtureCard({ f, locked = true, isLoggedIn, goPlans }) {
           </div>
 
           <div className="mt-1 text-[11px] text-slate-400 truncate">
-            {meta.league ? `${meta.league} · ` : ""}
-            {meta.country ? `${meta.country} · ` : ""}
+            {meta.league ? `${meta.league} • ` : ""}
+            {meta.country ? `${meta.country} • ` : ""}
             {meta.timeLabel ? `${meta.timeLabel}` : ""}
           </div>
         </div>
@@ -645,18 +643,59 @@ function LockedFixtureCard({ f, locked = true, isLoggedIn, goPlans }) {
   );
 }
 
-function RecoWeeklyCard({ fixtures = [] }) {
+function RecoWeeklyCard({ fixtures = [], loading = false, error = "" }) {
   const picks = useMemo(() => picksFromFixtures(fixtures), [fixtures]);
 
-  return (
+  // ✅ NUEVO: aviso de estado (listo / sin resultados)
+  const [notice, setNotice] = useState("");
+  const prevLoadingRef = useRef(false);
+
+  useEffect(() => {
+    const prev = prevLoadingRef.current;
+    prevLoadingRef.current = loading;
+
+    // Cuando termina de cargar (true -> false)
+    if (prev && !loading) {
+      if (error) {
+        setNotice("Ocurrió un error al cargar partidazos.");
+      } else if (picks.length > 0) {
+        setNotice(`Listo: ${picks.length} partidazo${picks.length === 1 ? "" : "s"} cargado${picks.length === 1 ? "" : "s"}.`);
+      } else {
+        setNotice("Listo: no encontramos partidazos para el rango.");
+      }
+
+      // se borra solo
+      const t = setTimeout(() => setNotice(""), 3200);
+      return () => clearTimeout(t);
+    }
+  }, [loading, error, picks.length]);
+
+  // ...tu return sigue abajo
+
+    return (
     <HudCard bg={BG_PARTIDAZOS} overlayVariant="casillasSharp" glow="gold">
       <div className="relative p-5 md:p-6">
         <div className="text-xs tracking-wide text-emerald-200/90 font-semibold">Factor Victoria recomienda</div>
         <div className="mt-1 text-lg md:text-xl font-bold text-slate-100">Partidazos de la semana</div>
         <div className="mt-1 text-xs text-slate-300">Selección curada manualmente.</div>
 
+        {/* ✅ NUEVO: aviso (Listo / Error / Sin resultados) */}
+        {notice ? (
+          <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-emerald-200">
+            {notice}
+          </div>
+        ) : null}
+
         <div className="mt-4 space-y-2">
-          {picks.length === 0 ? (
+          {loading ? (
+            <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-slate-300">
+              Cargando partidazos…
+            </div>
+          ) : error ? (
+            <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-amber-300">
+              {error}
+            </div>
+          ) : picks.length === 0 ? (
             <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-slate-300">
               Aún no hay coincidencias (revisa texto/fecha/liga o usa fixtureId).
             </div>
@@ -790,6 +829,13 @@ export default function Fixtures() {
   const [toDate, setToDate] = useState(today);
   const [filterText, setFilterText] = useState("");
 
+  function addDaysYMD(ymd, days) {
+  const d = parseYMDLocal(ymd);
+  if (!d) return ymd;
+  d.setDate(d.getDate() + Number(days || 0));
+  return toYYYYMMDDLocal(d);
+}
+
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [fixtures, setFixtures] = useState([]);
@@ -808,21 +854,26 @@ export default function Fixtures() {
     return { country: parts[0] || "", league: parts[1] || "", team: parts[2] || "" };
   }
 
-  async function fetchDay(dateStr, { country, league, team }) {
-    const params = new URLSearchParams();
-    if (dateStr) params.set("date", dateStr);
-    if (country) params.set("country", country);
-    if (league) params.set("league", league);
-    if (team) params.set("team", team);
+  async function fetchRange(from, to, { country, league, team }) {
+  const params = new URLSearchParams();
+  params.set("from", from);
+  params.set("to", to);
+  if (country) params.set("country", country);
+  if (league) params.set("league", league);
+  if (team) params.set("team", team);
 
-    const url = `${API_BASE}/api/fixtures?${params.toString()}`;
-    const r = await fetch(url);
-    if (!r.ok) throw new Error(`Error ${r.status}`);
-    const data = await r.json();
+  const url = `${API_BASE}/api/fixtures?${params.toString()}`;
+  const r = await fetch(url);
 
-    const list = data?.fixtures || data?.response || data?.data || data || [];
-    return Array.isArray(list) ? list : [];
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const msg = data?.message || data?.error || `Error ${r.status}`;
+    throw new Error(msg);
   }
+
+  const list = data?.fixtures || data?.response || data?.data || data || [];
+  return Array.isArray(list) ? list : [];
+}
 
   async function onSearch() {
     setErr("");
@@ -831,96 +882,42 @@ export default function Fixtures() {
     try {
       const quick = parseQuickFilter(filterText);
 
-      const dates = enumerateDates(fromDate, toDate, 10);
-      if (!dates.length) {
-        setFixtures([]);
-        setErr("Rango de fechas inválido.");
-        return;
-      }
-function PartidazoLine({ f }) {
-  const id = getFixtureId(f);
-  const home = getHomeName(f);
-  const away = getAwayName(f);
-  const league = getLeagueName(f);
-  const country = getCountryName(f);
-  const time = getKickoffTime(f);
+// ✅ 1 sola llamada por rango (backend exige from/to)
+const main = await fetchRange(fromDate, toDate, quick);
+// ✅ Ventana semanal (para "Partidazos de la semana"), sin filtros
+const weekFrom = today;
+const weekTo = addDaysYMD(today, 7);
+const week = await fetchRange(weekFrom, weekTo, { country: "", league: "", team: "" });
 
-  const hLogo = getHomeLogo(f);
-  const aLogo = getAwayLogo(f);
+// ✅ Si quieres asegurar que siempre salgan los partidazos manuales,
+// ampliamos rango para cubrir sus fechas (si están fuera del rango del usuario)
+const manualDates = manualPickDates();
+let all = [...main, ...week];
 
-  return (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/25 px-4 py-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-[11px] text-slate-400 truncate">
-            {league} {country ? `· ${country}` : ""}
-          </div>
+if (manualDates.length) {
+  const reqFrom = manualDates.reduce((min, d) => (d < min ? d : min), fromDate);
+  const reqTo = manualDates.reduce((max, d) => (d > max ? d : max), toDate);
 
-          <div className="mt-1 flex items-center gap-2 min-w-0">
-            {hLogo ? (
-              <img src={hLogo} alt="" aria-hidden="true" className="h-6 w-6 rounded-sm object-contain" />
-            ) : (
-              <div className="h-6 w-6 rounded-sm bg-white/5 border border-white/10" />
-            )}
-
-            <div className="text-sm font-semibold text-slate-100 truncate">{home}</div>
-
-            <div className="text-xs font-bold" style={{ color: "rgba(230,196,100,0.80)" }}>
-              vs
-            </div>
-
-            <div className="text-sm font-semibold text-slate-100 truncate">{away}</div>
-
-            {aLogo ? (
-              <img src={aLogo} alt="" aria-hidden="true" className="h-6 w-6 rounded-sm object-contain" />
-            ) : (
-              <div className="h-6 w-6 rounded-sm bg-white/5 border border-white/10" />
-            )}
-          </div>
-        </div>
-
-        <div className="shrink-0 text-xs px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-slate-200">
-          {time || "—"}
-        </div>
-      </div>
-
-      <div className="mt-2 text-[11px] text-slate-400">
-        fixtureId: <span className="text-slate-200 font-semibold">{String(id)}</span>
-      </div>
-    </div>
-  );
+  // Solo si el rango manual se sale del rango actual
+  if (reqFrom !== fromDate || reqTo !== toDate) {
+    const extra = await fetchRange(reqFrom, reqTo, { country: "", league: "", team: "" });
+    all = [...main, ...extra];
+  }
 }
 
-      // traer fechas de PARTIDAZOS aunque no estén en el rango
-      const extra = manualPickDates().filter((d) => !dates.includes(d));
+// Dedup por fixtureId
+const map = new Map();
+for (const f of all) {
+  const id = fixtureId(f);
+  if (!map.has(id)) map.set(id, f);
+}
 
-      const chunks = [];
+setFixtures([...map.values()]);
 
-      // rango del usuario (aplica filtro)
-      for (const d of dates) {
-        // eslint-disable-next-line no-await-in-loop
-        const day = await fetchDay(d, quick);
-        chunks.push(...day);
-      }
-
-      // fechas partidazos (NO aplica filtro para no romperlos)
-      for (const d of extra) {
-        // eslint-disable-next-line no-await-in-loop
-        const day = await fetchDay(d, { country: "", league: "", team: "" });
-        chunks.push(...day);
-      }
-
-      // Dedup
-      const map = new Map();
-      for (const f of chunks) {
-        const id = fixtureId(f);
-        if (!map.has(id)) map.set(id, f);
-      }
-
-      setFixtures([...map.values()]);
     } catch (e) {
-      setErr("No se pudieron cargar los partidos. Intenta nuevamente.");
-      setFixtures([]);
+     console.error("❌ Error cargando fixtures:", e);
+     setErr(String(e?.message || e || "No se pudieron cargar los partidos."));
+     setFixtures([]);
     } finally {
       setLoading(false);
     }
@@ -1151,7 +1148,8 @@ function PartidazoLine({ f }) {
 
       {/* 1) Partidazos de la semana */}
       <div className="mt-4">
-        <RecoWeeklyCard fixtures={fixturesSorted} />
+        <RecoWeeklyCard fixtures={fixturesSorted} loading={loading} error={err} />
+
       </div>
 
       {/* 2) Partidazos bloqueados (top 3) */}
@@ -1240,7 +1238,11 @@ function PartidazoLine({ f }) {
       </HudCard>
 
       {/* Simulador */}
-      <Simulator />
+<Simulator
+  bg={BG_DINERO}
+  overlayVariant="casillasSharp"
+  imgStyle={{ objectPosition: "60% 35%" }}
+/>
 
       {/* CTA final */}
       <HudCard bg={BG_12000} overlayVariant="player" className="mt-4" glow="gold" imgStyle={{ objectPosition: "70% 22%" }}>
