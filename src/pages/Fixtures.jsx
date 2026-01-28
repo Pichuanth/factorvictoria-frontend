@@ -3,7 +3,6 @@ import React, { useMemo, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import Simulator from "../components/Simulator";
-import RecoWeeklyCard from "../components/RecoWeeklyCard";
 
 const GOLD = "#E6C464";
 
@@ -399,26 +398,22 @@ function HudCard({
  * - Si puedes, usa fixtureId: { fixtureId: 123456 }
  * - Si no, usa { date, league, home, away } (más estable que “match suelto”)
  */
+/* ------------------- Partidazos manuales ------------------- */
 const PARTIDAZOS_MANUAL = [
-  // Champions (Martes 20-01-2026)
-  { date: "2026-01-20", league: "UEFA Champions League", home: "Inter", away: "Arsenal" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "Tottenham", away: "Borussia Dortmund" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "Monaco" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "Sporting CP", away: "Paris" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "Villarreal", away: "Ajax" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "Psg" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "madrid" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "club brugge" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "kairat" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "Ajax" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "Glimt" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "Bayer 04 Leverkusen" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "Olympiacos" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "Napoli" },
-  { date: "2026-01-20", league: "UEFA Champions League", home: "Copenhague" },
-  
+  { date: "2026-01-28", league: "UEFA Champions League", home: "Arsenal", away: "FC kairat" },
+  { date: "2026-01-28", league: "UEFA Champions League", home: "paris", away: "newcastle" },
+  { date: "2026-01-28", league: "UEFA Champions League", home: "atletico" },
+  { date: "2026-01-28", league: "UEFA Champions League", home: "napoli" },
+  { date: "2026-01-28", league: "UEFA Champions League", home: "barcelona", away: "København" },
+  { date: "2026-01-28", league: "UEFA Champions League", home: "Benfica", away: "madrid" },
+  { date: "2026-01-28", league: "UEFA Champions League", home: "Manchester city", away: "galatasaray" },
+  { date: "2026-01-28", league: "UEFA Champions League", home: "borusia", away: "inter" },
+  { date: "2026-01-28", league: "UEFA Champions League", home: "club brugge", away: "marseille" },
+  { date: "2026-01-28", league: "UEFA Champions League", home: "atalanta" },
+  { date: "2026-01-28", league: "UEFA Champions League", home: "Pafos" },
+  { date: "2026-01-28", league: "UEFA Champions League", home: "Juventus" },
 
-  // Los que te faltan: aquí conviene fixtureId (por nombres “raros” o abreviaciones)
+   // Los que te faltan: aquí conviene fixtureId (por nombres “raros” o abreviaciones)
   { fixtureId: 1504664 }, // Bodo/Glimt vs Manchester City
   { fixtureId: 1451134 }, // Olympiacos vs Bayer Leverkusen
   { fixtureId: 1451132 }, // FC Copenhagen vs Napoli
@@ -832,6 +827,13 @@ export default function Fixtures() {
   const [toDate, setToDate] = useState(today);
   const [filterText, setFilterText] = useState("");
 
+  function addDaysYMD(ymd, days) {
+  const d = parseYMDLocal(ymd);
+  if (!d) return ymd;
+  d.setDate(d.getDate() + Number(days || 0));
+  return toYYYYMMDDLocal(d);
+}
+
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [fixtures, setFixtures] = useState([]);
@@ -880,11 +882,15 @@ export default function Fixtures() {
 
 // ✅ 1 sola llamada por rango (backend exige from/to)
 const main = await fetchRange(fromDate, toDate, quick);
+// ✅ Ventana semanal (para "Partidazos de la semana"), sin filtros
+const weekFrom = today;
+const weekTo = addDaysYMD(today, 7);
+const week = await fetchRange(weekFrom, weekTo, { country: "", league: "", team: "" });
 
 // ✅ Si quieres asegurar que siempre salgan los partidazos manuales,
 // ampliamos rango para cubrir sus fechas (si están fuera del rango del usuario)
 const manualDates = manualPickDates();
-let all = main;
+let all = [...main, ...week];
 
 if (manualDates.length) {
   const reqFrom = manualDates.reduce((min, d) => (d < min ? d : min), fromDate);
