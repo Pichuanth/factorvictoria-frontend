@@ -3,6 +3,7 @@ import React, { useMemo, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import Simulator from "../components/Simulator";
+import RecoWeeklyCard from "../components/RecoWeeklyCard";
 
 const GOLD = "#E6C464";
 
