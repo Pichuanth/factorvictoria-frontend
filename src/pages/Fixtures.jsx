@@ -849,35 +849,26 @@ export default function Fixtures() {
     return { country: parts[0] || "", league: parts[1] || "", team: parts[2] || "" };
   }
 
-  async function fetchDay(dateStr, { country, league, team }) {
-    const params = new URLSearchParams();
-    if (dateStr) params.set("date", dateStr);
-    if (country) params.set("country", country);
-    if (league) params.set("league", league);
-    if (team) params.set("team", team);
+  async function fetchRange(from, to, { country, league, team }) {
+  const params = new URLSearchParams();
+  params.set("from", from);
+  params.set("to", to);
+  if (country) params.set("country", country);
+  if (league) params.set("league", league);
+  if (team) params.set("team", team);
 
-    const url = `${API_BASE}/api/fixtures?${params.toString()}`;
-    const r = await fetch(url);
-const raw = await r.text();
+  const url = `${API_BASE}/api/fixtures?${params.toString()}`;
+  const r = await fetch(url);
 
-let data;
-try {
-  data = raw ? JSON.parse(raw) : null;
-} catch {
-  data = raw;
-}
-
-if (!r.ok) {
-  const msg =
-    (data && (data.error || data.message)) ||
-    (typeof data === "string" ? data : "") ||
-    `Error ${r.status}`;
-  throw new Error(msg);
-}
-
-    const list = data?.fixtures || data?.response || data?.data || data || [];
-    return Array.isArray(list) ? list : [];
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const msg = data?.message || data?.error || `Error ${r.status}`;
+    throw new Error(msg);
   }
+
+  const list = data?.fixtures || data?.response || data?.data || data || [];
+  return Array.isArray(list) ? list : [];
+}
 
   async function onSearch() {
     setErr("");
@@ -886,40 +877,34 @@ if (!r.ok) {
     try {
       const quick = parseQuickFilter(filterText);
 
-      const dates = enumerateDates(fromDate, toDate, 10);
-      if (!dates.length) {
-        setFixtures([]);
-        setErr("Rango de fechas inválido.");
-        return;
-      }
+// ✅ 1 sola llamada por rango (backend exige from/to)
+const main = await fetchRange(fromDate, toDate, quick);
 
-      // traer fechas de PARTIDAZOS aunque no estén en el rango
-      const extra = manualPickDates().filter((d) => !dates.includes(d));
+// ✅ Si quieres asegurar que siempre salgan los partidazos manuales,
+// ampliamos rango para cubrir sus fechas (si están fuera del rango del usuario)
+const manualDates = manualPickDates();
+let all = main;
 
-      const chunks = [];
+if (manualDates.length) {
+  const reqFrom = manualDates.reduce((min, d) => (d < min ? d : min), fromDate);
+  const reqTo = manualDates.reduce((max, d) => (d > max ? d : max), toDate);
 
-      // rango del usuario (aplica filtro)
-      for (const d of dates) {
-        // eslint-disable-next-line no-await-in-loop
-        const day = await fetchDay(d, quick);
-        chunks.push(...day);
-      }
+  // Solo si el rango manual se sale del rango actual
+  if (reqFrom !== fromDate || reqTo !== toDate) {
+    const extra = await fetchRange(reqFrom, reqTo, { country: "", league: "", team: "" });
+    all = [...main, ...extra];
+  }
+}
 
-      // fechas partidazos (NO aplica filtro para no romperlos)
-      for (const d of extra) {
-        // eslint-disable-next-line no-await-in-loop
-        const day = await fetchDay(d, { country: "", league: "", team: "" });
-        chunks.push(...day);
-      }
+// Dedup por fixtureId
+const map = new Map();
+for (const f of all) {
+  const id = fixtureId(f);
+  if (!map.has(id)) map.set(id, f);
+}
 
-      // Dedup
-      const map = new Map();
-      for (const f of chunks) {
-        const id = fixtureId(f);
-        if (!map.has(id)) map.set(id, f);
-      }
+setFixtures([...map.values()]);
 
-      setFixtures([...map.values()]);
     } catch (e) {
      console.error("❌ Error cargando fixtures:", e);
      setErr(String(e?.message || e || "No se pudieron cargar los partidos."));
