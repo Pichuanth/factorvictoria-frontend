@@ -63,10 +63,15 @@ function addDaysYYYYMMDD(baseYYYYMMDD, days) {
   return toYYYYMMDD(d);
 }
 
-function stripDiacritics(s) {
-  return String(s || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+function refereeLevel(avg) {
+  if (avg >= 5.5) return "Muy tarjetero";
+  if (avg >= 4.5) return "Tarjetero";
+  if (avg >= 3.5) return "Normal";
+  return "Pocas tarjetas";
+}
+
+function getRefereeName(fx) {
+  return fx?.fixture?.referee || fx?.referee || "";
 }
 
 /* ------------------- Helpers de fecha/hora (APP_TZ) ------------------- */
@@ -1180,171 +1185,94 @@ const ensureFvPack = useCallback(
     return { games: picks.length, finalOdd, target: maxBoostArg, impliedProb, reachedTarget };
   }
 
-  async function handleAutoParlay() {
-  console.log("[FV] auto click");
+  const runGeneration = useCallback(
+  async (mode) => {
+    setParlayError("");
+    setParlayResult(null);
+    setFvOutput(null);
+    
+    try {
+      if (!fixtures.length) {
+        setParlayError("Genera primero partidos con el botón de arriba.");
+        return;
+      }
 
-  setParlayError("");
-  setParlayResult(null);
-  setFvOutput(null);
+      const pool =
+        mode === "selected"
+          ? fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)))
+          : fixtures.slice(0, 14);
 
-  try {
-    if (!fixtures.length) {
-      setParlayError("Genera primero partidos con el botón de arriba.");
-      return;
+      if (mode === "selected" && pool.length < 2) {
+        setParlayError("Selecciona al menos 2 partidos de la lista superior.");
+        return;
+      }
+
+      const ids = pool.map(getFixtureId).filter(Boolean);
+
+      // Pre-carga stats+odds (y si quieres, luego agregamos shots/SOT aquí también)
+      await Promise.all(
+        ids.map((id) => Promise.all([ensureFvPack(id), ensureOdds(id)]))
+      );
+
+      // Referees: siempre que el plan lo permita
+      if (features.referees) {
+        await loadReferees(); // ya lo tienes
+      }
+
+      const candidatesByFixture = {};
+      for (const fx of pool) {
+        const id = getFixtureId(fx);
+        if (!id) continue;
+
+        const pack = fvPackByFixture[id] || fvRef.current[id] || null;
+        const markets = pack?.markets || oddsByFixture[id]?.markets || {};
+
+        candidatesByFixture[id] = buildCandidatePicks({
+          fixture: fx,
+          pack: pack || {},
+          markets,
+        });
+      }
+
+      const safe = pickSafe(candidatesByFixture);
+
+      const targets = [10, 20, 50, 100].filter((t) => t <= maxBoost);
+      const parlays = targets
+        .map((t) => buildParlay({ candidatesByFixture, target: t, cap: maxBoost }))
+        .filter(Boolean);
+
+      const valueList = buildValueList(candidatesByFixture, 0.06);
+
+      if (!safe && !parlays.length) {
+        setParlayError("No pudimos armar picks con stats/odds disponibles. Prueba con otro rango o liga.");
+        return;
+      }
+
+      setFvOutput({ mode, safe, parlays, valueList, candidatesByFixture });
+
+      if (parlays[0]) setParlayResult({ mode, ...parlays[0] });
+    } catch (e) {
+      console.error("[FV] runGeneration error", e);
+      setParlayError(String(e?.message || e));
     }
+  },
+  [
+    fixtures,
+    selectedIds,
+    ensureFvPack,
+    ensureOdds,
+    fvPackByFixture,
+    oddsByFixture,
+    maxBoost,
+    features.referees,
+    loadReferees,
+  ]
+);
 
-    const pool = fixtures.slice(0, 14);
-    const ids = pool.map(getFixtureId).filter(Boolean);
+const handleAutoParlay = () => runGeneration("auto");
+const handleSelectedParlay = () => runGeneration("selected");
 
-    await Promise.all(ids.map((id) => Promise.all([ensureFvPack(id), ensureOdds(id)])));
-
-    const candidatesByFixture = {};
-    for (const fx of pool) {
-      const id = getFixtureId(fx);
-      if (!id) continue;
-
-      const pack = fvPackByFixture[id] || fvRef.current[id] || null;
-      const markets = pack?.markets || oddsByFixture[id]?.markets || {};
-
-      candidatesByFixture[id] = buildCandidatePicks({ fixture: fx, pack: pack || {}, markets });
-    }
-
-    const safe = pickSafe(candidatesByFixture);
-
-    const targets = [10, 20, 50, 100].filter((t) => t <= maxBoost);
-    const parlays = targets.map((t) => buildParlay({ candidatesByFixture, target: t, cap: maxBoost })).filter(Boolean);
-
-    const valueList = buildValueList(candidatesByFixture, 0.06);
-
-    if (!safe && !parlays.length) {
-      setParlayError("No pudimos armar picks con stats/odds disponibles. Prueba con otro rango o liga.");
-      return;
-    }
-
-    setFvOutput({ mode: "auto", safe, parlays, valueList, candidatesByFixture });
-
-    if (parlays[0]) setParlayResult({ mode: "auto", ...parlays[0] });
-  } catch (e) {
-    console.error("[FV] auto error", e);
-    setParlayError(String(e?.message || e));
-  }
-}
-
-async function handleSelectedParlay() {
-  console.log("[FV] selected click");
-
-  setParlayError("");
-  setParlayResult(null);
-  setFvOutput(null);
-
-  try {
-    if (!fixtures.length) {
-      setParlayError("Genera primero partidos con el botón de arriba.");
-      return;
-    }
-
-    if (selectedCount < 2) {
-      setParlayError("Selecciona al menos 2 partidos de la lista superior.");
-      return;
-    }
-
-    const pool = fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)));
-    const ids = pool.map(getFixtureId).filter(Boolean);
-
-    await Promise.all(ids.map((id) => Promise.all([ensureFvPack(id), ensureOdds(id)])));
-
-    const candidatesByFixture = {};
-    for (const fx of pool) {
-      const id = getFixtureId(fx);
-      if (!id) continue;
-
-      const pack = fvPackByFixture[id] || fvRef.current[id] || null;
-      const markets = pack?.markets || oddsByFixture[id]?.markets || {};
-
-      candidatesByFixture[id] = buildCandidatePicks({ fixture: fx, pack: pack || {}, markets });
-    }
-
-    const safe = pickSafe(candidatesByFixture);
-
-    const targets = [10, 20, 50, 100].filter((t) => t <= maxBoost);
-    const parlays = targets.map((t) => buildParlay({ candidatesByFixture, target: t, cap: maxBoost })).filter(Boolean);
-
-    const valueList = buildValueList(candidatesByFixture, 0.06);
-
-    if (!safe && !parlays.length) {
-      setParlayError("Con esta selección no pudimos generar picks. Prueba agregando más partidos o usando Auto.");
-      return;
-    }
-
-    setFvOutput({ mode: "selected", safe, parlays, valueList, candidatesByFixture });
-
-    if (parlays[0]) setParlayResult({ mode: "selected", ...parlays[0] });
-  } catch (e) {
-    console.error("[FV] selected error", e);
-    setParlayError(String(e?.message || e));
-  }
-}
-
-  async function handleSelectedParlay() {
-  console.log("[FV] selected click");
-
-  setParlayError("");
-  setParlayResult(null);
-  setFvOutput(null);
-
-  try {
-    if (!fixtures.length) {
-      setParlayError("Genera primero partidos con el botón de arriba.");
-      return;
-    }
-
-    if (selectedCount < 2) {
-      setParlayError("Selecciona al menos 2 partidos de la lista superior.");
-      return;
-    }
-
-    const pool = fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)));
-    const ids = pool.map(getFixtureId).filter(Boolean);
-
-    await Promise.all(ids.map((id) => Promise.all([ensureFvPack(id), ensureOdds(id)])));
-
-    const candidatesByFixture = {};
-    for (const fx of pool) {
-      const id = getFixtureId(fx);
-      if (!id) continue;
-
-      const pack = fvPackByFixture[id] || fvRef.current[id] || null;
-      const markets = pack?.markets || oddsByFixture[id]?.markets || {};
-
-      candidatesByFixture[id] = buildCandidatePicks({ fixture: fx, pack: pack || {}, markets });
-    }
-
-    const safe = pickSafe(candidatesByFixture);
-
-    const targets = [10, 20, 50, 100].filter((t) => t <= maxBoost);
-    const parlays = targets
-      .map((t) => buildParlay({ candidatesByFixture, target: t, cap: maxBoost }))
-      .filter(Boolean);
-
-    const valueList = buildValueList(candidatesByFixture, 0.06);
-
-    if (!safe && !parlays.length) {
-      setParlayError("Con esta selección no pudimos generar picks. Prueba agregando más partidos o usando Auto.");
-      return;
-    }
-
-    setFvOutput({ mode: "selected", safe, parlays, valueList, candidatesByFixture });
-
-    if (parlays[0]) {
-      setParlayResult({ mode: "selected", ...parlays[0] });
-    }
-  } catch (e) {
-    console.error("[FV] selected error", e);
-    setParlayError(String(e?.message || e));
-  }
-}
-
-  async function handleGenerate() {
+    async function handleGenerate() {
     setParlayError("");
     setParlayResult(null);
 
@@ -1647,6 +1575,43 @@ async function handleSelectedParlay() {
           <div className="text-xs text-slate-300">
   Pick con mayor probabilidad (FV). Si hay cuota de mercado, la mostramos; si no, usamos FV.
 </div>
+{fvOutput?.candidatesByFixture ? (
+  <div className="mt-3">
+    <div className="text-xs text-slate-300 font-semibold mb-2">Tus partidos</div>
+    <div className="space-y-2">
+      {Object.keys(fvOutput.candidatesByFixture).slice(0, 8).map((fixtureId) => {
+        const fx = fixtures.find((x) => String(getFixtureId(x)) === String(fixtureId));
+        if (!fx) return null;
+
+        const refName = getRefereeName(fx);
+        if (!refName) {
+          return (
+            <div key={fixtureId} className="text-[11px] text-slate-400">
+              {getHomeName(fx)} vs {getAwayName(fx)} — árbitro: (no disponible)
+            </div>
+          );
+        }
+
+        const hit = (refData?.topReferees || []).find((r) => norm(r.name) === norm(refName));
+        const avg = hit?.avgCards ?? null;
+
+        return (
+          <div key={fixtureId} className="text-[11px] text-slate-200">
+            {getHomeName(fx)} vs {getAwayName(fx)} — {refName}
+            {avg ? (
+              <>
+                {" "}· <span className="text-emerald-200 font-semibold">{avg}</span> cards/partido
+                {" "}· <span className="text-amber-200 font-semibold">{refereeLevel(avg)}</span>
+              </>
+            ) : (
+              <span className="text-slate-400"> · (sin rating)</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  </div>
+) : null}
 
 {fvOutput?.safe ? (
   <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/30 p-3">
@@ -1703,7 +1668,7 @@ async function handleSelectedParlay() {
             <span className="text-slate-500">·</span>{" "}
             Cap plan: <span className="text-slate-100 font-semibold">x{p.cap}</span>
           </div>
-          <div className="text-sm font-bold text-emerald-200">Cuota final: x{p.finalOdd}</div>
+          <div className="text-sm font-bold text-emerald-200">Cuota final: {Number(p.finalOdd) > 1 ? `x${p.finalOdd}` : "—"} </div>
         </div>
 
         <div className="mt-1 text-[11px] text-slate-400">
@@ -1719,7 +1684,9 @@ async function handleSelectedParlay() {
               <span className="text-slate-500">·</span>{" "}
               {leg.home} vs {leg.away}{" "}
               <span className="text-slate-500">·</span>{" "}
-              Odd: <span className="text-slate-100 font-semibold">x{leg.usedOdd}</span>{" "}
+              Odd: <span className="text-slate-100 font-semibold">
+                {leg.usedOdd && leg.usedOdd > 1 ? `x${leg.usedOdd}` : "—"}
+                </span>
               <span className="text-slate-500">·</span>{" "}
               Prob FV: <span className="text-emerald-200 font-semibold">{Math.round(leg.prob * 100)}%</span>
             </div>
