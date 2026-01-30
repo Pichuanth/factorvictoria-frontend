@@ -240,8 +240,9 @@ function isAllowedCompetition(countryName, leagueName) {
     { country: "mexico", league: "liga mx" },
     { country: "usa", league: "mls" },
     { country: "brazil", league: "serie a" },
-    { country: "argentina", league: "primera" },
-    { country: "chile", league: "liga de primera mercado libre" },
+    { country: "argentina", league: "primera división argentina" },
+    { country: "chile", league: "campeonato itaú" },
+    { country: "chile", league: "copa chile" },
   ];
 
   return allowedPairs.some((p) => c.includes(p.country) && l.includes(normStr(p.league)));
