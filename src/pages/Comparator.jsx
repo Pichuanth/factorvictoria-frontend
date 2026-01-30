@@ -1003,6 +1003,7 @@ export default function Comparator() {
   const planInfo = useMemo(() => PLAN_LABELS[planId] || PLAN_LABELS.basic, [planId]);
   const maxBoost = planInfo.boost;
   const features = useMemo(() => getFeaturesByPlanId(planId), [planId]);
+  const canReferees = !!features?.referees; // ✅ AQUÍ (dentro del componente)
 
   // combinadas
   const [parlayResult, setParlayResult] = useState(null);
@@ -1172,6 +1173,7 @@ const ensureFvPack = useCallback(
 );
 
     const loadReferees = useCallback(async () => {
+      
     try {
       setRefErr("");
       setRefLoading(true);
@@ -1195,7 +1197,7 @@ const ensureFvPack = useCallback(
     } finally {
       setRefLoading(false);
     }
-  }, [from, to, selectedCountries]);
+  }, [from, to, selectedCountries, API_BASE]);
 
   function fakeOddForFixture(fx) {
     const id = getFixtureId(fx);
@@ -1262,7 +1264,7 @@ const ensureFvPack = useCallback(
       );
 
       // Referees: siempre que el plan lo permita
-      if (features?.referees) {
+      if (canReferees) {
         await loadReferees(); // ya lo tienes
       }
 
@@ -1305,14 +1307,14 @@ const ensureFvPack = useCallback(
   },
   [
     fixtures,
-    selectedIds,
-    ensureFvPack,
-    ensureOdds,
-    fvPackByFixture,
-    oddsByFixture,
-    maxBoost,
-    features,
-    loadReferees,
+  selectedIds,
+  ensureFvPack,
+  ensureOdds,
+  fvPackByFixture,
+  oddsByFixture,
+  maxBoost,
+  canReferees,
+  loadReferees,
   ]
 );
 
@@ -1438,7 +1440,7 @@ const handleSelectedParlay = () => runGeneration("selected");
       if (okTimerRef.current) clearTimeout(okTimerRef.current);
       okTimerRef.current = setTimeout(() => setGeneratedOk(false), 2500);
 
-      if (features?.referees) await loadReferees();
+      if (canReferees) await loadReferees();
     } catch (e2) {
       setErr(String(e2?.message || e2));
     } finally {
@@ -1745,7 +1747,7 @@ const handleSelectedParlay = () => runGeneration("selected");
 ) : null}
         </FeatureCard>
 
-        <FeatureCard title="Árbitros tarjeteros" badge="Tarjetas" locked={!features?.referees} lockText="Disponible desde Plan Anual.">
+        <FeatureCard title="Árbitros tarjeteros" badge="Tarjetas" locked={!canReferees} lockText="Disponible desde Plan Anual.">
           <div className="text-xs text-slate-300">Ranking de árbitros con más tarjetas (por rango de fechas y país).</div>
 
           {refLoading ? <div className="mt-3 text-xs text-slate-300">Cargando árbitros…</div> : null}
