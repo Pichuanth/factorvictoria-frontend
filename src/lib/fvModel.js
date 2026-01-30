@@ -11,6 +11,50 @@ function round2(n) {
   return Number.isFinite(x) ? Number(x.toFixed(2)) : null;
 }
 
+function avg(arr) {
+  if (!arr?.length) return null;
+  const s = arr.reduce((a,b)=>a+b,0);
+  return s / arr.length;
+}
+
+function safeNum(n) {
+  const x = Number(n);
+  return Number.isFinite(x) ? x : null;
+}
+
+// stats: [{gf, ga}] últimos partidos
+function summarizeRecent(list) {
+  if (!Array.isArray(list) || !list.length) return null;
+  const gf = avg(list.map(x => safeNum(x.gf) ?? 0));
+  const ga = avg(list.map(x => safeNum(x.ga) ?? 0));
+  const total = (gf ?? 0) + (ga ?? 0);
+  return { gf: gf ?? 0, ga: ga ?? 0, total };
+}
+
+// h2h: [{hg, ag}]
+function summarizeH2H(list) {
+  if (!Array.isArray(list) || !list.length) return null;
+  const totals = list.map(x => (safeNum(x.hg) ?? 0) + (safeNum(x.ag) ?? 0));
+  const btts = list.map(x => ((safeNum(x.hg) ?? 0) > 0 && (safeNum(x.ag) ?? 0) > 0) ? 1 : 0);
+  return {
+    avgTotal: avg(totals) ?? null,
+    bttsRate: avg(btts) ?? null,
+  };
+}
+function probUnderFromAvgGoals(avgGoals, line) {
+  // Heurística suave: si avgGoals << line, prob alta
+  if (!Number.isFinite(avgGoals)) return null;
+  const diff = line - avgGoals; // positivo = favorece Under
+  // mapa simple con sigmoide
+  const p = 1 / (1 + Math.exp(-1.4 * diff));
+  return clamp(p, 0.05, 0.95);
+}
+
+function probBTTSNoFromBttsRate(bttsRate) {
+  if (!Number.isFinite(bttsRate)) return null;
+  return clamp(1 - bttsRate, 0.05, 0.95);
+}
+
 export function fairOddFromProb(p) {
   const pp = clamp(Number(p || 0), 1e-6, 0.999999);
   return 1 / pp;
@@ -98,9 +142,47 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
   const { lambdaHome, lambdaAway, lambdaTotal } = estimateLambdasFromPack(pack);
 
   const dc = probsDoubleChance(lambdaHome, lambdaAway);
-  const bttsNo = probBTTSNo(lambdaHome, lambdaAway);
-  const under35 = probUnderLine(lambdaTotal, 3.5);
-  const under25 = probUnderLine(lambdaTotal, 2.5);
+  const under35_h = probUnderFromAvgGoals(usableTotal, 3.5);
+  const under25_h = probUnderFromAvgGoals(usableTotal, 2.5);
+    const over25 = clamp(1 - under25, 0.01, 0.99);
+
+  out.push({
+    market: "OU_25",
+    selection: "over",
+    label: "Over 2.5 goles",
+    prob: over25,
+    fvOdd: fairOddFromProb(over25),
+    marketOdd: markets?.OU_25?.over ?? null,
+  });
+
+  const bttsNo_h = probBTTSNoFromBttsRate(h2h?.bttsRate);
+
+  // fallback: si heurística da null, usa Poisson
+  const under35 = under35_h ?? probUnderLine(lambdaTotal, 3.5);
+  const under25 = under25_h ?? probUnderLine(lambdaTotal, 2.5);
+
+  const bttsNo = bttsNo_h ?? probBTTSNo(lambdaHome, lambdaAway);
+
+    // --- NUEVO: forma + h2h ---
+  const recentHome = summarizeRecent(pack?.recent?.home);
+  const recentAway = summarizeRecent(pack?.recent?.away);
+  const h2h = summarizeH2H(pack?.h2h);
+
+  // promedio goles esperados por heurística
+  const recentTotal = Number.isFinite(recentHome?.total) && Number.isFinite(recentAway?.total)
+    ? (recentHome.total + recentAway.total) / 2
+    : null;
+
+  const h2hTotal = Number.isFinite(h2h?.avgTotal) ? h2h.avgTotal : null;
+
+  // Mezcla final de goles esperados (para Under/Over)
+  // Si no hay datos, cae al lambdaTotal
+  const blendTotal =
+    (Number.isFinite(recentTotal) ? 0.45 * recentTotal : 0) +
+    (Number.isFinite(h2hTotal) ? 0.35 * h2hTotal : 0) +
+    (Number.isFinite(lambdaTotal) ? 0.20 * lambdaTotal : 0);
+
+  const usableTotal = (blendTotal > 0.2) ? blendTotal : lambdaTotal;
 
   const out = [];
 
@@ -232,7 +314,7 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) 
 export function buildValueList(candidatesByFixture, minEdge = 0.06) {
   const all = Object.values(candidatesByFixture || {}).flat();
   const value = all
-    .filter((x) => x.marketOdd && Number.isFinite(x.valueEdge) && x.valueEdge >= minEdge)
+    .filter(x => x.marketOdd && Number.isFinite(x.valueEdge) && x.valueEdge >= minEdge && x.prob >= 0.80)
     .sort((a, b) => (b.valueEdge - a.valueEdge));
   return value.slice(0, 12);
 }
