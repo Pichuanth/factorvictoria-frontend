@@ -80,6 +80,7 @@ function normStr(s) {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/\s+/g, " ")
     .trim();
+    return COUNTRY_ALIAS[key] || null;
 }
 
 /* ------------------- Helpers de fecha/hora (APP_TZ) ------------------- */
