@@ -80,7 +80,6 @@ function normStr(s) {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/\s+/g, " ")
     .trim();
-    return COUNTRY_ALIAS[key] || null;
 }
 
 /* ------------------- Helpers de fecha/hora (APP_TZ) ------------------- */
@@ -141,11 +140,9 @@ const COUNTRY_ALIAS = {
 };
 
 function normalizeCountryQuery(q) {
-  const key = normStr(String(q || ""))
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, "");
-  }
+  const key = normStr(q);
+  return COUNTRY_ALIAS[key] ?? null;
+}
 
 /* Emojis banderas */
 const COUNTRY_FLAG = {
@@ -160,6 +157,7 @@ const COUNTRY_FLAG = {
   Portugal: "🇵🇹",
   Mexico: "🇲🇽",
   USA: "🇺🇸",
+  Colombia: "col"
 };
 
 /* ------------------- Prioridades / filtro TOP ------------------- */
@@ -177,6 +175,7 @@ function countryPriority(countryName) {
   if (c.includes("mexico") || c.includes("méxico")) return 8;
   if (c.includes("usa")) return 9;
   if (c.includes("brazil") || c.includes("brasil")) return 10;
+  if (c.includes("Colombia") || c.includes("colombia")) return 11;
 
   return 50;
 }
