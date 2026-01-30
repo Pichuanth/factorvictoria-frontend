@@ -6,6 +6,32 @@ import Simulator from "../components/Simulator";
 import PriceCalculatorCard from "../components/PriceCalculatorCard";
 import RecoWeeklyCard from "../components/RecoWeeklyCard";
 import { buildCandidatePicks, pickSafe, buildParlay, buildValueList } from "../lib/fvModel";
+import cors from "cors";
+
+const ALLOWED_ORIGINS = [
+  "https://factorvictoria.com",
+  "https://www.factorvictoria.com",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+];
+
+const corsOptions = {
+  origin: function (origin, cb) {
+    // permite requests server-to-server o sin origin (postman)
+    if (!origin) return cb(null, true);
+
+    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+
+    return cb(new Error("Not allowed by CORS: " + origin));
+  },
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "x-admin-token"],
+  credentials: false, // en tu caso no estás usando cookies; déjalo en false
+};
+
+// IMPORTANTE: antes de routes
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions)); // preflight
 
 const GOLD = "#E6C464";
 
@@ -913,6 +939,19 @@ function stripDiacritics(s) {
 
 const norm = (s) => stripDiacritics(s).toLowerCase().trim();
 
+function refereeLevel(avg) {
+  const n = Number(avg);
+  if (!Number.isFinite(n)) return "";
+  if (n >= 5.5) return "Muy tarjetero";
+  if (n >= 4.5) return "Tarjetero";
+  if (n >= 3.5) return "Normal";
+  return "Pocas tarjetas";
+}
+
+function getRefereeName(fx) {
+  return fx?.fixture?.referee || fx?.referee || "";
+}
+
 export default function Comparator() {
   const { isLoggedIn, user } = useAuth();
   const [searchParams] = useSearchParams();
@@ -1223,7 +1262,7 @@ const ensureFvPack = useCallback(
       );
 
       // Referees: siempre que el plan lo permita
-      if (features.referees) {
+      if (features?.referees) {
         await loadReferees(); // ya lo tienes
       }
 
@@ -1272,7 +1311,7 @@ const ensureFvPack = useCallback(
     fvPackByFixture,
     oddsByFixture,
     maxBoost,
-    features.referees,
+    features,
     loadReferees,
   ]
 );
@@ -1399,7 +1438,7 @@ const handleSelectedParlay = () => runGeneration("selected");
       if (okTimerRef.current) clearTimeout(okTimerRef.current);
       okTimerRef.current = setTimeout(() => setGeneratedOk(false), 2500);
 
-      if (features.referees) await loadReferees();
+      if (features?.referees) await loadReferees();
     } catch (e2) {
       setErr(String(e2?.message || e2));
     } finally {
@@ -1706,7 +1745,7 @@ const handleSelectedParlay = () => runGeneration("selected");
 ) : null}
         </FeatureCard>
 
-        <FeatureCard title="Árbitros tarjeteros" badge="Tarjetas" locked={!features.referees} lockText="Disponible desde Plan Anual.">
+        <FeatureCard title="Árbitros tarjeteros" badge="Tarjetas" locked={!features?.referees} lockText="Disponible desde Plan Anual.">
           <div className="text-xs text-slate-300">Ranking de árbitros con más tarjetas (por rango de fechas y país).</div>
 
           {refLoading ? <div className="mt-3 text-xs text-slate-300">Cargando árbitros…</div> : null}
