@@ -73,6 +73,14 @@ function refereeLevel(avg) {
 function getRefereeName(fx) {
   return fx?.fixture?.referee || fx?.referee || "";
 }
+function normStr(s) {
+  return String(s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 /* ------------------- Helpers de fecha/hora (APP_TZ) ------------------- */
 function fixtureDateKey(f) {
@@ -131,12 +139,11 @@ const COUNTRY_ALIAS = {
 };
 
 function normalizeCountryQuery(q) {
-  const key = stripDiacritics(String(q || ""))
+  const key = normStr(String(q || ""))
     .toLowerCase()
     .trim()
     .replace(/\s+/g, "");
-  return COUNTRY_ALIAS[key] || null;
-}
+  }
 
 /* Emojis banderas */
 const COUNTRY_FLAG = {
