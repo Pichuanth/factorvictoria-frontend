@@ -905,6 +905,14 @@ function ManualPicksSection() {
   );
 }
 
+function stripDiacritics(s) {
+  return String(s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+const norm = (s) => stripDiacritics(s).toLowerCase().trim();
+
 export default function Comparator() {
   const { isLoggedIn, user } = useAuth();
   const [searchParams] = useSearchParams();
