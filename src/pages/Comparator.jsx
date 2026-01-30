@@ -136,6 +136,7 @@ const COUNTRY_ALIAS = {
   brasil: "Brazil",
   eeuu: "USA",
   estadosunidos: "USA",
+  colombia: "Colombia"
 };
 
 function normalizeCountryQuery(q) {
