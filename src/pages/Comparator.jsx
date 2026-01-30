@@ -45,6 +45,7 @@ function normStr(s) {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -72,14 +73,6 @@ function refereeLevel(avg) {
 
 function getRefereeName(fx) {
   return fx?.fixture?.referee || fx?.referee || "";
-}
-function normStr(s) {
-  return String(s || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 /* ------------------- Helpers de fecha/hora (APP_TZ) ------------------- */
@@ -141,7 +134,7 @@ const COUNTRY_ALIAS = {
 
 function normalizeCountryQuery(q) {
   const key = normStr(q);
-  return COUNTRY_ALIAS[key] ?? null;
+  return COUNTRY_ALIAS[key] || null;
 }
 
 /* Emojis banderas */
@@ -175,7 +168,7 @@ function countryPriority(countryName) {
   if (c.includes("mexico") || c.includes("méxico")) return 8;
   if (c.includes("usa")) return 9;
   if (c.includes("brazil") || c.includes("brasil")) return 10;
-  if (c.includes("Colombia") || c.includes("colombia")) return 11;
+  if (c.includes("colombia")) return 11;
 
   return 50;
 }
@@ -249,8 +242,9 @@ function isAllowedCompetition(countryName, leagueName) {
     { country: "usa", league: "mls" },
     { country: "brazil", league: "serie a" },
     { country: "argentina", league: "primera división argentina" },
-    { country: "chile", league: "campeonato itaú" },
+    { country: "chile", league: "campeonato itau" },
     { country: "chile", league: "copa chile" },
+
   ];
 
   return allowedPairs.some((p) => c.includes(p.country) && l.includes(normStr(p.league)));
