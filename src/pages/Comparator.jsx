@@ -150,7 +150,7 @@ const COUNTRY_FLAG = {
   Portugal: "🇵🇹",
   Mexico: "🇲🇽",
   USA: "🇺🇸",
-  Colombia: "col"
+  Colombia: "co"
 };
 
 /* ------------------- Prioridades / filtro TOP ------------------- */
@@ -165,7 +165,7 @@ function countryPriority(countryName) {
   if (c.includes("argentina")) return 5;
   if (c.includes("chile")) return 6;
   if (c.includes("portugal")) return 7;
-  if (c.includes("mexico") || c.includes("méxico")) return 8;
+  if (c.includes("mexico") || c.includes("méxico"))
   if (c.includes("usa")) return 9;
   if (c.includes("brazil") || c.includes("brasil")) return 10;
   if (c.includes("colombia")) return 11;
@@ -176,10 +176,7 @@ function countryPriority(countryName) {
 function leaguePriority(leagueName) {
   const n = normStr(leagueName);
 
-  // UEFA
-  if (n.includes("uefa champions") || n.includes("champions league")) return 0;
-  if (n.includes("uefa europa") || n.includes("europa league")) return 1;
-  if (n.includes("uefa conference") || n.includes("conference league")) return 2;
+  // UEFA aqui eliminé, uefa champions league, europa league y conference league
 
   // Big-5
   if (n.includes("premier league")) return 3;
@@ -220,16 +217,14 @@ function isAllowedCompetition(countryName, leagueName) {
   ];
   if (bannedPatterns.some((p) => l.includes(p))) return false;
 
-  const intlAllowed = [
-    "uefa champions league",
-    "uefa europa league",
-    "uefa europa conference league",
-    "champions league",
-    "europa league",
-    "conference league",
-    "super copa",
-  ];
-  if (intlAllowed.some((x) => l.includes(x))) return true;
+  const intlAllowedExact = new Set([
+  "uefa champions league",
+  "uefa europa league",
+  "uefa europa conference league",
+  "uefa super cup",
+]);
+
+if (intlAllowedExact.has(l)) return true;
 
   const allowedPairs = [
     { country: "england", league: "premier league" },
