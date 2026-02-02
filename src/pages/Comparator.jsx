@@ -1243,6 +1243,7 @@ const ensureFvPack = useCallback(
       }
 
       const safe = pickSafe(candidatesByFixture);
+      const giftBundle = buildGiftPickBundle(candidatesByFixture, 1.5, 3.0, 3);
 
       const targets = [10, 20, 50, 100].filter((t) => t <= maxBoost);
       const parlays = targets

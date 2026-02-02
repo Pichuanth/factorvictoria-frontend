@@ -139,8 +139,13 @@ export function estimateLambdasFromPack(pack) {
 }
 
 export function buildCandidatePicks({ fixture, pack, markets }) {
+  
+  // Genera picks candidatos con: market, selection, label, prob, fvOdd, marketOdd, usedOdd, valueEdge, fixtureId, home, away
+  const out = [];
+
   const { lambdaHome, lambdaAway, lambdaTotal } = estimateLambdasFromPack(pack);
 
+  // --- NUEVO: forma + h2h ---
   const recentHome = summarizeRecent(pack?.recent?.home);
   const recentAway = summarizeRecent(pack?.recent?.away);
   const h2h = summarizeH2H(pack?.h2h);
@@ -152,6 +157,7 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
 
   const h2hTotal = Number.isFinite(h2h?.avgTotal) ? h2h.avgTotal : null;
 
+  // Mezcla final de goles esperados (para Under/Over)
   const blendTotal =
     (Number.isFinite(recentTotal) ? 0.45 * recentTotal : 0) +
     (Number.isFinite(h2hTotal) ? 0.35 * h2hTotal : 0) +
@@ -159,19 +165,22 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
 
   const usableTotal = blendTotal > 0.2 ? blendTotal : lambdaTotal;
 
+  // probabilidades base
   const dc = probsDoubleChance(lambdaHome, lambdaAway);
 
   const under35_h = probUnderFromAvgGoals(usableTotal, 3.5);
   const under25_h = probUnderFromAvgGoals(usableTotal, 2.5);
-  const bttsNo_h = probBTTSNoFromBttsRate(h2h?.bttsRate);
 
+  // fallback: si heurística da null, usa Poisson
   const under35 = under35_h ?? probUnderLine(lambdaTotal, 3.5);
   const under25 = under25_h ?? probUnderLine(lambdaTotal, 2.5);
+
   const over25 = clamp(1 - under25, 0.01, 0.99);
+
+  const bttsNo_h = probBTTSNoFromBttsRate(h2h?.bttsRate);
   const bttsNo = bttsNo_h ?? probBTTSNo(lambdaHome, lambdaAway);
 
-  const out = [];
-
+  // ---------- picks ----------
   out.push({
     market: "DC",
     selection: "home_draw",
@@ -226,36 +235,85 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
     marketOdd: markets?.BTTS?.no ?? null,
   });
 
+  // ---------- limpieza + métricas ----------
   const cleaned = out
     .filter((x) => Number.isFinite(x.prob) && x.prob > 0.01 && x.prob < 0.999)
     .map((x) => {
-      const fvOdd = Number(x.fvOdd);
-      const marketOddNum = Number(x.marketOdd);
+      const fvOddNum = Number(x.fvOdd);
+      const mkOddNum = Number(x.marketOdd);
 
-      const bestOdd = Number.isFinite(marketOddNum) ? marketOddNum : fvOdd;
-      const valueEdge = Number.isFinite(marketOddNum) ? marketOddNum / fvOdd - 1 : null;
+      const bestOdd = Number.isFinite(mkOddNum) ? mkOddNum : fvOddNum;
+      const valueEdge = Number.isFinite(mkOddNum) && Number.isFinite(fvOddNum) && fvOddNum > 0
+        ? (mkOddNum / fvOddNum) - 1
+        : null;
 
       return {
         ...x,
-        fvOdd: round2(fvOdd),
-        marketOdd: Number.isFinite(marketOddNum) ? round2(marketOddNum) : null,
+        fvOdd: round2(fvOddNum),
+        marketOdd: Number.isFinite(mkOddNum) ? round2(mkOddNum) : null,
         usedOdd: round2(bestOdd),
         valueEdge: valueEdge === null ? null : round2(valueEdge),
-
         fixtureId: Number(fixture?.fixture?.id || fixture?.id || pack?.fixtureId),
         home: fixture?.teams?.home?.name || pack?.teams?.home?.name || "Home",
         away: fixture?.teams?.away?.name || pack?.teams?.away?.name || "Away",
       };
     });
 
+  // Orden: primero mayor prob (seguro), luego menor odd
   cleaned.sort((a, b) => (b.prob - a.prob) || (a.usedOdd - b.usedOdd));
   return cleaned;
 }
+// =====================
+// Helpers de armado FV
+// =====================
 
 export function pickSafe(candidatesByFixture) {
   const all = Object.values(candidatesByFixture || {}).flat();
-  all.sort((a, b) => (b.prob - a.prob) || (a.usedOdd - b.usedOdd));
+  all.sort((a, b) => (b.prob - a.prob) || (Number(a.usedOdd) - Number(b.usedOdd)));
   return all[0] || null;
+}
+
+export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 3.0, maxLegs = 3) {
+  const pool = Object.values(candidatesByFixture || {})
+    .map((list) => (list || [])[0])   // tomamos el pick “más seguro” de cada fixture
+    .filter(Boolean)
+    .filter((x) => Number.isFinite(x.prob) && x.prob >= 0.85)
+    .filter((x) => {
+      const odd = Number(x.usedOdd);
+      return Number.isFinite(odd) && odd > 1;
+    });
+
+  pool.sort((a, b) => (b.prob - a.prob) || (Number(a.usedOdd) - Number(b.usedOdd)));
+
+  const legs = [];
+  let prod = 1;
+
+  for (const cand of pool) {
+    if (legs.some((l) => l.fixtureId === cand.fixtureId)) continue;
+
+    const odd = Number(cand.usedOdd);
+    if (!Number.isFinite(odd) || odd <= 1) continue;
+
+    const next = prod * odd;
+
+    // evita pasarte demasiado del maxOdd
+    if (next > maxOdd * 1.03) continue;
+
+    legs.push(cand);
+    prod = next;
+
+    if (legs.length >= maxLegs) break;
+    if (prod >= minOdd) break;
+  }
+
+  if (legs.length < 1) return null;
+
+  return {
+    games: legs.length,
+    finalOdd: round2(prod),
+    legs,
+    reached: prod >= minOdd && prod <= maxOdd * 1.05,
+  };
 }
 
 export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) {
@@ -267,43 +325,57 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) 
     })
     .filter(Boolean);
 
-  pool.sort((a, b) => b.best.prob - a.best.prob);
+  pool.sort((a, b) => (b.best.prob - a.best.prob));
 
-  let legs = [];
+  const legs = [];
   let prod = 1;
 
   for (const item of pool) {
     const cand = item.best;
-    const next = prod * cand.usedOdd;
 
+    const odd = Number(cand.usedOdd);
+    if (!Number.isFinite(odd) || odd <= 1) continue;
+
+    const next = prod * odd;
+
+    // no pasar el cap del plan (con un mini margen)
     if (next > cap * 1.01) continue;
+
     legs.push(cand);
     prod = next;
 
     if (legs.length >= maxLegs) break;
+
+    // corta cuando ya estás suficientemente cerca del target
     if (prod >= target * 0.95) break;
   }
 
   if (legs.length < 2) return null;
 
-  const finalOdd = round2(prod);
-  const impliedProb = round2(1 / prod);
-
   return {
     target,
     cap,
     games: legs.length,
-    finalOdd,
-    impliedProb,
+    finalOdd: round2(prod),
+    impliedProb: round2(1 / prod),
     legs,
-    reached: finalOdd >= target * 0.9,
+    reached: prod >= target * 0.90,
   };
 }
 
 export function buildValueList(candidatesByFixture, minEdge = 0.06) {
   const all = Object.values(candidatesByFixture || {}).flat();
+
   const value = all
-    .filter((x) => x.marketOdd && Number.isFinite(x.valueEdge) && x.valueEdge >= minEdge && x.prob >= 0.8)
+    .filter((x) => Number.isFinite(Number(x.marketOdd)) && Number.isFinite(Number(x.fvOdd)))
+    .map((x) => {
+      const mk = Number(x.marketOdd);
+      const fv = Number(x.fvOdd);
+      const edge = fv > 0 ? (mk / fv) - 1 : null;
+      return { ...x, valueEdge: edge === null ? null : round2(edge) };
+    })
+    .filter((x) => Number.isFinite(x.valueEdge) && x.valueEdge >= minEdge && x.prob >= 0.80)
     .sort((a, b) => b.valueEdge - a.valueEdge);
+
   return value.slice(0, 12);
 }
