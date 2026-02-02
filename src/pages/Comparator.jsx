@@ -5,7 +5,13 @@ import { useAuth } from "../lib/auth";
 import Simulator from "../components/Simulator";
 import PriceCalculatorCard from "../components/PriceCalculatorCard";
 import RecoWeeklyCard from "../components/RecoWeeklyCard";
-import { buildCandidatePicks, pickSafe, buildParlay, buildValueList } from "../lib/fvModel";
+import {
+  buildCandidatePicks,
+  pickSafe,
+  buildGiftPickBundle,   // ✅ ESTE FALTA
+  buildParlay,
+  buildValueList,
+} from "../lib/fvModel";
 
 const GOLD = "#E6C464";
 
@@ -1257,7 +1263,7 @@ const ensureFvPack = useCallback(
         return;
       }
 
-      setFvOutput({ mode, safe, parlays, valueList, candidatesByFixture });
+      setFvOutput({ mode, safe, giftBundle, parlays, valueList, candidatesByFixture });
 
       if (parlays[0]) setParlayResult({ mode, ...parlays[0] });
     } catch (e) {

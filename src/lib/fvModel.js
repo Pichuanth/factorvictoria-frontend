@@ -275,7 +275,7 @@ export function pickSafe(candidatesByFixture) {
 
 export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 3.0, maxLegs = 3) {
   const pool = Object.values(candidatesByFixture || {})
-    .map((list) => (list || [])[0])   // tomamos el pick “más seguro” de cada fixture
+    .map((list) => (list || [])[0])
     .filter(Boolean)
     .filter((x) => Number.isFinite(x.prob) && x.prob >= 0.85)
     .filter((x) => {
@@ -295,8 +295,6 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
     if (!Number.isFinite(odd) || odd <= 1) continue;
 
     const next = prod * odd;
-
-    // evita pasarte demasiado del maxOdd
     if (next > maxOdd * 1.03) continue;
 
     legs.push(cand);
@@ -306,7 +304,7 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
     if (prod >= minOdd) break;
   }
 
-  if (legs.length < 1) return null;
+  if (!legs.length) return null;
 
   return {
     games: legs.length,
