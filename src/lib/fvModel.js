@@ -1,144 +1,5 @@
-// src/lib/fvModel.js
-// Motor MVP de probabilidades + armado de parlays para Factor Victoria.
-// Objetivo: simple, interpretable, con fallbacks (si no hay odds o stats).
-
-function clamp(n, a, b) {
-  return Math.max(a, Math.min(b, n));
-}
-
-function round2(n) {
-  const x = Number(n);
-  return Number.isFinite(x) ? Number(x.toFixed(2)) : null;
-}
-
-function avg(arr) {
-  if (!arr?.length) return null;
-  const s = arr.reduce((a,b)=>a+b,0);
-  return s / arr.length;
-}
-
-function safeNum(n) {
-  const x = Number(n);
-  return Number.isFinite(x) ? x : null;
-}
-
-// stats: [{gf, ga}] últimos partidos
-function summarizeRecent(list) {
-  if (!Array.isArray(list) || !list.length) return null;
-  const gf = avg(list.map(x => safeNum(x.gf) ?? 0));
-  const ga = avg(list.map(x => safeNum(x.ga) ?? 0));
-  const total = (gf ?? 0) + (ga ?? 0);
-  return { gf: gf ?? 0, ga: ga ?? 0, total };
-}
-
-// h2h: [{hg, ag}]
-function summarizeH2H(list) {
-  if (!Array.isArray(list) || !list.length) return null;
-  const totals = list.map(x => (safeNum(x.hg) ?? 0) + (safeNum(x.ag) ?? 0));
-  const btts = list.map(x => ((safeNum(x.hg) ?? 0) > 0 && (safeNum(x.ag) ?? 0) > 0) ? 1 : 0);
-  return {
-    avgTotal: avg(totals) ?? null,
-    bttsRate: avg(btts) ?? null,
-  };
-}
-function probUnderFromAvgGoals(avgGoals, line) {
-  // Heurística suave: si avgGoals << line, prob alta
-  if (!Number.isFinite(avgGoals)) return null;
-  const diff = line - avgGoals; // positivo = favorece Under
-  // mapa simple con sigmoide
-  const p = 1 / (1 + Math.exp(-1.4 * diff));
-  return clamp(p, 0.05, 0.95);
-}
-
-function probBTTSNoFromBttsRate(bttsRate) {
-  if (!Number.isFinite(bttsRate)) return null;
-  return clamp(1 - bttsRate, 0.05, 0.95);
-}
-
-export function fairOddFromProb(p) {
-  const pp = clamp(Number(p || 0), 1e-6, 0.999999);
-  return 1 / pp;
-}
-
-function factorial(n) {
-  let x = 1;
-  for (let i = 2; i <= n; i++) x *= i;
-  return x;
-}
-
-function poissonP(k, lambda) {
-  if (lambda <= 0) return k === 0 ? 1 : 0;
-  return Math.exp(-lambda) * Math.pow(lambda, k) / factorial(k);
-}
-
-export function probUnderLine(lambdaTotal, line) {
-  // Under line: P(G <= floor(line)) si line es entero; para 3.5, floor=3
-  const maxGoals = 10;
-  const thr = Math.floor(Number(line));
-  let s = 0;
-  for (let g = 0; g <= maxGoals; g++) {
-    const p = poissonP(g, lambdaTotal);
-    if (g <= thr) s += p;
-  }
-  return clamp(s, 0, 1);
-}
-
-export function probBTTSNo(lambdaHome, lambdaAway) {
-  // P(home=0 OR away=0) = P(home=0) + P(away=0) - P(both=0)
-  const pH0 = poissonP(0, lambdaHome);
-  const pA0 = poissonP(0, lambdaAway);
-  const pBoth0 = pH0 * pA0;
-  return clamp(pH0 + pA0 - pBoth0, 0, 1);
-}
-
-export function scoreMatrix(lambdaHome, lambdaAway, maxG = 6) {
-  const mat = [];
-  for (let i = 0; i <= maxG; i++) {
-    for (let j = 0; j <= maxG; j++) {
-      mat.push({ hg: i, ag: j, p: poissonP(i, lambdaHome) * poissonP(j, lambdaAway) });
-    }
-  }
-  return mat;
-}
-
-export function probs1X2(lambdaHome, lambdaAway) {
-  const mat = scoreMatrix(lambdaHome, lambdaAway, 6);
-  let pH = 0, pD = 0, pA = 0;
-  for (const c of mat) {
-    if (c.hg > c.ag) pH += c.p;
-    else if (c.hg === c.ag) pD += c.p;
-    else pA += c.p;
-  }
-  // cola (7+ goles) ignorada: re-normaliza un poco
-  const s = pH + pD + pA;
-  if (s > 0) {
-    pH /= s; pD /= s; pA /= s;
-  }
-  return { home: clamp(pH,0,1), draw: clamp(pD,0,1), away: clamp(pA,0,1) };
-}
-
-export function probsDoubleChance(lambdaHome, lambdaAway) {
-  const p = probs1X2(lambdaHome, lambdaAway);
-  return {
-    home_draw: clamp(p.home + p.draw, 0, 1),
-    home_away: clamp(p.home + p.away, 0, 1),
-    draw_away: clamp(p.draw + p.away, 0, 1),
-  };
-}
-
-export function estimateLambdasFromPack(pack) {
-  // pack.model viene del backend; si no existe, fallback con valores neutros
-  const lh = Number(pack?.model?.lambdaHome);
-  const la = Number(pack?.model?.lambdaAway);
-
-  const lambdaHome = Number.isFinite(lh) ? clamp(lh, 0.2, 3.2) : 1.25;
-  const lambdaAway = Number.isFinite(la) ? clamp(la, 0.2, 3.2) : 1.05;
-
-  return { lambdaHome, lambdaAway, lambdaTotal: lambdaHome + lambdaAway };
-}
-
 export function buildCandidatePicks({ fixture, pack, markets }) {
-  // 1) modelo base (Poisson)
+  // 1) lambdas (si no hay modelo, usa fallback)
   const { lambdaHome, lambdaAway, lambdaTotal } = estimateLambdasFromPack(pack);
 
   // 2) forma + h2h (heurística)
@@ -160,20 +21,21 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
 
   const usableTotal = blendTotal > 0.2 ? blendTotal : lambdaTotal;
 
-  // 3) probabilidades
+  // 3) probs base
   const dc = probsDoubleChance(lambdaHome, lambdaAway);
 
   const under35_h = probUnderFromAvgGoals(usableTotal, 3.5);
   const under25_h = probUnderFromAvgGoals(usableTotal, 2.5);
-  const bttsNo_h = probBTTSNoFromBttsRate(h2h?.bttsRate);
 
   const under35 = under35_h ?? probUnderLine(lambdaTotal, 3.5);
   const under25 = under25_h ?? probUnderLine(lambdaTotal, 2.5);
+
   const over25 = clamp(1 - under25, 0.01, 0.99);
 
+  const bttsNo_h = probBTTSNoFromBttsRate(h2h?.bttsRate);
   const bttsNo = bttsNo_h ?? probBTTSNo(lambdaHome, lambdaAway);
 
-  // 4) construir lista de picks
+  // 4) output candidates
   const out = [];
 
   out.push({
@@ -230,14 +92,12 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
     marketOdd: markets?.BTTS?.no ?? null,
   });
 
-  // 5) limpiar + enriquecer
+  // 5) clean + enrich
   const cleaned = out
     .filter((x) => Number.isFinite(x.prob) && x.prob > 0.01 && x.prob < 0.999)
     .map((x) => {
       const bestOdd = Number.isFinite(Number(x.marketOdd)) ? Number(x.marketOdd) : Number(x.fvOdd);
-      const valueEdge = Number.isFinite(Number(x.marketOdd))
-        ? Number(x.marketOdd) / Number(x.fvOdd) - 1
-        : null;
+      const valueEdge = Number.isFinite(Number(x.marketOdd)) ? (Number(x.marketOdd) / Number(x.fvOdd)) - 1 : null;
 
       return {
         ...x,
@@ -253,62 +113,4 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
 
   cleaned.sort((a, b) => (b.prob - a.prob) || (a.usedOdd - b.usedOdd));
   return cleaned;
-}
-
-export function pickSafe(candidatesByFixture) {
-  const all = Object.values(candidatesByFixture || {}).flat();
-  all.sort((a, b) => (b.prob - a.prob) || (a.usedOdd - b.usedOdd));
-  return all[0] || null;
-}
-
-export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) {
-  const fixtures = Object.keys(candidatesByFixture || {});
-  const pool = fixtures
-    .map((fid) => {
-      const list = candidatesByFixture[fid] || [];
-      return list[0] ? { fid, best: list[0], list } : null;
-    })
-    .filter(Boolean);
-
-  // Ordena por prob desc (más seguros primero)
-  pool.sort((a, b) => (b.best.prob - a.best.prob));
-
-  let legs = [];
-  let prod = 1;
-
-  for (const item of pool) {
-    const cand = item.best;
-    const next = prod * cand.usedOdd;
-
-    // si ya estamos cerca del objetivo, intentamos no pasarnos del cap
-    if (next > cap * 1.01) continue;
-    legs.push(cand);
-    prod = next;
-
-    if (legs.length >= maxLegs) break;
-    if (prod >= target * 0.95) break;
-  }
-
-  if (legs.length < 2) return null;
-
-  const finalOdd = round2(prod);
-  const impliedProb = round2(1 / prod);
-
-  return {
-    target,
-    cap,
-    games: legs.length,
-    finalOdd,
-    impliedProb,
-    legs,
-    reached: finalOdd >= target * 0.90,
-  };
-}
-
-export function buildValueList(candidatesByFixture, minEdge = 0.06) {
-  const all = Object.values(candidatesByFixture || {}).flat();
-  const value = all
-    .filter(x => x.marketOdd && Number.isFinite(x.valueEdge) && x.valueEdge >= minEdge && x.prob >= 0.80)
-    .sort((a, b) => (b.valueEdge - a.valueEdge));
-  return value.slice(0, 12);
 }
