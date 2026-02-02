@@ -1208,7 +1208,7 @@ const ensureFvPack = useCallback(
       const pool =
         mode === "selected"
           ? fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)))
-          : fixtures.slice(0, 14);
+          : fixtures.slice(0, Math.min(28, fixtures.length));
 
       if (mode === "selected" && pool.length < 2) {
         setParlayError("Selecciona al menos 2 partidos de la lista superior.");
@@ -1583,43 +1583,6 @@ const handleSelectedParlay = () => runGeneration("selected");
           <div className="text-xs text-slate-300">
   Pick con mayor probabilidad (FV). Si hay cuota de mercado, la mostramos; si no, usamos FV.
 </div>
-{fvOutput?.candidatesByFixture ? (
-  <div className="mt-3">
-    <div className="text-xs text-slate-300 font-semibold mb-2">Tus partidos</div>
-    <div className="space-y-2">
-      {Object.keys(fvOutput.candidatesByFixture).slice(0, 8).map((fixtureId) => {
-        const fx = fixtures.find((x) => String(getFixtureId(x)) === String(fixtureId));
-        if (!fx) return null;
-
-        const refName = getRefereeName(fx);
-        if (!refName) {
-          return (
-            <div key={fixtureId} className="text-[11px] text-slate-400">
-              {getHomeName(fx)} vs {getAwayName(fx)} — árbitro: (no disponible)
-            </div>
-          );
-        }
-
-        const hit = (refData?.topReferees || []).find((r) => normStr(r.name) === normStr(refName));
-        const avg = hit?.avgCards ?? null;
-
-        return (
-          <div key={fixtureId} className="text-[11px] text-slate-200">
-            {getHomeName(fx)} vs {getAwayName(fx)} — {refName}
-            {avg ? (
-              <>
-                {" "}· <span className="text-emerald-200 font-semibold">{avg}</span> cards/partido
-                {" "}· <span className="text-amber-200 font-semibold">{refereeLevel(avg)}</span>
-              </>
-            ) : (
-              <span className="text-slate-400"> · (sin rating)</span>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  </div>
-) : null}
 
 {fvOutput?.safe ? (
   <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/30 p-3">
