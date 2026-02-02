@@ -43,6 +43,33 @@ function summarizeH2H(list) {
     bttsRate: avg(btts) ?? null,
   };
 }
+const fvOddNum = Number(x.fvOdd);
+const mkOddNum = Number(x.marketOdd);
+
+const bestOddRaw = Number.isFinite(mkOddNum) ? mkOddNum : fvOddNum;
+
+// valueEdge = (mercado / FV) - 1
+const valueEdgeRaw =
+  Number.isFinite(mkOddNum) && Number.isFinite(fvOddNum) && fvOddNum > 0
+    ? mkOddNum / fvOddNum - 1
+    : null;
+
+return {
+  ...x,
+  fvOdd: round2(fvOddNum),
+  marketOdd: Number.isFinite(mkOddNum) ? round2(mkOddNum) : null,
+
+  // ✅ IMPORTANTE: usedOdd sin redondear para cálculos
+  usedOdd: bestOddRaw,
+  // ✅ para UI
+  usedOddDisplay: round2(bestOddRaw),
+
+  valueEdge: valueEdgeRaw === null ? null : round2(valueEdgeRaw),
+
+  fixtureId: Number(fixture?.fixture?.id || fixture?.id || pack?.fixtureId),
+  home: fixture?.teams?.home?.name || pack?.teams?.home?.name || "Home",
+  away: fixture?.teams?.away?.name || pack?.teams?.away?.name || "Away",
+};
 
 function probUnderFromAvgGoals(avgGoals, line) {
   if (!Number.isFinite(avgGoals)) return null;
@@ -260,7 +287,7 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
     });
 
   // Orden: primero mayor prob (seguro), luego menor odd
-  cleaned.sort((a, b) => (b.prob - a.prob) || (a.usedOdd - b.usedOdd));
+  cleaned.sort((a, b) => (b.prob - a.prob) || (Number(a.usedOdd) - Number(b.usedOdd)));
   return cleaned;
 }
 // =====================
