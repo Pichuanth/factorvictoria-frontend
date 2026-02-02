@@ -179,11 +179,14 @@ function leaguePriority(leagueName) {
   // UEFA aqui eliminé, uefa champions league, europa league y conference league
 
   // Big-5
+  if (n.includes("uefa champions league")) return 0;
   if (n.includes("premier league")) return 3;
   if (n.includes("la liga") || n.includes("laliga")) return 4;
   if (n.includes("serie a")) return 5;
   if (n.includes("bundesliga") && !n.includes("2.")) return 6;
   if (n.includes("ligue 1")) return 7;
+  if (n.includes("primera division") || n.includes("primera división") || n.includes("campeonato itau") || n.includes("campeonato itaú")) return 8;
+  if (n.includes("copa chile")) return 9;
 
   // América
   if (n.includes("liga mx")) return 10;
@@ -237,8 +240,11 @@ if (intlAllowedExact.has(l)) return true;
     { country: "usa", league: "mls" },
     { country: "brazil", league: "serie a" },
     { country: "argentina", league: "primera división argentina" },
-    { country: "chile", league: "campeonato itau" },
+    { country: "chile", league: "primera division" },
+    { country: "chile", league: "primera división" },
+    { country: "chile", league: "primera" },         // opcional si quieres más amplio
     { country: "chile", league: "copa chile" },
+
 
   ];
 
