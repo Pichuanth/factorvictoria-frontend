@@ -216,7 +216,9 @@ function isAllowedCompetition(countryName, leagueName) {
     "tercera division",
     "tercera division rfef",
     "paulista","paulista a2","baiano","goiano","cearense","pernambucano",
-    "matogrossense","maranhense","potiguar","acreano",
+    "matogrossense","maranhense","potiguar","acreano","ofc",
+"ofc champions league",
+
   ];
   if (bannedPatterns.some((p) => l.includes(p))) return false;
 
