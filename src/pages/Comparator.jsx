@@ -196,8 +196,16 @@ function leaguePriority(leagueName) {
 
   // América
   if (n.includes("liga mx")) return 10;
-  if (n.includes("primera division") || n.includes("liga profesional")) return 11;
+  if (n.includes("primera division argentina") || n.includes("liga profesional")) return 11;
   if (n.includes("mls")) return 14;
+
+  // Otras copas
+  if (n.includes("copa libertadores")) return 15;
+  if (n.includes("copa sudamericana")) return 16;
+  if (n.includes("copa alemania")) return 17;
+  if (n.includes("EFL carabao cup")) return 18;
+  if (n.includes("copa argentina")) return 19;
+  if (n.includes("liga colombiana")) return 20;
 
   return 50;
 }
