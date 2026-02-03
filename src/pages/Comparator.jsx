@@ -199,13 +199,25 @@ function leaguePriority(leagueName) {
   if (n.includes("primera division argentina") || n.includes("liga profesional")) return 11;
   if (n.includes("mls")) return 14;
 
-  // Otras copas
-  if (n.includes("copa libertadores")) return 15;
-  if (n.includes("copa sudamericana")) return 16;
-  if (n.includes("copa alemania")) return 17;
-  if (n.includes("efl carabao cup")) return 18;
-  if (n.includes("copa argentina")) return 19;
-  if (n.includes("liga colombiana")) return 20;
+    // Otras copas (robusto)
+if (n.includes("libertadores")) return 15;
+if (n.includes("sudamericana")) return 16;
+
+// Copa Alemania suele venir como "dfb pokal" o "dfb-pokal"
+if (n.includes("dfb") || n.includes("pokal") || n.includes("copa alemania")) return 17;
+
+// Carabao Cup puede venir como "efl cup" o "carabao"
+if (n.includes("carabao") || n.includes("efl cup") || n.includes("league cup")) return 18;
+
+// Copa Argentina
+if (n.includes("copa argentina")) return 19;
+
+// Liga Colombia (puede venir como "primera a colombia", "categoría primera a", etc.)
+if (n.includes("colombia")) return 20;
+
+// CONCACAF Champions Cup (por tu screenshot de partidos)
+if (n.includes("concacaf") && (n.includes("champions") || n.includes("champions cup"))) return 21;
+
 
   return 50;
 }
