@@ -172,7 +172,7 @@ function countryPriority(countryName) {
   if (c.includes("chile")) return 6;
   if (c.includes("portugal")) return 7;
   if (c.includes("mexico") || c.includes("méxico")) return 8;
-  if (c.includes("usa")) return 9; 
+  if (c.includes("usa")) return 9;
   if (c.includes("brazil") || c.includes("brasil")) return 10;
   if (c.includes("colombia")) return 11;
 
@@ -203,9 +203,10 @@ function leaguePriority(leagueName) {
   if (n.includes("copa libertadores")) return 15;
   if (n.includes("copa sudamericana")) return 16;
   if (n.includes("copa alemania")) return 17;
-  if (n.includes("EFL carabao cup")) return 18;
-  if (n.includes("copa argentina")) return 19;
-  if (n.includes("liga colombiana")) return 20;
+  if (n.includes("efl carabao cup")) return 18;
+  if (n.includes("carabao cup") || n.includes("efl cup")) return 19;
+  if (n.includes("copa argentina")) return 20;
+  if (n.includes("liga colombiana")) return 21;
 
   return 50;
 }
@@ -231,10 +232,24 @@ function isAllowedCompetition(countryName, leagueName) {
     "tercera division rfef",
     "paulista","paulista a2","baiano","goiano","cearense","pernambucano",
     "matogrossense","maranhense","potiguar","acreano","ofc",
-"ofc champions league",
+    "ofc champions league",
 
   ];
   if (bannedPatterns.some((p) => l.includes(p))) return false;
+
+  // ✅ Copas internacionales (permitidas)
+const intlAllowedIncludes = [
+  "libertadores",
+  "sudamericana",
+  "dfb pokal",          // copa alemania
+  "copa alemania",
+  "carabao cup",
+  "efl cup",
+  "copa argentina",
+  "liga colombiana",
+];
+
+if (intlAllowedIncludes.some((k) => l.includes(k))) return true;
 
   const intlAllowedExact = new Set([
   "uefa champions league",
