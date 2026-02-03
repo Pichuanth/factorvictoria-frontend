@@ -156,7 +156,7 @@ const COUNTRY_FLAG = {
   Portugal: "🇵🇹",
   Mexico: "🇲🇽",
   USA: "🇺🇸",
-  Colombia: "co"
+  Colombia: "🇨🇴"
 };
 
 /* ------------------- Prioridades / filtro TOP ------------------- */
@@ -171,8 +171,8 @@ function countryPriority(countryName) {
   if (c.includes("argentina")) return 5;
   if (c.includes("chile")) return 6;
   if (c.includes("portugal")) return 7;
-  if (c.includes("mexico") || c.includes("méxico"))
-  if (c.includes("usa")) return 9;
+  if (c.includes("mexico") || c.includes("méxico")) return 8;
+  if (c.includes("usa")) return 9; 
   if (c.includes("brazil") || c.includes("brasil")) return 10;
   if (c.includes("colombia")) return 11;
 
@@ -1247,6 +1247,9 @@ const ensureFvPack = useCallback(
           markets,
         });
       }
+      console.log("cand sample", Object.values(candidatesByFixture)[0]?.slice(0,3));
+      console.log("cand fixtures:", Object.keys(candidatesByFixture).length);
+      console.log("cand count total:", Object.values(candidatesByFixture).reduce((acc, arr) => acc + (arr?.length || 0), 0));
 
       const safe = pickSafe(candidatesByFixture);
       const giftBundle = buildGiftPickBundle(candidatesByFixture, 1.5, 3.0, 3);
@@ -1636,44 +1639,34 @@ const handleSelectedParlay = () => runGeneration("selected");
 
           {parlayError ? <div className="mt-3 text-xs text-amber-300">{parlayError}</div> : null}
 
-          {fvOutput?.parlays?.length ? (
-  <div className="mt-3 space-y-3">
-    {fvOutput.parlays.map((p) => (
-      <div key={String(p.target)} className="rounded-xl border border-white/10 bg-slate-950/30 p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="text-xs text-slate-300">
-            Objetivo: <span className="text-slate-100 font-semibold">x{p.target}</span>{" "}
-            <span className="text-slate-500">·</span>{" "}
-            Cap plan: <span className="text-slate-100 font-semibold">x{p.cap}</span>
-          </div>
-          <div className="text-sm font-bold text-emerald-200">Cuota final: {Number(p.finalOdd) > 1 ? `x${p.finalOdd}` : "—"} </div>
-        </div>
+          <div className="mt-2 space-y-1">
+  {p.legs.map((leg, idx) => {
+    const oddToShow =
+      Number(leg.usedOddDisplay) > 1 ? Number(leg.usedOddDisplay)
+      : Number(leg.usedOdd) > 1 ? Number(leg.usedOdd)
+      : null;
 
-        <div className="mt-1 text-[11px] text-slate-400">
-          Legs: {p.games} · Prob implícita aprox: {(p.impliedProb * 100).toFixed(1)}%
-          {!p.reached ? <span className="text-amber-300"> · (no alcanzó el objetivo, sube partidos)</span> : null}
-        </div>
-
-        <div className="mt-2 space-y-1">
-          {p.legs.map((leg, idx) => (
-            <div key={`${leg.fixtureId}-${idx}`} className="text-[11px] text-slate-300">
-              <span className="text-slate-500">#{idx + 1}</span>{" "}
-              <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
-              <span className="text-slate-500">·</span>{" "}
-              {leg.home} vs {leg.away}{" "}
-              <span className="text-slate-500">·</span>{" "}
-              Odd: <span className="text-slate-100 font-semibold">
-                {leg.usedOdd && leg.usedOdd > 1 ? `x${leg.usedOdd}` : "—"}
-                </span>
-              <span className="text-slate-500">·</span>{" "}
-              Prob FV: <span className="text-emerald-200 font-semibold">{Math.round(leg.prob * 100)}%</span>
-            </div>
-          ))}
-        </div>
+    return (
+      <div key={`${leg.fixtureId}-${idx}`} className="text-[11px] text-slate-300">
+        <span className="text-slate-500">#{idx + 1}</span>{" "}
+        <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
+        <span className="text-slate-500">·</span>{" "}
+        {leg.home} vs {leg.away}{" "}
+        <span className="text-slate-500">·</span>{" "}
+        Odd:{" "}
+        <span className="text-slate-100 font-semibold">
+          {oddToShow ? `x${oddToShow}` : "—"}
+        </span>{" "}
+        <span className="text-slate-500">·</span>{" "}
+        Prob FV:{" "}
+        <span className="text-emerald-200 font-semibold">
+          {Math.round(leg.prob * 100)}%
+        </span>
       </div>
-    ))}
-  </div>
-) : null}
+    );
+  })}
+</div>
+
         </FeatureCard>
 
         <FeatureCard title="Árbitros tarjeteros" badge="Tarjetas" locked={!canReferees} lockText="Disponible desde Plan Anual.">
@@ -1713,19 +1706,34 @@ const handleSelectedParlay = () => runGeneration("selected");
           {fvOutput?.valueList?.length ? (
   <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/30 p-3">
     <div className="text-sm font-semibold text-slate-100">Value (desfase mercado vs FV)</div>
+
     <div className="mt-2 space-y-1">
-      {fvOutput.valueList.map((v, idx) => (
-        <div key={`${v.fixtureId}-${idx}`} className="text-[11px] text-slate-300">
-          <span className="text-amber-200 font-semibold">{(v.valueEdge * 100).toFixed(0)}%</span>{" "}
-          <span className="text-slate-500">·</span>{" "}
-          {v.home} vs {v.away}{" "}
-          <span className="text-slate-500">·</span>{" "}
-          <span className="text-slate-100 font-semibold">{v.label}</span>{" "}
-          <span className="text-slate-500">·</span>{" "}
-          Mercado x<span className="text-slate-100 font-semibold">{v.marketOdd}</span>{" "}
-          FV justa x<span className="text-slate-100 font-semibold">{v.fvOdd}</span>
-        </div>
-      ))}
+      {fvOutput.valueList.map((v, idx) => {
+        const edgePct =
+          typeof v.valueEdge === "number" ? Math.round(v.valueEdge * 100) : null;
+
+        return (
+          <div key={`${v.fixtureId}-${idx}`} className="text-[11px] text-slate-300">
+            <span className="text-slate-100 font-semibold">{v.home}</span>{" "}
+            vs{" "}
+            <span className="text-slate-100 font-semibold">{v.away}</span>{" "}
+            <span className="text-slate-500">·</span>{" "}
+            <span className="text-slate-100 font-semibold">{v.label}</span>{" "}
+            <span className="text-slate-500">·</span>{" "}
+            Mercado x<span className="text-slate-100 font-semibold">{v.marketOdd}</span>{" "}
+            FV justa x<span className="text-slate-100 font-semibold">{v.fvOdd}</span>
+
+            {edgePct !== null && edgePct > 0 ? (
+              <>
+                {" "}<span className="text-slate-500">·</span>{" "}
+                <span className="text-amber-200 font-semibold">
+                  Ventaja estimada +{edgePct}%
+                </span>
+              </>
+            ) : null}
+          </div>
+        );
+      })}
     </div>
   </div>
 ) : (
@@ -1733,6 +1741,14 @@ const handleSelectedParlay = () => runGeneration("selected");
     Genera una combinada para buscar value (si la API entrega odds para esos fixtures).
   </div>
 )}
+
+{edgePct !== null && edgePct > 0 ? (
+  <>
+    {" "}<span className="text-slate-500">·</span>{" "}
+    <span className="text-amber-200 font-semibold">Ventaja estimada +{edgePct}%</span>
+  </>
+) : null}
+
         </FeatureCard>
       </section>
 

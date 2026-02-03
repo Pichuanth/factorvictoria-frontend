@@ -43,8 +43,6 @@ function summarizeH2H(list) {
     bttsRate: avg(btts) ?? null,
   };
 }
-const fvOddNum = Number(x.fvOdd);
-const mkOddNum = Number(x.marketOdd);
 
 const bestOddRaw = Number.isFinite(mkOddNum) ? mkOddNum : fvOddNum;
 
@@ -264,27 +262,29 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
 
   // ---------- limpieza + métricas ----------
   const cleaned = out
-    .filter((x) => Number.isFinite(x.prob) && x.prob > 0.01 && x.prob < 0.999)
-    .map((x) => {
-      const fvOddNum = Number(x.fvOdd);
-      const mkOddNum = Number(x.marketOdd);
+  .filter((x) => Number.isFinite(x.prob) && x.prob > 0.01 && x.prob < 0.999)
+  .map((x) => {
+    const fvOddNum = Number(x.fvOdd);
+    const mkOddNum = Number(x.marketOdd);
 
-      const bestOdd = Number.isFinite(mkOddNum) ? mkOddNum : fvOddNum;
-      const valueEdge = Number.isFinite(mkOddNum) && Number.isFinite(fvOddNum) && fvOddNum > 0
+    const bestOddRaw = Number.isFinite(mkOddNum) ? mkOddNum : fvOddNum;
+
+    const valueEdgeRaw =
+      Number.isFinite(mkOddNum) && Number.isFinite(fvOddNum) && fvOddNum > 0
         ? (mkOddNum / fvOddNum) - 1
         : null;
 
-      return {
-        ...x,
-        fvOdd: round2(fvOddNum),
-        marketOdd: Number.isFinite(mkOddNum) ? round2(mkOddNum) : null,
-        usedOdd: round2(bestOdd),
-        valueEdge: valueEdge === null ? null : round2(valueEdge),
-        fixtureId: Number(fixture?.fixture?.id || fixture?.id || pack?.fixtureId),
-        home: fixture?.teams?.home?.name || pack?.teams?.home?.name || "Home",
-        away: fixture?.teams?.away?.name || pack?.teams?.away?.name || "Away",
-      };
-    });
+    return {
+      ...x,
+      fvOdd: round2(fvOddNum),
+      marketOdd: Number.isFinite(mkOddNum) ? round2(mkOddNum) : null,
+      usedOdd: round2(bestOddRaw),
+      valueEdge: valueEdgeRaw === null ? null : round2(valueEdgeRaw),
+      fixtureId: Number(fixture?.fixture?.id || fixture?.id || pack?.fixtureId),
+      home: fixture?.teams?.home?.name || pack?.teams?.home?.name || "Home",
+      away: fixture?.teams?.away?.name || pack?.teams?.away?.name || "Away",
+    };
+  });
 
   // Orden: primero mayor prob (seguro), luego menor odd
   cleaned.sort((a, b) => (b.prob - a.prob) || (Number(a.usedOdd) - Number(b.usedOdd)));
