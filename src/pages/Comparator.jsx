@@ -204,9 +204,8 @@ function leaguePriority(leagueName) {
   if (n.includes("copa sudamericana")) return 16;
   if (n.includes("copa alemania")) return 17;
   if (n.includes("efl carabao cup")) return 18;
-  if (n.includes("carabao cup") || n.includes("efl cup")) return 19;
-  if (n.includes("copa argentina")) return 20;
-  if (n.includes("liga colombiana")) return 21;
+  if (n.includes("copa argentina")) return 19;
+  if (n.includes("liga colombiana")) return 20;
 
   return 50;
 }
@@ -1764,13 +1763,6 @@ const handleSelectedParlay = () => runGeneration("selected");
     Genera una combinada para buscar value (si la API entrega odds para esos fixtures).
   </div>
 )}
-
-{edgePct !== null && edgePct > 0 ? (
-  <>
-    {" "}<span className="text-slate-500">·</span>{" "}
-    <span className="text-amber-200 font-semibold">Ventaja estimada +{edgePct}%</span>
-  </>
-) : null}
 
         </FeatureCard>
       </section>
