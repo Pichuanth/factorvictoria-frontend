@@ -1256,10 +1256,10 @@ const ensureFvPack = useCallback(
       }
 
       const ids = pool.map(getFixtureId).filter(Boolean);
+      await Promise.all(ids.map((id) => ensureOdds(id)));
 
       // Pre-carga stats+odds (y si quieres, luego agregamos shots/SOT aquí también)
-      await Promise.all(
-        ids.map((id) => Promise.all([ensureFvPack(id), ensureOdds(id)]))
+      await Promise.all(ids.map((id) => Promise.all([ensureFvPack(id), ensureOdds(id)]))
       );
 
       // Referees: siempre que el plan lo permita
