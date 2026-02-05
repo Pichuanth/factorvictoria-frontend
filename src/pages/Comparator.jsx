@@ -795,25 +795,29 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
               <div className="text-[11px] text-slate-300 leading-relaxed">
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
                   <div>
-                    <span className="text-slate-400">Racha (últ.5) local:</span>{" "}
-                    <span className="text-slate-100 font-semibold">{fvPack?.last5?.home?.form || "--"}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400">Racha (últ.5) visita:</span>{" "}
-                    <span className="text-slate-100 font-semibold">{fvPack?.last5?.away?.form || "--"}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400">Goles local:</span>{" "}
-                    <span className="text-slate-100 font-semibold">
-                      {fvPack?.last5?.home?.gf ?? "-"} / {fvPack?.last5?.home?.ga ?? "-"}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400">Goles visita:</span>{" "}
-                    <span className="text-slate-100 font-semibold">
-                      {fvPack?.last5?.away?.gf ?? "-"} / {fvPack?.last5?.away?.ga ?? "-"}
-                    </span>
-                  </div>
+  <span className="text-slate-400">Racha (últ.5) local:</span>{" "}
+  <span className="text-slate-100 font-semibold">{fvPack?.last5?.home?.form || "--"}</span>
+</div>
+
+<div>
+  <span className="text-slate-400">Racha (últ.5) visita:</span>{" "}
+  <span className="text-slate-100 font-semibold">{fvPack?.last5?.away?.form || "--"}</span>
+</div>
+
+<div>
+  <span className="text-slate-400">Goles (últ.5) local:</span>{" "}
+  <span className="text-slate-100 font-semibold">
+    {fvPack?.last5?.home?.gf ?? "--"} / {fvPack?.last5?.home?.ga ?? "--"}
+  </span>
+</div>
+
+<div>
+  <span className="text-slate-400">Goles (últ.5) visita:</span>{" "}
+  <span className="text-slate-100 font-semibold">
+    {fvPack?.last5?.away?.gf ?? "--"} / {fvPack?.last5?.away?.ga ?? "--"}
+  </span>
+</div>
+
                   <div>
                     <span className="text-slate-400">Corners prom:</span>{" "}
                     <span className="text-slate-100 font-semibold">
@@ -827,11 +831,12 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-400">λ goles (FV):</span>{" "}
-                    <span className="text-emerald-200 font-semibold">
-                      {fvPack?.model?.lambdaHome ?? "-"} + {fvPack?.model?.lambdaAway ?? "-"} = {fvPack?.model?.lambdaTotal ?? "-"}
-                    </span>
-                  </div>
+  <span className="text-slate-400">Goles esperados (FV):</span>{" "}
+  <span className="text-emerald-200 font-semibold">
+    {(fvPack?.model?.lambdaTotal ?? "--")}
+  </span>
+</div>
+
                 </div>
 
                 <div className="mt-2 text-slate-400">
@@ -1105,7 +1110,6 @@ export default function Comparator() {
   const selectedCount = selectedIds.length;
 
   // odds cache
-// odds cache
 const ensureOdds = useCallback(
   async (fixtureId) => {
     if (!fixtureId) return;
@@ -1285,36 +1289,41 @@ for (const fx of pool) {
     markets,
   });
 
-  // DEBUG seguro (NO rompe el scope)
+  // debug seguro (dentro del loop, aquí sí existe id)
   // console.log("[ODDS]", id, oddsRef.current?.[id]);
 }
 
-// DEBUG resumen (aquí NO uses `id`)
+// debug resumen (FUERA del loop: aquí NO uses "id")
 console.log("cand sample", Object.values(candidatesByFixture)[0]?.slice(0, 3));
 console.log("cand fixtures:", Object.keys(candidatesByFixture).length);
 console.log(
   "cand count total:",
   Object.values(candidatesByFixture).reduce((acc, arr) => acc + (arr?.length || 0), 0)
 );
-    
-      const safe = pickSafe(candidatesByFixture);
-      const giftBundle = buildGiftPickBundle(candidatesByFixture, 1.5, 3.0, 3);
 
-      const targets = [10, 20, 50, 100].filter((t) => t <= maxBoost);
-      const parlays = targets
-        .map((t) => buildParlay({ candidatesByFixture, target: t, cap: maxBoost }))
-        .filter(Boolean);
+const safe = pickSafe(candidatesByFixture);
+const giftBundle = buildGiftPickBundle(candidatesByFixture, 1.5, 3.0, 3);
 
-      const valueList = buildValueList(candidatesByFixture, 0.06);
+const targets = [10, 20, 50, 100].filter((t) => t <= maxBoost);
+const parlays = targets
+  .map((t) => buildParlay({ candidatesByFixture, target: t, cap: maxBoost }))
+  .filter(Boolean);
 
-      if (!safe && !parlays.length) {
-        setParlayError("No pudimos armar picks con stats/odds disponibles. Prueba con otro rango o liga.");
-        return;
-      }
+const valueList = buildValueList(candidatesByFixture, 0.06);
 
-      setFvOutput({ mode, safe, giftBundle, parlays, valueList, candidatesByFixture });
+console.log("parlays:", parlays);
+console.log("valueList:", valueList?.length);
 
-      if (parlays[0]) setParlayResult({ mode, ...parlays[0] });
+if (!safe && !parlays.length) {
+  setParlayError("No pudimos armar picks con stats/odds disponibles. Prueba con otro rango o liga.");
+  return;
+}
+
+setFvOutput({ mode, safe, giftBundle, parlays, valueList, candidatesByFixture });
+
+// si quieres que el “panel principal” muestre la mejor potenciadas:
+if (parlays[0]) setParlayResult({ mode, ...parlays[0] });
+
     } catch (e) {
       console.error("[FV] runGeneration error", e);
       setParlayError(String(e?.message || e));
