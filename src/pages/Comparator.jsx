@@ -1256,8 +1256,7 @@ const ensureFvPack = useCallback(
       }
 
       const ids = pool.map(getFixtureId).filter(Boolean);
-      await Promise.all(ids.map((id) => ensureOdds(id)));
-
+      
       // Pre-carga stats+odds (y si quieres, luego agregamos shots/SOT aquí también)
       await Promise.all(ids.map((id) => Promise.all([ensureFvPack(id), ensureOdds(id)]))
       );
@@ -1674,31 +1673,27 @@ const handleSelectedParlay = () => runGeneration("selected");
           {parlayError ? <div className="mt-3 text-xs text-amber-300">{parlayError}</div> : null}
 
           <div className="mt-2 space-y-1">
-  {p.legs.map((leg, idx) => {
-    const oddToShow =
-      Number(leg.usedOddDisplay) > 1 ? Number(leg.usedOddDisplay)
-      : Number(leg.usedOdd) > 1 ? Number(leg.usedOdd)
-      : null;
+  {(parlayResult?.legs || []).map((leg, idx) => {
+  const oddToShow =
+    Number(leg.usedOddDisplay) > 1 ? Number(leg.usedOddDisplay)
+    : Number(leg.usedOdd) > 1 ? Number(leg.usedOdd)
+    : null;
 
-    return (
-      <div key={`${leg.fixtureId}-${idx}`} className="text-[11px] text-slate-300">
-        <span className="text-slate-500">#{idx + 1}</span>{" "}
-        <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
-        <span className="text-slate-500">·</span>{" "}
-        {leg.home} vs {leg.away}{" "}
-        <span className="text-slate-500">·</span>{" "}
-        Odd:{" "}
-        <span className="text-slate-100 font-semibold">
-          {oddToShow ? `x${oddToShow}` : "—"}
-        </span>{" "}
-        <span className="text-slate-500">·</span>{" "}
-        Prob FV:{" "}
-        <span className="text-emerald-200 font-semibold">
-          {Math.round(leg.prob * 100)}%
-        </span>
-      </div>
-    );
-  })}
+  return (
+    <div key={`${leg.fixtureId}-${idx}`} className="text-[11px] text-slate-300">
+      <span className="text-slate-500">#{idx + 1}</span>{" "}
+      <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
+      <span className="text-slate-500">—</span>{" "}
+      {leg.home} vs {leg.away}{" "}
+      {oddToShow ? (
+        <>
+          <span className="text-slate-500">·</span>{" "}
+          <span className="text-amber-200 font-semibold">{oddToShow}</span>
+        </>
+      ) : null}
+    </div>
+  );
+})}
 </div>
 
         </FeatureCard>
