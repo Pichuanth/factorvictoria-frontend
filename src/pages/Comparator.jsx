@@ -697,7 +697,6 @@ function WelcomeProCard({ planInfo }) {
 }
 
 /* ------------------- FixtureCard (compact) ------------------- */
-/* ------------------- FixtureCard (compact) ------------------- */
 function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats, fvPack, fvLoading, fvErr }) {
   const id = getFixtureId(fx);
 
@@ -1272,7 +1271,11 @@ const ensureFvPack = useCallback(
         if (!id) continue;
 
         const pack = fvPackByFixture[id] || fvRef.current[id] || null;
-        const markets = pack?.markets || oddsByFixture[id]?.markets || {};
+        const markets =
+        pack?.markets ||
+        oddsRef.current[id]?.markets ||
+        oddsByFixture[id]?.markets ||
+       {};
 
         candidatesByFixture[id] = buildCandidatePicks({
           fixture: fx,
@@ -1283,6 +1286,7 @@ const ensureFvPack = useCallback(
       console.log("cand sample", Object.values(candidatesByFixture)[0]?.slice(0,3));
       console.log("cand fixtures:", Object.keys(candidatesByFixture).length);
       console.log("cand count total:", Object.values(candidatesByFixture).reduce((acc, arr) => acc + (arr?.length || 0), 0));
+      console.log("[ODDS]", id, oddsRef.current[id]);
 
       const safe = pickSafe(candidatesByFixture);
       const giftBundle = buildGiftPickBundle(candidatesByFixture, 1.5, 3.0, 3);
