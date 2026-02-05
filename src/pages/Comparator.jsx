@@ -796,7 +796,7 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
                   <div>
   <span className="text-slate-400">Racha (últ.5) local:</span>{" "}
-  <span className="text-slate-100 font-semibold">{fvPack?.last5?.home?.form || "--"}</span>
+  <span className="text-slate-100 font-semibold">{last5?.home?.form || "--"}</span>
 </div>
 
 <div>
@@ -807,27 +807,27 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
 <div>
   <span className="text-slate-400">Goles (últ.5) local:</span>{" "}
   <span className="text-slate-100 font-semibold">
-    {fvPack?.last5?.home?.gf ?? "--"} / {fvPack?.last5?.home?.ga ?? "--"}
+    {last5?.home?.gf ?? "--"} / {last5?.home?.ga ?? "--"}
   </span>
 </div>
 
 <div>
   <span className="text-slate-400">Goles (últ.5) visita:</span>{" "}
   <span className="text-slate-100 font-semibold">
-    {fvPack?.last5?.away?.gf ?? "--"} / {fvPack?.last5?.away?.ga ?? "--"}
+    {fvPack?.last5?.away?.gf ?? "--"} / {last5?.away?.ga ?? "--"}
   </span>
 </div>
 
                   <div>
                     <span className="text-slate-400">Corners prom:</span>{" "}
                     <span className="text-slate-100 font-semibold">
-                      {fvPack?.last5?.home?.avgCorners ?? "-"} / {fvPack?.last5?.away?.avgCorners ?? "-"}
+                      {last5?.home?.avgCorners ?? "-"} / {last5?.away?.avgCorners ?? "-"}
                     </span>
                   </div>
                   <div>
                     <span className="text-slate-400">Tarjetas prom:</span>{" "}
                     <span className="text-slate-100 font-semibold">
-                      {fvPack?.last5?.home?.avgCards ?? "-"} / {fvPack?.last5?.away?.avgCards ?? "-"}
+                      {last5?.home?.avgCards ?? "-"} / {last5?.away?.avgCards ?? "-"}
                     </span>
                   </div>
                   <div>
@@ -1113,13 +1113,23 @@ export default function Comparator() {
 const ensureOdds = useCallback(
   async (fixtureId) => {
     if (!fixtureId) return;
-    if (oddsRef.current[fixtureId]) return;
+
+    const TTL = 1000 * 60 * 10; // 10 min
+    const cached = oddsRef.current[fixtureId];
+    if (cached && cached.fetchedAt && Date.now() - cached.fetchedAt < TTL) return;
+
+
+    // ✅ si ya hay cache y está fresco, no vuelvas a pedirlo
+    if (cached?.fetchedAt && Date.now() - cached.fetchedAt < ODDS_TTL) return;
 
     try {
       const res = await fetch(`${API_BASE}/api/odds?fixture=${encodeURIComponent(fixtureId)}`);
+
+      // ✅ si falla HTTP, igual guarda cache con fetchedAt (si no, el TTL no sirve)
       if (!res.ok) {
-        oddsRef.current[fixtureId] = { found: false, markets: {} };
-        setOddsByFixture((prev) => ({ ...prev, [fixtureId]: oddsRef.current[fixtureId] }));
+        const pack = { found: false, markets: {}, fetchedAt: Date.now() };
+        oddsRef.current[fixtureId] = pack;
+        setOddsByFixture((prev) => ({ ...prev, [fixtureId]: pack }));
         return;
       }
 
@@ -1133,9 +1143,10 @@ const ensureOdds = useCallback(
       oddsRef.current[fixtureId] = pack;
       setOddsByFixture((prev) => ({ ...prev, [fixtureId]: pack }));
     } catch (e) {
-      // silencio (pero cerramos bien el try/catch)
-      oddsRef.current[fixtureId] = { found: false, markets: {} };
-      setOddsByFixture((prev) => ({ ...prev, [fixtureId]: oddsRef.current[fixtureId] }));
+      // ✅ en catch, también guarda fetchedAt
+      const pack = { found: false, markets: {}, fetchedAt: Date.now() };
+      oddsRef.current[fixtureId] = pack;
+      setOddsByFixture((prev) => ({ ...prev, [fixtureId]: pack }));
     }
   },
   [API_BASE]
@@ -1275,7 +1286,8 @@ for (const fx of pool) {
   const id = getFixtureId(fx);
   if (!id) continue;
 
-  const pack = fvPackByFixture[id] || fvRef.current[id] || null;
+  console.log("[FVPACK keys]", String(id), pack && Object.keys(pack));
+  console.log("[FVPACK last5]", String(id), pack?.last5, pack?.stats?.last5, pack?.form?.last5);
 
   const markets =
     pack?.markets ||
@@ -1288,6 +1300,10 @@ for (const fx of pool) {
     pack: pack || {},
     markets,
   });
+if (!debugOnce) {
+  console.log("[CAND 0]", id, candidatesByFixture[id]?.slice(0, 10));
+  debugOnce = true;
+}
 
   // debug seguro (dentro del loop, aquí sí existe id)
   // console.log("[ODDS]", id, oddsRef.current?.[id]);
@@ -1313,6 +1329,9 @@ const valueList = buildValueList(candidatesByFixture, 0.06);
 
 console.log("parlays:", parlays);
 console.log("valueList:", valueList?.length);
+console.log("[FVPACK keys]", String(id), fvPack && Object.keys(fvPack));
+console.log("[FVPACK last5]", String(id), fvPack?.last5);
+
 
 if (!safe && !parlays.length) {
   setParlayError("No pudimos armar picks con stats/odds disponibles. Prueba con otro rango o liga.");
@@ -1614,29 +1633,40 @@ const handleSelectedParlay = () => runGeneration("selected");
           ) : (
             <div className="grid grid-cols-1 gap-4">
               {fixtures.map((fx) => {
-                const id = getFixtureId(fx);
-                const isSelected = selectedIds.includes(id);
+  const id = getFixtureId(fx);
+  if (!id) return null;
 
-                return (
-                  <FixtureCardCompact
-  key={String(id)}
-  fx={fx}
-  isSelected={isSelected}
-  onToggle={(fixtureId) => {
-    toggleFixtureSelection(fixtureId);
-    setParlayResult(null);
-    setParlayError("");
-    setFvOutput(null);
-  }}
-  onLoadOdds={(fixtureId) => ensureOdds(fixtureId)}
-  onLoadStats={(fixtureId) => ensureFvPack(fixtureId)}
-  fvPack={fvPackByFixture[id] || null}
-  fvLoading={!!fvLoadingByFixture[id]}
-  fvErr={fvErrByFixture?.[id] || null}
-/>
+  const fvPack = fvPackByFixture[id] || null;
 
-                );
-              })}
+  const last5 =
+    fvPack?.last5 ||
+    fvPack?.stats?.last5 ||
+    fvPack?.form?.last5 ||
+    null;
+
+  const isSelected = selectedIds.includes(id);
+
+  return (
+    <FixtureCardCompact
+      key={String(id)}
+      fx={fx}
+      isSelected={isSelected}
+      fvPack={fvPack}
+      last5={last5}
+      onToggle={(fixtureId) => {
+        toggleFixtureSelection(fixtureId);
+        setParlayResult(null);
+        setParlayError("");
+        setFvOutput(null);
+      }}
+      onLoadOdds={(fixtureId) => ensureOdds(fixtureId)}
+      onLoadStats={(fixtureId) => ensureFVPack(fixtureId)}
+      fvLoading={!!fvLoadingByFixture[id]}
+      fvErr={fvErrByFixture?.[id] || null}
+    />
+  );
+})}
+
             </div>
           )}
         </section>
