@@ -697,7 +697,7 @@ function WelcomeProCard({ planInfo }) {
 }
 
 /* ------------------- FixtureCard (compact) ------------------- */
-function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats, fvPack, fvLoading, fvErr }) {
+function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats, fvPack, last5, fvLoading, fvErr }) {
   const id = getFixtureId(fx);
 
   const league = getLeagueName(fx);
@@ -1114,11 +1114,9 @@ const ensureOdds = useCallback(
   async (fixtureId) => {
     if (!fixtureId) return;
 
-    const TTL = 1000 * 60 * 10; // 10 min
+    const ODDS_TTL = 1000 * 60 * 10;
     const cached = oddsRef.current[fixtureId];
-    if (cached && cached.fetchedAt && Date.now() - cached.fetchedAt < TTL) return;
-
-
+    
     // ✅ si ya hay cache y está fresco, no vuelvas a pedirlo
     if (cached?.fetchedAt && Date.now() - cached.fetchedAt < ODDS_TTL) return;
 
@@ -1281,29 +1279,27 @@ if (canReferees) {
 }
 
 const candidatesByFixture = {};
+let debugOnce = false;
+
 
 for (const fx of pool) {
   const id = getFixtureId(fx);
   if (!id) continue;
 
-  console.log("[FVPACK keys]", String(id), pack && Object.keys(pack));
-  console.log("[FVPACK last5]", String(id), pack?.last5, pack?.stats?.last5, pack?.form?.last5);
+  // 1) pack SIEMPRE definido aquí (nunca usar pack antes de esta línea)
+  const pack = fvPackByFixture?.[id] || fvRef.current?.[id] || null;
 
+  // 2) markets desde odds cache (independiente de pack)
   const markets =
-    pack?.markets ||
-    oddsRef.current?.[id]?.markets ||
     oddsByFixture?.[id]?.markets ||
+    oddsRef.current?.[id]?.markets ||
     {};
 
   candidatesByFixture[id] = buildCandidatePicks({
     fixture: fx,
-    pack: pack || {},
+    pack: pack || {},       // 👈 pasa objeto vacío si no hay stats
     markets,
   });
-if (!debugOnce) {
-  console.log("[CAND 0]", id, candidatesByFixture[id]?.slice(0, 10));
-  debugOnce = true;
-}
 
   // debug seguro (dentro del loop, aquí sí existe id)
   // console.log("[ODDS]", id, oddsRef.current?.[id]);
@@ -1329,8 +1325,8 @@ const valueList = buildValueList(candidatesByFixture, 0.06);
 
 console.log("parlays:", parlays);
 console.log("valueList:", valueList?.length);
-console.log("[FVPACK keys]", String(id), fvPack && Object.keys(fvPack));
-console.log("[FVPACK last5]", String(id), fvPack?.last5);
+// console.log("[FVPACK keys]", String(id), fvPack && Object.keys(fvPack));
+//console.log("[FVPACK last5]", String(id), fvPack?.last5);
 
 
 if (!safe && !parlays.length) {
@@ -1660,7 +1656,7 @@ const handleSelectedParlay = () => runGeneration("selected");
         setFvOutput(null);
       }}
       onLoadOdds={(fixtureId) => ensureOdds(fixtureId)}
-      onLoadStats={(fixtureId) => ensureFVPack(fixtureId)}
+      onLoadStats={(fixtureId) => ensureFvPack(fixtureId)}
       fvLoading={!!fvLoadingByFixture[id]}
       fvErr={fvErrByFixture?.[id] || null}
     />
