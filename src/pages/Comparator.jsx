@@ -795,21 +795,21 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
               <div className="text-[11px] text-slate-300 leading-relaxed">
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
                   <div>
-                    <span className="text-slate-400">Forma local:</span>{" "}
+                    <span className="text-slate-400">Racha (últ.5) local:</span>{" "}
                     <span className="text-slate-100 font-semibold">{fvPack?.last5?.home?.form || "--"}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400">Forma visita:</span>{" "}
+                    <span className="text-slate-400">Racha (últ.5) visita:</span>{" "}
                     <span className="text-slate-100 font-semibold">{fvPack?.last5?.away?.form || "--"}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400">GF/GA local:</span>{" "}
+                    <span className="text-slate-400">Goles local:</span>{" "}
                     <span className="text-slate-100 font-semibold">
                       {fvPack?.last5?.home?.gf ?? "-"} / {fvPack?.last5?.home?.ga ?? "-"}
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-400">GF/GA visita:</span>{" "}
+                    <span className="text-slate-400">Goles visita:</span>{" "}
                     <span className="text-slate-100 font-semibold">
                       {fvPack?.last5?.away?.gf ?? "-"} / {fvPack?.last5?.away?.ga ?? "-"}
                     </span>
@@ -1261,33 +1261,42 @@ const ensureFvPack = useCallback(
       );
 
       // Referees: siempre que el plan lo permita
-      if (canReferees) {
-        await loadReferees(); // ya lo tienes
-      }
+if (canReferees) {
+  await loadReferees();
+}
 
-      const candidatesByFixture = {};
-      for (const fx of pool) {
-        const id = getFixtureId(fx);
-        if (!id) continue;
+const candidatesByFixture = {};
 
-        const pack = fvPackByFixture[id] || fvRef.current[id] || null;
-        const markets =
-        pack?.markets ||
-        oddsRef.current[id]?.markets ||
-        oddsByFixture[id]?.markets ||
-       {};
+for (const fx of pool) {
+  const id = getFixtureId(fx);
+  if (!id) continue;
 
-        candidatesByFixture[id] = buildCandidatePicks({
-          fixture: fx,
-          pack: pack || {},
-          markets,
-        });
-      }
-      console.log("cand sample", Object.values(candidatesByFixture)[0]?.slice(0,3));
-      console.log("cand fixtures:", Object.keys(candidatesByFixture).length);
-      console.log("cand count total:", Object.values(candidatesByFixture).reduce((acc, arr) => acc + (arr?.length || 0), 0));
-      console.log("[ODDS]", id, oddsRef.current[id]);
+  const pack = fvPackByFixture[id] || fvRef.current[id] || null;
 
+  const markets =
+    pack?.markets ||
+    oddsRef.current?.[id]?.markets ||
+    oddsByFixture?.[id]?.markets ||
+    {};
+
+  candidatesByFixture[id] = buildCandidatePicks({
+    fixture: fx,
+    pack: pack || {},
+    markets,
+  });
+
+  // DEBUG seguro (NO rompe el scope)
+  // console.log("[ODDS]", id, oddsRef.current?.[id]);
+}
+
+// DEBUG resumen (aquí NO uses `id`)
+console.log("cand sample", Object.values(candidatesByFixture)[0]?.slice(0, 3));
+console.log("cand fixtures:", Object.keys(candidatesByFixture).length);
+console.log(
+  "cand count total:",
+  Object.values(candidatesByFixture).reduce((acc, arr) => acc + (arr?.length || 0), 0)
+);
+    
       const safe = pickSafe(candidatesByFixture);
       const giftBundle = buildGiftPickBundle(candidatesByFixture, 1.5, 3.0, 3);
 
