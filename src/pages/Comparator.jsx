@@ -801,7 +801,7 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
 
 <div>
   <span className="text-slate-400">Racha (últ.5) visita:</span>{" "}
-  <span className="text-slate-100 font-semibold">{fvPack?.last5?.away?.form || "--"}</span>
+  <span className="text-slate-100 font-semibold">{last5?.away?.form || "--"}</span>
 </div>
 
 <div>
@@ -814,7 +814,7 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
 <div>
   <span className="text-slate-400">Goles (últ.5) visita:</span>{" "}
   <span className="text-slate-100 font-semibold">
-    {fvPack?.last5?.away?.gf ?? "--"} / {last5?.away?.ga ?? "--"}
+    {last5?.away?.gf ?? "--"} / {last5?.away?.ga ?? "--"}
   </span>
 </div>
 
@@ -1316,15 +1316,28 @@ console.log(
 const safe = pickSafe(candidatesByFixture);
 const giftBundle = buildGiftPickBundle(candidatesByFixture, 1.5, 3.0, 3);
 
+console.log("[PARLAY] sample cand keys", Object.keys(candidatesByFixture).slice(0, 5));
+console.log(
+  "[PARLAY] sample first fixture candidates",
+  Object.values(candidatesByFixture)[0]?.slice(0, 8)
+);
+
 const targets = [10, 20, 50, 100].filter((t) => t <= maxBoost);
+console.log("[PARLAY] targets =", targets);
+
 const parlays = targets
-  .map((t) => buildParlay({ candidatesByFixture, target: t, cap: maxBoost }))
+  .map((t) => {
+    const r = buildParlay({ candidatesByFixture, target: t, cap: maxBoost });
+    console.log("[PARLAY] buildParlay target", t, "=>", r);
+    return r;
+  })
   .filter(Boolean);
 
 const valueList = buildValueList(candidatesByFixture, 0.06);
 
 console.log("parlays:", parlays);
 console.log("valueList:", valueList?.length);
+
 // console.log("[FVPACK keys]", String(id), fvPack && Object.keys(fvPack));
 //console.log("[FVPACK last5]", String(id), fvPack?.last5);
 
@@ -1632,13 +1645,13 @@ const handleSelectedParlay = () => runGeneration("selected");
   const id = getFixtureId(fx);
   if (!id) return null;
 
-  const fvPack = fvPackByFixture[id] || null;
+  const fvPack = fvPackByFixture[id] || fvRef.current?.[id] || null;
 
-  const last5 =
-    fvPack?.last5 ||
-    fvPack?.stats?.last5 ||
-    fvPack?.form?.last5 ||
-    null;
+const last5 =
+  fvPack?.last5 ||
+  fvPack?.stats?.last5 ||
+  fvPack?.form?.last5 ||
+  null;
 
   const isSelected = selectedIds.includes(id);
 
@@ -1765,8 +1778,7 @@ const handleSelectedParlay = () => runGeneration("selected");
     Aún sin ranking (fixturesScanned: {refData?.fixturesScanned ?? 0}). Endpoint OK.
   </div>
 )}
-
-        </FeatureCard>
+</FeatureCard>
 
         <FeatureCard
           title="Goleadores / Remates / Value"
