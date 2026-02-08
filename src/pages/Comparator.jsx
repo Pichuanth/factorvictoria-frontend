@@ -46,6 +46,26 @@ const BG_BIENVENIDO = asset("hero-bienvenido.png");
 const APP_TZ = "America/Santiago";
 
 /* --------------------- helpers base --------------------- */
+function toOdd(v) {
+  if (v == null) return null;
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+
+  let s = String(v).trim();
+  if (!s) return null;
+
+  // quita "x", "X", etc (ej "x1.22")
+  s = s.replace(/^[xX]\s*/, "");
+
+  // convierte coma decimal a punto
+  s = s.replace(",", ".");
+
+  // deja solo dígitos y punto
+  s = s.replace(/[^\d.]/g, "");
+
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
 function normStr(s) {
   return String(s || "")
     .toLowerCase()
@@ -1137,6 +1157,14 @@ const ensureOdds = useCallback(
         markets: data?.markets || {},
         fetchedAt: Date.now(),
       };
+      // DEBUG una sola vez
+      if (!window.__oddsDebugOnce) {
+     window.__oddsDebugOnce = true;
+     console.log("[ODDS raw data]", fixtureId, data);
+     console.log("[ODDS markets keys]", fixtureId, Object.keys(data?.markets || {}));
+     console.log("[ODDS markets dump]", fixtureId, data?.markets);
+
+     }
 
       oddsRef.current[fixtureId] = pack;
       setOddsByFixture((prev) => ({ ...prev, [fixtureId]: pack }));
@@ -1266,12 +1294,25 @@ const ensureFvPack = useCallback(
         setParlayError("Selecciona al menos 2 partidos de la lista superior.");
         return;
       }
-
+     
       const ids = pool.map(getFixtureId).filter(Boolean);
-      
-      // Pre-carga stats+odds (y si quieres, luego agregamos shots/SOT aquí también)
-      await Promise.all(ids.map((id) => Promise.all([ensureFvPack(id), ensureOdds(id)]))
-      );
+
+      // 1) precarga
+      await Promise.all(ids.map((id) => Promise.all([ensureFvPack(id), ensureOdds(id)])));
+
+      // 2) ahora sí valida si llegaron markets reales
+      const anyMarkets = ids.some((id) => {
+      const mk =
+      oddsByFixture?.[id]?.markets ||
+      oddsRef.current?.[id]?.markets ||
+      null;
+   return mk && Object.keys(mk).length > 0;
+});
+
+if (!anyMarkets) {
+  setParlayError("Aún no hay cuotas reales (markets vacío). Generaré con Cuota FV por mientras.");
+  // NO return -> dejamos que parlays usen FV
+}
 
       // Referees: siempre que el plan lo permita
 if (canReferees) {
@@ -1295,15 +1336,47 @@ for (const fx of pool) {
     oddsRef.current?.[id]?.markets ||
     {};
 
-  candidatesByFixture[id] = buildCandidatePicks({
-    fixture: fx,
-    pack: pack || {},       // 👈 pasa objeto vacío si no hay stats
-    markets,
-  });
+  const rawCands = buildCandidatePicks({
+  fixture: fx,
+  pack: pack || {},
+  markets,
+});
+
+function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+function shrinkProb(p, k = 0.45) { return 0.5 + (p - 0.5) * k; } // k<1 baja confianza
+
+const fixedCands = (rawCands || []).map((c) => {
+  const prob = Number(c?.prob);
+  const probOk = Number.isFinite(prob) ? prob : null;
+
+  // FV odd "más realista": baja confianza y evita extremos
+  let fvOddAdj = c?.fvOdd;
+  if (probOk != null) {
+    const pAdj = clamp(shrinkProb(probOk, 0.45), 0.08, 0.90);
+    fvOddAdj = 1 / pAdj;
+  }
+
+  const marketOddNum = toOdd(c?.marketOdd);
+  const fvOddNum = toOdd(fvOddAdj) ?? fvOddAdj;
+
+  const usedOddNum = marketOddNum ?? fvOddNum;
+
+  return {
+    ...c,
+    fvOdd: fvOddNum,
+    marketOdd: marketOddNum ?? c?.marketOdd, // si vino string, igual lo dejas para debug
+    usedOdd: usedOddNum,
+    usedOddDisplay: usedOddNum,
+  };
+});
+
+candidatesByFixture[id] = fixedCands;
 
   // debug seguro (dentro del loop, aquí sí existe id)
   // console.log("[ODDS]", id, oddsRef.current?.[id]);
 }
+// ================= DEBUG candidates / odds =================
+const firstFx = Object.keys(candidatesByFixture)[0];
 
 // debug resumen (FUERA del loop: aquí NO uses "id")
 console.log("cand sample", Object.values(candidatesByFixture)[0]?.slice(0, 3));
@@ -1313,16 +1386,69 @@ console.log(
   Object.values(candidatesByFixture).reduce((acc, arr) => acc + (arr?.length || 0), 0)
 );
 
-const safe = pickSafe(candidatesByFixture);
-const giftBundle = buildGiftPickBundle(candidatesByFixture, 1.5, 3.0, 3);
+// model sample del primer fixture (si existe)
+if (firstFx) {
+  console.log(
+    "[PARLAY] model sample",
+    (candidatesByFixture[firstFx] || []).slice(0, 5).map((c) => ({
+      pick: c.pick || c.label,
+      prob: c.prob,
+      lambdaTotal: c.lambdaTotal,
+      gfH: c.gfH,
+      gaH: c.gaH,
+      gfA: c.gfA,
+      gaA: c.gaA,
+      fvOdd: c.fvOdd,
+      marketOdd: c.marketOdd,
+      usedOdd: c.usedOdd,
+      usedOddDisplay: c.usedOddDisplay,
+    }))
+  );
 
-console.log("[PARLAY] sample cand keys", Object.keys(candidatesByFixture).slice(0, 5));
+  console.log(
+    "[PARLAY] sample first fixture candidates",
+    (candidatesByFixture[firstFx] || []).slice(0, 8)
+  );
+
+  console.log("[PARLAY] first fixture id =", firstFx);
+  console.log("[PARLAY] first candidates (raw) =", (candidatesByFixture[firstFx] || []).slice(0, 5));
+
+  console.log(
+    "[PARLAY] odds sample =",
+    (candidatesByFixture[firstFx] || []).slice(0, 5).map((c) => ({
+      pick: c?.pick || c?.label,
+      prob: c?.prob,
+      fvOdd: c?.fvOdd,
+      marketOdd: c?.marketOdd,
+      usedOdd: c?.usedOdd,
+      usedOddDisplay: c?.usedOddDisplay,
+    }))
+  );
+}
+
+const flat = Object.values(candidatesByFixture).flat();
+
+const usable = flat.filter((c) => {
+  const n = toOdd(c.usedOddDisplay) ?? toOdd(c.usedOdd) ?? toOdd(c.marketOdd) ?? toOdd(c.fvOdd);
+  return n != null && n > 1;
+});
+
+console.log("[PARLAY] candidates total =", flat.length);
+console.log("[PARLAY] candidates usable(odd>1) =", usable.length);
 console.log(
-  "[PARLAY] sample first fixture candidates",
-  Object.values(candidatesByFixture)[0]?.slice(0, 8)
+  "[PARLAY] usable sample =",
+  usable.slice(0, 10).map((c) => ({
+    pick: c.pick || c.label,
+    prob: c.prob,
+    fvOdd: c.fvOdd,
+    marketOdd: c.marketOdd,
+    usedOdd: c.usedOdd,
+    usedOddDisplay: c.usedOddDisplay,
+  }))
 );
+// ===========================================================
 
-const targets = [10, 20, 50, 100].filter((t) => t <= maxBoost);
+const targets = [3, 5, 10, 20, 50, 100].filter((t) => t <= maxBoost);
 console.log("[PARLAY] targets =", targets);
 
 const parlays = targets
@@ -1332,6 +1458,8 @@ const parlays = targets
     return r;
   })
   .filter(Boolean);
+function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+function shrinkProb(p, k = 0.45) { return 0.5 + (p - 0.5) * k; } // k<1 baja confianza
 
 const valueList = buildValueList(candidatesByFixture, 0.06);
 
@@ -1436,10 +1564,17 @@ const handleSelectedParlay = () => runGeneration("selected");
         else if (qTrim) params.set("q", qTrim);
       }
 
+      
       const res = await fetch(`${API_BASE}/api/fixtures?${params.toString()}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+     const data = await res.json();
 
-      const data = await res.json();
+      if (!window.__fixturesDebugOnce) {
+  window.__fixturesDebugOnce = true;
+  console.log("[FIXTURES raw]", data);
+  console.log("[FIXTURES keys]", Object.keys(data || {}));
+  console.log("[FIXTURES items sample]", (data?.items || data?.response || data?.fixtures || []).slice?.(0, 2));
+}
 
       const itemsRaw =
         (Array.isArray(data?.items) && data.items) ||
@@ -1736,8 +1871,8 @@ const last5 =
           <div className="mt-2 space-y-1">
   {(parlayResult?.legs || []).map((leg, idx) => {
   const oddToShow =
-    Number(leg.usedOddDisplay) > 1 ? Number(leg.usedOddDisplay)
-    : Number(leg.usedOdd) > 1 ? Number(leg.usedOdd)
+  (toOdd(leg.usedOddDisplay) ?? toOdd(leg.usedOdd)) > 1
+    ? (toOdd(leg.usedOddDisplay) ?? toOdd(leg.usedOdd))
     : null;
 
   return (
