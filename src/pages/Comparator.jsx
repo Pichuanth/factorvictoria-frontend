@@ -69,20 +69,7 @@ function normStr(s) {
     .replace(/\s+/g, " ")
     .trim();
 }
-function toOdd(v) {
-  if (v == null) return null;
-  if (typeof v === "number" && Number.isFinite(v)) return v;
 
-  const s = String(v)
-    .trim()
-    .toLowerCase()
-    .replace(/^x/, "")     // quita "x1.22"
-    .replace(/\s+/g, "")
-    .replace(",", ".");    // "1,22" -> "1.22"
-
-  const n = Number(s);
-  return Number.isFinite(n) ? n : null;
-}
 
 function includesNorm(haystack, needle) {
   return normStr(haystack).includes(normStr(needle));
@@ -1086,7 +1073,7 @@ export default function Comparator() {
         const data = await res.json();
 if (!window.__fvpackOnce) {
   window.__fvpackOnce = true;
-  console.log("[FVPACK sample]", fixtureId, data);
+  console.log("[FVPACK sample]", data);
   console.log("[FVPACK keys]", Object.keys(data || {}));
 }
 
@@ -1333,13 +1320,64 @@ if (canReferees) {
   await loadReferees();
 }
 
+// ===================== MODEL BUILD =====================
 const candidatesByFixture = {};
-let debugOnce = false;
 
-// ================= DEBUG candidates / odds =================
-const firstFx = Object.keys(candidatesByFixture)[0];
+// helpers (defínelos UNA sola vez en runGeneration)
+function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+function shrinkProb(p, k = 0.45) { return 0.5 + (p - 0.5) * k; } // k<1 baja confianza
 
-// debug resumen (FUERA del loop: aquí NO uses "id")
+for (const fx of pool) {
+  const id = getFixtureId(fx);
+  if (!id) continue;
+
+  // pack del endpoint fvpack (stats + modelo)
+  const pack = fvPackByFixture?.[id] || fvRef.current?.[id] || null;
+
+  // markets (odds) desde cache
+  const markets =
+    oddsByFixture?.[id]?.markets ||
+    oddsRef.current?.[id]?.markets ||
+    {};
+
+  const rawCands = buildCandidatePicks({
+    fixture: fx,
+    pack: pack || {},
+    markets,
+  });
+
+  const fixedCands = (rawCands || []).map((c) => {
+    const prob = Number(c?.prob);
+    const probOk = Number.isFinite(prob) ? prob : null;
+
+    // FV odd ajustada (más conservadora)
+    let fvOddAdj = c?.fvOdd;
+    if (probOk != null) {
+      const pAdj = clamp(shrinkProb(probOk, 0.45), 0.08, 0.90);
+      fvOddAdj = 1 / pAdj;
+    }
+
+    const marketOddNum = toOdd(c?.marketOdd);
+    const fvOddNum = toOdd(fvOddAdj) ?? toOdd(c?.fvOdd) ?? c?.fvOdd;
+
+    // odd usada: mercado si existe; si no, FV
+    const usedOddNum = marketOddNum ?? toOdd(c?.usedOdd) ?? fvOddNum;
+
+    return {
+      ...c,
+      fvOdd: fvOddNum,
+      marketOdd: marketOddNum ?? c?.marketOdd,
+      usedOdd: usedOddNum,
+      usedOddDisplay: usedOddNum,
+    };
+  });
+
+  candidatesByFixture[id] = fixedCands;
+}
+
+// ===================== DEBUG (DESPUÉS del loop) =====================
+const firstFx = Object.keys(candidatesByFixture)[0] || null;
+
 console.log("cand sample", Object.values(candidatesByFixture)[0]?.slice(0, 3));
 console.log("cand fixtures:", Object.keys(candidatesByFixture).length);
 console.log(
@@ -1347,120 +1385,21 @@ console.log(
   Object.values(candidatesByFixture).reduce((acc, arr) => acc + (arr?.length || 0), 0)
 );
 
-// model sample del primer fixture (si existe)
 if (firstFx) {
   console.log(
     "[PARLAY] model sample",
     (candidatesByFixture[firstFx] || []).slice(0, 5).map((c) => ({
       pick: c.pick || c.label,
       prob: c.prob,
-      lambdaTotal: c.lambdaTotal,
-      gfH: c.gfH,
-      gaH: c.gaH,
-      gfA: c.gfA,
-      gaA: c.gaA,
       fvOdd: c.fvOdd,
       marketOdd: c.marketOdd,
       usedOdd: c.usedOdd,
       usedOddDisplay: c.usedOddDisplay,
     }))
   );
-
-  console.log(
-    "[PARLAY] sample first fixture candidates",
-    (candidatesByFixture[firstFx] || []).slice(0, 8)
-  );
-
-  console.log("[PARLAY] first fixture id =", firstFx);
-  console.log("[PARLAY] first candidates (raw) =", (candidatesByFixture[firstFx] || []).slice(0, 5));
-
-  console.log(
-    "[PARLAY] odds sample =",
-    (candidatesByFixture[firstFx] || []).slice(0, 5).map((c) => ({
-      pick: c?.pick || c?.label,
-      prob: c?.prob,
-      fvOdd: c?.fvOdd,
-      marketOdd: c?.marketOdd,
-      usedOdd: c?.usedOdd,
-      usedOddDisplay: c?.usedOddDisplay,
-    }))
-  );
-}
-for (const fx of pool) {
-  const id = getFixtureId(fx);
-  if (!id) continue;
-
-  // 1) pack SIEMPRE definido aquí (nunca usar pack antes de esta línea)
-  const pack = fvPackByFixture?.[id] || fvRef.current?.[id] || null;
-
-  // 2) markets desde odds cache (independiente de pack)
-  const markets =
-    oddsByFixture?.[id]?.markets ||
-    oddsRef.current?.[id]?.markets ||
-    {};
-
-  const rawCands = buildCandidatePicks({
-  fixture: fx,
-  pack: pack || {},
-  markets,
-});
-
-function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
-function shrinkProb(p, k = 0.45) { return 0.5 + (p - 0.5) * k; } // k<1 baja confianza
-
-const fixedCands = (rawCands || []).map((c) => {
-  const prob = Number(c?.prob);
-  const probOk = Number.isFinite(prob) ? prob : null;
-
-  // FV odd "más realista": baja confianza y evita extremos
-  let fvOddAdj = c?.fvOdd;
-  if (probOk != null) {
-    const pAdj = clamp(shrinkProb(probOk, 0.45), 0.08, 0.90);
-    fvOddAdj = 1 / pAdj;
-  }
-
-  const marketOddNum = toOdd(c?.marketOdd);
-  const fvOddNum = toOdd(fvOddAdj) ?? fvOddAdj;
-
-  const usedOddNum = marketOddNum ?? fvOddNum;
-
-  return {
-    ...c,
-    fvOdd: fvOddNum,
-    marketOdd: marketOddNum ?? c?.marketOdd, // si vino string, igual lo dejas para debug
-    usedOdd: usedOddNum,
-    usedOddDisplay: usedOddNum,
-  };
-});
-
-candidatesByFixture[id] = fixedCands;
-
-  // debug seguro (dentro del loop, aquí sí existe id)
-  // console.log("[ODDS]", id, oddsRef.current?.[id]);
 }
 
-
-const flat = Object.values(candidatesByFixture).flat();
-
-const usable = flat.filter((c) => {
-  const n = toOdd(c.usedOddDisplay) ?? toOdd(c.usedOdd) ?? toOdd(c.marketOdd) ?? toOdd(c.fvOdd);
-  return n != null && n > 1;
-});
-
-console.log("[PARLAY] candidates total =", flat.length);
-console.log("[PARLAY] candidates usable(odd>1) =", usable.length);
-console.log(
-  "[PARLAY] usable sample =",
-  usable.slice(0, 10).map((c) => ({
-    pick: c.pick || c.label,
-    prob: c.prob,
-    fvOdd: c.fvOdd,
-    marketOdd: c.marketOdd,
-    usedOdd: c.usedOdd,
-    usedOddDisplay: c.usedOddDisplay,
-  }))
-);
-// ===========================================================
+// ===================== SANITIZE (números) =====================
 const candidatesByFixtureSanitized = Object.fromEntries(
   Object.entries(candidatesByFixture).map(([fxId, arr]) => {
     const clean = (arr || []).map((c) => {
@@ -1481,6 +1420,11 @@ const candidatesByFixtureSanitized = Object.fromEntries(
   })
 );
 
+// ===================== SAFE + GIFT (AQUÍ nacen safe/giftBundle) =====================
+const safe = pickSafe(candidatesByFixtureSanitized);
+const giftBundle = buildGiftPickBundle(candidatesByFixtureSanitized, 1.5, 3.0, 3);
+
+// ===================== TARGETS + PARLAYS =====================
 const targets = [3, 5, 10, 20, 50, 100].filter((t) => t <= maxBoost);
 console.log("[PARLAY] targets =", targets);
 
@@ -1492,27 +1436,31 @@ const parlays = targets
   })
   .filter(Boolean);
 
-function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
-function shrinkProb(p, k = 0.45) { return 0.5 + (p - 0.5) * k; } // k<1 baja confianza
-
-const valueList = buildValueList(candidatesByFixture, 0.06);
+// ===================== VALUE LIST (usar SANITIZED) =====================
+const valueList = buildValueList(candidatesByFixtureSanitized, 0.06);
 
 console.log("parlays:", parlays);
 console.log("valueList:", valueList?.length);
 
-// console.log("[FVPACK keys]", String(id), fvPack && Object.keys(fvPack));
-//console.log("[FVPACK last5]", String(id), fvPack?.last5);
-
-
+// si no hay nada, cortamos con error claro
 if (!safe && !parlays.length) {
   setParlayError("No pudimos armar picks con stats/odds disponibles. Prueba con otro rango o liga.");
   return;
 }
 
-setFvOutput({ mode, safe, giftBundle, parlays, valueList, candidatesByFixture: candidatesByFixtureSanitized });
+// output final
+setFvOutput({
+  mode,
+  safe,
+  giftBundle,
+  parlays,
+  valueList,
+  candidatesByFixture: candidatesByFixtureSanitized
+});
 
-// si quieres que el “panel principal” muestre la mejor potenciadas:
+// panel principal muestra la primera potenciadas
 if (parlays[0]) setParlayResult({ mode, ...parlays[0] });
+
 
     } catch (e) {
       console.error("[FV] runGeneration error", e);
@@ -1603,11 +1551,9 @@ const handleSelectedParlay = () => runGeneration("selected");
      if (!res.ok) throw new Error(`HTTP ${res.status}`);
      const data = await res.json();
 
-      if (!window.__fixturesDebugOnce) {
-  window.__fixturesDebugOnce = true;
-  console.log("[FIXTURES raw]", data);
-  console.log("[FIXTURES keys]", Object.keys(data || {}));
-  console.log("[FIXTURES items sample]", (data?.items || data?.response || data?.fixtures || []).slice?.(0, 2));
+      if (!window.__fvpackDebugOnce) {
+  window.__fvpackDebugOnce = true;
+  console.log("[FVPACK FULL SAMPLE]", data);
 }
 
       const itemsRaw =
