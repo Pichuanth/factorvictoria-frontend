@@ -970,6 +970,107 @@ function ManualPicksSection() {
     </section>
   );
 }
+function buildBoostedParlayLocal({ candidatesByFixture, target, cap, minProb = 0.52, maxLegs = 12 }) {
+  const fixtureIds = Object.keys(candidatesByFixture || {});
+  if (!fixtureIds.length) return null;
+
+  // Para cada fixture, nos quedamos con candidatos "usables" (odd>1 y prob decente)
+  const perFx = fixtureIds.map((fxId) => {
+    const arr = (candidatesByFixture[fxId] || [])
+      .map((c) => {
+        const odd =
+          toOdd(c.usedOddDisplay) ??
+          toOdd(c.usedOdd) ??
+          toOdd(c.marketOdd) ??
+          toOdd(c.fvOdd);
+
+        const prob = Number(c?.prob);
+        const probOk = Number.isFinite(prob) ? prob : null;
+
+        return { ...c, _fxId: fxId, _odd: odd, _prob: probOk };
+      })
+      .filter((c) => c._odd != null && c._odd > 1.01)
+      .filter((c) => c._prob == null || c._prob >= minProb)
+      .sort((a, b) => (b._odd || 0) - (a._odd || 0)); // prioriza odds
+
+    return { fxId, candidates: arr };
+  });
+
+  // Si no hay candidatos usables, no se puede
+  if (!perFx.some((x) => x.candidates.length)) return null;
+
+  // Máximo alcanzable: producto del mejor odd por fixture (limitado a maxLegs)
+  const bestOdds = perFx
+    .map((x) => x.candidates[0]?._odd)
+    .filter((x) => x != null)
+    .sort((a, b) => b - a)
+    .slice(0, maxLegs);
+
+  const maxPossible = bestOdds.reduce((acc, o) => acc * o, 1);
+  if (maxPossible < Math.min(target * 0.98, cap * 0.98)) {
+    // No alcanza el target ni siquiera con los mejores odds
+    return null;
+  }
+
+  // Greedy: vamos agregando la mejor pieza que más acerque al target sin pasarnos absurdamente
+  let product = 1;
+  const usedFx = new Set();
+  const legs = [];
+
+  while (legs.length < maxLegs && product < target * 0.98) {
+    let best = null;
+
+    for (const fx of perFx) {
+      if (usedFx.has(fx.fxId)) continue;
+      if (!fx.candidates.length) continue;
+
+      // probamos top 5 de cada fixture (suficiente)
+      const top = fx.candidates.slice(0, 5);
+
+      for (const c of top) {
+        const next = product * c._odd;
+
+        // score: preferimos acercarnos al target; si lo sobrepasa un poco no importa
+        const dist = Math.abs(Math.log(target) - Math.log(next));
+        const probBonus = c._prob != null ? (c._prob - 0.5) : 0;
+        const score = -dist + probBonus * 0.35; // ajustable
+
+        if (!best || score > best.score) best = { c, score, next };
+      }
+    }
+
+    if (!best) break;
+    legs.push(best.c);
+    usedFx.add(best.c._fxId);
+    product = best.next;
+  }
+
+  if (!legs.length) return null;
+
+  const finalOdd = Number(product.toFixed(2));
+  const impliedProb = Number(((1 / finalOdd) * 100).toFixed(1));
+  const reachedTarget = finalOdd >= target * 0.98;
+
+  return {
+    target,
+    cap,
+    games: legs.length,
+    finalOdd,
+    impliedProb,
+    reachedTarget,
+    legs: legs.map((c) => ({
+      fixtureId: c._fxId,
+      label: c.label || c.pick || "Pick",
+      home: c.home,
+      away: c.away,
+      prob: c.prob,
+      fvOdd: c.fvOdd,
+      marketOdd: c.marketOdd,
+      usedOdd: c.usedOdd,
+      usedOddDisplay: c.usedOddDisplay ?? c.usedOdd ?? c.marketOdd ?? c.fvOdd,
+    })),
+  };
+}
 
 export default function Comparator() {
   const { isLoggedIn, user } = useAuth();
@@ -1430,9 +1531,20 @@ console.log("[PARLAY] targets =", targets);
 
 const parlays = targets
   .map((t) => {
-    const r = buildParlay({ candidatesByFixture: candidatesByFixtureSanitized, target: t, cap: maxBoost });
-    console.log("[PARLAY] buildParlay target", t, "=>", r);
-    return r;
+    const r1 = buildParlay({ candidatesByFixture: candidatesByFixtureSanitized, target: t, cap: maxBoost });
+    console.log("[PARLAY] buildParlay target", t, "=>", r1);
+
+    if (r1) return r1;
+
+    const r2 = buildBoostedParlayLocal({
+      candidatesByFixture: candidatesByFixtureSanitized,
+      target: t,
+      cap: maxBoost,
+      minProb: 0.52,
+      maxLegs: 12,
+    });
+    console.log("[PARLAY] localParlay target", t, "=>", r2);
+    return r2;
   })
   .filter(Boolean);
 
@@ -1762,10 +1874,12 @@ const handleSelectedParlay = () => runGeneration("selected");
 
   const fvPack = fvPackByFixture[id] || fvRef.current?.[id] || null;
 
-const last5 =
+ const last5 =
   fvPack?.last5 ||
+  fvPack?.data?.last5 ||
   fvPack?.stats?.last5 ||
   fvPack?.form?.last5 ||
+  fvPack?.direct?.last5 ||
   null;
 
   const isSelected = selectedIds.includes(id);
