@@ -1280,19 +1280,35 @@ const ensureOdds = useCallback(
   [API_BASE]
 );
 
+// arriba de ensureFvPack
+const FVPACK_TTL = 1000 * 60 * 5; // 5 min
+
 // FV pack cache (stats + modelo + markets)
 const ensureFvPack = useCallback(
   async (fixtureId) => {
     if (!fixtureId) return null;
 
-    // cache rápido
-    if (fvRef.current[fixtureId]) return fvRef.current[fixtureId];
+    const cached = fvRef.current[fixtureId];
+
+    // ✅ si hay pack bueno, úsalo
+    if (cached && !cached.__error) return cached;
+
+    // ✅ si hubo error reciente, NO spamear el endpoint
+    if (
+      cached?.__error &&
+      cached?.fetchedAt &&
+      Date.now() - cached.fetchedAt < FVPACK_TTL
+    ) {
+      return null;
+    }
 
     setFvLoadingByFixture((m) => ({ ...m, [fixtureId]: true }));
     setFvErrByFixture((m) => ({ ...m, [fixtureId]: null }));
 
     try {
-      const res = await fetch(`${API_BASE}/api/fixture/${encodeURIComponent(fixtureId)}/fvpack`);
+      const res = await fetch(
+        `${API_BASE}/api/fixture/${encodeURIComponent(fixtureId)}/fvpack`
+      );
       if (!res.ok) throw new Error(`fvpack ${res.status}`);
 
       const data = await res.json();
@@ -1301,10 +1317,15 @@ const ensureFvPack = useCallback(
       setFvPackByFixture((m) => ({ ...m, [fixtureId]: data }));
       return data;
     } catch (e) {
+      const msg = String(e?.message || e);
       console.error("ensureFvPack error", fixtureId, e);
-      setFvErrByFixture((m) => ({ ...m, [fixtureId]: String(e?.message || e) }));
-      fvRef.current[fixtureId] = null;
-      setFvPackByFixture((m) => ({ ...m, [fixtureId]: null }));
+
+      setFvErrByFixture((m) => ({ ...m, [fixtureId]: msg }));
+
+      // ✅ guarda error con timestamp para TTL
+      const errPack = { __error: true, message: msg, fetchedAt: Date.now() };
+      fvRef.current[fixtureId] = errPack;
+      setFvPackByFixture((m) => ({ ...m, [fixtureId]: errPack }));
       return null;
     } finally {
       setFvLoadingByFixture((m) => ({ ...m, [fixtureId]: false }));
@@ -1529,24 +1550,17 @@ const giftBundle = buildGiftPickBundle(candidatesByFixtureSanitized, 1.5, 3.0, 3
 const targets = [3, 5, 10, 20, 50, 100].filter((t) => t <= maxBoost);
 console.log("[PARLAY] targets =", targets);
 
-const parlays = targets
+   const parlays = targets
   .map((t) => {
     const r1 = buildParlay({ candidatesByFixture: candidatesByFixtureSanitized, target: t, cap: maxBoost });
-    console.log("[PARLAY] buildParlay target", t, "=>", r1);
-
     if (r1) return r1;
 
-    const r2 = buildBoostedParlayLocal({
-      candidatesByFixture: candidatesByFixtureSanitized,
-      target: t,
-      cap: maxBoost,
-      minProb: 0.52,
-      maxLegs: 12,
-    });
-    console.log("[PARLAY] localParlay target", t, "=>", r2);
+    const r2 = buildBoostedParlayLocal({ candidatesByFixture: candidatesByFixtureSanitized, target: t, cap: maxBoost });
     return r2;
   })
-  .filter(Boolean);
+  .filter(Boolean)
+  // ✅ mínimo 2 partidos para que NO aparezca ese “#1 …” suelto
+  .filter((p) => Array.isArray(p.legs) && p.legs.length >= 2);
 
 // ===================== VALUE LIST (usar SANITIZED) =====================
 const valueList = buildValueList(candidatesByFixtureSanitized, 0.06);
@@ -1571,8 +1585,12 @@ setFvOutput({
 });
 
 // panel principal muestra la primera potenciadas
-if (parlays[0]) setParlayResult({ mode, ...parlays[0] });
+// toma la más cercana al target mayor disponible
+const best = parlays
+  .slice()
+  .sort((a, b) => (b.finalOdd || 0) - (a.finalOdd || 0))[0];
 
+if (best) setParlayResult({ mode, ...best });
 
     } catch (e) {
       console.error("[FV] runGeneration error", e);
@@ -1663,9 +1681,11 @@ const handleSelectedParlay = () => runGeneration("selected");
      if (!res.ok) throw new Error(`HTTP ${res.status}`);
      const data = await res.json();
 
-      if (!window.__fvpackDebugOnce) {
-  window.__fvpackDebugOnce = true;
-  console.log("[FVPACK FULL SAMPLE]", data);
+      if (!window.__fvpackFixtureOnce) window.__fvpackFixtureOnce = {};
+      if (!window.__fvpackFixtureOnce[fixtureId]) {
+      window.__fvpackFixtureOnce[fixtureId] = true;
+     console.log("[FIXTURES raw]", data);
+     console.log("[FIXTURES keys]", Object.keys(data || {}));
 }
 
       const itemsRaw =
@@ -1872,7 +1892,8 @@ const handleSelectedParlay = () => runGeneration("selected");
   const id = getFixtureId(fx);
   if (!id) return null;
 
-  const fvPack = fvPackByFixture[id] || fvRef.current?.[id] || null;
+  const fvPackRaw = fvPackByFixture[id] || fvRef.current?.[id] || null;
+const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 
  const last5 =
   fvPack?.last5 ||
