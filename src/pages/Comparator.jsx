@@ -1172,13 +1172,28 @@ export default function Comparator() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const data = await res.json();
-       if (!window.__fvpackOnce) {
-       window.__fvpackOnce = true;
-       console.log("[FVPACK sample]", data);
-       console.log("[FVPACK keys]", Object.keys(data || {}));
-       }
 
-        // DEBUG: solo para ver estructura una vez por "primerId"
+
+if (!window.__fvpackOnce) {
+  window.__fvpackOnce = true;
+  console.log("[FVPACK sample]", data);
+  console.log("[FVPACK keys]", Object.keys(data || {}));
+}
+
+// Normaliza respuesta (mantén fallback a data.fixtures)
+const itemsRaw =
+  (Array.isArray(data?.items) && data.items) ||
+  (Array.isArray(data?.response) && data.response) ||
+  (Array.isArray(data?.fixtures) && data.fixtures) ||
+  [];
+
+let items = itemsRaw;
+
+const base = items
+  .filter(isFutureFixture)
+  .filter((fx) => !isYouthOrWomenOrReserve(fx));
+
+
 
         const filteredTop = base.filter((fx) => isAllowedCompetition(getCountryName(fx), getLeagueName(fx)));
 
