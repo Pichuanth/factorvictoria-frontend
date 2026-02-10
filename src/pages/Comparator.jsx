@@ -97,6 +97,56 @@ function getRefereeName(fx) {
   return fx?.fixture?.referee || fx?.referee || "";
 }
 
+function getExpectedGoalsFromPack(pack) {
+  const model =
+    pack?.model ||
+    pack?.data?.model ||
+    pack?.stats?.model ||
+    pack?.payload?.model ||
+    null;
+
+  const num = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const home =
+    num(model?.lambdaHome) ??
+    num(model?.homeLambda) ??
+    num(model?.home_lambda) ??
+    num(model?.lambda_home) ??
+    num(model?.xgHome) ??
+    num(model?.homeXG) ??
+    num(model?.expectedHomeGoals) ??
+    num(model?.homeExpectedGoals);
+
+  const away =
+    num(model?.lambdaAway) ??
+    num(model?.awayLambda) ??
+    num(model?.away_lambda) ??
+    num(model?.lambda_away) ??
+    num(model?.xgAway) ??
+    num(model?.awayXG) ??
+    num(model?.expectedAwayGoals) ??
+    num(model?.awayExpectedGoals);
+
+  const total =
+    num(model?.lambdaTotal) ??
+    num(model?.lambda_total) ??
+    num(model?.xgTotal) ??
+    num(model?.expectedGoalsTotal) ??
+    (home != null && away != null ? home + away : null);
+
+  if (home == null && away == null && total == null) return null;
+
+  return {
+    home,
+    away,
+    total,
+  };
+}
+
+
 /* ------------------- Helpers de fecha/hora (APP_TZ) ------------------- */
 function fixtureDateKey(f) {
   const when = f?.fixture?.date || f?.date || "";
@@ -847,18 +897,22 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
                     </span>
                   </div>
                   <div>
-    <span className="text-slate-400">Goles esperados (FV):</span>{" "}
+  <span className="text-slate-400">Goles esperados (FV):</span>{" "}
   <span className="text-emerald-200 font-semibold">
     {(() => {
-      const m = fvPack?.model || fvPack?.data?.model || fvPack?.stats?.model || null;
-      const v =
-        m?.lambdaTotal ??
-        m?.lambda_total ??
-        m?.lambda?.total ??
-        (m?.lambdaHome != null && m?.lambdaAway != null ? Number(m.lambdaHome) + Number(m.lambdaAway) : null);
+      const xg = getExpectedGoalsFromPack(fvPack);
+      if (!xg) return "--";
 
-      const n = Number(v);
-      return Number.isFinite(n) ? n.toFixed(2) : "--";
+      // si tenemos home/away, mostramos desglosado
+      if (xg.home != null && xg.away != null) {
+        const total = (xg.total != null ? xg.total : xg.home + xg.away);
+        return `${xg.home.toFixed(2)} + ${xg.away.toFixed(2)} = ${total.toFixed(2)}`;
+      }
+
+      // fallback a total
+      if (xg.total != null) return xg.total.toFixed(2);
+
+      return "--";
     })()}
   </span>
 </div>
@@ -1332,6 +1386,14 @@ const ensureFvPack = useCallback(
       const res = await fetch(`${API_BASE}/api/fixture/${encodeURIComponent(fixtureId)}/fvpack`);
       if (!res.ok) throw new Error(`fvpack ${res.status}`);
       const data = await res.json();
+
+      // DEBUG (una vez por fixture): keys del modelo para ajustar UI
+      if (!window.__fvpackModelKeysOnce) window.__fvpackModelKeysOnce = {};
+      if (!window.__fvpackModelKeysOnce[fixtureId]) {
+        window.__fvpackModelKeysOnce[fixtureId] = true;
+        const modelKeys = Object.keys((data?.model) || (data?.data?.model) || {});
+        console.log("[FVPACK model keys]", fixtureId, modelKeys);
+      }
 
       fvRef.current[fixtureId] = data;
       setFvPackByFixture((m) => ({ ...m, [fixtureId]: data }));
@@ -2099,10 +2161,59 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
     Aún sin ranking (fixturesScanned: {refData?.fixturesScanned ?? 0}). Endpoint OK.
   </div>
 )}
+
 </FeatureCard>
 
         <FeatureCard
+          title="Desfase del mercado"
+          badge="Value"
+          locked={!features.marketValue}
+          lockText="Disponible desde Plan Vitalicio."
+        >
+          <div className="text-xs text-slate-300">
+            Picks con posible valor (cuando tu estimación FV sugiere que el mercado está pagando “de más”).
+          </div>
+
+          {fvOutput?.valueList?.length ? (
+            <div className="mt-3 space-y-2">
+              {fvOutput.valueList.slice(0, 8).map((v, idx) => (
+                <div
+                  key={`${v.fixtureId || "fx"}-${v.label || v.pick || idx}-${idx}`}
+                  className="rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2"
+                >
+                  <div className="text-[11px] text-slate-300">
+                    <span className="text-slate-500">#{idx + 1}</span>{" "}
+                    <span className="text-slate-100 font-semibold">{v.label || v.pick}</span>
+                    {v.home && v.away ? (
+                      <>
+                        {" "}
+                        <span className="text-slate-500">—</span> {v.home} vs {v.away}
+                      </>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-1 text-[11px] text-slate-300">
+                    FV: <span className="text-emerald-200 font-semibold">x{toOdd(v.fvOdd) ?? v.fvOdd}</span>{" "}
+                    <span className="text-slate-500">·</span>{" "}
+                    Mercado: <span className="text-amber-200 font-semibold">x{toOdd(v.marketOdd) ?? v.marketOdd}</span>{" "}
+                    {v.valueEdge != null ? (
+                      <>
+                        <span className="text-slate-500">·</span>{" "}
+                        Value: <span className="text-emerald-200 font-semibold">+{Math.round(Number(v.valueEdge) * 100)}%</span>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-3 text-[11px] text-slate-400">Genera una combinada para calcular value.</div>
+          )}
+        </FeatureCard>
+
+        <FeatureCard
           title="Goleadores / Remates / Value"
+
           badge="VIP"
           locked={!(features.scorersValue || features.marketValue)}
           lockText="Disponible en planes superiores (Anual/Vitalicio)."
