@@ -137,13 +137,40 @@ export function probsDoubleChance(lambdaHome, lambdaAway) {
 }
 
 export function estimateLambdasFromPack(pack) {
-  const lh = Number(pack?.model?.lambdaHome);
-  const la = Number(pack?.model?.lambdaAway);
+  // El backend puede enviar llaves en camelCase o PascalCase.
+  // Ej: { model: { LambdaHome, LambdaAway, LambdaTotal } }
+  const safeNum = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const pick = (...vals) => {
+    for (const v of vals) {
+      const n = safeNum(v);
+      if (n != null) return n;
+    }
+    return null;
+  };
 
-  const lambdaHome = Number.isFinite(lh) ? clamp(lh, 0.2, 3.2) : 1.25;
-  const lambdaAway = Number.isFinite(la) ? clamp(la, 0.2, 3.2) : 1.05;
+  const m = pack?.model || pack?.data?.model || pack?.stats?.model || null;
 
-  return { lambdaHome, lambdaAway, lambdaTotal: lambdaHome + lambdaAway };
+  const lhRaw = pick(m?.lambdaHome, m?.lambda_home, m?.homeLambda, m?.LambdaHome, m?.lambdaH);
+  const laRaw = pick(m?.lambdaAway, m?.lambda_away, m?.awayLambda, m?.LambdaAway, m?.lambdaA);
+  const ltRaw = pick(m?.lambdaTotal, m?.lambda_total, m?.LambdaTotal, m?.totalLambda);
+
+  // Defaults (conservadores) si no llega modelo
+  let lambdaHome = lhRaw != null ? clamp(lhRaw, 0.2, 3.2) : 1.25;
+  let lambdaAway = laRaw != null ? clamp(laRaw, 0.2, 3.2) : 1.05;
+
+  // Si llega total pero falta home/away, repartimos.
+  if (ltRaw != null && (lhRaw == null || laRaw == null)) {
+    const lt = clamp(ltRaw, 0.4, 6.0);
+    const wH = lhRaw != null ? clamp(lhRaw / lt, 0.25, 0.75) : 0.55;
+    lambdaHome = clamp(lt * wH, 0.2, 3.2);
+    lambdaAway = clamp(lt - lambdaHome, 0.2, 3.2);
+  }
+
+  const lambdaTotal = clamp(lambdaHome + lambdaAway, 0.4, 6.0);
+  return { lambdaHome, lambdaAway, lambdaTotal };
 }
 
 export function buildCandidatePicks({ fixture, pack, markets }) {

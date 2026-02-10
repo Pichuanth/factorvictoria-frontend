@@ -111,6 +111,8 @@ function getExpectedGoalsFromPack(pack) {
   };
 
   const home =
+    // Backend suele venir con PascalCase
+    num(model?.LambdaHome) ??
     num(model?.lambdaHome) ??
     num(model?.homeLambda) ??
     num(model?.home_lambda) ??
@@ -121,6 +123,7 @@ function getExpectedGoalsFromPack(pack) {
     num(model?.homeExpectedGoals);
 
   const away =
+    num(model?.LambdaAway) ??
     num(model?.lambdaAway) ??
     num(model?.awayLambda) ??
     num(model?.away_lambda) ??
@@ -131,6 +134,7 @@ function getExpectedGoalsFromPack(pack) {
     num(model?.awayExpectedGoals);
 
   const total =
+    num(model?.LambdaTotal) ??
     num(model?.lambdaTotal) ??
     num(model?.lambda_total) ??
     num(model?.xgTotal) ??
@@ -919,16 +923,12 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
 
                 </div>
 
-                <div className="mt-2 text-slate-400">
-                  fixtureId: <span className="text-slate-200 font-semibold">{String(id)}</span>
-                </div>
+                {/* fixtureId oculto (debug) */}
               </div>
             ) : (
               <div className="text-[11px] text-slate-400">
                 Sin estadísticas aún (o no disponibles). Igual podemos estimar con heurísticas.
-                <div className="mt-2 text-slate-400">
-                  fixtureId: <span className="text-slate-200 font-semibold">{String(id)}</span>
-                </div>
+                {/* fixtureId oculto (debug) */}
               </div>
             )}
 
