@@ -1172,21 +1172,13 @@ export default function Comparator() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const data = await res.json();
-if (!window.__fvpackOnce) {
-  window.__fvpackOnce = true;
-  console.log("[FVPACK sample]", data);
-  console.log("[FVPACK keys]", Object.keys(data || {}));
-}
+       if (!window.__fvpackOnce) {
+       window.__fvpackOnce = true;
+       console.log("[FVPACK sample]", data);
+       console.log("[FVPACK keys]", Object.keys(data || {}));
+       }
 
-        const itemsRaw =
-          (Array.isArray(data?.items) && data.items) ||
-          (Array.isArray(data?.response) && data.response) ||
-          (Array.isArray(data?.fixtures) && data.fixtures) ||
-          [];
-
-        const base = itemsRaw
-          .filter(isFutureFixture)
-          .filter((fx) => !isYouthOrWomenOrReserve(fx));
+        // DEBUG: solo para ver estructura una vez por "primerId"
 
         const filteredTop = base.filter((fx) => isAllowedCompetition(getCountryName(fx), getLeagueName(fx)));
 
@@ -1283,22 +1275,15 @@ const ensureOdds = useCallback(
 // arriba de ensureFvPack
 const FVPACK_TTL = 1000 * 60 * 5; // 5 min
 
-// FV pack cache (stats + modelo + markets)
 const ensureFvPack = useCallback(
   async (fixtureId) => {
     if (!fixtureId) return null;
 
     const cached = fvRef.current[fixtureId];
 
-    // ✅ si hay pack bueno, úsalo
     if (cached && !cached.__error) return cached;
 
-    // ✅ si hubo error reciente, NO spamear el endpoint
-    if (
-      cached?.__error &&
-      cached?.fetchedAt &&
-      Date.now() - cached.fetchedAt < FVPACK_TTL
-    ) {
+    if (cached?.__error && cached?.fetchedAt && Date.now() - cached.fetchedAt < FVPACK_TTL) {
       return null;
     }
 
@@ -1306,26 +1291,18 @@ const ensureFvPack = useCallback(
     setFvErrByFixture((m) => ({ ...m, [fixtureId]: null }));
 
     try {
-      const res = await fetch(
-        `${API_BASE}/api/fixture/${encodeURIComponent(fixtureId)}/fvpack`
-      );
+      const res = await fetch(`${API_BASE}/api/fixture/${encodeURIComponent(fixtureId)}/fvpack`);
       if (!res.ok) throw new Error(`fvpack ${res.status}`);
-
       const data = await res.json();
 
       fvRef.current[fixtureId] = data;
       setFvPackByFixture((m) => ({ ...m, [fixtureId]: data }));
       return data;
     } catch (e) {
-      const msg = String(e?.message || e);
-      console.error("ensureFvPack error", fixtureId, e);
-
-      setFvErrByFixture((m) => ({ ...m, [fixtureId]: msg }));
-
-      // ✅ guarda error con timestamp para TTL
-      const errPack = { __error: true, message: msg, fetchedAt: Date.now() };
+      const errPack = { __error: true, message: String(e?.message || e), fetchedAt: Date.now() };
       fvRef.current[fixtureId] = errPack;
       setFvPackByFixture((m) => ({ ...m, [fixtureId]: errPack }));
+      setFvErrByFixture((m) => ({ ...m, [fixtureId]: errPack.message }));
       return null;
     } finally {
       setFvLoadingByFixture((m) => ({ ...m, [fixtureId]: false }));
@@ -1333,6 +1310,7 @@ const ensureFvPack = useCallback(
   },
   [API_BASE]
 );
+
 
     const loadReferees = useCallback(async () => {
       
@@ -1550,19 +1528,27 @@ const giftBundle = buildGiftPickBundle(candidatesByFixtureSanitized, 1.5, 3.0, 3
 const targets = [3, 5, 10, 20, 50, 100].filter((t) => t <= maxBoost);
 console.log("[PARLAY] targets =", targets);
 
-   const parlays = targets
+const parlays = targets
   .map((t) => {
-    const r1 = buildParlay({ candidatesByFixture: candidatesByFixtureSanitized, target: t, cap: maxBoost });
+    const r1 = buildParlay({
+      candidatesByFixture: candidatesByFixtureSanitized,
+      target: t,
+      cap: maxBoost,
+    });
+    console.log("[PARLAY] buildParlay target", t, "=>", r1);
     if (r1) return r1;
 
-    const r2 = buildBoostedParlayLocal({ candidatesByFixture: candidatesByFixtureSanitized, target: t, cap: maxBoost });
-    return r2;
+    const r2 = buildBoostedParlayLocal({
+      candidatesByFixture: candidatesByFixtureSanitized,
+      target: t,
+      cap: maxBoost,
+    });
+    console.log("[PARLAY] localParlay target", t, "=>", r2);
+    return r2; // ✅ clave: retornar r2
   })
-  .filter(Boolean)
-  // ✅ mínimo 2 partidos para que NO aparezca ese “#1 …” suelto
-  .filter((p) => Array.isArray(p.legs) && p.legs.length >= 2);
+  .filter(Boolean);
 
-// ===================== VALUE LIST (usar SANITIZED) =====================
+  // ===================== VALUE LIST (usar SANITIZED) =====================
 const valueList = buildValueList(candidatesByFixtureSanitized, 0.06);
 
 console.log("parlays:", parlays);
@@ -1676,23 +1662,28 @@ const handleSelectedParlay = () => runGeneration("selected");
         else if (qTrim) params.set("q", qTrim);
       }
 
-      
-      const res = await fetch(`${API_BASE}/api/fixtures?${params.toString()}`);
-     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-     const data = await res.json();
+        const res = await fetch(`${API_BASE}/api/fixtures?${params.toString()}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
 
-      if (!window.__fvpackFixtureOnce) window.__fvpackFixtureOnce = {};
-      if (!window.__fvpackFixtureOnce[fixtureId]) {
-      window.__fvpackFixtureOnce[fixtureId] = true;
-     console.log("[FIXTURES raw]", data);
-     console.log("[FIXTURES keys]", Object.keys(data || {}));
+// DEBUG: ver forma de respuesta solo una vez por "firstId"
+const itemsRaw =
+  (Array.isArray(data?.items) && data.items) ||
+  (Array.isArray(data?.response) && data.response) ||
+  (Array.isArray(data?.fixtures) && data.fixtures) ||
+  [];
+
+const firstId = itemsRaw[0] ? getFixtureId(itemsRaw[0]) : null;
+
+if (!window.__fixturesFirstOnce) window.__fixturesFirstOnce = {};
+if (firstId && !window.__fixturesFirstOnce[firstId]) {
+  window.__fixturesFirstOnce[firstId] = true;
+  console.log("[FIXTURES firstId]", firstId);
+  console.log("[FIXTURES raw]", data);
+  console.log("[FIXTURES keys]", Object.keys(data || {}));
 }
 
-      const itemsRaw =
-        (Array.isArray(data?.items) && data.items) ||
-        (Array.isArray(data?.response) && data.response) ||
-        (Array.isArray(data?.fixtures) && data.fixtures) ||
-        [];
+// desde aquí sigues con tu lógica normal:
 
       let items = itemsRaw;
 
@@ -1983,29 +1974,40 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 
           {parlayError ? <div className="mt-3 text-xs text-amber-300">{parlayError}</div> : null}
 
-          <div className="mt-2 space-y-1">
-  {(parlayResult?.legs || []).map((leg, idx) => {
-  const oddToShow =
-  (toOdd(leg.usedOddDisplay) ?? toOdd(leg.usedOdd)) > 1
-    ? (toOdd(leg.usedOddDisplay) ?? toOdd(leg.usedOdd))
-    : null;
+{parlayResult?.legs?.length ? (
+  <div className="mt-2 space-y-1">
+    {(parlayResult.legs || [])
+      .filter(
+        (l) =>
+          l &&
+          l.label &&
+          l.home &&
+          l.away &&
+          Number(toOdd(l.usedOddDisplay) ?? toOdd(l.usedOdd)) > 1
+      )
+      .map((leg, idx) => {
+        const oddNum = toOdd(leg.usedOddDisplay) ?? toOdd(leg.usedOdd);
+        const oddToShow = oddNum && oddNum > 1 ? oddNum : null;
 
-  return (
-    <div key={`${leg.fixtureId}-${idx}`} className="text-[11px] text-slate-300">
-      <span className="text-slate-500">#{idx + 1}</span>{" "}
-      <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
-      <span className="text-slate-500">—</span>{" "}
-      {leg.home} vs {leg.away}{" "}
-      {oddToShow ? (
-        <>
-          <span className="text-slate-500">·</span>{" "}
-          <span className="text-amber-200 font-semibold">{oddToShow}</span>
-        </>
-      ) : null}
-    </div>
-  );
-})}
-</div>
+        return (
+          <div key={`${leg.fixtureId || "fx"}-${idx}`} className="text-[11px] text-slate-300">
+            <span className="text-slate-500">#{idx + 1}</span>{" "}
+            <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
+            <span className="text-slate-500">—</span>{" "}
+            {leg.home} vs {leg.away}{" "}
+            {oddToShow ? (
+              <>
+                <span className="text-slate-500">·</span>{" "}
+                <span className="text-amber-200 font-semibold">{oddToShow}</span>
+              </>
+            ) : null}
+          </div>
+        );
+      })}
+  </div>
+) : (
+  <div className="mt-3 text-[11px] text-slate-400">Genera una combinada para que aparezca aquí.</div>
+)}
 
         </FeatureCard>
 
@@ -2042,46 +2044,49 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
         <FeatureCard title="Cuota desfase del mercado" badge="Value" locked={!features.marketValue} lockText="Disponible desde Plan Vitalicio.">
           <div className="text-xs text-slate-300">Detecta cuotas con posible valor (desfase entre tu estimación y el mercado).</div>
 
-          {fvOutput?.valueList?.length ? (
-  <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/30 p-3">
-    <div className="text-sm font-semibold text-slate-100">Value (desfase mercado vs FV)</div>
-
-    <div className="mt-2 space-y-1">
-      {fvOutput.valueList.map((v, idx) => {
-        const edgePct =
-          typeof v.valueEdge === "number" ? Math.round(v.valueEdge * 100) : null;
-
-        return (
-          <div key={`${v.fixtureId}-${idx}`} className="text-[11px] text-slate-300">
-            <span className="text-slate-100 font-semibold">{v.home}</span>{" "}
-            vs{" "}
-            <span className="text-slate-100 font-semibold">{v.away}</span>{" "}
-            <span className="text-slate-500">·</span>{" "}
-            <span className="text-slate-100 font-semibold">{v.label}</span>{" "}
-            <span className="text-slate-500">·</span>{" "}
-            Mercado x<span className="text-slate-100 font-semibold">{v.marketOdd}</span>{" "}
-            FV justa x<span className="text-slate-100 font-semibold">{v.fvOdd}</span>
-
-            {edgePct !== null && edgePct > 0 ? (
-              <>
-                {" "}<span className="text-slate-500">·</span>{" "}
-                <span className="text-amber-200 font-semibold">
-                  Ventaja estimada +{edgePct}%
-                </span>
-              </>
-            ) : null}
+          {fvOutput?.parlays?.length ? (
+         <div className="mt-3 space-y-3">
+         {fvOutput.parlays.map((p) => (
+         <div key={p.target} className="rounded-xl border border-white/10 bg-slate-950/30 p-3">
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-semibold text-slate-100">Potenciada x{p.target}</div>
+          <div className="text-xs text-slate-300">
+            Final: <span className="text-amber-200 font-semibold">x{p.finalOdd}</span>{" "}
+            · Partidos: {p.games}
           </div>
-        );
-      })}
-    </div>
+        </div>
+
+        <div className="mt-2 space-y-1">
+          {(p.legs || []).map((leg, idx) => {
+            const oddToShow =
+              (toOdd(leg.usedOddDisplay) ?? toOdd(leg.usedOdd)) > 1
+                ? (toOdd(leg.usedOddDisplay) ?? toOdd(leg.usedOdd))
+                : null;
+
+            return (
+              <div key={`${p.target}-${leg.fixtureId || idx}-${idx}`} className="text-[11px] text-slate-300">
+                <span className="text-slate-500">#{idx + 1}</span>{" "}
+                <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
+                <span className="text-slate-500">—</span>{" "}
+                {leg.home} vs {leg.away}{" "}
+                {oddToShow ? (
+                  <>
+                    <span className="text-slate-500">·</span>{" "}
+                    <span className="text-amber-200 font-semibold">{oddToShow}</span>
+                  </>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    ))}
   </div>
 ) : (
-  <div className="mt-3 text-[11px] text-slate-400">
-    Genera una combinada para buscar value (si la API entrega odds para esos fixtures).
-  </div>
+  <div className="mt-3 text-[11px] text-slate-400">Genera una combinada para que aparezca aquí.</div>
 )}
 
-        </FeatureCard>
+    </FeatureCard>
       </section>
 
       {/* 5) Manual Picks */}
