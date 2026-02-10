@@ -847,9 +847,19 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
                     </span>
                   </div>
                   <div>
-  <span className="text-slate-400">Goles esperados (FV):</span>{" "}
+    <span className="text-slate-400">Goles esperados (FV):</span>{" "}
   <span className="text-emerald-200 font-semibold">
-    {(fvPack?.model?.lambdaTotal ?? "--")}
+    {(() => {
+      const m = fvPack?.model || fvPack?.data?.model || fvPack?.stats?.model || null;
+      const v =
+        m?.lambdaTotal ??
+        m?.lambda_total ??
+        m?.lambda?.total ??
+        (m?.lambdaHome != null && m?.lambdaAway != null ? Number(m.lambdaHome) + Number(m.lambdaAway) : null);
+
+      const n = Number(v);
+      return Number.isFinite(n) ? n.toFixed(2) : "--";
+    })()}
   </span>
 </div>
 
@@ -974,6 +984,15 @@ function buildBoostedParlayLocal({ candidatesByFixture, target, cap, minProb = 0
   const fixtureIds = Object.keys(candidatesByFixture || {});
   if (!fixtureIds.length) return null;
 
+function localPenalty(label) {
+  const s = String(label || "").toLowerCase();
+  let p = 1;
+  if (s.includes("2.5") && (s.includes("over") || s.includes("under") || s.includes("goles"))) p *= 0.82;
+  if ((s.includes("over") || s.includes("under")) && !s.includes("1x") && !s.includes("x2")) p *= 0.92;
+  if (s.includes("btts") || s.includes("both teams") || s.includes("ambos")) p *= 0.95;
+  return p;
+}
+
   // Para cada fixture, nos quedamos con candidatos "usables" (odd>1 y prob decente)
   const perFx = fixtureIds.map((fxId) => {
     const arr = (candidatesByFixture[fxId] || [])
@@ -991,7 +1010,11 @@ function buildBoostedParlayLocal({ candidatesByFixture, target, cap, minProb = 0
       })
       .filter((c) => c._odd != null && c._odd > 1.01)
       .filter((c) => c._prob == null || c._prob >= minProb)
-      .sort((a, b) => (b._odd || 0) - (a._odd || 0)); // prioriza odds
+      .map((c) => {
+        const pen = localPenalty(c.label || c.pick);
+        return { ...c, _penalty: pen, _scoreOdd: (c._odd || 0) * pen };
+      })
+      .sort((a, b) => (b._scoreOdd || 0) - (a._scoreOdd || 0)); // prioriza odds (con penalización)
 
     return { fxId, candidates: arr };
   });
@@ -1033,7 +1056,8 @@ function buildBoostedParlayLocal({ candidatesByFixture, target, cap, minProb = 0
         // score: preferimos acercarnos al target; si lo sobrepasa un poco no importa
         const dist = Math.abs(Math.log(target) - Math.log(next));
         const probBonus = c._prob != null ? (c._prob - 0.5) : 0;
-        const score = -dist + probBonus * 0.35; // ajustable
+        const pen = c._penalty ?? 1;
+        const score = -dist + probBonus * 0.35 - (1 - pen) * 0.8; // penaliza overs repetidos
 
         if (!best || score > best.score) best = { c, score, next };
       }
@@ -1172,8 +1196,7 @@ export default function Comparator() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const data = await res.json();
-
-
+    
 if (!window.__fvpackOnce) {
   window.__fvpackOnce = true;
   console.log("[FVPACK sample]", data);
@@ -1442,6 +1465,30 @@ const candidatesByFixture = {};
 function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
 function shrinkProb(p, k = 0.45) { return 0.5 + (p - 0.5) * k; } // k<1 baja confianza
 
+function pickPenalty(label) {
+  const s = String(label || "").toLowerCase();
+  let p = 1;
+
+  // penaliza "Over/Under 2.5" (muy repetido)
+  if (s.includes("2.5") && (s.includes("over") || s.includes("under") || s.includes("goles"))) p *= 0.82;
+
+  // penaliza totales en general (over/under) un poco
+  if ((s.includes("over") || s.includes("under")) && !s.includes("1x") && !s.includes("x2")) p *= 0.92;
+
+  // BTTS suele repetirse también
+  if (s.includes("btts") || s.includes("both teams") || s.includes("ambos")) p *= 0.95;
+
+  return p;
+}
+
+function probForRank(c) {
+  const base = Number(c?.prob);
+  const prob = Number.isFinite(base) ? base : 0.5;
+  const pen = pickPenalty(c?.label || c?.pick);
+  // reducimos prob solo para ranking (no para display)
+  return prob * pen;
+}
+
 for (const fx of pool) {
   const id = getFixtureId(fx);
   if (!id) continue;
@@ -1478,16 +1525,23 @@ for (const fx of pool) {
     // odd usada: mercado si existe; si no, FV
     const usedOddNum = marketOddNum ?? toOdd(c?.usedOdd) ?? fvOddNum;
 
+    const __penalty = pickPenalty(c?.label || c?.pick);
+    const __probRank = (probOk != null ? probOk : 0.5) * __penalty;
+
     return {
       ...c,
       fvOdd: fvOddNum,
       marketOdd: marketOddNum ?? c?.marketOdd,
       usedOdd: usedOddNum,
       usedOddDisplay: usedOddNum,
+      __penalty,
+      __probRank,
     };
   });
 
-  candidatesByFixture[id] = fixedCands;
+  // ordena por prob "rank" (penaliza overs repetidos) para que buildParlay/pickSafe elijan mejor
+  const ranked = [...fixedCands].sort((a, b) => (b.__probRank || 0) - (a.__probRank || 0));
+  candidatesByFixture[id] = ranked;
 }
 
 // ===================== DEBUG (DESPUÉS del loop) =====================
@@ -2056,8 +2110,8 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
           <div className="text-xs text-slate-300">Aquí reactivaremos los módulos avanzados (goleadores, remates, value del mercado).</div>
         </FeatureCard>
 
-        <FeatureCard title="Cuota desfase del mercado" badge="Value" locked={!features.marketValue} lockText="Disponible desde Plan Vitalicio.">
-          <div className="text-xs text-slate-300">Detecta cuotas con posible valor (desfase entre tu estimación y el mercado).</div>
+        <FeatureCard title="Parlays potenciados" badge="Parlays" locked={!features.boosted} lockText="Disponible en todos los planes.">
+          <div className="text-xs text-slate-300">Aquí verás los parlays potenciados que genera el modelo (x3, x5, x10, x20, etc.).</div>
 
           {fvOutput?.parlays?.length ? (
          <div className="mt-3 space-y-3">

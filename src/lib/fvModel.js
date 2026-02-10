@@ -22,6 +22,14 @@ function safeNum(n) {
   return Number.isFinite(x) ? x : null;
 }
 
+
+function pr(c) {
+  const v = Number(c?.__probRank);
+  if (Number.isFinite(v)) return v;
+  const p = Number(c?.prob);
+  return Number.isFinite(p) ? p : 0;
+}
+
 // stats: [{gf, ga}] últimos partidos
 function summarizeRecent(list) {
   if (!Array.isArray(list) || !list.length) return null;
@@ -237,7 +245,7 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
 
   // ---------- limpieza + métricas ----------
   const cleaned = out
-  .filter((x) => Number.isFinite(x.prob) && x.prob > 0.01 && x.prob < 0.999)
+  .filter((x) => Number.isFinite(x.prob) && pr(x) > 0.01 && pr(x) < 0.999)
   .map((x) => {
     const fvOddNum = Number(x.fvOdd);
     const mkOddNum = Number(x.marketOdd);
@@ -263,7 +271,7 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
   });
 
   // Orden: primero mayor prob (seguro), luego menor odd
-  cleaned.sort((a, b) => (b.prob - a.prob) || (Number(a.usedOdd) - Number(b.usedOdd)));
+  cleaned.sort((a, b) => (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
   return cleaned;
 }
 // =====================
@@ -272,7 +280,7 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
 
 export function pickSafe(candidatesByFixture) {
   const all = Object.values(candidatesByFixture || {}).flat();
-  all.sort((a, b) => (b.prob - a.prob) || (Number(a.usedOdd) - Number(b.usedOdd)));
+  all.sort((a, b) => (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
   return all[0] || null;
 }
 
@@ -280,13 +288,13 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
   const pool = Object.values(candidatesByFixture || {})
     .map((list) => (list || [])[0])
     .filter(Boolean)
-    .filter((x) => Number.isFinite(x.prob) && x.prob >= 0.85)
+    .filter((x) => Number.isFinite(x.prob) && pr(x) >= 0.85)
     .filter((x) => {
       const odd = Number(x.usedOdd);
       return Number.isFinite(odd) && odd > 1;
     });
 
-  pool.sort((a, b) => (b.prob - a.prob) || (Number(a.usedOdd) - Number(b.usedOdd)));
+  pool.sort((a, b) => (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
 
   const legs = [];
   let prod = 1;
@@ -326,7 +334,7 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) 
     })
     .filter(Boolean);
 
-  pool.sort((a, b) => (b.best.prob - a.best.prob));
+  pool.sort((a, b) => (pr(b.best) - pr(a.best)));
 
   const legs = [];
   let prod = 1;
@@ -375,7 +383,7 @@ export function buildValueList(candidatesByFixture, minEdge = 0.06) {
       const edge = fv > 0 ? (mk / fv) - 1 : null;
       return { ...x, valueEdge: edge === null ? null : round2(edge) };
     })
-    .filter((x) => Number.isFinite(x.valueEdge) && x.valueEdge >= minEdge && x.prob >= 0.80)
+    .filter((x) => Number.isFinite(x.valueEdge) && x.valueEdge >= minEdge && pr(x) >= 0.80)
     .sort((a, b) => b.valueEdge - a.valueEdge);
 
   return value.slice(0, 12);
