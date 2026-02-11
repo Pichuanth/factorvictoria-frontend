@@ -1623,7 +1623,20 @@ for (const fx of pool) {
     const usedOddNum = marketOddNum ?? toOdd(c?.usedOdd) ?? fvOddNum;
 
     const __penalty = pickPenalty(c?.label || c?.pick);
-    const __probRank = (probOk != null ? probOk : 0.5) * __penalty;
+
+    // Diversificación suave por tipo de pick (si no, se tiende a ir siempre a BTTS:NO)
+    const labelTxt = String(c?.label || c?.pick || "").toLowerCase();
+    const __typeWeight = labelTxt.includes("ambos") && labelTxt.includes("no")
+      ? 0.72
+      : labelTxt.includes("ambos") && (labelTxt.includes("sí") || labelTxt.includes("si"))
+        ? 0.85
+        : labelTxt.includes("under")
+          ? 0.9
+          : labelTxt.includes("over")
+            ? 0.85
+            : 1;
+
+    const __probRank = (probOk != null ? probOk : 0.5) * __penalty * __typeWeight;
 
     return {
       ...c,
@@ -1636,7 +1649,7 @@ for (const fx of pool) {
     };
   });
 
-  // ordena por prob "rank" (penaliza overs repetidos) para que buildParlay/pickSafe elijan mejor
+  // ordena por prob "rank" (penaliza overs repetidos + diversifica) para que buildParlay/pickSafe elijan mejor
   const ranked = [...fixedCands].sort((a, b) => (b.__probRank || 0) - (a.__probRank || 0));
   candidatesByFixture[id] = ranked;
 }
@@ -1713,7 +1726,12 @@ const parlays = targets
     // Evita mostrar targets altos si la combinada queda muy lejos (esto generaba x20/x50/x100 idénticos)
     if (!r2 || !Number.isFinite(r2.finalOdd)) return null;
     const ratio = (r2.finalOdd || 0) / (t || 1);
-    if (ratio < 0.75 || ratio > 1.35) return null;
+
+    // Margen por target: evitamos que "x50" termine mostrando una combinada tipo "x10",
+    // pero permitimos cierta holgura para que aparezcan x5/x10/x20 con datasets cortos.
+    const minRatio = t >= 50 ? 0.45 : 0.6;
+    const maxRatio = 1.6;
+    if (ratio < minRatio || ratio > maxRatio) return null;
     return r2;
   })
   .filter(Boolean)
