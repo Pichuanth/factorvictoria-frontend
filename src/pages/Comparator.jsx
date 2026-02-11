@@ -70,6 +70,32 @@ function normStr(s) {
     .trim();
 }
 
+// Convierte una racha tipo "W-W-D-W-W" a algo entendible.
+// W = Ganado, D = Empate, L = Perdido
+function prettyForm(formStr) {
+  if (!formStr || typeof formStr !== "string") return "--";
+  const parts = formStr
+    .split(/\s*[-|\s]\s*/)
+    .filter(Boolean)
+    .slice(0, 5);
+  if (!parts.length) return "--";
+  const map = {
+    W: { short: "G", icon: "🟢", label: "Ganado" },
+    D: { short: "E", icon: "🟡", label: "Empate" },
+    L: { short: "P", icon: "🔴", label: "Perdido" },
+  };
+  return parts
+    .map((p) => {
+      const k = String(p || "").toUpperCase();
+      const m = map[k];
+      if (!m) return k;
+      return `${m.icon}${m.short}`;
+    })
+    .join(" ");
+}
+
+const FORM_LEGEND = "Leyenda: 🟢G=Ganado, 🟡E=Empate, 🔴P=Perdido";
+
 
 function includesNorm(haystack, needle) {
   return normStr(haystack).includes(normStr(needle));
@@ -864,14 +890,20 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
             ) : fvPack ? (
               <div className="text-[11px] text-slate-300 leading-relaxed">
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
-                  <div>
+<div>
   <span className="text-slate-400">Racha (últ.5) local:</span>{" "}
   <span className="text-slate-100 font-semibold">{last5?.home?.form || "--"}</span>
+  {last5?.home?.form ? (
+    <span className="ml-2 text-slate-300">({prettyForm(last5.home.form)})</span>
+  ) : null}
 </div>
 
 <div>
   <span className="text-slate-400">Racha (últ.5) visita:</span>{" "}
   <span className="text-slate-100 font-semibold">{last5?.away?.form || "--"}</span>
+  {last5?.away?.form ? (
+    <span className="ml-2 text-slate-300">({prettyForm(last5.away.form)})</span>
+  ) : null}
 </div>
 
 <div>
@@ -922,6 +954,9 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
 </div>
 
                 </div>
+                {(last5?.home?.form || last5?.away?.form) ? (
+                  <div className="mt-1 text-[10px] text-slate-400">{FORM_LEGEND}</div>
+                ) : null}
 
                 {/* fixtureId oculto (debug) */}
               </div>
@@ -1675,9 +1710,18 @@ const parlays = targets
       cap: maxBoost,
     });
     console.log("[PARLAY] localParlay target", t, "=>", r2);
-    return r2; // ✅ clave: retornar r2
+    // Evita mostrar targets altos si la combinada queda muy lejos (esto generaba x20/x50/x100 idénticos)
+    if (!r2 || !Number.isFinite(r2.finalOdd)) return null;
+    const ratio = (r2.finalOdd || 0) / (t || 1);
+    if (ratio < 0.75 || ratio > 1.35) return null;
+    return r2;
   })
-  .filter(Boolean);
+  .filter(Boolean)
+  // Evita duplicados exactos entre targets
+  .filter((p, idx, arr) => {
+    const sig = (p.picks || []).map((x) => `${x.fixtureId}:${x.marketKey || x.key || x.label || ""}`).join("|");
+    return arr.findIndex((q) => (q.picks || []).map((x) => `${x.fixtureId}:${x.marketKey || x.key || x.label || ""}`).join("|") === sig) === idx;
+  });
 
   // ===================== VALUE LIST (usar SANITIZED) =====================
 const valueList = buildValueList(candidatesByFixtureSanitized, 0.06);
@@ -1747,13 +1791,8 @@ const handleSelectedParlay = () => runGeneration("selected");
     const pool = fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)));
     pool.map(getFixtureId).filter(Boolean).forEach((id) => ensureOdds(id));
 
-    const suggestion = buildComboSuggestion(pool, maxBoost);
-    if (!suggestion) {
-      setParlayError("Con esta combinación no pudimos llegar a una cuota interesante. Prueba agregando más partidos.");
-      return;
-    }
-
-    setParlayResult({ mode: "selected", ...suggestion });
+    // Generación completa (cuota segura + potenciadas + value + etc.) con los seleccionados.
+    await runGeneration("selected");
   }
 
   async function handleLoadFixtures(e) {
