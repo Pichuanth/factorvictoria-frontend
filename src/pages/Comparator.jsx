@@ -1069,128 +1069,120 @@ function ManualPicksSection() {
     </section>
   );
 }
-function buildBoostedParlayLocal({
-  candidatesByFixture,
-  target,
-  cap = 100,
-  minProb = 0.70,
-  maxLegs = 7,
-}) {
-  try {
-    if (!candidatesByFixture || typeof candidatesByFixture !== "object") return null;
+function buildBoostedParlayLocal({ candidatesByFixture, target, cap, minProb = 0.52, maxLegs = 12 }) {
+  const fixtureIds = Object.keys(candidatesByFixture || {});
+  if (!fixtureIds.length) return null;
 
-    const t = Number(target || 1);
-    // Target alto => aceptamos picks con menor probabilidad (más cuota) para poder llegar a x10/x20/x50
-    const minProbLocal = t <= 5 ? Math.max(minProb, 0.70) : t <= 10 ? Math.min(minProb, 0.62) : t <= 20 ? Math.min(minProb, 0.55) : Math.min(minProb, 0.50);
-    const headLocal = t <= 5 ? 6 : t <= 10 ? 8 : t <= 20 ? 10 : 12;
+function localPenalty(label) {
+  const s = String(label || "").toLowerCase();
+  let p = 1;
+  if (s.includes("2.5") && (s.includes("over") || s.includes("under") || s.includes("goles"))) p *= 0.82;
+  if ((s.includes("over") || s.includes("under")) && !s.includes("1x") && !s.includes("x2")) p *= 0.92;
+  if (s.includes("btts") || s.includes("both teams") || s.includes("ambos")) p *= 0.95;
+  return p;
+}
 
-    // Build pools per fixture (filter low-prob / invalid odds)
-    const pools = Object.keys(candidatesByFixture)
-      .map((fixtureId) => {
-        const list = (candidatesByFixture[fixtureId] || [])
-          .filter((c) => Number(c?.odd || 0) > 1.01 && Number(c?.prob || 0) >= minProbLocal)
-          .sort((a, b) => (b?.odd || 0) - (a?.odd || 0));
-        return { fixtureId, list };
+  // Para cada fixture, nos quedamos con candidatos "usables" (odd>1 y prob decente)
+  const perFx = fixtureIds.map((fxId) => {
+    const arr = (candidatesByFixture[fxId] || [])
+      .map((c) => {
+        const odd =
+          toOdd(c.usedOddDisplay) ??
+          toOdd(c.usedOdd) ??
+          toOdd(c.marketOdd) ??
+          toOdd(c.fvOdd);
+
+        const prob = Number(c?.prob);
+        const probOk = Number.isFinite(prob) ? prob : null;
+
+        return { ...c, _fxId: fxId, _odd: odd, _prob: probOk };
       })
-      .filter((p) => p.list.length > 0);
+      .filter((c) => c._odd != null && c._odd > 1.01)
+      .filter((c) => c._prob == null || c._prob >= minProb)
+      .map((c) => {
+        const pen = localPenalty(c.label || c.pick);
+        return { ...c, _penalty: pen, _scoreOdd: (c._odd || 0) * pen };
+      })
+      .sort((a, b) => (b._scoreOdd || 0) - (a._scoreOdd || 0)); // prioriza odds (con penalización)
 
-    if (pools.length === 0) return null;
+    return { fxId, candidates: arr };
+  });
 
-    // Theoretical max we can get with distinct fixtures
-    const topOdds = pools
-      .map((p) => Number(p.list[0].odd || 1))
-      .sort((a, b) => b - a)
-      .slice(0, Math.min(maxLegs, headLocal, pools.length));
+  // Si no hay candidatos usables, no se puede
+  if (!perFx.some((x) => x.candidates.length)) return null;
 
-    const maxPossible = topOdds.reduce((acc, o) => acc * o, 1);
+  // Máximo alcanzable: producto del mejor odd por fixture (limitado a maxLegs)
+  const bestOdds = perFx
+    .map((x) => x.candidates[0]?._odd)
+    .filter((x) => x != null)
+    .sort((a, b) => b - a)
+    .slice(0, maxLegs);
 
-    // Si el target es alto, intentamos acercarnos con picks de mayor cuota. Si no alcanzamos, el caller puede ocultar ese target.
-    const effectiveTarget = Math.min(Number(target || 1), Number(cap || 100));
-
-    const used = new Set();
-    const chosen = [];
-    let product = 1;
-
-    // Greedy selection: prioritize higher odds but keep probability and avoid repeating the same market too much
-    const marketKeyOf = (c) => String(c?.market || c?.type || "").toLowerCase().trim();
-
-    while (chosen.length < maxLegs) {
-      let best = null;
-
-      for (const p of pools) {
-        if (used.has(p.fixtureId)) continue;
-
-        // Only look at top N candidates per fixture (keeps it fast)
-        const head = p.list.slice(0, headLocal);
-
-        for (const c of head) {
-          const odd = Number(c?.odd || 0);
-          const prob = Number(c?.prob || 0);
-          if (odd <= 1.01 || prob < minProbLocal) continue;
-
-          const newProduct = product * odd;
-
-          // Soft cap: don't massively exceed the cap; allow slight overshoot
-          if (Number.isFinite(cap) && cap > 0 && newProduct > cap * 1.08) continue;
-
-          const mk = marketKeyOf(c);
-          const repeats = mk
-            ? chosen.reduce((acc, x) => acc + (marketKeyOf(x) === mk ? 1 : 0), 0)
-            : 0;
-
-          // Score: odds (log) + prob (log) - penalty for repeats
-          const wOdd = t <= 5 ? 1.0 : t <= 10 ? 1.15 : t <= 20 ? 1.3 : 1.45;
-          const wProb = t <= 5 ? 0.65 : t <= 10 ? 0.55 : t <= 20 ? 0.45 : 0.35;
-          const score =
-            wOdd * Math.log(Math.max(odd, 1.0001)) +
-            wProb * Math.log(Math.max(prob, 0.0001)) -
-            repeats * 0.25;
-
-          if (!best || score > best.score) {
-            best = { ...c, fixtureId: p.fixtureId, score };
-          }
-        }
-      }
-
-      if (!best) break;
-
-      chosen.push(best);
-      used.add(best.fixtureId);
-      product *= Number(best.odd || 1);
-
-      // Stop when we are close enough to the effective target
-      if (product >= effectiveTarget * 0.98 && chosen.length >= 2) break;
-    }
-
-    if (chosen.length === 0) return null;
-
-    const impliedProb = chosen.reduce(
-      (acc, c) => acc * Math.max(0, Number(c?.prob || 0)),
-      1
-    );
-
-    return {
-      target,
-      cap,
-      games: chosen.length,
-      finalOdd: Number(product.toFixed(2)),
-      impliedProb: Number((impliedProb * 100).toFixed(1)),
-      reachedTarget: product >= Number(target || 1) * 0.98,
-      legs: chosen.map((c) => ({
-        fixtureId: c.fixtureId,
-        market: c.market || c.type,
-        label:
-          c.label ||
-          c.name ||
-          `${c.market || c.type || "Pick"} — ${c.fixtureLabel || ""}`.trim(),
-        odd: Number(c.odd || 0),
-        prob: Number(c.prob || 0),
-      })),
-    };
-  } catch (e) {
-    console.warn("[PARLAY] buildBoostedParlayLocal error", e);
+  const maxPossible = bestOdds.reduce((acc, o) => acc * o, 1);
+  if (maxPossible < Math.min(target * 0.98, cap * 0.98)) {
+    // No alcanza el target ni siquiera con los mejores odds
     return null;
   }
+
+  // Greedy: vamos agregando la mejor pieza que más acerque al target sin pasarnos absurdamente
+  let product = 1;
+  const usedFx = new Set();
+  const legs = [];
+
+  while (legs.length < maxLegs && product < target * 0.98) {
+    let best = null;
+
+    for (const fx of perFx) {
+      if (usedFx.has(fx.fxId)) continue;
+      if (!fx.candidates.length) continue;
+
+      // probamos top 5 de cada fixture (suficiente)
+      const top = fx.candidates.slice(0, 5);
+
+      for (const c of top) {
+        const next = product * c._odd;
+
+        // score: preferimos acercarnos al target; si lo sobrepasa un poco no importa
+        const dist = Math.abs(Math.log(target) - Math.log(next));
+        const probBonus = c._prob != null ? (c._prob - 0.5) : 0;
+        const pen = c._penalty ?? 1;
+        const score = -dist + probBonus * 0.35 - (1 - pen) * 0.8; // penaliza overs repetidos
+
+        if (!best || score > best.score) best = { c, score, next };
+      }
+    }
+
+    if (!best) break;
+    legs.push(best.c);
+    usedFx.add(best.c._fxId);
+    product = best.next;
+  }
+
+  if (!legs.length) return null;
+
+  const finalOdd = Number(product.toFixed(2));
+  const impliedProb = Number(((1 / finalOdd) * 100).toFixed(1));
+  const reachedTarget = finalOdd >= target * 0.98;
+
+  return {
+    target,
+    cap,
+    games: legs.length,
+    finalOdd,
+    impliedProb,
+    reachedTarget,
+    legs: legs.map((c) => ({
+      fixtureId: c._fxId,
+      label: c.label || c.pick || "Pick",
+      home: c.home,
+      away: c.away,
+      prob: c.prob,
+      fvOdd: c.fvOdd,
+      marketOdd: c.marketOdd,
+      usedOdd: c.usedOdd,
+      usedOddDisplay: c.usedOddDisplay ?? c.usedOdd ?? c.marketOdd ?? c.fvOdd,
+    })),
+  };
 }
 
 export default function Comparator() {
@@ -1467,25 +1459,6 @@ const ensureFvPack = useCallback(
       params.set("from", from);
       params.set("to", to);
 
-
-    // Guard: backend limita a 14 días por request
-    try {
-      const dFrom = new Date(from);
-      const dTo = new Date(to);
-      const diffDays = Math.floor((dTo - dFrom) / (24 * 60 * 60 * 1000)) + 1;
-      if (!Number.isFinite(diffDays) || diffDays <= 0) {
-        alert("Rango de fechas inválido. Revisa 'Desde' y 'Hasta'.");
-        setLoading(false);
-        return;
-      }
-      if (diffDays > 14) {
-        alert("Rango demasiado grande. Máximo 14 días por búsqueda.");
-        setLoading(false);
-        return;
-      }
-    } catch (e) {
-      // ignore
-    }
       // si hay un país seleccionado, tomamos el primero
       const country = (selectedCountries || []).filter(Boolean)[0];
       if (country) params.set("country", country);
@@ -1730,85 +1703,92 @@ const candidatesByFixtureSanitized = Object.fromEntries(
 const safe = pickSafe(candidatesByFixtureSanitized);
 const giftBundle = buildGiftPickBundle(candidatesByFixtureSanitized, 1.5, 3.0, 3);
 
-
-// UI handlers
-const handleGenerateAutoParlay = async () => {
-  await runGeneration({ mode: "auto" });
-};
-
-const handleGenerateSelectedParlay = async () => {
-  await runGeneration({ mode: "selected" });
-};
-
 // ===================== TARGETS + PARLAYS =====================
-const targets = [3, 5, 10, 20, 50, 100].filter((t) => t <= maxBoost);
-console.log("[PARLAY] targets =", targets);
 
+    const targets = [3, 5, 10, 20, 50, 100];
+    console.log("[PARLAY] targets =>", targets);
 
-// Build parlays for each target. We always return an entry per target so the UI can show
-// either the parlay or a helpful message (instead of silently hiding x5/x10/etc).
-const parlayResults = (() => {
-  const results = [];
-  let lastSignature = null;
-  let lastTargetShown = null;
+    const parlaysOut = targets
+      .map((target) => {
+        // 1) Intento "buildParlay" (si existe en fvModel) para llegar lo más cerca posible al target
+        try {
+          const r1 = buildParlay?.({
+            fixtures: candFixtures,
+            fvpackByFixture,
+            oddsByFixture,
+            maxLegs: 8,
+            maxBoost,
+            targetOdd: target,
+            minProb: 0.75,
+          });
 
-  for (const t of targets) {
-    const built = buildParlay({ candidates, target: t, cap: 100 });
-    if (!built) {
-      results.push({
-        target: t,
-        parlay: null,
-        note: "No se pudo generar (faltan candidatos o el target es muy agresivo para este rango).",
-      });
-      continue;
+          if (r1 && r1.picks?.length) {
+            console.log("[PARLAY] buildParlay target", target, "=>", {
+              finalOdd: r1.finalOdd,
+              impliedProb: r1.impliedProb,
+              games: r1.picks.length,
+            });
+            return { ...r1, target };
+          }
+        } catch (e) {
+          console.warn("[PARLAY] buildParlay error target", target, e);
+        }
+
+        // 2) Fallback local (si buildParlay no existe o no encontró)
+        try {
+          const r2 = buildBoostedParlayLocal({
+            fixtures: candFixtures,
+            maxLegs: 8,
+            maxBoost,
+            targetOdd: target,
+            minProb: 0.75,
+          });
+
+          if (r2 && r2.picks?.length) {
+            console.log("[PARLAY] localParlay target", target, "=>", {
+              finalOdd: r2.finalOdd,
+              impliedProb: r2.impliedProb,
+              games: r2.picks.length,
+            });
+            return { ...r2, target };
+          }
+        } catch (e) {
+          console.warn("[PARLAY] localParlay error target", target, e);
+        }
+
+        return null;
+      })
+      .filter(Boolean);
+
+    // De-dup por mismo set de partidos+mercado (si alguna salida repite exactamente lo mismo)
+    const seen = new Set();
+    const dedup = [];
+    for (const p of parlaysOut) {
+      const sig = (p.picks || [])
+        .map((x) => `${x.fixtureId}:${x.marketKey}:${x.selection}`)
+        .sort()
+        .join("|");
+      if (!sig || seen.has(sig)) continue;
+      seen.add(sig);
+      dedup.push(p);
     }
 
-    const signature = ((built.legs || built.picks) || [])
-      .map((p) => `${p.fixtureId}:${p.market || p.marketKey || p.selKey || ''}:${p.sel || p.selection || p.pick || ''}`)
-      .join("|");
+    // Mantener orden por target
+    dedup.sort((a, b) => (a.target ?? 0) - (b.target ?? 0));
 
-    // If this target yields the exact same set of picks as a previous one, we don't repeat the list.
-    if (signature && lastSignature && signature === lastSignature) {
-      results.push({
-        target: t,
-        parlay: null,
-        note: `Quedó igual a x${lastTargetShown} (mismos picks). Amplía el rango o agrega más ligas para diversificar.`,
-      });
-      continue;
-    }
+    setParlays(dedup);
 
-    lastSignature = signature;
-    lastTargetShown = t;
+    // Si quieres mostrar los "legs" en UI, los dejamos guardados, pero por defecto NO los renderizamos bajo los botones.
+    setParlayLegs(dedup?.[0]?.picks || []);
 
-    results.push({
-      target: t,
-      parlay: built,
-      note: null,
-    });
-  }
-
-  return results;
-})();
-
-const parlays = parlayResults.map((r) => (
-  r.parlay
-    ? { ...r.parlay, target: r.target }
-    : { target: r.target, legs: [], finalOdd: null, games: 0, reached: false, note: r.note }
-));
-
-const validParlays = parlays.filter((p) => (p.legs || []).length > 0);
-
-// Backward compatible: keep "parlays" for existing UI, but also keep "parlayResults"
-// so we can render placeholders for missing targets.
-
-// ===================== VALUE LIST (usar SANITIZED) =====================
+  // ===================== VALUE LIST (usar SANITIZED) =====================
 const valueList = buildValueList(candidatesByFixtureSanitized, 0.06);
 
 console.log("parlays:", parlays);
 console.log("valueList:", valueList?.length);
 
 // si no hay nada, cortamos con error claro
-if (!safe && !validParlays.length) {
+if (!safe && !parlays.length) {
   setParlayError("No pudimos armar picks con stats/odds disponibles. Prueba con otro rango o liga.");
   return;
 }
@@ -1819,14 +1799,13 @@ setFvOutput({
   safe,
   giftBundle,
   parlays,
-  parlayResults,
   valueList,
   candidatesByFixture: candidatesByFixtureSanitized
 });
 
 // panel principal muestra la primera potenciadas
 // toma la más cercana al target mayor disponible
-const best = validParlays
+const best = parlays
   .slice()
   .sort((a, b) => (b.finalOdd || 0) - (a.finalOdd || 0))[0];
 
@@ -1893,6 +1872,23 @@ const handleSelectedParlay = () => runGeneration("selected");
     setLoading(true);
 
     try {
+      // Backend limita a 14 días por request (para proteger cuota/API y performance)
+      try {
+        const MAX_DAYS = 14;
+        const f0 = new Date(`${from}T00:00:00`);
+        const t0 = new Date(`${to}T00:00:00`);
+        if (!isNaN(f0.getTime()) && !isNaN(t0.getTime())) {
+          const diff = Math.floor((t0 - f0) / 86400000) + 1; // inclusive
+          if (diff > MAX_DAYS) {
+            const t1 = new Date(f0);
+            t1.setDate(t1.getDate() + (MAX_DAYS - 1));
+            const toClamped = toYYYYMMDDLocal(t1);
+            setError(`Rango demasiado grande. Máximo ${MAX_DAYS} días por búsqueda. Ajusté "Hasta" a ${toClamped}.`);
+            setTo(toClamped);
+          }
+        }
+      } catch (_) {}
+
       const params = new URLSearchParams();
       params.set("from", from);
       params.set("to", to);
@@ -2202,27 +2198,62 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
         <FeatureCard title="Cuotas potenciadas" badge={`Hasta x${maxBoost}`} locked={!features.boosted}>
           <div className="text-xs text-slate-300">Arma una combinada automática o con partidos seleccionados.</div>
 
-          <div className="mt-3 space-y-2">
+          <div className="mt-3 flex flex-col sm:flex-row gap-2">
             <button
-              className="w-full rounded-full bg-fv-gold py-3 text-center font-semibold text-black transition hover:brightness-110 disabled:opacity-60"
-              onClick={handleGenerateAutoParlay}
-              disabled={loading || generatingAuto}
+              type="button"
+              onClick={handleAutoParlay}
+              className="px-4 py-2 rounded-full text-xs font-bold"
+              style={{ backgroundColor: GOLD, color: "#0f172a" }}
             >
-              {generatingAuto ? "Generando..." : "Generar combinada automática"}
+              Generar combinada automática
             </button>
 
             <button
-              className="w-full rounded-full bg-white/10 py-3 text-center font-semibold text-white transition hover:bg-white/15 disabled:opacity-60"
-              onClick={handleGenerateSelectedParlay}
-              disabled={selectedFixtures.length === 0 || generatingSelected}
+              type="button"
+              onClick={handleSelectedParlay}
+              className="px-4 py-2 rounded-full text-xs font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition"
             >
-              {generatingSelected
-                ? "Generando..."
-                : `Generar con seleccionados (${selectedFixtures.length})`}
+              Generar con seleccionados ({selectedCount})
             </button>
           </div>
 
-          {parlayError && <div className="mt-3 text-xs text-red-300">{parlayError}</div>}
+          {parlayError ? <div className="mt-3 text-xs text-amber-300">{parlayError}</div> : null}
+
+{parlayResult?.legs?.length ? (
+  <div className="mt-2 space-y-1">
+    {(parlayResult.legs || [])
+      .filter(
+        (l) =>
+          l &&
+          l.label &&
+          l.home &&
+          l.away &&
+          Number(toOdd(l.usedOddDisplay) ?? toOdd(l.usedOdd)) > 1
+      )
+      .map((leg, idx) => {
+        const oddNum = toOdd(leg.usedOddDisplay) ?? toOdd(leg.usedOdd);
+        const oddToShow = oddNum && oddNum > 1 ? oddNum : null;
+
+        return (
+          <div key={`${leg.fixtureId || "fx"}-${idx}`} className="text-[11px] text-slate-300">
+            <span className="text-slate-500">#{idx + 1}</span>{" "}
+            <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
+            <span className="text-slate-500">—</span>{" "}
+            {leg.home} vs {leg.away}{" "}
+            {oddToShow ? (
+              <>
+                <span className="text-slate-500">·</span>{" "}
+                <span className="text-amber-200 font-semibold">{oddToShow}</span>
+              </>
+            ) : null}
+          </div>
+        );
+      })}
+  </div>
+) : (
+  <div className="mt-3 text-[11px] text-slate-400">Genera una combinada para que aparezca aquí.</div>
+)}
+
         </FeatureCard>
 
         <FeatureCard title="Árbitros tarjeteros" badge="Tarjetas" locked={!canReferees} lockText="Disponible desde Plan Anual.">
@@ -2309,48 +2340,41 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 
           {fvOutput?.parlays?.length ? (
          <div className="mt-3 space-y-3">
-         {(fvOutput.parlayResults || []).map((r) => {
-                  const p = r.parlay;
-                  return (
-                    <div
-                      key={`parlay-${r.target}`}
-                      className="rounded-2xl p-4 bg-white/5 border border-white/10"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="text-white font-semibold">
-                          Potenciada x{r.target}
-                        </div>
-                        {p ? (
-                          <div className="text-white/80 text-sm">
-                            Final: <span className="text-[#E6C464] font-semibold">x{Number(p.finalOdd).toFixed(2)}</span> · Partidos:{" "}
-                            <span className="text-white/90">{p.games}</span>
-                          </div>
-                        ) : null}
-                      </div>
+         {fvOutput.parlays.map((p) => (
+         <div key={p.target} className="rounded-xl border border-white/10 bg-slate-950/30 p-3">
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-semibold text-slate-100">Potenciada x{p.target}</div>
+          <div className="text-xs text-slate-300">
+            Final: <span className="text-amber-200 font-semibold">x{p.finalOdd}</span>{" "}
+            · Partidos: {p.games}
+          </div>
+        </div>
 
-                      {!p ? (
-                        <div className="mt-2 text-white/70 text-sm">
-                          {r.note || "Sin parlay para este target."}
-                        </div>
-                      ) : (
-                        <div className="mt-3 space-y-1">
-                          {(p.legs || []).map((leg, i) => (
-                            <div key={i} className="text-white/90 text-sm flex gap-2">
-                              <span className="text-white/50">#{i + 1}</span>
-                              <span className="font-medium">
-                                {leg.label}
-                              </span>
-                              <span className="text-white/60">—</span>
-                              <span className="text-[#E6C464] font-semibold">
-                                {leg.odd}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+        <div className="mt-2 space-y-1">
+          {(p.legs || []).map((leg, idx) => {
+            const oddToShow =
+              (toOdd(leg.usedOddDisplay) ?? toOdd(leg.usedOdd)) > 1
+                ? (toOdd(leg.usedOddDisplay) ?? toOdd(leg.usedOdd))
+                : null;
+
+            return (
+              <div key={`${p.target}-${leg.fixtureId || idx}-${idx}`} className="text-[11px] text-slate-300">
+                <span className="text-slate-500">#{idx + 1}</span>{" "}
+                <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
+                <span className="text-slate-500">—</span>{" "}
+                {leg.home} vs {leg.away}{" "}
+                {oddToShow ? (
+                  <>
+                    <span className="text-slate-500">·</span>{" "}
+                    <span className="text-amber-200 font-semibold">{oddToShow}</span>
+                  </>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    ))}
   </div>
 ) : (
   <div className="mt-3 text-[11px] text-slate-400">Genera una combinada para que aparezca aquí.</div>
