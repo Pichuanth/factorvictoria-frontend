@@ -517,7 +517,7 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) 
   };
 }
 
-export function buildValueListexport function buildValueList(candidatesByFixture, minEdge = 0.06) {
+export function buildValueList(candidatesByFixture, minEdge = 0.06) {
   const all = Object.values(candidatesByFixture || {}).flat();
 
   const value = all
