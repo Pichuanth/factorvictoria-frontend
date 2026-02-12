@@ -70,32 +70,6 @@ function normStr(s) {
     .trim();
 }
 
-// Convierte una racha tipo "W-W-D-W-W" a algo entendible.
-// W = Ganado, D = Empate, L = Perdido
-function prettyForm(formStr) {
-  if (!formStr || typeof formStr !== "string") return "--";
-  const parts = formStr
-    .split(/\s*[-|\s]\s*/)
-    .filter(Boolean)
-    .slice(0, 5);
-  if (!parts.length) return "--";
-  const map = {
-    W: { short: "G", icon: "🟢", label: "Ganado" },
-    D: { short: "E", icon: "🟡", label: "Empate" },
-    L: { short: "P", icon: "🔴", label: "Perdido" },
-  };
-  return parts
-    .map((p) => {
-      const k = String(p || "").toUpperCase();
-      const m = map[k];
-      if (!m) return k;
-      return `${m.icon}${m.short}`;
-    })
-    .join(" ");
-}
-
-const FORM_LEGEND = "Leyenda: 🟢G=Ganado, 🟡E=Empate, 🔴P=Perdido";
-
 
 function includesNorm(haystack, needle) {
   return normStr(haystack).includes(normStr(needle));
@@ -122,60 +96,6 @@ function refereeLevel(avg) {
 function getRefereeName(fx) {
   return fx?.fixture?.referee || fx?.referee || "";
 }
-
-function getExpectedGoalsFromPack(pack) {
-  const model =
-    pack?.model ||
-    pack?.data?.model ||
-    pack?.stats?.model ||
-    pack?.payload?.model ||
-    null;
-
-  const num = (v) => {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
-  };
-
-  const home =
-    // Backend suele venir con PascalCase
-    num(model?.LambdaHome) ??
-    num(model?.lambdaHome) ??
-    num(model?.homeLambda) ??
-    num(model?.home_lambda) ??
-    num(model?.lambda_home) ??
-    num(model?.xgHome) ??
-    num(model?.homeXG) ??
-    num(model?.expectedHomeGoals) ??
-    num(model?.homeExpectedGoals);
-
-  const away =
-    num(model?.LambdaAway) ??
-    num(model?.lambdaAway) ??
-    num(model?.awayLambda) ??
-    num(model?.away_lambda) ??
-    num(model?.lambda_away) ??
-    num(model?.xgAway) ??
-    num(model?.awayXG) ??
-    num(model?.expectedAwayGoals) ??
-    num(model?.awayExpectedGoals);
-
-  const total =
-    num(model?.LambdaTotal) ??
-    num(model?.lambdaTotal) ??
-    num(model?.lambda_total) ??
-    num(model?.xgTotal) ??
-    num(model?.expectedGoalsTotal) ??
-    (home != null && away != null ? home + away : null);
-
-  if (home == null && away == null && total == null) return null;
-
-  return {
-    home,
-    away,
-    total,
-  };
-}
-
 
 /* ------------------- Helpers de fecha/hora (APP_TZ) ------------------- */
 function fixtureDateKey(f) {
@@ -890,20 +810,14 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
             ) : fvPack ? (
               <div className="text-[11px] text-slate-300 leading-relaxed">
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
-<div>
+                  <div>
   <span className="text-slate-400">Racha (últ.5) local:</span>{" "}
   <span className="text-slate-100 font-semibold">{last5?.home?.form || "--"}</span>
-  {last5?.home?.form ? (
-    <span className="ml-2 text-slate-300">({prettyForm(last5.home.form)})</span>
-  ) : null}
 </div>
 
 <div>
   <span className="text-slate-400">Racha (últ.5) visita:</span>{" "}
   <span className="text-slate-100 font-semibold">{last5?.away?.form || "--"}</span>
-  {last5?.away?.form ? (
-    <span className="ml-2 text-slate-300">({prettyForm(last5.away.form)})</span>
-  ) : null}
 </div>
 
 <div>
@@ -935,35 +849,22 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
                   <div>
   <span className="text-slate-400">Goles esperados (FV):</span>{" "}
   <span className="text-emerald-200 font-semibold">
-    {(() => {
-      const xg = getExpectedGoalsFromPack(fvPack);
-      if (!xg) return "--";
-
-      // si tenemos home/away, mostramos desglosado
-      if (xg.home != null && xg.away != null) {
-        const total = (xg.total != null ? xg.total : xg.home + xg.away);
-        return `${xg.home.toFixed(2)} + ${xg.away.toFixed(2)} = ${total.toFixed(2)}`;
-      }
-
-      // fallback a total
-      if (xg.total != null) return xg.total.toFixed(2);
-
-      return "--";
-    })()}
+    {(fvPack?.model?.lambdaTotal ?? "--")}
   </span>
 </div>
 
                 </div>
-                {(last5?.home?.form || last5?.away?.form) ? (
-                  <div className="mt-1 text-[10px] text-slate-400">{FORM_LEGEND}</div>
-                ) : null}
 
-                {/* fixtureId oculto (debug) */}
+                <div className="mt-2 text-slate-400">
+                  fixtureId: <span className="text-slate-200 font-semibold">{String(id)}</span>
+                </div>
               </div>
             ) : (
               <div className="text-[11px] text-slate-400">
                 Sin estadísticas aún (o no disponibles). Igual podemos estimar con heurísticas.
-                {/* fixtureId oculto (debug) */}
+                <div className="mt-2 text-slate-400">
+                  fixtureId: <span className="text-slate-200 font-semibold">{String(id)}</span>
+                </div>
               </div>
             )}
 
@@ -1073,15 +974,6 @@ function buildBoostedParlayLocal({ candidatesByFixture, target, cap, minProb = 0
   const fixtureIds = Object.keys(candidatesByFixture || {});
   if (!fixtureIds.length) return null;
 
-function localPenalty(label) {
-  const s = String(label || "").toLowerCase();
-  let p = 1;
-  if (s.includes("2.5") && (s.includes("over") || s.includes("under") || s.includes("goles"))) p *= 0.82;
-  if ((s.includes("over") || s.includes("under")) && !s.includes("1x") && !s.includes("x2")) p *= 0.92;
-  if (s.includes("btts") || s.includes("both teams") || s.includes("ambos")) p *= 0.95;
-  return p;
-}
-
   // Para cada fixture, nos quedamos con candidatos "usables" (odd>1 y prob decente)
   const perFx = fixtureIds.map((fxId) => {
     const arr = (candidatesByFixture[fxId] || [])
@@ -1099,11 +991,7 @@ function localPenalty(label) {
       })
       .filter((c) => c._odd != null && c._odd > 1.01)
       .filter((c) => c._prob == null || c._prob >= minProb)
-      .map((c) => {
-        const pen = localPenalty(c.label || c.pick);
-        return { ...c, _penalty: pen, _scoreOdd: (c._odd || 0) * pen };
-      })
-      .sort((a, b) => (b._scoreOdd || 0) - (a._scoreOdd || 0)); // prioriza odds (con penalización)
+      .sort((a, b) => (b._odd || 0) - (a._odd || 0)); // prioriza odds
 
     return { fxId, candidates: arr };
   });
@@ -1145,8 +1033,7 @@ function localPenalty(label) {
         // score: preferimos acercarnos al target; si lo sobrepasa un poco no importa
         const dist = Math.abs(Math.log(target) - Math.log(next));
         const probBonus = c._prob != null ? (c._prob - 0.5) : 0;
-        const pen = c._penalty ?? 1;
-        const score = -dist + probBonus * 0.35 - (1 - pen) * 0.8; // penaliza overs repetidos
+        const score = -dist + probBonus * 0.35; // ajustable
 
         if (!best || score > best.score) best = { c, score, next };
       }
@@ -1240,9 +1127,6 @@ export default function Comparator() {
 
   // combinadas
   const [parlayResult, setParlayResult] = useState(null);
-  // Parlay bundles (x3, x5, x10, x20, x50, x100)
-  const [parlays, setParlays] = useState([]);
-
   const [parlayError, setParlayError] = useState("");
   const [fvOutput, setFvOutput] = useState(null);
 
@@ -1425,14 +1309,6 @@ const ensureFvPack = useCallback(
       if (!res.ok) throw new Error(`fvpack ${res.status}`);
       const data = await res.json();
 
-      // DEBUG (una vez por fixture): keys del modelo para ajustar UI
-      if (!window.__fvpackModelKeysOnce) window.__fvpackModelKeysOnce = {};
-      if (!window.__fvpackModelKeysOnce[fixtureId]) {
-        window.__fvpackModelKeysOnce[fixtureId] = true;
-        const modelKeys = Object.keys((data?.model) || (data?.data?.model) || {});
-        console.log("[FVPACK model keys]", fixtureId, modelKeys);
-      }
-
       fvRef.current[fixtureId] = data;
       setFvPackByFixture((m) => ({ ...m, [fixtureId]: data }));
       return data;
@@ -1565,30 +1441,6 @@ const candidatesByFixture = {};
 function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
 function shrinkProb(p, k = 0.45) { return 0.5 + (p - 0.5) * k; } // k<1 baja confianza
 
-function pickPenalty(label) {
-  const s = String(label || "").toLowerCase();
-  let p = 1;
-
-  // penaliza "Over/Under 2.5" (muy repetido)
-  if (s.includes("2.5") && (s.includes("over") || s.includes("under") || s.includes("goles"))) p *= 0.82;
-
-  // penaliza totales en general (over/under) un poco
-  if ((s.includes("over") || s.includes("under")) && !s.includes("1x") && !s.includes("x2")) p *= 0.92;
-
-  // BTTS suele repetirse también
-  if (s.includes("btts") || s.includes("both teams") || s.includes("ambos")) p *= 0.95;
-
-  return p;
-}
-
-function probForRank(c) {
-  const base = Number(c?.prob);
-  const prob = Number.isFinite(base) ? base : 0.5;
-  const pen = pickPenalty(c?.label || c?.pick);
-  // reducimos prob solo para ranking (no para display)
-  return prob * pen;
-}
-
 for (const fx of pool) {
   const id = getFixtureId(fx);
   if (!id) continue;
@@ -1625,36 +1477,16 @@ for (const fx of pool) {
     // odd usada: mercado si existe; si no, FV
     const usedOddNum = marketOddNum ?? toOdd(c?.usedOdd) ?? fvOddNum;
 
-    const __penalty = pickPenalty(c?.label || c?.pick);
-
-    // Diversificación suave por tipo de pick (si no, se tiende a ir siempre a BTTS:NO)
-    const labelTxt = String(c?.label || c?.pick || "").toLowerCase();
-    const __typeWeight = labelTxt.includes("ambos") && labelTxt.includes("no")
-      ? 0.72
-      : labelTxt.includes("ambos") && (labelTxt.includes("sí") || labelTxt.includes("si"))
-        ? 0.85
-        : labelTxt.includes("under")
-          ? 0.9
-          : labelTxt.includes("over")
-            ? 0.85
-            : 1;
-
-    const __probRank = (probOk != null ? probOk : 0.5) * __penalty * __typeWeight;
-
     return {
       ...c,
       fvOdd: fvOddNum,
       marketOdd: marketOddNum ?? c?.marketOdd,
       usedOdd: usedOddNum,
       usedOddDisplay: usedOddNum,
-      __penalty,
-      __probRank,
     };
   });
 
-  // ordena por prob "rank" (penaliza overs repetidos + diversifica) para que buildParlay/pickSafe elijan mejor
-  const ranked = [...fixedCands].sort((a, b) => (b.__probRank || 0) - (a.__probRank || 0));
-  candidatesByFixture[id] = ranked;
+  candidatesByFixture[id] = fixedCands;
 }
 
 // ===================== DEBUG (DESPUÉS del loop) =====================
@@ -1707,81 +1539,29 @@ const safe = pickSafe(candidatesByFixtureSanitized);
 const giftBundle = buildGiftPickBundle(candidatesByFixtureSanitized, 1.5, 3.0, 3);
 
 // ===================== TARGETS + PARLAYS =====================
+const targets = [3, 5, 10, 20, 50, 100].filter((t) => t <= maxBoost);
+console.log("[PARLAY] targets =", targets);
 
-    const targets = [3, 5, 10, 20, 50, 100];
-    console.log("[PARLAY] targets =>", targets);
+const parlays = targets
+  .map((t) => {
+    const r1 = buildParlay({
+      candidatesByFixture: candidatesByFixtureSanitized,
+      target: t,
+      cap: maxBoost,
+    });
+    console.log("[PARLAY] buildParlay target", t, "=>", r1);
+    if (r1) return r1;
 
-    const parlaysOut = targets
-      .map((target) => {
-        // 1) Intento "buildParlay" (si existe en fvModel) para llegar lo más cerca posible al target
-        try {
-          const r1 = buildParlay?.({
-            fixtures: pool,
-            fvPackByFixture,
-            oddsByFixture,
-            maxLegs: 8,
-            maxBoost,
-            targetOdd: target,
-            minProb: 0.75,
-          });
+    const r2 = buildBoostedParlayLocal({
+      candidatesByFixture: candidatesByFixtureSanitized,
+      target: t,
+      cap: maxBoost,
+    });
+    console.log("[PARLAY] localParlay target", t, "=>", r2);
+    return r2; // ✅ clave: retornar r2
+  })
+  .filter(Boolean);
 
-          if (r1 && r1.picks?.length) {
-            console.log("[PARLAY] buildParlay target", target, "=>", {
-              finalOdd: r1.finalOdd,
-              impliedProb: r1.impliedProb,
-              games: r1.picks.length,
-            });
-            return { ...r1, target };
-          }
-        } catch (e) {
-          console.warn("[PARLAY] buildParlay error target", target, e);
-        }
-
-        // 2) Fallback local (si buildParlay no existe o no encontró)
-        try {
-          const r2 = buildBoostedParlayLocal({
-            fixtures: pool,
-            maxLegs: 8,
-            maxBoost,
-            targetOdd: target,
-            minProb: 0.75,
-          });
-
-          if (r2 && r2.picks?.length) {
-            console.log("[PARLAY] localParlay target", target, "=>", {
-              finalOdd: r2.finalOdd,
-              impliedProb: r2.impliedProb,
-              games: r2.picks.length,
-            });
-            return { ...r2, target };
-          }
-        } catch (e) {
-          console.warn("[PARLAY] localParlay error target", target, e);
-        }
-
-        return null;
-      })
-      .filter(Boolean);
-
-    // De-dup por mismo set de partidos+mercado (si alguna salida repite exactamente lo mismo)
-    const seen = new Set();
-    const dedup = [];
-    for (const p of parlaysOut) {
-      const sig = (p.picks || [])
-        .map((x) => `${x.fixtureId}:${x.marketKey}:${x.selection}`)
-        .sort()
-        .join("|");
-      if (!sig || seen.has(sig)) continue;
-      seen.add(sig);
-      dedup.push(p);
-    }
-
-    // Mantener orden por target
-    dedup.sort((a, b) => (a.target ?? 0) - (b.target ?? 0));
-
-    setParlays(dedup);
-
-    // Si quieres mostrar los "legs" en UI, los dejamos guardados, pero por defecto NO los renderizamos bajo los botones.
   // ===================== VALUE LIST (usar SANITIZED) =====================
 const valueList = buildValueList(candidatesByFixtureSanitized, 0.06);
 
@@ -1850,8 +1630,13 @@ const handleSelectedParlay = () => runGeneration("selected");
     const pool = fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)));
     pool.map(getFixtureId).filter(Boolean).forEach((id) => ensureOdds(id));
 
-    // Generación completa (cuota segura + potenciadas + value + etc.) con los seleccionados.
-    await runGeneration("selected");
+    const suggestion = buildComboSuggestion(pool, maxBoost);
+    if (!suggestion) {
+      setParlayError("Con esta combinación no pudimos llegar a una cuota interesante. Prueba agregando más partidos.");
+      return;
+    }
+
+    setParlayResult({ mode: "selected", ...suggestion });
   }
 
   async function handleLoadFixtures(e) {
@@ -1873,23 +1658,6 @@ const handleSelectedParlay = () => runGeneration("selected");
     setLoading(true);
 
     try {
-      // Backend limita a 14 días por request (para proteger cuota/API y performance)
-      try {
-        const MAX_DAYS = 14;
-        const f0 = new Date(`${from}T00:00:00`);
-        const t0 = new Date(`${to}T00:00:00`);
-        if (!isNaN(f0.getTime()) && !isNaN(t0.getTime())) {
-          const diff = Math.floor((t0 - f0) / 86400000) + 1; // inclusive
-          if (diff > MAX_DAYS) {
-            const t1 = new Date(f0);
-            t1.setDate(t1.getDate() + (MAX_DAYS - 1));
-            const toClamped = toYYYYMMDDLocal(t1);
-            setError(`Rango demasiado grande. Máximo ${MAX_DAYS} días por búsqueda. Ajusté "Hasta" a ${toClamped}.`);
-            setTo(toClamped);
-          }
-        }
-      } catch (_) {}
-
       const params = new URLSearchParams();
       params.set("from", from);
       params.set("to", to);
@@ -2220,7 +1988,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 
           {parlayError ? <div className="mt-3 text-xs text-amber-300">{parlayError}</div> : null}
 
-{false && parlayResult?.legs?.length ? (
+{parlayResult?.legs?.length ? (
   <div className="mt-2 space-y-1">
     {(parlayResult.legs || [])
       .filter(
@@ -2276,59 +2044,10 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
     Aún sin ranking (fixturesScanned: {refData?.fixturesScanned ?? 0}). Endpoint OK.
   </div>
 )}
-
 </FeatureCard>
 
         <FeatureCard
-          title="Desfase del mercado"
-          badge="Value"
-          locked={!features.marketValue}
-          lockText="Disponible desde Plan Vitalicio."
-        >
-          <div className="text-xs text-slate-300">
-            Picks con posible valor (cuando tu estimación FV sugiere que el mercado está pagando “de más”).
-          </div>
-
-          {fvOutput?.valueList?.length ? (
-            <div className="mt-3 space-y-2">
-              {fvOutput.valueList.slice(0, 8).map((v, idx) => (
-                <div
-                  key={`${v.fixtureId || "fx"}-${v.label || v.pick || idx}-${idx}`}
-                  className="rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2"
-                >
-                  <div className="text-[11px] text-slate-300">
-                    <span className="text-slate-500">#{idx + 1}</span>{" "}
-                    <span className="text-slate-100 font-semibold">{v.label || v.pick}</span>
-                    {v.home && v.away ? (
-                      <>
-                        {" "}
-                        <span className="text-slate-500">—</span> {v.home} vs {v.away}
-                      </>
-                    ) : null}
-                  </div>
-
-                  <div className="mt-1 text-[11px] text-slate-300">
-                    FV: <span className="text-emerald-200 font-semibold">x{toOdd(v.fvOdd) ?? v.fvOdd}</span>{" "}
-                    <span className="text-slate-500">·</span>{" "}
-                    Mercado: <span className="text-amber-200 font-semibold">x{toOdd(v.marketOdd) ?? v.marketOdd}</span>{" "}
-                    {v.valueEdge != null ? (
-                      <>
-                        <span className="text-slate-500">·</span>{" "}
-                        Value: <span className="text-emerald-200 font-semibold">+{Math.round(Number(v.valueEdge) * 100)}%</span>
-                      </>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="mt-3 text-[11px] text-slate-400">Genera una combinada para calcular value.</div>
-          )}
-        </FeatureCard>
-
-        <FeatureCard
           title="Goleadores / Remates / Value"
-
           badge="VIP"
           locked={!(features.scorersValue || features.marketValue)}
           lockText="Disponible en planes superiores (Anual/Vitalicio)."
@@ -2336,8 +2055,8 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
           <div className="text-xs text-slate-300">Aquí reactivaremos los módulos avanzados (goleadores, remates, value del mercado).</div>
         </FeatureCard>
 
-        <FeatureCard title="Parlays potenciados" badge="Parlays" locked={!features.boosted} lockText="Disponible en todos los planes.">
-          <div className="text-xs text-slate-300">Aquí verás los parlays potenciados que genera el modelo (x3, x5, x10, x20, etc.).</div>
+        <FeatureCard title="Cuota desfase del mercado" badge="Value" locked={!features.marketValue} lockText="Disponible desde Plan Vitalicio.">
+          <div className="text-xs text-slate-300">Detecta cuotas con posible valor (desfase entre tu estimación y el mercado).</div>
 
           {fvOutput?.parlays?.length ? (
          <div className="mt-3 space-y-3">
