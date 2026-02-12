@@ -1717,7 +1717,7 @@ const giftBundle = buildGiftPickBundle(candidatesByFixtureSanitized, 1.5, 3.0, 3
         try {
           const r1 = buildParlay?.({
             fixtures: pool,
-            fvpackByFixture,
+            fvPackByFixture,
             oddsByFixture,
             maxLegs: 8,
             maxBoost,
@@ -2220,7 +2220,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 
           {parlayError ? <div className="mt-3 text-xs text-amber-300">{parlayError}</div> : null}
 
-{parlayResult?.legs?.length ? (
+{false && parlayResult?.legs?.length ? (
   <div className="mt-2 space-y-1">
     {(parlayResult.legs || [])
       .filter(
