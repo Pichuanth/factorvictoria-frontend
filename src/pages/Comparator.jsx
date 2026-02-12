@@ -94,7 +94,7 @@ function prettyForm(formStr) {
     .join(" ");
 }
 
-const FORM_LEGEND = "Leyenda: 🟢G=Ganado, 🟡E=Empate, 🔴P=Perdido";
+const FORM_LEGEND = "🟢 G=Ganado, 🟡 E=Empate, 🔴 P=Perdido";
 
 
 function includesNorm(haystack, needle) {
@@ -741,7 +741,7 @@ function VisitorPlansGrid() {
         title="Plan Mensual"
         price="$19.990 · x10"
         href="/#plan-mensual"
-        bullets={["Cuotas potenciadas hasta x10", "Cuota segura (regalo)", "Acceso a herramientas base"]}
+        bullets={["Cuotas potenciadas hasta x10", "Cuota de regalo", "Acceso a herramientas base"]}
       />
       <LockedPlanCard
         title="Plan Trimestral"
@@ -2116,9 +2116,11 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 
       {/* 4) MÓDULOS premium */}
       <section className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-        <FeatureCard title="Cuota segura (regalo)" badge="Alta probabilidad" locked={!features.giftPick}>
+        <FeatureCard title="Cuota de regalo" badge="Alta probabilidad" locked={!features.giftPick}>
           <div className="text-xs text-slate-300">
-  Pick con mayor probabilidad (FV). Si hay cuota de mercado, la mostramos; si no, usamos FV.
+  Pick con mayor probabilidad. Prioriza partidos con estadísticas completas de ambos equipos.
+  Si uno no presenta datos, el porcentaje de acierto se reduce en un 70%. Recarga la página o vuelve a generar para un análisis óptimo.
+  Consulta siempre los datos en la parte superior.
 </div>
 
 {fvOutput?.safe ? (
