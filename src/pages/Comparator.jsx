@@ -1467,6 +1467,25 @@ const ensureFvPack = useCallback(
       params.set("from", from);
       params.set("to", to);
 
+
+    // Guard: backend limita a 14 días por request
+    try {
+      const dFrom = new Date(from);
+      const dTo = new Date(to);
+      const diffDays = Math.floor((dTo - dFrom) / (24 * 60 * 60 * 1000)) + 1;
+      if (!Number.isFinite(diffDays) || diffDays <= 0) {
+        alert("Rango de fechas inválido. Revisa 'Desde' y 'Hasta'.");
+        setLoading(false);
+        return;
+      }
+      if (diffDays > 14) {
+        alert("Rango demasiado grande. Máximo 14 días por búsqueda.");
+        setLoading(false);
+        return;
+      }
+    } catch (e) {
+      // ignore
+    }
       // si hay un país seleccionado, tomamos el primero
       const country = (selectedCountries || []).filter(Boolean)[0];
       if (country) params.set("country", country);
@@ -1771,9 +1790,13 @@ const parlayResults = (() => {
   return results;
 })();
 
-const parlays = parlayResults
-  .filter((r) => r.parlay)
-  .map((r) => ({ ...r.parlay, target: r.target }));
+const parlays = parlayResults.map((r) => (
+  r.parlay
+    ? { ...r.parlay, target: r.target }
+    : { target: r.target, legs: [], finalOdd: null, games: 0, reached: false, note: r.note }
+));
+
+const validParlays = parlays.filter((p) => (p.legs || []).length > 0);
 
 // Backward compatible: keep "parlays" for existing UI, but also keep "parlayResults"
 // so we can render placeholders for missing targets.
@@ -1785,7 +1808,7 @@ console.log("parlays:", parlays);
 console.log("valueList:", valueList?.length);
 
 // si no hay nada, cortamos con error claro
-if (!safe && !parlays.length) {
+if (!safe && !validParlays.length) {
   setParlayError("No pudimos armar picks con stats/odds disponibles. Prueba con otro rango o liga.");
   return;
 }
@@ -1803,7 +1826,7 @@ setFvOutput({
 
 // panel principal muestra la primera potenciadas
 // toma la más cercana al target mayor disponible
-const best = parlays
+const best = validParlays
   .slice()
   .sort((a, b) => (b.finalOdd || 0) - (a.finalOdd || 0))[0];
 
@@ -1829,9 +1852,6 @@ if (best) setParlayResult({ mode, ...best });
 
 const handleAutoParlay = () => runGeneration("auto");
 const handleSelectedParlay = () => runGeneration("selected");
-// Aliases used by older UI handlers / builds
-const handleGenerateAutoParlay = handleAutoParlay;
-const handleGenerateSelectedParlay = handleSelectedParlay;
 
     async function handleGenerate() {
     setParlayError("");
@@ -2186,7 +2206,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
             <button
               className="w-full rounded-full bg-fv-gold py-3 text-center font-semibold text-black transition hover:brightness-110 disabled:opacity-60"
               onClick={handleGenerateAutoParlay}
-              disabled={loadingFixtures || generatingAuto}
+              disabled={loading || generatingAuto}
             >
               {generatingAuto ? "Generando..." : "Generar combinada automática"}
             </button>
