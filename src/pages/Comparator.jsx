@@ -70,32 +70,6 @@ function normStr(s) {
     .trim();
 }
 
-// Convierte una racha tipo "W-W-D-W-W" a algo entendible.
-// W = Ganado, D = Empate, L = Perdido
-function prettyForm(formStr) {
-  if (!formStr || typeof formStr !== "string") return "--";
-  const parts = formStr
-    .split(/\s*[-|\s]\s*/)
-    .filter(Boolean)
-    .slice(0, 5);
-  if (!parts.length) return "--";
-  const map = {
-    W: { short: "G", icon: "🟢", label: "Ganado" },
-    D: { short: "E", icon: "🟡", label: "Empate" },
-    L: { short: "P", icon: "🔴", label: "Perdido" },
-  };
-  return parts
-    .map((p) => {
-      const k = String(p || "").toUpperCase();
-      const m = map[k];
-      if (!m) return k;
-      return `${m.icon}${m.short}`;
-    })
-    .join(" ");
-}
-
-const FORM_LEGEND = "Leyenda: 🟢G=Ganado, 🟡E=Empate, 🔴P=Perdido";
-
 
 function includesNorm(haystack, needle) {
   return normStr(haystack).includes(normStr(needle));
@@ -890,20 +864,14 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
             ) : fvPack ? (
               <div className="text-[11px] text-slate-300 leading-relaxed">
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
-<div>
+                  <div>
   <span className="text-slate-400">Racha (últ.5) local:</span>{" "}
   <span className="text-slate-100 font-semibold">{last5?.home?.form || "--"}</span>
-  {last5?.home?.form ? (
-    <span className="ml-2 text-slate-300">({prettyForm(last5.home.form)})</span>
-  ) : null}
 </div>
 
 <div>
   <span className="text-slate-400">Racha (últ.5) visita:</span>{" "}
   <span className="text-slate-100 font-semibold">{last5?.away?.form || "--"}</span>
-  {last5?.away?.form ? (
-    <span className="ml-2 text-slate-300">({prettyForm(last5.away.form)})</span>
-  ) : null}
 </div>
 
 <div>
@@ -954,9 +922,6 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
 </div>
 
                 </div>
-                {(last5?.home?.form || last5?.away?.form) ? (
-                  <div className="mt-1 text-[10px] text-slate-400">{FORM_LEGEND}</div>
-                ) : null}
 
                 {/* fixtureId oculto (debug) */}
               </div>
@@ -1069,121 +1034,120 @@ function ManualPicksSection() {
     </section>
   );
 }
-function buildBoostedParlayLocal({
-  candidatesByFixture,
-  target,
-  cap = 100,
-  minProb = 0.70,
-  maxLegs = 7,
-}) {
-  try {
-    if (!candidatesByFixture || typeof candidatesByFixture !== "object") return null;
+function buildBoostedParlayLocal({ candidatesByFixture, target, cap, minProb = 0.52, maxLegs = 12 }) {
+  const fixtureIds = Object.keys(candidatesByFixture || {});
+  if (!fixtureIds.length) return null;
 
-    // Build pools per fixture (filter low-prob / invalid odds)
-    const pools = Object.keys(candidatesByFixture)
-      .map((fixtureId) => {
-        const list = (candidatesByFixture[fixtureId] || [])
-          .filter((c) => Number(c?.odd || 0) > 1.01 && Number(c?.prob || 0) >= minProb)
-          .sort((a, b) => (b?.odd || 0) - (a?.odd || 0));
-        return { fixtureId, list };
+function localPenalty(label) {
+  const s = String(label || "").toLowerCase();
+  let p = 1;
+  if (s.includes("2.5") && (s.includes("over") || s.includes("under") || s.includes("goles"))) p *= 0.82;
+  if ((s.includes("over") || s.includes("under")) && !s.includes("1x") && !s.includes("x2")) p *= 0.92;
+  if (s.includes("btts") || s.includes("both teams") || s.includes("ambos")) p *= 0.95;
+  return p;
+}
+
+  // Para cada fixture, nos quedamos con candidatos "usables" (odd>1 y prob decente)
+  const perFx = fixtureIds.map((fxId) => {
+    const arr = (candidatesByFixture[fxId] || [])
+      .map((c) => {
+        const odd =
+          toOdd(c.usedOddDisplay) ??
+          toOdd(c.usedOdd) ??
+          toOdd(c.marketOdd) ??
+          toOdd(c.fvOdd);
+
+        const prob = Number(c?.prob);
+        const probOk = Number.isFinite(prob) ? prob : null;
+
+        return { ...c, _fxId: fxId, _odd: odd, _prob: probOk };
       })
-      .filter((p) => p.list.length > 0);
+      .filter((c) => c._odd != null && c._odd > 1.01)
+      .filter((c) => c._prob == null || c._prob >= minProb)
+      .map((c) => {
+        const pen = localPenalty(c.label || c.pick);
+        return { ...c, _penalty: pen, _scoreOdd: (c._odd || 0) * pen };
+      })
+      .sort((a, b) => (b._scoreOdd || 0) - (a._scoreOdd || 0)); // prioriza odds (con penalización)
 
-    if (pools.length === 0) return null;
+    return { fxId, candidates: arr };
+  });
 
-    // Theoretical max we can get with distinct fixtures
-    const topOdds = pools
-      .map((p) => Number(p.list[0].odd || 1))
-      .sort((a, b) => b - a)
-      .slice(0, maxLegs);
+  // Si no hay candidatos usables, no se puede
+  if (!perFx.some((x) => x.candidates.length)) return null;
 
-    const maxPossible = topOdds.reduce((acc, o) => acc * o, 1);
+  // Máximo alcanzable: producto del mejor odd por fixture (limitado a maxLegs)
+  const bestOdds = perFx
+    .map((x) => x.candidates[0]?._odd)
+    .filter((x) => x != null)
+    .sort((a, b) => b - a)
+    .slice(0, maxLegs);
 
-    // If the target is unreachable, we still build the best parlay we can (so UI can render x5/x10/x20/etc.)
-    const effectiveTarget = Math.min(Number(target || 1), Number(cap || 100), maxPossible);
-
-    const used = new Set();
-    const chosen = [];
-    let product = 1;
-
-    // Greedy selection: prioritize higher odds but keep probability and avoid repeating the same market too much
-    const marketKeyOf = (c) => String(c?.market || c?.type || "").toLowerCase().trim();
-
-    while (chosen.length < maxLegs) {
-      let best = null;
-
-      for (const p of pools) {
-        if (used.has(p.fixtureId)) continue;
-
-        // Only look at top N candidates per fixture (keeps it fast)
-        const head = p.list.slice(0, 6);
-
-        for (const c of head) {
-          const odd = Number(c?.odd || 0);
-          const prob = Number(c?.prob || 0);
-          if (odd <= 1.01 || prob < minProb) continue;
-
-          const newProduct = product * odd;
-
-          // Soft cap: don't massively exceed the cap; allow slight overshoot
-          if (Number.isFinite(cap) && cap > 0 && newProduct > cap * 1.08) continue;
-
-          const mk = marketKeyOf(c);
-          const repeats = mk
-            ? chosen.reduce((acc, x) => acc + (marketKeyOf(x) === mk ? 1 : 0), 0)
-            : 0;
-
-          // Score: odds (log) + prob (log) - penalty for repeats
-          const score =
-            Math.log(Math.max(odd, 1.0001)) +
-            0.65 * Math.log(Math.max(prob, 0.0001)) -
-            repeats * 0.25;
-
-          if (!best || score > best.score) {
-            best = { ...c, fixtureId: p.fixtureId, score };
-          }
-        }
-      }
-
-      if (!best) break;
-
-      chosen.push(best);
-      used.add(best.fixtureId);
-      product *= Number(best.odd || 1);
-
-      // Stop when we are close enough to the effective target
-      if (product >= effectiveTarget * 0.98 && chosen.length >= 2) break;
-    }
-
-    if (chosen.length === 0) return null;
-
-    const impliedProb = chosen.reduce(
-      (acc, c) => acc * Math.max(0, Number(c?.prob || 0)),
-      1
-    );
-
-    return {
-      target,
-      cap,
-      games: chosen.length,
-      finalOdd: Number(product.toFixed(2)),
-      impliedProb: Number((impliedProb * 100).toFixed(1)),
-      reachedTarget: product >= Number(target || 1) * 0.98,
-      legs: chosen.map((c) => ({
-        fixtureId: c.fixtureId,
-        market: c.market || c.type,
-        label:
-          c.label ||
-          c.name ||
-          `${c.market || c.type || "Pick"} — ${c.fixtureLabel || ""}`.trim(),
-        odd: Number(c.odd || 0),
-        prob: Number(c.prob || 0),
-      })),
-    };
-  } catch (e) {
-    console.warn("[PARLAY] buildBoostedParlayLocal error", e);
+  const maxPossible = bestOdds.reduce((acc, o) => acc * o, 1);
+  if (maxPossible < Math.min(target * 0.98, cap * 0.98)) {
+    // No alcanza el target ni siquiera con los mejores odds
     return null;
   }
+
+  // Greedy: vamos agregando la mejor pieza que más acerque al target sin pasarnos absurdamente
+  let product = 1;
+  const usedFx = new Set();
+  const legs = [];
+
+  while (legs.length < maxLegs && product < target * 0.98) {
+    let best = null;
+
+    for (const fx of perFx) {
+      if (usedFx.has(fx.fxId)) continue;
+      if (!fx.candidates.length) continue;
+
+      // probamos top 5 de cada fixture (suficiente)
+      const top = fx.candidates.slice(0, 5);
+
+      for (const c of top) {
+        const next = product * c._odd;
+
+        // score: preferimos acercarnos al target; si lo sobrepasa un poco no importa
+        const dist = Math.abs(Math.log(target) - Math.log(next));
+        const probBonus = c._prob != null ? (c._prob - 0.5) : 0;
+        const pen = c._penalty ?? 1;
+        const score = -dist + probBonus * 0.35 - (1 - pen) * 0.8; // penaliza overs repetidos
+
+        if (!best || score > best.score) best = { c, score, next };
+      }
+    }
+
+    if (!best) break;
+    legs.push(best.c);
+    usedFx.add(best.c._fxId);
+    product = best.next;
+  }
+
+  if (!legs.length) return null;
+
+  const finalOdd = Number(product.toFixed(2));
+  const impliedProb = Number(((1 / finalOdd) * 100).toFixed(1));
+  const reachedTarget = finalOdd >= target * 0.98;
+
+  return {
+    target,
+    cap,
+    games: legs.length,
+    finalOdd,
+    impliedProb,
+    reachedTarget,
+    legs: legs.map((c) => ({
+      fixtureId: c._fxId,
+      label: c.label || c.pick || "Pick",
+      home: c.home,
+      away: c.away,
+      prob: c.prob,
+      fvOdd: c.fvOdd,
+      marketOdd: c.marketOdd,
+      usedOdd: c.usedOdd,
+      usedOddDisplay: c.usedOddDisplay ?? c.usedOdd ?? c.marketOdd ?? c.fvOdd,
+    })),
+  };
 }
 
 export default function Comparator() {
@@ -1624,20 +1588,7 @@ for (const fx of pool) {
     const usedOddNum = marketOddNum ?? toOdd(c?.usedOdd) ?? fvOddNum;
 
     const __penalty = pickPenalty(c?.label || c?.pick);
-
-    // Diversificación suave por tipo de pick (si no, se tiende a ir siempre a BTTS:NO)
-    const labelTxt = String(c?.label || c?.pick || "").toLowerCase();
-    const __typeWeight = labelTxt.includes("ambos") && labelTxt.includes("no")
-      ? 0.72
-      : labelTxt.includes("ambos") && (labelTxt.includes("sí") || labelTxt.includes("si"))
-        ? 0.85
-        : labelTxt.includes("under")
-          ? 0.9
-          : labelTxt.includes("over")
-            ? 0.85
-            : 1;
-
-    const __probRank = (probOk != null ? probOk : 0.5) * __penalty * __typeWeight;
+    const __probRank = (probOk != null ? probOk : 0.5) * __penalty;
 
     return {
       ...c,
@@ -1650,7 +1601,7 @@ for (const fx of pool) {
     };
   });
 
-  // ordena por prob "rank" (penaliza overs repetidos + diversifica) para que buildParlay/pickSafe elijan mejor
+  // ordena por prob "rank" (penaliza overs repetidos) para que buildParlay/pickSafe elijan mejor
   const ranked = [...fixedCands].sort((a, b) => (b.__probRank || 0) - (a.__probRank || 0));
   candidatesByFixture[id] = ranked;
 }
@@ -1724,23 +1675,9 @@ const parlays = targets
       cap: maxBoost,
     });
     console.log("[PARLAY] localParlay target", t, "=>", r2);
-    // Evita mostrar targets altos si la combinada queda muy lejos (esto generaba x20/x50/x100 idénticos)
-    if (!r2 || !Number.isFinite(r2.finalOdd)) return null;
-    const ratio = (r2.finalOdd || 0) / (t || 1);
-
-    // Margen por target: evitamos que "x50" termine mostrando una combinada tipo "x10",
-    // pero permitimos cierta holgura para que aparezcan x5/x10/x20 con datasets cortos.
-    const minRatio = t >= 50 ? 0.45 : 0.6;
-    const maxRatio = 1.6;
-    if (ratio < minRatio || ratio > maxRatio) return null;
-    return r2;
+    return r2; // ✅ clave: retornar r2
   })
-  .filter(Boolean)
-  // Evita duplicados exactos entre targets
-  .filter((p, idx, arr) => {
-    const sig = (p.picks || []).map((x) => `${x.fixtureId}:${x.marketKey || x.key || x.label || ""}`).join("|");
-    return arr.findIndex((q) => (q.picks || []).map((x) => `${x.fixtureId}:${x.marketKey || x.key || x.label || ""}`).join("|") === sig) === idx;
-  });
+  .filter(Boolean);
 
   // ===================== VALUE LIST (usar SANITIZED) =====================
 const valueList = buildValueList(candidatesByFixtureSanitized, 0.06);
@@ -1810,8 +1747,13 @@ const handleSelectedParlay = () => runGeneration("selected");
     const pool = fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)));
     pool.map(getFixtureId).filter(Boolean).forEach((id) => ensureOdds(id));
 
-    // Generación completa (cuota segura + potenciadas + value + etc.) con los seleccionados.
-    await runGeneration("selected");
+    const suggestion = buildComboSuggestion(pool, maxBoost);
+    if (!suggestion) {
+      setParlayError("Con esta combinación no pudimos llegar a una cuota interesante. Prueba agregando más partidos.");
+      return;
+    }
+
+    setParlayResult({ mode: "selected", ...suggestion });
   }
 
   async function handleLoadFixtures(e) {
@@ -2163,6 +2105,33 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 
           {parlayError ? <div className="mt-3 text-xs text-amber-300">{parlayError}</div> : null}
 
+{parlayResult?.legs?.length ? (
+  <div className="mt-2 space-y-1">
+    {(parlayResult.legs || [])
+      .filter(
+        (l) =>
+          l &&
+          l.label &&
+          l.home &&
+          l.away &&
+          Number(toOdd(l.usedOddDisplay) ?? toOdd(l.usedOdd)) > 1
+      )
+      .map((leg, idx) => {
+        const oddNum = toOdd(leg.usedOddDisplay) ?? toOdd(leg.usedOdd);
+        const oddToShow = oddNum && oddNum > 1 ? oddNum : null;
+
+        return (
+          <div key={`${leg.fixtureId || "fx"}-${idx}`} className="text-[11px] text-slate-300">
+            <span className="text-slate-500">#{idx + 1}</span>{" "}
+            <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
+            <span className="text-slate-500">—</span>{" "}
+            {leg.home} vs {leg.away}{" "}
+            {oddToShow ? (
+              <>
+                <span className="text-slate-500">·</span>{" "}
+                <span className="text-amber-200 font-semibold">{oddToShow}</span>
+              </>
+            ) : null}
           </div>
         );
       })}
