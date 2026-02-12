@@ -1079,16 +1079,11 @@ function buildBoostedParlayLocal({
   try {
     if (!candidatesByFixture || typeof candidatesByFixture !== "object") return null;
 
-    const t = Number(target || 1);
-    // Target alto => aceptamos picks con menor probabilidad (más cuota) para poder llegar a x10/x20/x50
-    const minProbLocal = t <= 5 ? Math.max(minProb, 0.70) : t <= 10 ? Math.min(minProb, 0.62) : t <= 20 ? Math.min(minProb, 0.55) : Math.min(minProb, 0.50);
-    const headLocal = t <= 5 ? 6 : t <= 10 ? 8 : t <= 20 ? 10 : 12;
-
     // Build pools per fixture (filter low-prob / invalid odds)
     const pools = Object.keys(candidatesByFixture)
       .map((fixtureId) => {
         const list = (candidatesByFixture[fixtureId] || [])
-          .filter((c) => Number(c?.odd || 0) > 1.01 && Number(c?.prob || 0) >= minProbLocal)
+          .filter((c) => Number(c?.odd || 0) > 1.01 && Number(c?.prob || 0) >= minProb)
           .sort((a, b) => (b?.odd || 0) - (a?.odd || 0));
         return { fixtureId, list };
       })
@@ -1100,12 +1095,12 @@ function buildBoostedParlayLocal({
     const topOdds = pools
       .map((p) => Number(p.list[0].odd || 1))
       .sort((a, b) => b - a)
-      .slice(0, Math.min(maxLegs, headLocal, pools.length));
+      .slice(0, maxLegs);
 
     const maxPossible = topOdds.reduce((acc, o) => acc * o, 1);
 
-    // Si el target es alto, intentamos acercarnos con picks de mayor cuota. Si no alcanzamos, el caller puede ocultar ese target.
-    const effectiveTarget = Math.min(Number(target || 1), Number(cap || 100));
+    // If the target is unreachable, we still build the best parlay we can (so UI can render x5/x10/x20/etc.)
+    const effectiveTarget = Math.min(Number(target || 1), Number(cap || 100), maxPossible);
 
     const used = new Set();
     const chosen = [];
@@ -1121,12 +1116,12 @@ function buildBoostedParlayLocal({
         if (used.has(p.fixtureId)) continue;
 
         // Only look at top N candidates per fixture (keeps it fast)
-        const head = p.list.slice(0, headLocal);
+        const head = p.list.slice(0, 6);
 
         for (const c of head) {
           const odd = Number(c?.odd || 0);
           const prob = Number(c?.prob || 0);
-          if (odd <= 1.01 || prob < minProbLocal) continue;
+          if (odd <= 1.01 || prob < minProb) continue;
 
           const newProduct = product * odd;
 
@@ -1139,11 +1134,9 @@ function buildBoostedParlayLocal({
             : 0;
 
           // Score: odds (log) + prob (log) - penalty for repeats
-          const wOdd = t <= 5 ? 1.0 : t <= 10 ? 1.15 : t <= 20 ? 1.3 : 1.45;
-          const wProb = t <= 5 ? 0.65 : t <= 10 ? 0.55 : t <= 20 ? 0.45 : 0.35;
           const score =
-            wOdd * Math.log(Math.max(odd, 1.0001)) +
-            wProb * Math.log(Math.max(prob, 0.0001)) -
+            Math.log(Math.max(odd, 1.0001)) +
+            0.65 * Math.log(Math.max(prob, 0.0001)) -
             repeats * 0.25;
 
           if (!best || score > best.score) {
@@ -1743,46 +1736,11 @@ const parlays = targets
     return r2;
   })
   .filter(Boolean)
-  // Evita duplicados exactos entre targets, pero elige el target más razonable para esos mismos legs.
-  .reduce((acc, p) => {
-    const sig = (p.picks || [])
-      .map((x) => `${x.fixtureId}:${x.marketKey || x.key || x.label || ""}`)
-      .join("|");
-
-    const idx = acc.findIndex((q) =>
-      (q.picks || [])
-        .map((x) => `${x.fixtureId}:${x.marketKey || x.key || x.label || ""}`)
-        .join("|") === sig
-    );
-
-    if (idx === -1) {
-      acc.push(p);
-      return acc;
-    }
-
-    const cur = acc[idx];
-    const curOdd = Number(cur.finalOdd || 0);
-    const newOdd = Number(p.finalOdd || 0);
-
-    // Preferimos el que tenga finalOdd más alto.
-    if (newOdd > curOdd + 1e-9) {
-      acc[idx] = p;
-      return acc;
-    }
-
-    // Si el odd es igual, quedarnos con el target más alto que NO exceda el odd
-    const curOk = curOdd >= Number(cur.target || 0);
-    const newOk = newOdd >= Number(p.target || 0);
-    if (newOk && !curOk) {
-      acc[idx] = p;
-      return acc;
-    }
-    if (newOk && curOk) {
-      if (Number(p.target || 0) > Number(cur.target || 0)) acc[idx] = p;
-    }
-
-    return acc;
-  }, []);
+  // Evita duplicados exactos entre targets
+  .filter((p, idx, arr) => {
+    const sig = (p.picks || []).map((x) => `${x.fixtureId}:${x.marketKey || x.key || x.label || ""}`).join("|");
+    return arr.findIndex((q) => (q.picks || []).map((x) => `${x.fixtureId}:${x.marketKey || x.key || x.label || ""}`).join("|") === sig) === idx;
+  });
 
   // ===================== VALUE LIST (usar SANITIZED) =====================
 const valueList = buildValueList(candidatesByFixtureSanitized, 0.06);
@@ -2184,27 +2142,35 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
         <FeatureCard title="Cuotas potenciadas" badge={`Hasta x${maxBoost}`} locked={!features.boosted}>
           <div className="text-xs text-slate-300">Arma una combinada automática o con partidos seleccionados.</div>
 
-          <div className="mt-3 space-y-2">
+          <div className="mt-3 flex flex-col sm:flex-row gap-2">
             <button
-              className="w-full rounded-full bg-fv-gold py-3 text-center font-semibold text-black transition hover:brightness-110 disabled:opacity-60"
-              onClick={handleGenerateAutoParlay}
-              disabled={loadingFixtures || generatingAuto}
+              type="button"
+              onClick={handleAutoParlay}
+              className="px-4 py-2 rounded-full text-xs font-bold"
+              style={{ backgroundColor: GOLD, color: "#0f172a" }}
             >
-              {generatingAuto ? "Generando..." : "Generar combinada automática"}
+              Generar combinada automática
             </button>
 
             <button
-              className="w-full rounded-full bg-white/10 py-3 text-center font-semibold text-white transition hover:bg-white/15 disabled:opacity-60"
-              onClick={handleGenerateSelectedParlay}
-              disabled={selectedFixtures.length === 0 || generatingSelected}
+              type="button"
+              onClick={handleSelectedParlay}
+              className="px-4 py-2 rounded-full text-xs font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition"
             >
-              {generatingSelected
-                ? "Generando..."
-                : `Generar con seleccionados (${selectedFixtures.length})`}
+              Generar con seleccionados ({selectedCount})
             </button>
           </div>
 
-          {parlayError && <div className="mt-3 text-xs text-red-300">{parlayError}</div>}
+          {parlayError ? <div className="mt-3 text-xs text-amber-300">{parlayError}</div> : null}
+
+          </div>
+        );
+      })}
+  </div>
+) : (
+  <div className="mt-3 text-[11px] text-slate-400">Genera una combinada para que aparezca aquí.</div>
+)}
+
         </FeatureCard>
 
         <FeatureCard title="Árbitros tarjeteros" badge="Tarjetas" locked={!canReferees} lockText="Disponible desde Plan Anual.">
