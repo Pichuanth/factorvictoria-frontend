@@ -97,60 +97,6 @@ function getRefereeName(fx) {
   return fx?.fixture?.referee || fx?.referee || "";
 }
 
-function getExpectedGoalsFromPack(pack) {
-  const model =
-    pack?.model ||
-    pack?.data?.model ||
-    pack?.stats?.model ||
-    pack?.payload?.model ||
-    null;
-
-  const num = (v) => {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
-  };
-
-  const home =
-    // Backend suele venir con PascalCase
-    num(model?.LambdaHome) ??
-    num(model?.lambdaHome) ??
-    num(model?.homeLambda) ??
-    num(model?.home_lambda) ??
-    num(model?.lambda_home) ??
-    num(model?.xgHome) ??
-    num(model?.homeXG) ??
-    num(model?.expectedHomeGoals) ??
-    num(model?.homeExpectedGoals);
-
-  const away =
-    num(model?.LambdaAway) ??
-    num(model?.lambdaAway) ??
-    num(model?.awayLambda) ??
-    num(model?.away_lambda) ??
-    num(model?.lambda_away) ??
-    num(model?.xgAway) ??
-    num(model?.awayXG) ??
-    num(model?.expectedAwayGoals) ??
-    num(model?.awayExpectedGoals);
-
-  const total =
-    num(model?.LambdaTotal) ??
-    num(model?.lambdaTotal) ??
-    num(model?.lambda_total) ??
-    num(model?.xgTotal) ??
-    num(model?.expectedGoalsTotal) ??
-    (home != null && away != null ? home + away : null);
-
-  if (home == null && away == null && total == null) return null;
-
-  return {
-    home,
-    away,
-    total,
-  };
-}
-
-
 /* ------------------- Helpers de fecha/hora (APP_TZ) ------------------- */
 function fixtureDateKey(f) {
   const when = f?.fixture?.date || f?.date || "";
@@ -903,32 +849,22 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
                   <div>
   <span className="text-slate-400">Goles esperados (FV):</span>{" "}
   <span className="text-emerald-200 font-semibold">
-    {(() => {
-      const xg = getExpectedGoalsFromPack(fvPack);
-      if (!xg) return "--";
-
-      // si tenemos home/away, mostramos desglosado
-      if (xg.home != null && xg.away != null) {
-        const total = (xg.total != null ? xg.total : xg.home + xg.away);
-        return `${xg.home.toFixed(2)} + ${xg.away.toFixed(2)} = ${total.toFixed(2)}`;
-      }
-
-      // fallback a total
-      if (xg.total != null) return xg.total.toFixed(2);
-
-      return "--";
-    })()}
+    {(fvPack?.model?.lambdaTotal ?? "--")}
   </span>
 </div>
 
                 </div>
 
-                {/* fixtureId oculto (debug) */}
+                <div className="mt-2 text-slate-400">
+                  fixtureId: <span className="text-slate-200 font-semibold">{String(id)}</span>
+                </div>
               </div>
             ) : (
               <div className="text-[11px] text-slate-400">
                 Sin estadísticas aún (o no disponibles). Igual podemos estimar con heurísticas.
-                {/* fixtureId oculto (debug) */}
+                <div className="mt-2 text-slate-400">
+                  fixtureId: <span className="text-slate-200 font-semibold">{String(id)}</span>
+                </div>
               </div>
             )}
 
@@ -1038,15 +974,6 @@ function buildBoostedParlayLocal({ candidatesByFixture, target, cap, minProb = 0
   const fixtureIds = Object.keys(candidatesByFixture || {});
   if (!fixtureIds.length) return null;
 
-function localPenalty(label) {
-  const s = String(label || "").toLowerCase();
-  let p = 1;
-  if (s.includes("2.5") && (s.includes("over") || s.includes("under") || s.includes("goles"))) p *= 0.82;
-  if ((s.includes("over") || s.includes("under")) && !s.includes("1x") && !s.includes("x2")) p *= 0.92;
-  if (s.includes("btts") || s.includes("both teams") || s.includes("ambos")) p *= 0.95;
-  return p;
-}
-
   // Para cada fixture, nos quedamos con candidatos "usables" (odd>1 y prob decente)
   const perFx = fixtureIds.map((fxId) => {
     const arr = (candidatesByFixture[fxId] || [])
@@ -1064,11 +991,7 @@ function localPenalty(label) {
       })
       .filter((c) => c._odd != null && c._odd > 1.01)
       .filter((c) => c._prob == null || c._prob >= minProb)
-      .map((c) => {
-        const pen = localPenalty(c.label || c.pick);
-        return { ...c, _penalty: pen, _scoreOdd: (c._odd || 0) * pen };
-      })
-      .sort((a, b) => (b._scoreOdd || 0) - (a._scoreOdd || 0)); // prioriza odds (con penalización)
+      .sort((a, b) => (b._odd || 0) - (a._odd || 0)); // prioriza odds
 
     return { fxId, candidates: arr };
   });
@@ -1110,8 +1033,7 @@ function localPenalty(label) {
         // score: preferimos acercarnos al target; si lo sobrepasa un poco no importa
         const dist = Math.abs(Math.log(target) - Math.log(next));
         const probBonus = c._prob != null ? (c._prob - 0.5) : 0;
-        const pen = c._penalty ?? 1;
-        const score = -dist + probBonus * 0.35 - (1 - pen) * 0.8; // penaliza overs repetidos
+        const score = -dist + probBonus * 0.35; // ajustable
 
         if (!best || score > best.score) best = { c, score, next };
       }
@@ -1387,14 +1309,6 @@ const ensureFvPack = useCallback(
       if (!res.ok) throw new Error(`fvpack ${res.status}`);
       const data = await res.json();
 
-      // DEBUG (una vez por fixture): keys del modelo para ajustar UI
-      if (!window.__fvpackModelKeysOnce) window.__fvpackModelKeysOnce = {};
-      if (!window.__fvpackModelKeysOnce[fixtureId]) {
-        window.__fvpackModelKeysOnce[fixtureId] = true;
-        const modelKeys = Object.keys((data?.model) || (data?.data?.model) || {});
-        console.log("[FVPACK model keys]", fixtureId, modelKeys);
-      }
-
       fvRef.current[fixtureId] = data;
       setFvPackByFixture((m) => ({ ...m, [fixtureId]: data }));
       return data;
@@ -1527,30 +1441,6 @@ const candidatesByFixture = {};
 function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
 function shrinkProb(p, k = 0.45) { return 0.5 + (p - 0.5) * k; } // k<1 baja confianza
 
-function pickPenalty(label) {
-  const s = String(label || "").toLowerCase();
-  let p = 1;
-
-  // penaliza "Over/Under 2.5" (muy repetido)
-  if (s.includes("2.5") && (s.includes("over") || s.includes("under") || s.includes("goles"))) p *= 0.82;
-
-  // penaliza totales en general (over/under) un poco
-  if ((s.includes("over") || s.includes("under")) && !s.includes("1x") && !s.includes("x2")) p *= 0.92;
-
-  // BTTS suele repetirse también
-  if (s.includes("btts") || s.includes("both teams") || s.includes("ambos")) p *= 0.95;
-
-  return p;
-}
-
-function probForRank(c) {
-  const base = Number(c?.prob);
-  const prob = Number.isFinite(base) ? base : 0.5;
-  const pen = pickPenalty(c?.label || c?.pick);
-  // reducimos prob solo para ranking (no para display)
-  return prob * pen;
-}
-
 for (const fx of pool) {
   const id = getFixtureId(fx);
   if (!id) continue;
@@ -1587,23 +1477,16 @@ for (const fx of pool) {
     // odd usada: mercado si existe; si no, FV
     const usedOddNum = marketOddNum ?? toOdd(c?.usedOdd) ?? fvOddNum;
 
-    const __penalty = pickPenalty(c?.label || c?.pick);
-    const __probRank = (probOk != null ? probOk : 0.5) * __penalty;
-
     return {
       ...c,
       fvOdd: fvOddNum,
       marketOdd: marketOddNum ?? c?.marketOdd,
       usedOdd: usedOddNum,
       usedOddDisplay: usedOddNum,
-      __penalty,
-      __probRank,
     };
   });
 
-  // ordena por prob "rank" (penaliza overs repetidos) para que buildParlay/pickSafe elijan mejor
-  const ranked = [...fixedCands].sort((a, b) => (b.__probRank || 0) - (a.__probRank || 0));
-  candidatesByFixture[id] = ranked;
+  candidatesByFixture[id] = fixedCands;
 }
 
 // ===================== DEBUG (DESPUÉS del loop) =====================
@@ -2161,59 +2044,10 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
     Aún sin ranking (fixturesScanned: {refData?.fixturesScanned ?? 0}). Endpoint OK.
   </div>
 )}
-
 </FeatureCard>
 
         <FeatureCard
-          title="Desfase del mercado"
-          badge="Value"
-          locked={!features.marketValue}
-          lockText="Disponible desde Plan Vitalicio."
-        >
-          <div className="text-xs text-slate-300">
-            Picks con posible valor (cuando tu estimación FV sugiere que el mercado está pagando “de más”).
-          </div>
-
-          {fvOutput?.valueList?.length ? (
-            <div className="mt-3 space-y-2">
-              {fvOutput.valueList.slice(0, 8).map((v, idx) => (
-                <div
-                  key={`${v.fixtureId || "fx"}-${v.label || v.pick || idx}-${idx}`}
-                  className="rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2"
-                >
-                  <div className="text-[11px] text-slate-300">
-                    <span className="text-slate-500">#{idx + 1}</span>{" "}
-                    <span className="text-slate-100 font-semibold">{v.label || v.pick}</span>
-                    {v.home && v.away ? (
-                      <>
-                        {" "}
-                        <span className="text-slate-500">—</span> {v.home} vs {v.away}
-                      </>
-                    ) : null}
-                  </div>
-
-                  <div className="mt-1 text-[11px] text-slate-300">
-                    FV: <span className="text-emerald-200 font-semibold">x{toOdd(v.fvOdd) ?? v.fvOdd}</span>{" "}
-                    <span className="text-slate-500">·</span>{" "}
-                    Mercado: <span className="text-amber-200 font-semibold">x{toOdd(v.marketOdd) ?? v.marketOdd}</span>{" "}
-                    {v.valueEdge != null ? (
-                      <>
-                        <span className="text-slate-500">·</span>{" "}
-                        Value: <span className="text-emerald-200 font-semibold">+{Math.round(Number(v.valueEdge) * 100)}%</span>
-                      </>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="mt-3 text-[11px] text-slate-400">Genera una combinada para calcular value.</div>
-          )}
-        </FeatureCard>
-
-        <FeatureCard
           title="Goleadores / Remates / Value"
-
           badge="VIP"
           locked={!(features.scorersValue || features.marketValue)}
           lockText="Disponible en planes superiores (Anual/Vitalicio)."
@@ -2221,8 +2055,8 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
           <div className="text-xs text-slate-300">Aquí reactivaremos los módulos avanzados (goleadores, remates, value del mercado).</div>
         </FeatureCard>
 
-        <FeatureCard title="Parlays potenciados" badge="Parlays" locked={!features.boosted} lockText="Disponible en todos los planes.">
-          <div className="text-xs text-slate-300">Aquí verás los parlays potenciados que genera el modelo (x3, x5, x10, x20, etc.).</div>
+        <FeatureCard title="Cuota desfase del mercado" badge="Value" locked={!features.marketValue} lockText="Disponible desde Plan Vitalicio.">
+          <div className="text-xs text-slate-300">Detecta cuotas con posible valor (desfase entre tu estimación y el mercado).</div>
 
           {fvOutput?.parlays?.length ? (
          <div className="mt-3 space-y-3">
