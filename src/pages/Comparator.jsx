@@ -1069,120 +1069,121 @@ function ManualPicksSection() {
     </section>
   );
 }
-function buildBoostedParlayLocal({ candidatesByFixture, target, cap, minProb = 0.52, maxLegs = 12 }) {
-  const fixtureIds = Object.keys(candidatesByFixture || {});
-  if (!fixtureIds.length) return null;
+function buildBoostedParlayLocal({
+  candidatesByFixture,
+  target,
+  cap = 100,
+  minProb = 0.70,
+  maxLegs = 7,
+}) {
+  try {
+    if (!candidatesByFixture || typeof candidatesByFixture !== "object") return null;
 
-function localPenalty(label) {
-  const s = String(label || "").toLowerCase();
-  let p = 1;
-  if (s.includes("2.5") && (s.includes("over") || s.includes("under") || s.includes("goles"))) p *= 0.82;
-  if ((s.includes("over") || s.includes("under")) && !s.includes("1x") && !s.includes("x2")) p *= 0.92;
-  if (s.includes("btts") || s.includes("both teams") || s.includes("ambos")) p *= 0.95;
-  return p;
-}
-
-  // Para cada fixture, nos quedamos con candidatos "usables" (odd>1 y prob decente)
-  const perFx = fixtureIds.map((fxId) => {
-    const arr = (candidatesByFixture[fxId] || [])
-      .map((c) => {
-        const odd =
-          toOdd(c.usedOddDisplay) ??
-          toOdd(c.usedOdd) ??
-          toOdd(c.marketOdd) ??
-          toOdd(c.fvOdd);
-
-        const prob = Number(c?.prob);
-        const probOk = Number.isFinite(prob) ? prob : null;
-
-        return { ...c, _fxId: fxId, _odd: odd, _prob: probOk };
+    // Build pools per fixture (filter low-prob / invalid odds)
+    const pools = Object.keys(candidatesByFixture)
+      .map((fixtureId) => {
+        const list = (candidatesByFixture[fixtureId] || [])
+          .filter((c) => Number(c?.odd || 0) > 1.01 && Number(c?.prob || 0) >= minProb)
+          .sort((a, b) => (b?.odd || 0) - (a?.odd || 0));
+        return { fixtureId, list };
       })
-      .filter((c) => c._odd != null && c._odd > 1.01)
-      .filter((c) => c._prob == null || c._prob >= minProb)
-      .map((c) => {
-        const pen = localPenalty(c.label || c.pick);
-        return { ...c, _penalty: pen, _scoreOdd: (c._odd || 0) * pen };
-      })
-      .sort((a, b) => (b._scoreOdd || 0) - (a._scoreOdd || 0)); // prioriza odds (con penalización)
+      .filter((p) => p.list.length > 0);
 
-    return { fxId, candidates: arr };
-  });
+    if (pools.length === 0) return null;
 
-  // Si no hay candidatos usables, no se puede
-  if (!perFx.some((x) => x.candidates.length)) return null;
+    // Theoretical max we can get with distinct fixtures
+    const topOdds = pools
+      .map((p) => Number(p.list[0].odd || 1))
+      .sort((a, b) => b - a)
+      .slice(0, maxLegs);
 
-  // Máximo alcanzable: producto del mejor odd por fixture (limitado a maxLegs)
-  const bestOdds = perFx
-    .map((x) => x.candidates[0]?._odd)
-    .filter((x) => x != null)
-    .sort((a, b) => b - a)
-    .slice(0, maxLegs);
+    const maxPossible = topOdds.reduce((acc, o) => acc * o, 1);
 
-  const maxPossible = bestOdds.reduce((acc, o) => acc * o, 1);
-  if (maxPossible < Math.min(target * 0.98, cap * 0.98)) {
-    // No alcanza el target ni siquiera con los mejores odds
-    return null;
-  }
+    // If the target is unreachable, we still build the best parlay we can (so UI can render x5/x10/x20/etc.)
+    const effectiveTarget = Math.min(Number(target || 1), Number(cap || 100), maxPossible);
 
-  // Greedy: vamos agregando la mejor pieza que más acerque al target sin pasarnos absurdamente
-  let product = 1;
-  const usedFx = new Set();
-  const legs = [];
+    const used = new Set();
+    const chosen = [];
+    let product = 1;
 
-  while (legs.length < maxLegs && product < target * 0.98) {
-    let best = null;
+    // Greedy selection: prioritize higher odds but keep probability and avoid repeating the same market too much
+    const marketKeyOf = (c) => String(c?.market || c?.type || "").toLowerCase().trim();
 
-    for (const fx of perFx) {
-      if (usedFx.has(fx.fxId)) continue;
-      if (!fx.candidates.length) continue;
+    while (chosen.length < maxLegs) {
+      let best = null;
 
-      // probamos top 5 de cada fixture (suficiente)
-      const top = fx.candidates.slice(0, 5);
+      for (const p of pools) {
+        if (used.has(p.fixtureId)) continue;
 
-      for (const c of top) {
-        const next = product * c._odd;
+        // Only look at top N candidates per fixture (keeps it fast)
+        const head = p.list.slice(0, 6);
 
-        // score: preferimos acercarnos al target; si lo sobrepasa un poco no importa
-        const dist = Math.abs(Math.log(target) - Math.log(next));
-        const probBonus = c._prob != null ? (c._prob - 0.5) : 0;
-        const pen = c._penalty ?? 1;
-        const score = -dist + probBonus * 0.35 - (1 - pen) * 0.8; // penaliza overs repetidos
+        for (const c of head) {
+          const odd = Number(c?.odd || 0);
+          const prob = Number(c?.prob || 0);
+          if (odd <= 1.01 || prob < minProb) continue;
 
-        if (!best || score > best.score) best = { c, score, next };
+          const newProduct = product * odd;
+
+          // Soft cap: don't massively exceed the cap; allow slight overshoot
+          if (Number.isFinite(cap) && cap > 0 && newProduct > cap * 1.08) continue;
+
+          const mk = marketKeyOf(c);
+          const repeats = mk
+            ? chosen.reduce((acc, x) => acc + (marketKeyOf(x) === mk ? 1 : 0), 0)
+            : 0;
+
+          // Score: odds (log) + prob (log) - penalty for repeats
+          const score =
+            Math.log(Math.max(odd, 1.0001)) +
+            0.65 * Math.log(Math.max(prob, 0.0001)) -
+            repeats * 0.25;
+
+          if (!best || score > best.score) {
+            best = { ...c, fixtureId: p.fixtureId, score };
+          }
+        }
       }
+
+      if (!best) break;
+
+      chosen.push(best);
+      used.add(best.fixtureId);
+      product *= Number(best.odd || 1);
+
+      // Stop when we are close enough to the effective target
+      if (product >= effectiveTarget * 0.98 && chosen.length >= 2) break;
     }
 
-    if (!best) break;
-    legs.push(best.c);
-    usedFx.add(best.c._fxId);
-    product = best.next;
+    if (chosen.length === 0) return null;
+
+    const impliedProb = chosen.reduce(
+      (acc, c) => acc * Math.max(0, Number(c?.prob || 0)),
+      1
+    );
+
+    return {
+      target,
+      cap,
+      games: chosen.length,
+      finalOdd: Number(product.toFixed(2)),
+      impliedProb: Number((impliedProb * 100).toFixed(1)),
+      reachedTarget: product >= Number(target || 1) * 0.98,
+      legs: chosen.map((c) => ({
+        fixtureId: c.fixtureId,
+        market: c.market || c.type,
+        label:
+          c.label ||
+          c.name ||
+          `${c.market || c.type || "Pick"} — ${c.fixtureLabel || ""}`.trim(),
+        odd: Number(c.odd || 0),
+        prob: Number(c.prob || 0),
+      })),
+    };
+  } catch (e) {
+    console.warn("[PARLAY] buildBoostedParlayLocal error", e);
+    return null;
   }
-
-  if (!legs.length) return null;
-
-  const finalOdd = Number(product.toFixed(2));
-  const impliedProb = Number(((1 / finalOdd) * 100).toFixed(1));
-  const reachedTarget = finalOdd >= target * 0.98;
-
-  return {
-    target,
-    cap,
-    games: legs.length,
-    finalOdd,
-    impliedProb,
-    reachedTarget,
-    legs: legs.map((c) => ({
-      fixtureId: c._fxId,
-      label: c.label || c.pick || "Pick",
-      home: c.home,
-      away: c.away,
-      prob: c.prob,
-      fvOdd: c.fvOdd,
-      marketOdd: c.marketOdd,
-      usedOdd: c.usedOdd,
-      usedOddDisplay: c.usedOddDisplay ?? c.usedOdd ?? c.marketOdd ?? c.fvOdd,
-    })),
-  };
 }
 
 export default function Comparator() {
@@ -2162,33 +2163,6 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 
           {parlayError ? <div className="mt-3 text-xs text-amber-300">{parlayError}</div> : null}
 
-{parlayResult?.legs?.length ? (
-  <div className="mt-2 space-y-1">
-    {(parlayResult.legs || [])
-      .filter(
-        (l) =>
-          l &&
-          l.label &&
-          l.home &&
-          l.away &&
-          Number(toOdd(l.usedOddDisplay) ?? toOdd(l.usedOdd)) > 1
-      )
-      .map((leg, idx) => {
-        const oddNum = toOdd(leg.usedOddDisplay) ?? toOdd(leg.usedOdd);
-        const oddToShow = oddNum && oddNum > 1 ? oddNum : null;
-
-        return (
-          <div key={`${leg.fixtureId || "fx"}-${idx}`} className="text-[11px] text-slate-300">
-            <span className="text-slate-500">#{idx + 1}</span>{" "}
-            <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
-            <span className="text-slate-500">—</span>{" "}
-            {leg.home} vs {leg.away}{" "}
-            {oddToShow ? (
-              <>
-                <span className="text-slate-500">·</span>{" "}
-                <span className="text-amber-200 font-semibold">{oddToShow}</span>
-              </>
-            ) : null}
           </div>
         );
       })}
