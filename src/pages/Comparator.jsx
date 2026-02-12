@@ -1713,13 +1713,13 @@ const giftBundle = buildGiftPickBundle(candidatesByFixtureSanitized, 1.5, 3.0, 3
 
 
 // UI handlers
-async function handleGenerateAutoParlay() {
+const handleGenerateAutoParlay = async () => {
   await runGeneration({ mode: "auto" });
-}
+};
 
-async function handleGenerateSelectedParlay() {
+const handleGenerateSelectedParlay = async () => {
   await runGeneration({ mode: "selected" });
-}
+};
 
 // ===================== TARGETS + PARLAYS =====================
 const targets = [3, 5, 10, 20, 50, 100].filter((t) => t <= maxBoost);
@@ -1829,6 +1829,9 @@ if (best) setParlayResult({ mode, ...best });
 
 const handleAutoParlay = () => runGeneration("auto");
 const handleSelectedParlay = () => runGeneration("selected");
+// Aliases used by older UI handlers / builds
+const handleGenerateAutoParlay = handleAutoParlay;
+const handleGenerateSelectedParlay = handleSelectedParlay;
 
     async function handleGenerate() {
     setParlayError("");
