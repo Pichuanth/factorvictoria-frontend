@@ -1737,8 +1737,12 @@ const parlays = targets
   .filter(Boolean)
   // Evita duplicados exactos entre targets
   .filter((p, idx, arr) => {
-    const sig = (p.picks || []).map((x) => `${x.fixtureId}:${x.marketKey || x.key || x.label || ""}`).join("|");
-    return arr.findIndex((q) => (q.picks || []).map((x) => `${x.fixtureId}:${x.marketKey || x.key || x.label || ""}`).join("|") === sig) === idx;
+    const legs = p.picks || p.legs || [];
+    const sig = legs.map((x) => `${x.fixtureId}:${x.marketKey || x.key || x.label || ""}`).join("|");
+    return arr.findIndex((q) => {
+      const qlegs = q.picks || q.legs || [];
+      return qlegs.map((x) => `${x.fixtureId}:${x.marketKey || x.key || x.label || ""}`).join("|") === sig;
+    }) === idx;
   });
 
   // ===================== VALUE LIST (usar SANITIZED) =====================
@@ -1769,7 +1773,7 @@ const best = parlays
   .slice()
   .sort((a, b) => (b.finalOdd || 0) - (a.finalOdd || 0))[0];
 
-if (best) setParlayResult({ mode, ...best });
+if (best) setParlayResult({ mode, ...best, picks: best.picks || best.legs || [] });
 
     } catch (e) {
       console.error("[FV] runGeneration error", e);

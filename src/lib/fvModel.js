@@ -353,53 +353,171 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
 }
 
 export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) {
-  const fixtures = Object.keys(candidatesByFixture || {});
-  const pool = fixtures
-    .map((fid) => {
-      const list = candidatesByFixture[fid] || [];
-      return list[0] ? { fid, best: list[0], list } : null;
+  // Armado diversificado con fallback FV (si no hay marketOdd) usando usedOdd ya precalculado.
+  // Objetivo: siempre intentar armar x3/x5; y para x10+ armar si el pool alcanza sin pasarse del cap del plan.
+
+  const minLegs = 2;
+  const t = Number(target);
+  const hardCap = Number(cap);
+
+  if (!Number.isFinite(t) || t <= 1) return null;
+  if (!Number.isFinite(hardCap) || hardCap <= 1) return null;
+
+  // --- parámetros por target (relaja filtros para x3/x5) ---
+  const minProb =
+    t <= 5 ? 0.72 :
+    t <= 10 ? 0.68 :
+    t <= 20 ? 0.66 :
+    0.64;
+
+  const perTypeLimitBase = {
+    DC: 3,     // 1X/X2
+    OU: 3,     // Under/Over
+    BTTS: 1,   // evitar "todo BTTS"
+    OTHER: 2,
+  };
+
+  function typeOf(p) {
+    const mk = String(p?.market || p?.marketKey || "").toUpperCase();
+    if (mk.includes("DC")) return "DC";
+    if (mk.includes("OU")) return "OU";
+    if (mk.includes("BTTS")) return "BTTS";
+    return "OTHER";
+  }
+
+  function oddOf(p) {
+    const o = Number(p?.usedOdd ?? p?.usedOddDisplay ?? p?.marketOdd ?? p?.fvOdd);
+    return Number.isFinite(o) ? o : null;
+  }
+
+  function scoreOf(p) {
+    // mezcla de probRank / prob + (ligero) incentivo por subir odd para targets altos
+    const prob = Number(p?.__probRank);
+    const p0 = Number.isFinite(prob) ? prob : Number(p?.prob);
+    const pp = Number.isFinite(p0) ? p0 : 0;
+    const o = oddOf(p) ?? 1;
+    const logO = Math.log(Math.max(1.0001, o));
+    const wOdd = t >= 20 ? 0.22 : t >= 10 ? 0.16 : 0.10;
+    return pp * (1 - wOdd) + logO * wOdd;
+  }
+
+  // --- arma opciones por fixture ---
+  const byFx = Object.entries(candidatesByFixture || {})
+    .map(([fid, list]) => {
+      const arr = (list || [])
+        .filter(Boolean)
+        .filter((p) => Number.isFinite(Number(p?.prob)) || Number.isFinite(Number(p?.__probRank)))
+        .filter((p) => {
+          const o = oddOf(p);
+          return Number.isFinite(o) && o > 1.0001;
+        })
+        .map((p) => ({
+          ...p,
+          __type: typeOf(p),
+          __odd: oddOf(p),
+          __score: scoreOf(p),
+          __fx: fid,
+        }))
+        .sort((a, b) => (b.__score - a.__score));
+
+      // toma top-N por fixture, para permitir swaps (diversidad / subir cuota)
+      const topN = arr.slice(0, 5);
+
+      if (!topN.length) return null;
+      return { fid, options: topN };
     })
     .filter(Boolean);
 
-  pool.sort((a, b) => (pr(b.best) - pr(a.best)));
+  if (byFx.length < minLegs) return null;
 
-  const legs = [];
-  let prod = 1;
+  // ordenar fixtures: primero los que tienen mejor opción
+  byFx.sort((a, b) => (b.options[0].__score - a.options[0].__score));
 
-  for (const item of pool) {
-    const cand = item.best;
+  // --- greedy con restricciones de diversidad ---
+  function buildWithLimits(perTypeLimit, allowLowProb = false) {
+    const legs = [];
+    const typeCount = { DC: 0, OU: 0, BTTS: 0, OTHER: 0 };
+    let prod = 1;
 
-    const odd = Number(cand.usedOdd);
-    if (!Number.isFinite(odd) || odd <= 1) continue;
+    for (const fx of byFx) {
+      let picked = null;
 
-    const next = prod * odd;
+      for (const cand of fx.options) {
+        // filtro probabilidad (relajable)
+        const pRank = Number.isFinite(Number(cand.__probRank)) ? Number(cand.__probRank) : Number(cand.prob);
+        const pOk = Number.isFinite(pRank) ? pRank : 0;
+        if (!allowLowProb && pOk < minProb) continue;
 
-    // no pasar el cap del plan (con un mini margen)
-    if (next > cap * 1.01) continue;
+        // evita repetir BTTS "NO" como default (1 máximo, ya controlado por tipo)
+        const typ = cand.__type || "OTHER";
+        if ((typeCount[typ] || 0) >= (perTypeLimit[typ] ?? 99)) continue;
 
-    legs.push(cand);
-    prod = next;
+        const next = prod * cand.__odd;
+        if (next > hardCap * 1.02) continue;
 
-    if (legs.length >= maxLegs) break;
+        picked = cand;
+        break;
+      }
 
-    // corta cuando ya estás suficientemente cerca del target
-    if (prod >= target * 0.95) break;
+      if (!picked) continue;
+
+      legs.push(picked);
+      typeCount[picked.__type] = (typeCount[picked.__type] || 0) + 1;
+      prod *= picked.__odd;
+
+      if (legs.length >= maxLegs) break;
+      if (prod >= t * 0.95) break;
+    }
+
+    if (legs.length < minLegs) return null;
+
+    return { legs, prod, typeCount };
   }
 
-  if (legs.length < 2) return null;
+  // 1) intento normal con límites base
+  let attempt = buildWithLimits(perTypeLimitBase, false);
 
+  // 2) si no llega al target, relaja límites (más OU/DC) y permite picks un poco menos "seguros"
+  if (!attempt || attempt.prod < t * 0.85) {
+    const relaxed = {
+      ...perTypeLimitBase,
+      DC: perTypeLimitBase.DC + 1,
+      OU: perTypeLimitBase.OU + 1,
+      BTTS: 1,
+      OTHER: perTypeLimitBase.OTHER + 1,
+    };
+    attempt = buildWithLimits(relaxed, false) || attempt;
+  }
+
+  if (!attempt || attempt.prod < t * 0.80) {
+    const relaxed2 = {
+      ...perTypeLimitBase,
+      DC: perTypeLimitBase.DC + 2,
+      OU: perTypeLimitBase.OU + 2,
+      BTTS: 1,
+      OTHER: perTypeLimitBase.OTHER + 2,
+    };
+    attempt = buildWithLimits(relaxed2, true) || attempt;
+  }
+
+  if (!attempt) return null;
+
+  const { legs, prod } = attempt;
+
+  // retorna con alias picks para compatibilidad con UI
   return {
-    target,
-    cap,
+    target: t,
+    cap: hardCap,
     games: legs.length,
     finalOdd: round2(prod),
     impliedProb: round2(1 / prod),
     legs,
-    reached: prod >= target * 0.90,
+    picks: legs,
+    reached: prod >= t * 0.90,
   };
 }
 
-export function buildValueList(candidatesByFixture, minEdge = 0.06) {
+export function buildValueListexport function buildValueList(candidatesByFixture, minEdge = 0.06) {
   const all = Object.values(candidatesByFixture || {}).flat();
 
   const value = all
