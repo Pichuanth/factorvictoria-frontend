@@ -1240,6 +1240,9 @@ export default function Comparator() {
 
   // combinadas
   const [parlayResult, setParlayResult] = useState(null);
+  // Parlay bundles (x3, x5, x10, x20, x50, x100)
+  const [parlays, setParlays] = useState([]);
+
   const [parlayError, setParlayError] = useState("");
   const [fvOutput, setFvOutput] = useState(null);
 
@@ -1713,7 +1716,7 @@ const giftBundle = buildGiftPickBundle(candidatesByFixtureSanitized, 1.5, 3.0, 3
         // 1) Intento "buildParlay" (si existe en fvModel) para llegar lo más cerca posible al target
         try {
           const r1 = buildParlay?.({
-            fixtures: candFixtures,
+            fixtures: pool,
             fvpackByFixture,
             oddsByFixture,
             maxLegs: 8,
@@ -1737,7 +1740,7 @@ const giftBundle = buildGiftPickBundle(candidatesByFixtureSanitized, 1.5, 3.0, 3
         // 2) Fallback local (si buildParlay no existe o no encontró)
         try {
           const r2 = buildBoostedParlayLocal({
-            fixtures: candFixtures,
+            fixtures: pool,
             maxLegs: 8,
             maxBoost,
             targetOdd: target,
@@ -1779,8 +1782,6 @@ const giftBundle = buildGiftPickBundle(candidatesByFixtureSanitized, 1.5, 3.0, 3
     setParlays(dedup);
 
     // Si quieres mostrar los "legs" en UI, los dejamos guardados, pero por defecto NO los renderizamos bajo los botones.
-    setParlayLegs(dedup?.[0]?.picks || []);
-
   // ===================== VALUE LIST (usar SANITIZED) =====================
 const valueList = buildValueList(candidatesByFixtureSanitized, 0.06);
 
