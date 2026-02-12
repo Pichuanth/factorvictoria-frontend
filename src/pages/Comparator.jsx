@@ -2119,7 +2119,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
         <FeatureCard title="Cuota de regalo" badge="Alta probabilidad" locked={!features.giftPick}>
           <div className="text-xs text-slate-300">
   Pick con mayor probabilidad. Prioriza partidos con estadísticas completas de ambos equipos.
-  Si uno no presenta datos, el porcentaje de acierto se reduce en un 70%. Recarga la página o vuelve a generar para un análisis óptimo.
+  Si uno no presenta datos, el porcentaje de acierto se reduce en un 70%. Recarga o vuelve a generar para un análisis óptimo.
   Consulta siempre los datos en la parte superior.
 </div>
 
@@ -2285,7 +2285,8 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
         </FeatureCard>
 
         <FeatureCard title="Parlays potenciados" badge="Parlays" locked={!features.boosted} lockText="Disponible en todos los planes.">
-          <div className="text-xs text-slate-300">Aquí verás los parlays potenciados que genera el modelo (x3, x5, x10, x20, etc.).</div>
+          <div className="text-xs text-slate-300">Parlays potenciados que genera el modelo (x3, x5, x10, x20, x50, x100).
+          Confirma siempre los datos en la parte superior. ver estadísticas. </div>
 
           {fvOutput?.parlays?.length ? (
          <div className="mt-3 space-y-3">
