@@ -112,6 +112,19 @@ function dataQualityFromLast5(last5) {
   return { hasHome, hasAway, full: hasHome && hasAway };
 }
 
+
+function getLast5FromFvPack(pack) {
+  if (!pack || pack.__error) return null;
+  return (
+    pack?.last5 ||
+    pack?.data?.last5 ||
+    pack?.stats?.last5 ||
+    pack?.form?.last5 ||
+    pack?.direct?.last5 ||
+    null
+  );
+}
+
 function DataQualityBadge({ full }) {
   const base = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border";
   if (full) {
@@ -128,21 +141,13 @@ function DataQualityBadge({ full }) {
   );
 }
 
-
-function QualityDot({ full }) {
-  // Solo indicador visual (sin texto) para listas / parlays
-  const cls = full ? "bg-emerald-400/90" : "bg-yellow-400/90";
-  return <span className={`inline-block w-2 h-2 rounded-full ${cls}`} aria-hidden="true" />;
+function DataQualityDot({ full, title }) {
+  const cls = full
+    ? "inline-block w-2 h-2 rounded-full bg-emerald-400/90 ring-1 ring-emerald-200/40"
+    : "inline-block w-2 h-2 rounded-full bg-yellow-400/90 ring-1 ring-yellow-200/40";
+  return <span className={cls} title={title || (full ? "Datos completos" : "Datos parciales")} />;
 }
 
-function isFullDataByFixtureId(fixtureId, fvPackByFixture) {
-  const pack = fvPackByFixture?.[fixtureId];
-  const last5 = pack?.last5;
-  const homeForm = last5?.home?.form || last5?.local?.form || last5?.hom?.form || null;
-  const awayForm = last5?.away?.form || last5?.visitor?.form || last5?.vis?.form || null;
-  // IMPORTANTE: para el color solo consideramos racha W/D/L de ambos equipos.
-  return hasValidFormStr(homeForm) && hasValidFormStr(awayForm);
-}
 
 const FORM_LEGEND = "Leyenda: 🟢G=Ganado, 🟡E=Empate, 🔴P=Perdido";
 
@@ -970,18 +975,6 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
   </span>
 </div>
 
-                  <div>
-                    <span className="text-slate-400">Corners prom:</span>{" "}
-                    <span className="text-slate-100 font-semibold">
-                      {last5?.home?.avgCorners ?? "-"} / {last5?.away?.avgCorners ?? "-"}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400">Tarjetas prom:</span>{" "}
-                    <span className="text-slate-100 font-semibold">
-                      {last5?.home?.avgCards ?? "-"} / {last5?.away?.avgCards ?? "-"}
-                    </span>
-                  </div>
                   <div>
   <span className="text-slate-400">Goles esperados (FV):</span>{" "}
   <span className="text-emerald-200 font-semibold">
@@ -1832,8 +1825,29 @@ const candidatesByFixtureSanitized = Object.fromEntries(
 );
 
 // ===================== SAFE + GIFT (AQUÍ nacen safe/giftBundle) =====================
-const safe = pickSafe(candidatesByFixtureSanitized);
-const giftBundle = buildGiftPickBundle(candidatesByFixtureSanitized, 1.5, 3.0, 3);
+// Calidad de datos por fixture (solo considera Racha W/D/L de ambos equipos)
+const getLast5FromPack = (pack) =>
+  pack?.last5 || pack?.data?.last5 || pack?.stats?.last5 || pack?.form?.last5 || pack?.direct?.last5 || null;
+
+const fixtureQuality = (fxId) => {
+  const raw = fvPackByFixture?.[fxId] || null;
+  const pack = raw && !raw.__error ? raw : null;
+  const last5 = getLast5FromPack(pack);
+  return dataQualityFromLast5(last5);
+};
+
+const isFullFixture = (fxId) => fixtureQuality(fxId).full;
+
+// Pool preferente: solo fixtures con racha completa (verde). Fallback si queda corto.
+const candidatesFullOnly = Object.fromEntries(
+  Object.entries(candidatesByFixtureSanitized).filter(([fxId]) => isFullFixture(fxId))
+);
+
+// SAFE y regalo: preferir verdes. Si no hay suficientes, fallback al pool completo.
+const safe = pickSafe(candidatesFullOnly) || pickSafe(candidatesByFixtureSanitized);
+const giftBundle =
+  buildGiftPickBundle(candidatesFullOnly, 1.5, 3.0, 3) ||
+  buildGiftPickBundle(candidatesByFixtureSanitized, 1.5, 3.0, 3);
 
 // ===================== TARGETS + PARLAYS =====================
 const targets = [3, 5, 10, 20, 50, 100].filter((t) => t <= maxBoost);
@@ -1841,19 +1855,31 @@ console.log("[PARLAY] targets =", targets);
 
 const parlays = targets
   .map((t) => {
-    const r1 = buildParlay({
-      candidatesByFixture: candidatesByFixtureSanitized,
-      target: t,
-      cap: maxBoost,
-    });
+    const r1 =
+      buildParlay({
+        candidatesByFixture: candidatesFullOnly,
+        target: t,
+        cap: maxBoost,
+      }) ||
+      buildParlay({
+        candidatesByFixture: candidatesByFixtureSanitized,
+        target: t,
+        cap: maxBoost,
+      });
     console.log("[PARLAY] buildParlay target", t, "=>", r1);
     if (r1) return r1;
 
-    const r2 = buildBoostedParlayLocal({
-      candidatesByFixture: candidatesByFixtureSanitized,
-      target: t,
-      cap: maxBoost,
-    });
+    const r2 =
+      buildBoostedParlayLocal({
+        candidatesByFixture: candidatesFullOnly,
+        target: t,
+        cap: maxBoost,
+      }) ||
+      buildBoostedParlayLocal({
+        candidatesByFixture: candidatesByFixtureSanitized,
+        target: t,
+        cap: maxBoost,
+      });
     console.log("[PARLAY] localParlay target", t, "=>", r2);
     // Evita mostrar targets altos si la combinada queda muy lejos (esto generaba x20/x50/x100 idénticos)
     if (!r2 || !Number.isFinite(r2.finalOdd)) return null;
@@ -1874,7 +1900,20 @@ const parlays = targets
   });
 
   // ===================== VALUE LIST (usar SANITIZED) =====================
-const valueList = buildValueList(candidatesByFixtureSanitized, 0.06);
+let valueList = buildValueList(candidatesByFixtureSanitized, 0.06);
+
+// Orden: primero fixtures con racha completa (verde), luego parciales (amarillo)
+if (Array.isArray(valueList)) {
+  valueList = valueList
+    .slice()
+    .sort((a, b) => {
+      const af = isFullFixture(a?.fixtureId) ? 1 : 0;
+      const bf = isFullFixture(b?.fixtureId) ? 1 : 0;
+      if (bf !== af) return bf - af;
+      return (b?.value || 0) - (a?.value || 0);
+    });
+}
+
 
 console.log("parlays:", parlays);
 console.log("valueList:", valueList?.length);
@@ -2300,6 +2339,12 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 {parlayResult?.legs?.length ? (
   <div className="mt-2 space-y-1">
     {(parlayResult.legs || [])
+      .slice()
+      .sort((a, b) => {
+        const af = dataQualityFromLast5(getLast5FromFvPack(fvPackByFixture?.[a?.fixtureId])).full ? 1 : 0;
+        const bf = dataQualityFromLast5(getLast5FromFvPack(fvPackByFixture?.[b?.fixtureId])).full ? 1 : 0;
+        return bf - af;
+      })
       .filter(
         (l) =>
           l &&
@@ -2312,9 +2357,12 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
         const oddNum = toOdd(leg.usedOddDisplay) ?? toOdd(leg.usedOdd);
         const oddToShow = oddNum && oddNum > 1 ? oddNum : null;
 
+        const dq = dataQualityFromLast5(getLast5FromFvPack(fvPackByFixture?.[leg.fixtureId]));
+
         return (
           <div key={`${leg.fixtureId || "fx"}-${idx}`} className="text-[11px] text-slate-300">
-            <span className="inline-flex items-center gap-2 text-slate-500"><QualityDot full={isFullDataByFixtureId(leg.fixtureId, fvPackByFixture)} />{idx + 1}</span>{" "}
+            <span className="text-slate-500">{idx + 1}</span>{" "}
+            <DataQualityDot full={dq.full} />{" "}
             <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
             <span className="text-slate-500">—</span>{" "}
             {leg.home} vs {leg.away}{" "}
@@ -2376,7 +2424,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
                   className="rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2"
                 >
                   <div className="text-[11px] text-slate-300">
-                    <span className="inline-flex items-center gap-2 text-slate-500"><QualityDot full={isFullDataByFixtureId(leg.fixtureId, fvPackByFixture)} />{idx + 1}</span>{" "}
+                    <span className="text-slate-500">{idx + 1}</span>{" "}
                     <span className="text-slate-100 font-semibold">{v.label || v.pick}</span>
                     {v.home && v.away ? (
                       <>
@@ -2434,15 +2482,23 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
         </div>
 
         <div className="mt-2 space-y-1">
-          {(p.legs || []).map((leg, idx) => {
+          {(p.legs || [])
+      .slice()
+      .sort((a, b) => {
+        const af = dataQualityFromLast5(getLast5FromFvPack(fvPackByFixture?.[a?.fixtureId])).full ? 1 : 0;
+        const bf = dataQualityFromLast5(getLast5FromFvPack(fvPackByFixture?.[b?.fixtureId])).full ? 1 : 0;
+        return bf - af;
+      }).map((leg, idx) => {
             const oddToShow =
               (toOdd(leg.usedOddDisplay) ?? toOdd(leg.usedOdd)) > 1
                 ? (toOdd(leg.usedOddDisplay) ?? toOdd(leg.usedOdd))
                 : null;
+            const dq = dataQualityFromLast5(getLast5FromFvPack(fvPackByFixture?.[leg.fixtureId]));
 
             return (
               <div key={`${p.target}-${leg.fixtureId || idx}-${idx}`} className="text-[11px] text-slate-300">
-                <span className="inline-flex items-center gap-2 text-slate-500"><QualityDot full={isFullDataByFixtureId(leg.fixtureId, fvPackByFixture)} />{idx + 1}</span>{" "}
+                <span className="text-slate-500">{idx + 1}</span>{" "}
+                <DataQualityDot full={dq.full} />{" "}
                 <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
                 <span className="text-slate-500">—</span>{" "}
                 {leg.home} vs {leg.away}{" "}
