@@ -97,58 +97,6 @@ function prettyForm(formStr) {
     .join(" ");
 }
 
-function hasValidFormStr(s) {
-  if (!s || typeof s !== "string") return false;
-  const parts = s.split(/\s*[-|\s]\s*/).filter(Boolean);
-  if (parts.length < 3) return false;
-  return parts.every((t) => ["W", "D", "L"].includes(String(t).trim().toUpperCase()));
-}
-
-function dataQualityFromLast5(last5) {
-  const homeForm = last5?.home?.form || last5?.local?.form || null;
-  const awayForm = last5?.away?.form || last5?.visitor?.form || null;
-  const hasHome = hasValidFormStr(homeForm);
-  const hasAway = hasValidFormStr(awayForm);
-  return { hasHome, hasAway, full: hasHome && hasAway };
-}
-
-
-function getLast5FromFvPack(pack) {
-  if (!pack || pack.__error) return null;
-  return (
-    pack?.last5 ||
-    pack?.data?.last5 ||
-    pack?.stats?.last5 ||
-    pack?.form?.last5 ||
-    pack?.direct?.last5 ||
-    null
-  );
-}
-
-function DataQualityBadge({ full }) {
-  const base = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border";
-  if (full) {
-    return (
-      <span className={base + " border-emerald-300/40 bg-emerald-500/10 text-emerald-100"}>
-        🟢 Datos completos
-      </span>
-    );
-  }
-  return (
-    <span className={base + " border-yellow-300/40 bg-yellow-500/10 text-yellow-100"}>
-      🟡 Datos parciales
-    </span>
-  );
-}
-
-function DataQualityDot({ full, title }) {
-  const cls = full
-    ? "inline-block w-2 h-2 rounded-full bg-emerald-400/90 ring-1 ring-emerald-200/40"
-    : "inline-block w-2 h-2 rounded-full bg-yellow-400/90 ring-1 ring-yellow-200/40";
-  return <span className={cls} title={title || (full ? "Datos completos" : "Datos parciales")} />;
-}
-
-
 const FORM_LEGEND = "Leyenda: 🟢G=Ganado, 🟡E=Empate, 🔴P=Perdido";
 
 
@@ -976,6 +924,18 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
 </div>
 
                   <div>
+                    <span className="text-slate-400">Corners prom:</span>{" "}
+                    <span className="text-slate-100 font-semibold">
+                      {last5?.home?.avgCorners ?? "-"} / {last5?.away?.avgCorners ?? "-"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Tarjetas prom:</span>{" "}
+                    <span className="text-slate-100 font-semibold">
+                      {last5?.home?.avgCards ?? "-"} / {last5?.away?.avgCards ?? "-"}
+                    </span>
+                  </div>
+                  <div>
   <span className="text-slate-400">Goles esperados (FV):</span>{" "}
   <span className="text-emerald-200 font-semibold">
     {(() => {
@@ -1683,6 +1643,30 @@ if (canReferees) {
 // ===================== MODEL BUILD =====================
 const candidatesByFixture = {};
 
+const candidatesByFixtureGreen = {}; // solo fixtures con racha (últ.5) en ambos equipos
+
+// ✅ Extrae last5 desde distintas rutas del pack (backend puede variar)
+function getLast5FromPack(pack){
+  if (!pack) return null;
+  return (
+    pack.last5 ||
+    pack.data?.last5 ||
+    pack.stats?.last5 ||
+    pack.form?.last5 ||
+    pack.model?.last5 ||
+    null
+  );
+}
+
+// ✅ "Verde" solo si hay racha en ambos equipos (W/D/L últimos 5)
+function hasBothRachas(pack){
+  const last5 = getLast5FromPack(pack);
+  const h = String(last5?.home?.form || "").trim();
+  const a = String(last5?.away?.form || "").trim();
+  return Boolean(h && a);
+}
+
+
 // helpers (defínelos UNA sola vez en runGeneration)
 function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
 function shrinkProb(p, k = 0.45) { return 0.5 + (p - 0.5) * k; } // k<1 baja confianza
@@ -1724,7 +1708,10 @@ for (const fx of pool) {
     oddsRef.current?.[id]?.markets ||
     {};
 
-  const rawCands = buildCandidatePicks({
+  
+
+  const isGreen = hasBothRachas(pack || {});
+const rawCands = buildCandidatePicks({
     fixture: fx,
     pack: pack || {},
     markets,
@@ -1777,6 +1764,7 @@ for (const fx of pool) {
   // ordena por prob "rank" (penaliza overs repetidos + diversifica) para que buildParlay/pickSafe elijan mejor
   const ranked = [...fixedCands].sort((a, b) => (b.__probRank || 0) - (a.__probRank || 0));
   candidatesByFixture[id] = ranked;
+  if (isGreen) candidatesByFixtureGreen[id] = ranked;
 }
 
 // ===================== DEBUG (DESPUÉS del loop) =====================
@@ -1824,75 +1812,99 @@ const candidatesByFixtureSanitized = Object.fromEntries(
   })
 );
 
-// ===================== SAFE + GIFT (AQUÍ nacen safe/giftBundle) =====================
-// Calidad de datos por fixture (solo considera Racha W/D/L de ambos equipos)
-const getLast5FromPack = (pack) =>
-  pack?.last5 || pack?.data?.last5 || pack?.stats?.last5 || pack?.form?.last5 || pack?.direct?.last5 || null;
-
-const fixtureQuality = (fxId) => {
-  const raw = fvPackByFixture?.[fxId] || null;
-  const pack = raw && !raw.__error ? raw : null;
-  const last5 = getLast5FromPack(pack);
-  return dataQualityFromLast5(last5);
-};
-
-const isFullFixture = (fxId) => fixtureQuality(fxId).full;
-
-// Pool preferente: solo fixtures con racha completa (verde). Fallback si queda corto.
-const candidatesFullOnly = Object.fromEntries(
-  Object.entries(candidatesByFixtureSanitized).filter(([fxId]) => isFullFixture(fxId))
+const candidatesByFixtureGreenSanitized = Object.fromEntries(
+  Object.entries(candidatesByFixtureGreen).map(([fxId, arr]) => {
+    const clean = (arr || []).map((c) => {
+      const fv = toOdd(c.fvOdd);
+      const mk = toOdd(c.marketOdd);
+      const used = toOdd(c.usedOddDisplay) ?? toOdd(c.usedOdd) ?? mk ?? fv;
+      return {
+        ...c,
+        fvOdd: fv ?? c.fvOdd,
+        marketOdd: mk ?? c.marketOdd,
+        usedOdd: used ?? c.usedOdd,
+        usedOddDisplay: used ?? c.usedOddDisplay,
+      };
+    });
+    return [fxId, clean];
+  })
 );
 
-// SAFE y regalo: preferir verdes. Si no hay suficientes, fallback al pool completo.
-const safe = pickSafe(candidatesFullOnly) || pickSafe(candidatesByFixtureSanitized);
-const giftBundle =
-  buildGiftPickBundle(candidatesFullOnly, 1.5, 3.0, 3) ||
-  buildGiftPickBundle(candidatesByFixtureSanitized, 1.5, 3.0, 3);
+
+// ===================== SAFE + GIFT (AQUÍ nacen safe/giftBundle) =====================
+const safe = pickSafe(Object.keys(candidatesByFixtureGreenSanitized).length ? candidatesByFixtureGreenSanitized : candidatesByFixtureSanitized) || pickSafe(candidatesByFixtureSanitized);
+const giftBundle = buildGiftPickBundle(Object.keys(candidatesByFixtureGreenSanitized).length ? candidatesByFixtureGreenSanitized : candidatesByFixtureSanitized, 1.5, 3.0, 3) || buildGiftPickBundle(candidatesByFixtureSanitized, 1.5, 3.0, 3);
 
 // ===================== TARGETS + PARLAYS =====================
 const targets = [3, 5, 10, 20, 50, 100].filter((t) => t <= maxBoost);
 console.log("[PARLAY] targets =", targets);
 
-const parlays = targets
+
+const parlaysBuilt = targets
   .map((t) => {
-    const r1 =
-      buildParlay({
-        candidatesByFixture: candidatesFullOnly,
-        target: t,
-        cap: maxBoost,
-      }) ||
-      buildParlay({
-        candidatesByFixture: candidatesByFixtureSanitized,
+    // 1) Intento "verde" (racha completa en ambos equipos)
+    const greenPool =
+      Object.keys(candidatesByFixtureGreenSanitized).length >= 2
+        ? candidatesByFixtureGreenSanitized
+        : null;
+
+    const tryBuild = (poolObj) => {
+      const r1 = buildParlay({
+        candidatesByFixture: poolObj,
         target: t,
         cap: maxBoost,
       });
-    console.log("[PARLAY] buildParlay target", t, "=>", r1);
-    if (r1) return r1;
+      if (r1) return r1;
 
-    const r2 =
-      buildBoostedParlayLocal({
-        candidatesByFixture: candidatesFullOnly,
-        target: t,
-        cap: maxBoost,
-      }) ||
-      buildBoostedParlayLocal({
-        candidatesByFixture: candidatesByFixtureSanitized,
+      const r2 = buildBoostedParlayLocal({
+        candidatesByFixture: poolObj,
         target: t,
         cap: maxBoost,
       });
-    console.log("[PARLAY] localParlay target", t, "=>", r2);
-    // Evita mostrar targets altos si la combinada queda muy lejos (esto generaba x20/x50/x100 idénticos)
-    if (!r2 || !Number.isFinite(r2.finalOdd)) return null;
-    const ratio = (r2.finalOdd || 0) / (t || 1);
 
-    // Margen por target: evitamos que "x50" termine mostrando una combinada tipo "x10",
-    // pero permitimos cierta holgura para que aparezcan x5/x10/x20 con datasets cortos.
-    const minRatio = t >= 50 ? 0.45 : 0.6;
-    const maxRatio = 1.6;
-    if (ratio < minRatio || ratio > maxRatio) return null;
-    return r2;
+      if (!r2 || !Number.isFinite(r2.finalOdd)) return null;
+
+      // Control de "cercanía" al target: si queda MUY lejos, lo consideramos "no alcanzado"
+      const ratio = (r2.finalOdd || 0) / (t || 1);
+      const minRatio = t >= 50 ? 0.45 : 0.6;
+      const maxRatio = 1.6;
+      if (ratio < minRatio || ratio > maxRatio) return null;
+      return r2;
+    };
+
+    // preferimos verdes, pero si no alcanza el target, hacemos fallback a pool completo
+    const bestGreen = greenPool ? tryBuild(greenPool) : null;
+    if (bestGreen) return bestGreen;
+
+    const bestAll = tryBuild(candidatesByFixtureSanitized);
+    return bestAll;
   })
   .filter(Boolean)
+  // Evita duplicados exactos entre targets
+  .filter((p, idx, arr) => {
+    const sig = (p.picks || p.legs || []).map((x) => `${x.fixtureId}:${x.marketKey || x.key || x.label || ""}`).join("|");
+    return (
+      arr.findIndex((q) => (q.picks || q.legs || []).map((x) => `${x.fixtureId}:${x.marketKey || x.key || x.label || ""}`).join("|") === sig) === idx
+    );
+  });
+
+// ✅ Si faltan targets altos (x20/x50/x100), mostramos tarjeta con sugerencia en vez de "no aparecer"
+const builtTargets = new Set(parlaysBuilt.map((p) => p.target));
+const missingTargets = targets.filter((t) => !builtTargets.has(t));
+const parlays = [
+  ...parlaysBuilt,
+  ...missingTargets.map((t) => ({
+    target: t,
+    unavailable: true,
+    finalOdd: null,
+    games: 0,
+    legs: [],
+    message:
+      `No pudimos alcanzar x${t} con los partidos disponibles hoy. ` +
+      `Sugerencia: amplía el rango a 2 días (o agrega más ligas) y vuelve a generar.`,
+  })),
+];
+
   // Evita duplicados exactos entre targets
   .filter((p, idx, arr) => {
     const sig = (p.picks || []).map((x) => `${x.fixtureId}:${x.marketKey || x.key || x.label || ""}`).join("|");
@@ -1900,20 +1912,7 @@ const parlays = targets
   });
 
   // ===================== VALUE LIST (usar SANITIZED) =====================
-let valueList = buildValueList(candidatesByFixtureSanitized, 0.06);
-
-// Orden: primero fixtures con racha completa (verde), luego parciales (amarillo)
-if (Array.isArray(valueList)) {
-  valueList = valueList
-    .slice()
-    .sort((a, b) => {
-      const af = isFullFixture(a?.fixtureId) ? 1 : 0;
-      const bf = isFullFixture(b?.fixtureId) ? 1 : 0;
-      if (bf !== af) return bf - af;
-      return (b?.value || 0) - (a?.value || 0);
-    });
-}
-
+const valueList = buildValueList(candidatesByFixtureSanitized, 0.06);
 
 console.log("parlays:", parlays);
 console.log("valueList:", valueList?.length);
@@ -2293,7 +2292,6 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 {fvOutput?.safe ? (
   <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/30 p-3">
     <div className="text-sm font-semibold text-slate-100">{fvOutput.safe.label}</div>
-    <div className="mt-1"><DataQualityBadge full={fvOutput.safe.dataQuality === "full"} /></div>
     <div className="text-xs text-slate-300 mt-1">
       {fvOutput.safe.home} vs {fvOutput.safe.away}
     </div>
@@ -2339,12 +2337,6 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 {parlayResult?.legs?.length ? (
   <div className="mt-2 space-y-1">
     {(parlayResult.legs || [])
-      .slice()
-      .sort((a, b) => {
-        const af = dataQualityFromLast5(getLast5FromFvPack(fvPackByFixture?.[a?.fixtureId])).full ? 1 : 0;
-        const bf = dataQualityFromLast5(getLast5FromFvPack(fvPackByFixture?.[b?.fixtureId])).full ? 1 : 0;
-        return bf - af;
-      })
       .filter(
         (l) =>
           l &&
@@ -2357,12 +2349,9 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
         const oddNum = toOdd(leg.usedOddDisplay) ?? toOdd(leg.usedOdd);
         const oddToShow = oddNum && oddNum > 1 ? oddNum : null;
 
-        const dq = dataQualityFromLast5(getLast5FromFvPack(fvPackByFixture?.[leg.fixtureId]));
-
         return (
           <div key={`${leg.fixtureId || "fx"}-${idx}`} className="text-[11px] text-slate-300">
-            <span className="text-slate-500">{idx + 1}</span>{" "}
-            <DataQualityDot full={dq.full} />{" "}
+            <span className="text-slate-500">{idx + 1}.</span>{" "}
             <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
             <span className="text-slate-500">—</span>{" "}
             {leg.home} vs {leg.away}{" "}
@@ -2424,7 +2413,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
                   className="rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2"
                 >
                   <div className="text-[11px] text-slate-300">
-                    <span className="text-slate-500">{idx + 1}</span>{" "}
+                    <span className="text-slate-500">{idx + 1}.</span>{" "}
                     <span className="text-slate-100 font-semibold">{v.label || v.pick}</span>
                     {v.home && v.away ? (
                       <>
@@ -2472,6 +2461,16 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
           {fvOutput?.parlays?.length ? (
          <div className="mt-3 space-y-3">
          {fvOutput.parlays.map((p) => (
+            p?.unavailable ? (
+              <div key={p.target} className="rounded-xl border border-white/10 bg-slate-950/30 p-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold text-slate-100">Potenciada x{p.target}</div>
+                  <div className="text-xs text-slate-400">No disponible</div>
+                </div>
+                <div className="mt-2 text-[11px] text-slate-300">{p.message}</div>
+              </div>
+            ) : (
+
          <div key={p.target} className="rounded-xl border border-white/10 bg-slate-950/30 p-3">
         <div className="flex items-center justify-between">
           <div className="text-sm font-semibold text-slate-100">Potenciada x{p.target}</div>
@@ -2482,23 +2481,15 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
         </div>
 
         <div className="mt-2 space-y-1">
-          {(p.legs || [])
-      .slice()
-      .sort((a, b) => {
-        const af = dataQualityFromLast5(getLast5FromFvPack(fvPackByFixture?.[a?.fixtureId])).full ? 1 : 0;
-        const bf = dataQualityFromLast5(getLast5FromFvPack(fvPackByFixture?.[b?.fixtureId])).full ? 1 : 0;
-        return bf - af;
-      }).map((leg, idx) => {
+          {(p.legs || []).map((leg, idx) => {
             const oddToShow =
               (toOdd(leg.usedOddDisplay) ?? toOdd(leg.usedOdd)) > 1
                 ? (toOdd(leg.usedOddDisplay) ?? toOdd(leg.usedOdd))
                 : null;
-            const dq = dataQualityFromLast5(getLast5FromFvPack(fvPackByFixture?.[leg.fixtureId]));
 
             return (
               <div key={`${p.target}-${leg.fixtureId || idx}-${idx}`} className="text-[11px] text-slate-300">
-                <span className="text-slate-500">{idx + 1}</span>{" "}
-                <DataQualityDot full={dq.full} />{" "}
+                <span className="text-slate-500">{idx + 1}.</span>{" "}
                 <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
                 <span className="text-slate-500">—</span>{" "}
                 {leg.home} vs {leg.away}{" "}
@@ -2513,6 +2504,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
           })}
         </div>
       </div>
+            )
     ))}
   </div>
 ) : (
