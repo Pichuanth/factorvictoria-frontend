@@ -45,6 +45,9 @@ const BG_BIENVENIDO = asset("hero-bienvenido.png");
 /** Timezone oficial (igual que Fixtures) */
 const APP_TZ = "America/Santiago";
 
+const COMPARATOR_STORAGE_KEY = "fv_comparator_state_v1";
+const COMPARATOR_STORAGE_VERSION = 1;
+
 /* --------------------- helpers base --------------------- */
 function toOdd(v) {
   if (v == null) return null;
@@ -94,7 +97,7 @@ function prettyForm(formStr) {
     .join(" ");
 }
 
-const FORM_LEGEND = "🟢 G=Ganado, 🟡 E=Empate, 🔴 P=Perdido";
+const FORM_LEGEND = "Leyenda: 🟢G=Ganado, 🟡E=Empate, 🔴P=Perdido";
 
 
 function includesNorm(haystack, needle) {
@@ -741,7 +744,7 @@ function VisitorPlansGrid() {
         title="Plan Mensual"
         price="$19.990 · x10"
         href="/#plan-mensual"
-        bullets={["Cuotas potenciadas hasta x10", "Cuota de regalo", "Acceso a herramientas base"]}
+        bullets={["Cuotas potenciadas hasta x10", "Cuota segura (regalo)", "Acceso a herramientas base"]}
       />
       <LockedPlanCard
         title="Plan Trimestral"
@@ -1189,6 +1192,10 @@ export default function Comparator() {
   const { isLoggedIn, user } = useAuth();
   const [searchParams] = useSearchParams();
 
+  // Launch safeguard: hide unfinished modules for now
+  const ENABLE_REFEREES = false;
+  const ENABLE_SCORERS = false;
+
   const today = useMemo(() => new Date(), []);
   const [from, setFrom] = useState(toYYYYMMDD(today));
   const [to, setTo] = useState(toYYYYMMDD(today));
@@ -1247,6 +1254,84 @@ export default function Comparator() {
   const [refData, setRefData] = useState(null);
   const [refLoading, setRefLoading] = useState(false);
   const [refErr, setRefErr] = useState("");
+
+
+  // -------------------- Persist Comparator state across tab navigation --------------------
+  const _restoredRef = useRef(false);
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(COMPARATOR_STORAGE_KEY);
+      if (!raw) return;
+      const st = JSON.parse(raw);
+      if (!st || st.v !== COMPARATOR_STORAGE_VERSION) return;
+
+      if (st.from) setFrom(st.from);
+      if (st.to) setTo(st.to);
+      if (typeof st.q === "string") setQ(st.q);
+
+      if (Array.isArray(st.selectedIds)) setSelectedIds(st.selectedIds);
+      if (Array.isArray(st.selectedCountries)) setSelectedCountries(st.selectedCountries);
+
+      if (Array.isArray(st.fixtures)) setFixtures(st.fixtures);
+      if (Array.isArray(st.weeklyFixtures)) setWeeklyFixtures(st.weeklyFixtures);
+
+      if (st.oddsByFixture && typeof st.oddsByFixture === "object") setOddsByFixture(st.oddsByFixture);
+      if (st.fvPackByFixture && typeof st.fvPackByFixture === "object") setFvPackByFixture(st.fvPackByFixture);
+
+      if (st.fvOutput) setFvOutput(st.fvOutput);
+      if (st.parlayResult) setParlayResult(st.parlayResult);
+      if (typeof st.generatedOk === "boolean") setGeneratedOk(st.generatedOk);
+
+      _restoredRef.current = true;
+    } catch (e) {
+      // ignore corrupted cache
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!_restoredRef.current) return;
+
+    const payload = {
+      v: COMPARATOR_STORAGE_VERSION,
+      ts: Date.now(),
+      from,
+      to,
+      q,
+      selectedIds,
+      selectedCountries,
+      fixtures,
+      weeklyFixtures,
+      oddsByFixture,
+      fvPackByFixture,
+      fvOutput,
+      parlayResult,
+      generatedOk,
+    };
+
+    const t = setTimeout(() => {
+      try {
+        sessionStorage.setItem(COMPARATOR_STORAGE_KEY, JSON.stringify(payload));
+      } catch {
+        // storage full or blocked
+      }
+    }, 250);
+
+    return () => clearTimeout(t);
+  }, [
+    from,
+    to,
+    q,
+    selectedIds,
+    selectedCountries,
+    fixtures,
+    weeklyFixtures,
+    oddsByFixture,
+    fvPackByFixture,
+    fvOutput,
+    parlayResult,
+    generatedOk,
+  ]);
 
   useEffect(() => {
     const urlDate = searchParams.get("date");
@@ -1737,12 +1822,8 @@ const parlays = targets
   .filter(Boolean)
   // Evita duplicados exactos entre targets
   .filter((p, idx, arr) => {
-    const legs = p.picks || p.legs || [];
-    const sig = legs.map((x) => `${x.fixtureId}:${x.marketKey || x.key || x.label || ""}`).join("|");
-    return arr.findIndex((q) => {
-      const qlegs = q.picks || q.legs || [];
-      return qlegs.map((x) => `${x.fixtureId}:${x.marketKey || x.key || x.label || ""}`).join("|") === sig;
-    }) === idx;
+    const sig = (p.picks || []).map((x) => `${x.fixtureId}:${x.marketKey || x.key || x.label || ""}`).join("|");
+    return arr.findIndex((q) => (q.picks || []).map((x) => `${x.fixtureId}:${x.marketKey || x.key || x.label || ""}`).join("|") === sig) === idx;
   });
 
   // ===================== VALUE LIST (usar SANITIZED) =====================
@@ -1773,7 +1854,7 @@ const best = parlays
   .slice()
   .sort((a, b) => (b.finalOdd || 0) - (a.finalOdd || 0))[0];
 
-if (best) setParlayResult({ mode, ...best, picks: best.picks || best.legs || [] });
+if (best) setParlayResult({ mode, ...best });
 
     } catch (e) {
       console.error("[FV] runGeneration error", e);
@@ -2116,11 +2197,9 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 
       {/* 4) MÓDULOS premium */}
       <section className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-        <FeatureCard title="Cuota de regalo" badge="Alta probabilidad" locked={!features.giftPick}>
+        <FeatureCard title="Cuota segura (regalo)" badge="Alta probabilidad" locked={!features.giftPick}>
           <div className="text-xs text-slate-300">
-  Pick con mayor probabilidad. Prioriza partidos con estadísticas completas de ambos equipos.
-  Si uno no presenta datos, el porcentaje de acierto se reduce en un 70%. Recarga o vuelve a generar para un análisis óptimo.
-  Consulta siempre los datos en la parte superior.
+  Pick con mayor probabilidad (FV). Si hay cuota de mercado, la mostramos; si no, usamos FV.
 </div>
 
 {fvOutput?.safe ? (
@@ -2205,6 +2284,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 
         </FeatureCard>
 
+        {ENABLE_REFEREES && (
         <FeatureCard title="Árbitros tarjeteros" badge="Tarjetas" locked={!canReferees} lockText="Disponible desde Plan Anual.">
           <div className="text-xs text-slate-300">Ranking de árbitros con más tarjetas (por rango de fechas y país).</div>
 
@@ -2226,6 +2306,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 )}
 
 </FeatureCard>
+        )}
 
         <FeatureCard
           title="Desfase del mercado"
@@ -2274,6 +2355,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
           )}
         </FeatureCard>
 
+        {ENABLE_SCORERS && (
         <FeatureCard
           title="Goleadores / Remates / Value"
 
@@ -2283,10 +2365,10 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
         >
           <div className="text-xs text-slate-300">Aquí reactivaremos los módulos avanzados (goleadores, remates, value del mercado).</div>
         </FeatureCard>
+        )}
 
         <FeatureCard title="Parlays potenciados" badge="Parlays" locked={!features.boosted} lockText="Disponible en todos los planes.">
-          <div className="text-xs text-slate-300">Parlays potenciados que genera el modelo (x3, x5, x10, x20, x50, x100).
-          Confirma siempre los datos en la parte superior. ver estadísticas. </div>
+          <div className="text-xs text-slate-300">Aquí verás los parlays potenciados que genera el modelo (x3, x5, x10, x20, etc.).</div>
 
           {fvOutput?.parlays?.length ? (
          <div className="mt-3 space-y-3">

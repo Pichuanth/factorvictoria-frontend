@@ -276,8 +276,7 @@ export default function RecoWeeklyCard({
     <Card>
       <div className="text-emerald-200/90 text-xs font-semibold tracking-wide">Factor Victoria recomienda</div>
       <div className="mt-1 text-xl md:text-2xl font-bold text-slate-100">Partidazos de la semana</div>
-      <div className="mt-1 text-sm text-slate-200">Pin manual + Top automático.</div>
-
+      
       <div className="mt-4 space-y-2">
         {loading ? (
           <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4 text-sm text-slate-300">
