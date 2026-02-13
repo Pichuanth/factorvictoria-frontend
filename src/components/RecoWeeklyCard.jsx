@@ -296,7 +296,7 @@ export default function RecoWeeklyCard({
       </div>
 
       <div className="mt-3 text-[11px] text-slate-400">
-        Edita la lista <span className="font-semibold">PARTIDAZOS_MANUAL</span> para cambiar la selección.
+        Partidazos <span className="font-semibold">Ligas</span> Importantes
       </div>
     </Card>
   );
