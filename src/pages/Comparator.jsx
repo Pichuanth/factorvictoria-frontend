@@ -97,6 +97,37 @@ function prettyForm(formStr) {
     .join(" ");
 }
 
+function hasValidFormStr(s) {
+  if (!s || typeof s !== "string") return false;
+  const parts = s.split(/\s*[-|\s]\s*/).filter(Boolean);
+  if (parts.length < 3) return false;
+  return parts.every((t) => ["W", "D", "L"].includes(String(t).trim().toUpperCase()));
+}
+
+function dataQualityFromLast5(last5) {
+  const homeForm = last5?.home?.form || last5?.local?.form || null;
+  const awayForm = last5?.away?.form || last5?.visitor?.form || null;
+  const hasHome = hasValidFormStr(homeForm);
+  const hasAway = hasValidFormStr(awayForm);
+  return { hasHome, hasAway, full: hasHome && hasAway };
+}
+
+function DataQualityBadge({ full }) {
+  const base = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border";
+  if (full) {
+    return (
+      <span className={base + " border-emerald-300/40 bg-emerald-500/10 text-emerald-100"}>
+        🟢 Datos completos
+      </span>
+    );
+  }
+  return (
+    <span className={base + " border-yellow-300/40 bg-yellow-500/10 text-yellow-100"}>
+      🟡 Datos parciales
+    </span>
+  );
+}
+
 const FORM_LEGEND = "Leyenda: 🟢G=Ganado, 🟡E=Empate, 🔴P=Perdido";
 
 
@@ -2207,6 +2238,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 {fvOutput?.safe ? (
   <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/30 p-3">
     <div className="text-sm font-semibold text-slate-100">{fvOutput.safe.label}</div>
+    <div className="mt-1"><DataQualityBadge full={fvOutput.safe.dataQuality === "full"} /></div>
     <div className="text-xs text-slate-300 mt-1">
       {fvOutput.safe.home} vs {fvOutput.safe.away}
     </div>

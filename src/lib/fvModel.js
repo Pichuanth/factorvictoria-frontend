@@ -22,6 +22,43 @@ function safeNum(n) {
   return Number.isFinite(x) ? x : null;
 }
 
+// --- Data quality helpers (form/racha) ---
+function extractLast5(pack) {
+  return (
+    pack?.last5 ||
+    pack?.data?.last5 ||
+    pack?.stats?.last5 ||
+    pack?.form?.last5 ||
+    pack?.direct?.last5 ||
+    null
+  );
+}
+
+function hasValidFormStr(s) {
+  if (!s || typeof s !== "string") return false;
+  // Expect tokens like W-D-L (any length >= 3 tokens)
+  const parts = s.split(/\s*[-|\s]\s*/).filter(Boolean);
+  if (parts.length < 3) return false;
+  return parts.every((t) => ["W", "D", "L"].includes(String(t).trim().toUpperCase()));
+}
+
+function formQuality(pack) {
+  const last5 = extractLast5(pack);
+  const homeForm = last5?.home?.form || last5?.local?.form || null;
+  const awayForm = last5?.away?.form || last5?.visitor?.form || null;
+  const hasHome = hasValidFormStr(homeForm);
+  const hasAway = hasValidFormStr(awayForm);
+  return { hasHome, hasAway, full: hasHome && hasAway, homeForm, awayForm };
+}
+
+function applyConfidence(p, multiplier) {
+  // shrink toward 0.5 to be conservative when data is partial
+  const prob = Number(p);
+  if (!Number.isFinite(prob)) return prob;
+  const m = clamp(Number(multiplier), 0, 1);
+  return clamp(0.5 + (prob - 0.5) * m, 0.01, 0.99);
+}
+
 
 function pr(c) {
   const v = Number(c?.__probRank);
@@ -178,6 +215,11 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
   // Genera picks candidatos con: market, selection, label, prob, fvOdd, marketOdd, usedOdd, valueEdge, fixtureId, home, away
   const out = [];
 
+  // Calidad de datos: usamos la racha (W/D/L últimos 5) como señal principal.
+  const q = formQuality(pack);
+  const confidence = q.full ? 1 : 0.7; // si falta racha en 1+ equipos, reducimos confianza (sin bloquear)
+  const dataQuality = q.full ? "full" : "partial";
+
   const { lambdaHome, lambdaAway, lambdaTotal } = estimateLambdasFromPack(pack);
 
   // --- NUEVO: forma + h2h ---
@@ -286,6 +328,9 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
 
     return {
       ...x,
+      dataQuality,
+      confidence,
+      __probRank: applyConfidence(Number(x?.prob), confidence),
       fvOdd: round2(fvOddNum),
       marketOdd: Number.isFinite(mkOddNum) ? round2(mkOddNum) : null,
       usedOdd: bestOddRaw,
