@@ -128,6 +128,14 @@ function DataQualityBadge({ full }) {
   );
 }
 
+function DataQualityDot({ full, title }) {
+  const cls = full
+    ? "inline-block w-2 h-2 rounded-full bg-emerald-400/90 ring-1 ring-emerald-200/40"
+    : "inline-block w-2 h-2 rounded-full bg-yellow-400/90 ring-1 ring-yellow-200/40";
+  return <span className={cls} title={title || (full ? "Datos completos" : "Datos parciales")} />;
+}
+
+
 const FORM_LEGEND = "Leyenda: 🟢G=Ganado, 🟡E=Empate, 🔴P=Perdido";
 
 
@@ -2296,9 +2304,12 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
         const oddNum = toOdd(leg.usedOddDisplay) ?? toOdd(leg.usedOdd);
         const oddToShow = oddNum && oddNum > 1 ? oddNum : null;
 
+        const dq = dataQualityFromLast5(fvPackByFixture?.[leg.fixtureId]?.last5);
+
         return (
           <div key={`${leg.fixtureId || "fx"}-${idx}`} className="text-[11px] text-slate-300">
-            <span className="text-slate-500">#{idx + 1}</span>{" "}
+            <span className="text-slate-500">{idx + 1}</span>{" "}
+            <DataQualityDot full={dq.full} />{" "}
             <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
             <span className="text-slate-500">—</span>{" "}
             {leg.home} vs {leg.away}{" "}
@@ -2360,7 +2371,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
                   className="rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2"
                 >
                   <div className="text-[11px] text-slate-300">
-                    <span className="text-slate-500">#{idx + 1}</span>{" "}
+                    <span className="text-slate-500">{idx + 1}</span>{" "}
                     <span className="text-slate-100 font-semibold">{v.label || v.pick}</span>
                     {v.home && v.away ? (
                       <>
@@ -2423,10 +2434,12 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
               (toOdd(leg.usedOddDisplay) ?? toOdd(leg.usedOdd)) > 1
                 ? (toOdd(leg.usedOddDisplay) ?? toOdd(leg.usedOdd))
                 : null;
+            const dq = dataQualityFromLast5(fvPackByFixture?.[leg.fixtureId]?.last5);
 
             return (
               <div key={`${p.target}-${leg.fixtureId || idx}-${idx}`} className="text-[11px] text-slate-300">
-                <span className="text-slate-500">#{idx + 1}</span>{" "}
+                <span className="text-slate-500">{idx + 1}</span>{" "}
+                <DataQualityDot full={dq.full} />{" "}
                 <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
                 <span className="text-slate-500">—</span>{" "}
                 {leg.home} vs {leg.away}{" "}
