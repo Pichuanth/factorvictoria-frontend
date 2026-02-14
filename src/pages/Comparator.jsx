@@ -1104,7 +1104,7 @@ function ManualPicksSection() {
             >
               <div className="min-w-0">
                 <div className="text-sm text-slate-100 font-semibold truncate">{x.label}</div>
-                {x.note ? <div className="text-[11px] text-slate-400">{x.note}</div> : null}
+                {x.note ? <div className="text-[11px] text-emerald-300/80">{x.note}</div> : null}
               </div>
               <div className="text-sm font-bold text-emerald-200">x{Number(x.odd).toFixed(2)}</div>
             </div>
@@ -1746,6 +1746,21 @@ for (const fx of pool) {
     markets,
   });
 
+  // Calidad de datos: SOLO rachas (últ.5) de ambos equipos.
+  // Si falta cualquiera, marcamos como parcial.
+  const hasRacha = (v) => {
+    const s = String(v || "").trim();
+    if (!s) return false;
+    // API/BD a veces devuelve "--" o "-" cuando no hay datos
+    if (s === "--" || s === "-" || s.includes("--")) return false;
+    // esperamos letras tipo W-D-L o similares
+    return /[WDL]/i.test(s);
+  };
+  const dataQuality = (hasRacha(pack?.last5?.home?.form) && hasRacha(pack?.last5?.away?.form))
+    ? "full"
+    : "partial";
+  const __qualityRank = dataQuality === "full" ? 1 : 0;
+
   const fixedCands = (rawCands || []).map((c) => {
     const prob = Number(c?.prob);
     const probOk = Number.isFinite(prob) ? prob : null;
@@ -1781,6 +1796,8 @@ for (const fx of pool) {
 
     return {
       ...c,
+      dataQuality,
+      __qualityRank,
       fvOdd: fvOddNum,
       marketOdd: marketOddNum ?? c?.marketOdd,
       usedOdd: usedOddNum,
@@ -1791,7 +1808,13 @@ for (const fx of pool) {
   });
 
   // ordena por prob "rank" (penaliza overs repetidos + diversifica) para que buildParlay/pickSafe elijan mejor
-  const ranked = [...fixedCands].sort((a, b) => (b.__probRank || 0) - (a.__probRank || 0));
+  // PRIORIDAD: datos completos (racha local+visita) -> luego probRank
+  const ranked = [...fixedCands].sort((a, b) => {
+    const qa = a?.__qualityRank || 0;
+    const qb = b?.__qualityRank || 0;
+    if (qb !== qa) return qb - qa;
+    return (b.__probRank || 0) - (a.__probRank || 0);
+  });
   candidatesByFixture[id] = ranked;
 }
 
@@ -1848,7 +1871,10 @@ const giftBundle = buildGiftPickBundle(candidatesByFixtureSanitized, 1.5, 3.0, 3
 const targets = [3, 5, 10, 20, 50, 100].filter((t) => t <= maxBoost);
 console.log("[PARLAY] targets =", targets);
 
-const parlays = targets
+// Construimos tiers siempre (3,5,10,20,50,100) para no dejar casillas vacías.
+// Regla: prioriza VERDES; si para x50/x100 no alcanza, se muestra igualmente el mejor parlay
+// disponible con un mensaje sugeriendo ampliar rango.
+const builtParlays = targets
   .map((t) => {
     const r1 = buildParlay({
       candidatesByFixture: candidatesByFixtureSanitized,
@@ -1856,7 +1882,14 @@ const parlays = targets
       cap: maxBoost,
     });
     console.log("[PARLAY] buildParlay target", t, "=>", r1);
-    if (r1) return r1;
+    if (r1) {
+      const ratio = (r1.finalOdd || 0) / (t || 1);
+      return {
+        ...r1,
+        ratio,
+        note: ratio < 1 ? `No alcanzamos x${t} con los partidos actuales. Añade 1 o 2 días más para acercarte a la cuota esperada.` : "",
+      };
+    }
 
     const r2 = buildBoostedParlayLocal({
       candidatesByFixture: candidatesByFixtureSanitized,
@@ -1864,23 +1897,37 @@ const parlays = targets
       cap: maxBoost,
     });
     console.log("[PARLAY] localParlay target", t, "=>", r2);
-    // Evita mostrar targets altos si la combinada queda muy lejos (esto generaba x20/x50/x100 idénticos)
     if (!r2 || !Number.isFinite(r2.finalOdd)) return null;
     const ratio = (r2.finalOdd || 0) / (t || 1);
-
-    // Margen por target: evitamos que "x50" termine mostrando una combinada tipo "x10",
-    // pero permitimos cierta holgura para que aparezcan x5/x10/x20 con datasets cortos.
-    const minRatio = t >= 50 ? 0.45 : 0.6;
-    const maxRatio = 1.6;
-    if (ratio < minRatio || ratio > maxRatio) return null;
-    return r2;
+    return {
+      ...r2,
+      ratio,
+      note: ratio < 1 ? `No alcanzamos x${t} con los partidos actuales. Añade 1 o 2 días más para acercarte a la cuota esperada.` : "",
+    };
   })
-  .filter(Boolean)
-  // Evita duplicados exactos entre targets
-  .filter((p, idx, arr) => {
-    const sig = (p.picks || []).map((x) => `${x.fixtureId}:${x.marketKey || x.key || x.label || ""}`).join("|");
-    return arr.findIndex((q) => (q.picks || []).map((x) => `${x.fixtureId}:${x.marketKey || x.key || x.label || ""}`).join("|") === sig) === idx;
-  });
+  .filter(Boolean);
+
+// Mejor parlay para fallback (por finalOdd)
+const bestParlay = builtParlays
+  .slice()
+  .sort((a, b) => (b.finalOdd || 0) - (a.finalOdd || 0))[0];
+
+const byTarget = new Map(builtParlays.map((p) => [p.target, p]));
+const parlays = targets
+  .map((t) => {
+    const p = byTarget.get(t);
+    if (p) return p;
+    if (!bestParlay) return null;
+    // Repite el mejor para completar tiers faltantes
+    return {
+      ...bestParlay,
+      target: t,
+      ratio: (bestParlay.finalOdd || 0) / (t || 1),
+      note: `No alcanzamos x${t} con los partidos actuales. Añade 1 o 2 días más para acercarte a la cuota esperada.`,
+      __fallback: true,
+    };
+  })
+  .filter(Boolean);
 
   // ===================== VALUE LIST (usar SANITIZED) =====================
 const valueList = buildValueList(candidatesByFixtureSanitized, 0.06);
