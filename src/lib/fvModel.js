@@ -44,8 +44,8 @@ function hasValidFormStr(s) {
 
 function formQuality(pack) {
   const last5 = extractLast5(pack);
-  const homeForm = last5?.home?.form || last5?.local?.form || null;
-  const awayForm = last5?.away?.form || last5?.visitor?.form || null;
+  const homeForm = last5?.home?.form || last5?.local?.form || last5?.home?.display || last5?.local?.display || null;
+  const awayForm = last5?.away?.form || last5?.visitor?.form || last5?.away?.display || last5?.visitor?.display || null;
   const hasHome = hasValidFormStr(homeForm);
   const hasAway = hasValidFormStr(awayForm);
   return { hasHome, hasAway, full: hasHome && hasAway, homeForm, awayForm };
