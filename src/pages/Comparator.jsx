@@ -131,11 +131,44 @@ function hasValidFormStr(s) {
 
 
 function dataQualityFromLast5(last5) {
-  const homeForm = last5?.home?.form || last5?.local?.form || null || last5?.home?.display || last5?.local?.display || null;
-  const awayForm = last5?.away?.form || last5?.visitor?.form || null || last5?.away?.display || last5?.visitor?.display || null;
-  const hasHome = hasValidFormStr(homeForm);
-  const hasAway = hasValidFormStr(awayForm);
-  return { hasHome, hasAway, full: hasHome && hasAway };
+  // Prefer explicit 5-match results arrays (most reliable), then fall back to form strings.
+  const homeResults = last5?.home?.results || last5?.local?.results || null;
+  const awayResults = last5?.away?.results || last5?.visitor?.results || null;
+
+  const hasHomeResults = Array.isArray(homeResults) && homeResults.length >= 5;
+  const hasAwayResults = Array.isArray(awayResults) && awayResults.length >= 5;
+
+  if (hasHomeResults || hasAwayResults) {
+    return {
+      hasHome: hasHomeResults,
+      hasAway: hasAwayResults,
+      dataQuality: hasHomeResults && hasAwayResults ? 'full' : 'partial',
+    };
+  }
+
+  const homeForm =
+    last5?.home?.form ||
+    last5?.local?.form ||
+    last5?.home?.display ||
+    last5?.local?.display ||
+    null;
+
+  const awayForm =
+    last5?.away?.form ||
+    last5?.visitor?.form ||
+    last5?.away?.display ||
+    last5?.visitor?.display ||
+    null;
+
+  // Accept W/D/L as well as G/E/P (Spanish) just in case.
+  const hasHome = hasValidFormStr(homeForm) || /[WG][^a-zA-Z]*|[WDLGEP]/.test(String(homeForm || ''));
+  const hasAway = hasValidFormStr(awayForm) || /[WG][^a-zA-Z]*|[WDLGEP]/.test(String(awayForm || ''));
+
+  return {
+    hasHome,
+    hasAway,
+    dataQuality: hasHome && hasAway ? 'full' : (hasHome || hasAway ? 'partial' : 'none'),
+  };
 }
 
 

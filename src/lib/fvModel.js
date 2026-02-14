@@ -36,10 +36,13 @@ function extractLast5(pack) {
 
 function hasValidFormStr(s) {
   if (!s || typeof s !== "string") return false;
-  // Expect tokens like W-D-L (any length >= 3 tokens)
+  // Accept tokens like W-D-L or G-E-P
   const parts = s.split(/\s*[-|\s]\s*/).filter(Boolean);
   if (parts.length < 3) return false;
-  return parts.every((t) => ["W", "D", "L"].includes(String(t).trim().toUpperCase()));
+  return parts.every((t) => {
+    const u = String(t).trim().toUpperCase();
+    return ["W", "D", "L", "G", "E", "P"].includes(u);
+  });
 }
 
 function formQuality(pack) {
