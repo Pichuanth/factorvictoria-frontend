@@ -2323,7 +2323,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 
         return (
           <div key={`${leg.fixtureId || "fx"}-${idx}`} className="text-[11px] text-slate-300">
-            <QualityDot dataQuality={leg.dataQuality} />{" "}<span className="text-slate-500">{idx + 1}.</span>{" "}
+            <QualityDot dataQuality={v?.dataQuality || "partial"} />{" "}<span className="text-slate-500">{idx + 1}.</span>{" "}
             <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
             <span className="text-slate-500">—</span>{" "}
             {leg.home} vs {leg.away}{" "}
@@ -2385,7 +2385,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
                   className="rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2"
                 >
                   <div className="text-[11px] text-slate-300">
-                    <QualityDot dataQuality={leg.dataQuality} />{" "}<span className="text-slate-500">{idx + 1}.</span>{" "}
+                    <QualityDot dataQuality={v?.dataQuality || "partial"} />{" "}<span className="text-slate-500">{idx + 1}.</span>{" "}
                     <span className="text-slate-100 font-semibold">{v.label || v.pick}</span>
                     {v.home && v.away ? (
                       <>
@@ -2451,7 +2451,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 
             return (
               <div key={`${p.target}-${leg.fixtureId || idx}-${idx}`} className="text-[11px] text-slate-300">
-                <QualityDot dataQuality={leg.dataQuality} />{" "}<span className="text-slate-500">{idx + 1}.</span>{" "}
+                <QualityDot dataQuality={v?.dataQuality || "partial"} />{" "}<span className="text-slate-500">{idx + 1}.</span>{" "}
                 <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
                 <span className="text-slate-500">—</span>{" "}
                 {leg.home} vs {leg.away}{" "}
