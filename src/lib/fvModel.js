@@ -70,6 +70,11 @@ function pr(c) {
   return Number.isFinite(p) ? p : 0;
 }
 
+function qRank(p) {
+  return p?.dataQuality?.isComplete ? 1 : 0;
+}
+
+
 // stats: [{gf, ga}] últimos partidos
 function summarizeRecent(list) {
   if (!Array.isArray(list) || !list.length) return null;
@@ -346,7 +351,7 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
   });
 
   // Orden: primero mayor prob (seguro), luego menor odd
-  cleaned.sort((a, b) => (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
+  cleaned.sort((a, b) => (qRank(b) - qRank(a)) || (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
   return cleaned;
 }
 // =====================
@@ -355,7 +360,7 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
 
 export function pickSafe(candidatesByFixture) {
   const all = Object.values(candidatesByFixture || {}).flat();
-  all.sort((a, b) => (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
+  all.sort((a, b) => (qRank(b) - qRank(a)) || (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
   return all[0] || null;
 }
 
@@ -369,7 +374,7 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
       return Number.isFinite(odd) && odd > 1;
     });
 
-  pool.sort((a, b) => (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
+  pool.sort((a, b) => (qRank(b) - qRank(a)) || (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
 
   const legs = [];
   let prod = 1;
