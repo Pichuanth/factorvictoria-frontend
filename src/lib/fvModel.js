@@ -72,15 +72,39 @@ function extractLast5FromFixture(fixture) {
   return null;
 }
 
+// Normalize a "form" string to canonical tokens: W/D/L.
+// Backend/UI may include emojis like "🔴P" and parentheses.
+// We map G=Win, E=Draw, P=Loss, and ignore other characters.
+function normalizeFormTokens(s) {
+  if (!s) return [];
+  const raw = String(s);
+
+  let parts = raw
+    .replace(/[()\[\]{}]/g, " ")
+    .split(/[-\s]+/)
+    .filter(Boolean);
+
+  // If we got a single chunk like "LLWLL" (rare), split into chars.
+  if (parts.length === 1 && parts[0].length >= 5) {
+    const onlyLetters = parts[0].replace(/[^A-Za-z]/g, "");
+    if (onlyLetters.length >= 5) parts = onlyLetters.split("");
+  }
+
+  return parts
+    .map((t) => String(t).replace(/[^A-Za-z]/g, "").toUpperCase())
+    .flatMap((t) => (t.length > 1 ? t.split("") : [t]))
+    .map((t) => {
+      if (t === "G") return "W";
+      if (t === "E") return "D";
+      if (t === "P") return "L";
+      return t;
+    })
+    .filter((t) => t === "W" || t === "D" || t === "L");
+}
+
 function hasValidFormStr(s) {
-  if (!s || typeof s !== "string") return false;
-  // Accept tokens like W-D-L or G-E-P
-  const parts = s.split(/\s*[-|\s]\s*/).filter(Boolean);
-  if (parts.length < 3) return false;
-  return parts.every((t) => {
-    const u = String(t).trim().toUpperCase();
-    return ["W", "D", "L", "G", "E", "P"].includes(u);
-  });
+  // "Valid" means we can extract at least 3 W/D/L tokens.
+  return normalizeFormTokens(s).length >= 3;
 }
 
 function formQuality(pack, fixture) {
@@ -117,9 +141,19 @@ function formQuality(pack, fixture) {
     last5?.visitor?.display ||
     null;
 
-  const hasHome = hasValidFormStr(homeForm);
-  const hasAway = hasValidFormStr(awayForm);
-  return { hasHome, hasAway, full: hasHome && hasAway, homeForm, awayForm };
+  // Comparator "datos completos" means BOTH teams have a last-5 form.
+  // We classify completeness purely by form tokens (W/D/L).
+  const homeTokens = normalizeFormTokens(homeForm);
+  const awayTokens = normalizeFormTokens(awayForm);
+  const hasHome = homeTokens.length >= 5;
+  const hasAway = awayTokens.length >= 5;
+  return {
+    hasHome,
+    hasAway,
+    full: hasHome && hasAway,
+    homeForm: hasHome ? homeTokens.slice(0, 5).join("-") : homeForm,
+    awayForm: hasAway ? awayTokens.slice(0, 5).join("-") : awayForm,
+  };
 }
 
 function applyConfidence(p, multiplier) {
