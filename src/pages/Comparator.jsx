@@ -171,6 +171,20 @@ function dataQualityFromLast5(last5) {
   };
 }
 
+// IMPORTANT: the FV pack has had a few different shapes over iterations.
+// Keep this in ONE place so cards + pick builders agree on what "last5" is.
+function extractLast5FromPack(fvPack) {
+  return (
+    fvPack?.last5 ||
+    fvPack?.data?.last5 ||
+    fvPack?.stats?.last5 ||
+    fvPack?.form?.last5 ||
+    fvPack?.direct?.last5 ||
+    null
+  );
+}
+
+
 
 function QualityDot({ dataQuality }) {
   const isFull = dataQuality === "full";
@@ -443,11 +457,17 @@ function isAllowedCompetition(countryName, leagueName) {
     "liga 3",
     "tercera division",
     "tercera division rfef",
-    "paulista","paulista a2","baiano","goiano","cearense","pernambucano",
+    "paulista a2","baiano","goiano","cearense","pernambucano",
     "matogrossense","maranhense","potiguar","acreano","ofc",
     "ofc champions league",
 
   ];
+
+  // ✅ Excepción: permitir Paulista Série A1 (Brasil)
+  if (c.includes("brazil") && l.includes("paulista") && (l.includes("a1") || l.includes("serie a1") || l.includes("série a1"))) {
+    return true;
+  }
+
   if (bannedPatterns.some((p) => l.includes(p))) return false;
 
   // ✅ Copas internacionales (permitidas)
@@ -484,6 +504,9 @@ if (intlAllowedExact.has(l)) return true;
     { country: "usa", league: "mls" },
     { country: "brazil", league: "serie a" },
     { country: "argentina", league: "primera división argentina" },
+    { country: "argentina", league: "liga profesional argentina" },
+    { country: "argentina", league: "liga profesional" },
+    { country: "argentina", league: "copa de la liga profesional" },
     { country: "chile", league: "primera division" },
     { country: "chile", league: "primera división" },
     { country: "chile", league: "primera" },         // opcional si quieres más amplio
@@ -1780,19 +1803,10 @@ for (const fx of pool) {
   });
 
   // Calidad de datos: SOLO rachas (últ.5) de ambos equipos.
-  // Si falta cualquiera, marcamos como parcial.
-  const hasRacha = (v) => {
-    const s = String(v || "").trim();
-    if (!s) return false;
-    // API/BD a veces devuelve "--" o "-" cuando no hay datos
-    if (s === "--" || s === "-" || s.includes("--")) return false;
-    // esperamos letras tipo W-D-L o similares
-    return /[WDL]/i.test(s);
-  };
-  const dataQuality = (hasRacha(pack?.last5?.home?.form) && hasRacha(pack?.last5?.away?.form))
-    ? "full"
-    : "partial";
-  const __qualityRank = dataQuality === "full" ? 1 : 0;
+// Si falta cualquiera, marcamos como parcial.
+const last5ForQuality = extractLast5FromPack(pack);
+const dataQuality = dataQualityFromLast5(last5ForQuality).badge === "Datos completos" ? "full" : "partial";
+const __qualityRank = dataQuality === "full" ? 1 : 0;
 
   const fixedCands = (rawCands || []).map((c) => {
     const prob = Number(c?.prob);

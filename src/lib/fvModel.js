@@ -71,7 +71,7 @@ function pr(c) {
 }
 
 function qRank(p) {
-  return p?.dataQuality?.isComplete ? 1 : 0;
+  return (p?.dataQuality === "full") ? 1 : 0;
 }
 
 
