@@ -253,6 +253,7 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
   const under25 = under25_h ?? probUnderLine(lambdaTotal, 2.5);
 
   const over25 = clamp(1 - under25, 0.01, 0.99);
+  const over15 = clamp(1 - probUnderLine(lambdaTotal, 1.5), 0.01, 0.99);
 
   const bttsNo_h = probBTTSNoFromBttsRate(h2h?.bttsRate);
   const bttsNo = bttsNo_h ?? probBTTSNo(lambdaHome, lambdaAway);
@@ -286,21 +287,12 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
   });
 
   out.push({
-    market: "OU_25",
-    selection: "under",
-    label: "Under 2.5 goles",
-    prob: under25,
-    fvOdd: fairOddFromProb(under25),
-    marketOdd: markets?.OU_25?.under ?? null,
-  });
-
-  out.push({
-    market: "OU_25",
+    market: "OU_15",
     selection: "over",
-    label: "Over 2.5 goles",
-    prob: over25,
-    fvOdd: fairOddFromProb(over25),
-    marketOdd: markets?.OU_25?.over ?? null,
+    label: "Over 1.5 goles",
+    prob: over15,
+    fvOdd: fairOddFromProb(over15),
+    marketOdd: markets?.OU_15?.over ?? null,
   });
 
   out.push({

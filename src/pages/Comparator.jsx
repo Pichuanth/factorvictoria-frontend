@@ -981,20 +981,7 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
     {last5?.away?.gf ?? "--"} / {last5?.away?.ga ?? "--"}
   </span>
 </div>
-
-                  <div>
-                    <span className="text-slate-400">Corners prom:</span>{" "}
-                    <span className="text-slate-100 font-semibold">
-                      {last5?.home?.avgCorners ?? "-"} / {last5?.away?.avgCorners ?? "-"}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400">Tarjetas prom:</span>{" "}
-                    <span className="text-slate-100 font-semibold">
-                      {last5?.home?.avgCards ?? "-"} / {last5?.away?.avgCards ?? "-"}
-                    </span>
-                  </div>
-                  <div>
+<div>
   <span className="text-slate-400">Goles esperados (FV):</span>{" "}
   <span className="text-emerald-200 font-semibold">
     {(() => {
@@ -1864,41 +1851,36 @@ if (safe && safe.fixtureId && candidatesByFixtureForParlays[safe.fixtureId]) {
 const targets = [3, 5, 10, 20, 50, 100].filter((t) => t <= maxBoost);
 console.log("[PARLAY] targets =", targets);
 
-const parlays = targets
-  .map((t) => {
-    const r1 = buildParlay({
-      candidatesByFixture: candidatesByFixtureForParlays,
-      target: t,
-      cap: maxBoost,
-    });
-    console.log("[PARLAY] buildParlay target", t, "=>", r1);
-    if (r1) return r1;
 
-    const r2 = buildBoostedParlayLocal({
-      candidatesByFixture: candidatesByFixtureForParlays,
-      target: t,
-      cap: maxBoost,
-    });
-    console.log("[PARLAY] localParlay target", t, "=>", r2);
-    // Evita mostrar targets altos si la combinada queda muy lejos (esto generaba x20/x50/x100 idénticos)
-    if (!r2 || !Number.isFinite(r2.finalOdd)) return null;
-    const ratio = (r2.finalOdd || 0) / (t || 1);
+  // ===================== PARLAYS (x3, x5, x10, x20, x50, x100)
+  const targets = [3, 5, 10, 20, 50, 100];
 
-    // Margen por target: evitamos que "x50" termine mostrando una combinada tipo "x10",
-    // pero permitimos cierta holgura para que aparezcan x5/x10/x20 con datasets cortos.
-    const minRatio = t >= 50 ? 0.45 : 0.6;
-    const maxRatio = 1.6;
-    if (ratio < minRatio || ratio > maxRatio) return null;
-    return r2;
-  })
-  .filter(Boolean)
-  // Evita duplicados exactos entre targets
-  .filter((p, idx, arr) => {
-    const sig = (p.picks || []).map((x) => `${x.fixtureId}:${x.marketKey || x.key || x.label || ""}`).join("|");
-    return arr.findIndex((q) => (q.picks || []).map((x) => `${x.fixtureId}:${x.marketKey || x.key || x.label || ""}`).join("|") === sig) === idx;
+  const parlaysRaw = targets.map((t) => {
+    const r = buildParlay({
+      candidates,
+      target: t,
+      cap: 100,
+      preferComplete: true,
+      allowRepeatsAcrossParlays: true,
+    });
+    if (!r) return null;
+
+    // Si se aleja del target, igual lo mostramos (cuando hay pocos partidos es normal).
+    return { ...r, target: t };
   });
 
-  // ===================== VALUE LIST (usar SANITIZED) =====================
+  // Relleno: si un target no se puede construir, repetimos el mejor parlay disponible
+  // para que SIEMPRE se muestren todas las secciones (x3..x100) y el usuario no piense que "se cayó".
+  const firstNonNull = parlaysRaw.find((p) => p && p.legs && p.legs.length);
+  const parlays = parlaysRaw
+    .map((p, i) => {
+      if (p && p.legs && p.legs.length) return p;
+      if (!firstNonNull) return null;
+      return { ...firstNonNull, target: targets[i] };
+    })
+    .filter(Boolean);
+
+// ===================== VALUE LIST (usar SANITIZED) =====================
 const valueList = buildValueList(candidatesByFixtureSanitized, 0.06);
 
 console.log("parlays:", parlays);
