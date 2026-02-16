@@ -393,7 +393,9 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) 
   // Armado diversificado con fallback FV (si no hay marketOdd) usando usedOdd ya precalculado.
   // Objetivo: siempre intentar armar x3/x5; y para x10+ armar si el pool alcanza sin pasarse del cap del plan.
 
-  const minLegs = 2;
+  // Launch behavior: if we have at least 1 viable fixture, we ALWAYS return a parlay.
+  // When the pool is small, the UI can repeat the best parlay for higher targets.
+  const minLegs = 1;
   const t = Number(target);
   const hardCap = Number(cap);
 
