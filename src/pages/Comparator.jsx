@@ -1,11 +1,17 @@
 // src/pages/Comparator.jsx
 import React, { useMemo, useState, useEffect, useCallback, useRef } from "react";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { useAuth } from "../lib/auth";
+import Simulator from "../components/Simulator";
+import PriceCalculatorCard from "../components/PriceCalculatorCard";
+import RecoWeeklyCard from "../components/RecoWeeklyCard";
 import {
   buildCandidatePicks,
-  buildFvOutput,
+  pickSafe,
+  buildGiftPickBundle,   // ✅ ESTE FALTA
+  buildParlay,
+  buildValueList,
 } from "../lib/fvModel";
-import { useAuth } from "../lib/auth";
-import { useSearchParams } from "react-router-dom";
 
 const GOLD = "#E6C464";
 
@@ -92,37 +98,11 @@ function prettyForm(formStr) {
 }
 
 function hasValidFormStr(s) {
-  // Consideramos "racha válida" SOLO si podemos extraer al menos 3 resultados (de los últimos 5)
-  // Acepta formatos: "W-D-L-W-W", "G-E-P", "🟢G 🟡E 🔴P", etc.
   if (!s || typeof s !== "string") return false;
-
-  // Normaliza separadores y tokens
-  const raw = s
-    .replace(/\(|\)|\[|\]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  const tokens = raw
-    .split(/\s*[-|,\s]\s*/g)
-    .map((t) => (t || "").replace(/[^A-Za-z]/g, "").toUpperCase())
-    .filter(Boolean)
-    .slice(0, 5);
-
-  if (tokens.length < 3) return false;
-
-  // Mapeo: G/E/P (español) -> W/D/L
-  const mapped = tokens.map((t) => {
-    const c = (t[0] || "").toUpperCase();
-    if (c === "G") return "W";
-    if (c === "E") return "D";
-    if (c === "P") return "L";
-    return c;
-  });
-
-  const ok = mapped.filter((c) => c === "W" || c === "D" || c === "L");
-  return ok.length >= 3;
+  const parts = s.split(/\s*[-|\s]\s*/).filter(Boolean);
+  if (parts.length < 3) return false;
+  return parts.every((t) => ["W", "D", "L"].includes(String(t).trim().toUpperCase()));
 }
-
 
 function dataQualityFromLast5(last5) {
   const homeForm = last5?.home?.form || last5?.local?.form || null;
@@ -132,9 +112,36 @@ function dataQualityFromLast5(last5) {
   return { hasHome, hasAway, full: hasHome && hasAway };
 }
 
-function DataQualityBadge() {
-  // Ocultamos el indicador (circulitos verdes/amarillos) para el lanzamiento.
-  return null;
+function DataQualityBadge({ full }) {
+  const base = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border";
+  if (full) {
+    return (
+      <span className={base + " border-emerald-300/40 bg-emerald-500/10 text-emerald-100"}>
+        🟢 Datos completos
+      </span>
+    );
+  }
+  return (
+    <span className={base + " border-yellow-300/40 bg-yellow-500/10 text-yellow-100"}>
+      🟡 Datos parciales
+    </span>
+  );
+}
+
+
+function QualityDot({ full }) {
+  // Solo indicador visual (sin texto) para listas / parlays
+  const cls = full ? "bg-emerald-400/90" : "bg-yellow-400/90";
+  return <span className={`inline-block w-2 h-2 rounded-full ${cls}`} aria-hidden="true" />;
+}
+
+function isFullDataByFixtureId(fixtureId, fvPackByFixture) {
+  const pack = fvPackByFixture?.[fixtureId];
+  const last5 = pack?.last5;
+  const homeForm = last5?.home?.form || last5?.local?.form || last5?.hom?.form || null;
+  const awayForm = last5?.away?.form || last5?.visitor?.form || last5?.vis?.form || null;
+  // IMPORTANTE: para el color solo consideramos racha W/D/L de ambos equipos.
+  return hasValidFormStr(homeForm) && hasValidFormStr(awayForm);
 }
 
 const FORM_LEGEND = "Leyenda: 🟢G=Ganado, 🟡E=Empate, 🔴P=Perdido";
@@ -397,11 +404,6 @@ const intlAllowedIncludes = [
   "efl cup",
   "copa argentina",
   "liga colombiana",
-  "liga profesional argentina",
-  "paulista a1",
-  "paulista - a1",
-  "primera a",
-  "liga betplay",
 ];
 
 if (intlAllowedIncludes.some((k) => l.includes(k))) return true;
@@ -425,14 +427,6 @@ if (intlAllowedExact.has(l)) return true;
     { country: "mexico", league: "liga mx" },
     { country: "usa", league: "mls" },
     { country: "brazil", league: "serie a" },
-    
-    { country: "argentina", league: "liga profesional argentina" },
-    { country: "argentina", league: "liga profesional" },
-    { country: "argentina", league: "copa de la liga" },
-    { country: "colombia", league: "primera a" },
-    { country: "colombia", league: "liga betplay" },
-    { country: "brazil", league: "paulista - a1" },
-    { country: "brazil", league: "paulista a1" },
     { country: "argentina", league: "primera división argentina" },
     { country: "chile", league: "primera division" },
     { country: "chile", league: "primera división" },
@@ -797,7 +791,7 @@ function VisitorPlansGrid() {
         title="Plan Mensual"
         price="$19.990 · x10"
         href="/#plan-mensual"
-        bullets={["Cuotas potenciadas hasta x10", "Cuota segura (regalo)", "Acceso a herramientas base"]}
+        bullets={["Cuotas potenciadas hasta x10", "Cuota de regalo", "Acceso a herramientas base"]}
       />
       <LockedPlanCard
         title="Plan Trimestral"
@@ -975,7 +969,20 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
     {last5?.away?.gf ?? "--"} / {last5?.away?.ga ?? "--"}
   </span>
 </div>
-<div>
+
+                  <div>
+                    <span className="text-slate-400">Corners prom:</span>{" "}
+                    <span className="text-slate-100 font-semibold">
+                      {last5?.home?.avgCorners ?? "-"} / {last5?.away?.avgCorners ?? "-"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Tarjetas prom:</span>{" "}
+                    <span className="text-slate-100 font-semibold">
+                      {last5?.home?.avgCards ?? "-"} / {last5?.away?.avgCards ?? "-"}
+                    </span>
+                  </div>
+                  <div>
   <span className="text-slate-400">Goles esperados (FV):</span>{" "}
   <span className="text-emerald-200 font-semibold">
     {(() => {
@@ -1765,7 +1772,6 @@ for (const fx of pool) {
 
     return {
       ...c,
-      fixtureId: c.fixtureId ?? id,
       fvOdd: fvOddNum,
       marketOdd: marketOddNum ?? c?.marketOdd,
       usedOdd: usedOddNum,
@@ -1825,18 +1831,50 @@ const candidatesByFixtureSanitized = Object.fromEntries(
   })
 );
 
-// ===================== SAFE + GIFT + PARLAYS (ENGINE ÚNICO, SIN CONTRADICCIONES) =====================
-// fvModel ahora se encarga del bloqueo por fixtureId y de escalar los parlays.
-// Además aplica Over/Under conservador (Over 1.5 / Under 3.5) internamente.
-const engine = buildFvOutput({
-  candidatesByFixture: candidatesByFixtureSanitized,
-  maxBoost,
-});
+// ===================== SAFE + GIFT (AQUÍ nacen safe/giftBundle) =====================
+const safe = pickSafe(candidatesByFixtureSanitized);
+const giftBundle = buildGiftPickBundle(candidatesByFixtureSanitized, 1.5, 3.0, 3);
 
-const safe = engine?.safe || null;
-const giftBundle = engine?.giftBundle || null;
-const parlays = engine?.parlays || [];
-const valueList = engine?.valueList || [];
+// ===================== TARGETS + PARLAYS =====================
+const targets = [3, 5, 10, 20, 50, 100].filter((t) => t <= maxBoost);
+console.log("[PARLAY] targets =", targets);
+
+const parlays = targets
+  .map((t) => {
+    const r1 = buildParlay({
+      candidatesByFixture: candidatesByFixtureSanitized,
+      target: t,
+      cap: maxBoost,
+    });
+    console.log("[PARLAY] buildParlay target", t, "=>", r1);
+    if (r1) return r1;
+
+    const r2 = buildBoostedParlayLocal({
+      candidatesByFixture: candidatesByFixtureSanitized,
+      target: t,
+      cap: maxBoost,
+    });
+    console.log("[PARLAY] localParlay target", t, "=>", r2);
+    // Evita mostrar targets altos si la combinada queda muy lejos (esto generaba x20/x50/x100 idénticos)
+    if (!r2 || !Number.isFinite(r2.finalOdd)) return null;
+    const ratio = (r2.finalOdd || 0) / (t || 1);
+
+    // Margen por target: evitamos que "x50" termine mostrando una combinada tipo "x10",
+    // pero permitimos cierta holgura para que aparezcan x5/x10/x20 con datasets cortos.
+    const minRatio = t >= 50 ? 0.45 : 0.6;
+    const maxRatio = 1.6;
+    if (ratio < minRatio || ratio > maxRatio) return null;
+    return r2;
+  })
+  .filter(Boolean)
+  // Evita duplicados exactos entre targets
+  .filter((p, idx, arr) => {
+    const sig = (p.picks || []).map((x) => `${x.fixtureId}:${x.marketKey || x.key || x.label || ""}`).join("|");
+    return arr.findIndex((q) => (q.picks || []).map((x) => `${x.fixtureId}:${x.marketKey || x.key || x.label || ""}`).join("|") === sig) === idx;
+  });
+
+  // ===================== VALUE LIST (usar SANITIZED) =====================
+const valueList = buildValueList(candidatesByFixtureSanitized, 0.06);
 
 console.log("parlays:", parlays);
 console.log("valueList:", valueList?.length);
@@ -1854,7 +1892,7 @@ setFvOutput({
   giftBundle,
   parlays,
   valueList,
-  candidatesByFixture: candidatesByFixtureForParlays
+  candidatesByFixture: candidatesByFixtureSanitized
 });
 
 // panel principal muestra la primera potenciadas
@@ -2206,7 +2244,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 
       {/* 4) MÓDULOS premium */}
       <section className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-        <FeatureCard title="Cuota segura (regalo)" badge="Alta probabilidad" locked={!features.giftPick}>
+        <FeatureCard title="Cuota de regalo" badge="Alta probabilidad" locked={!features.giftPick}>
           <div className="text-xs text-slate-300">
    Pick con mayor probabilidad de acierto. Prioriza partidos con estadísticas completas de ambos equipos.
    Si uno no presenta datos, el acierto se reduce al 70%. Recarga y genera nuevamente para un análisis óptimo, 
@@ -2276,7 +2314,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 
         return (
           <div key={`${leg.fixtureId || "fx"}-${idx}`} className="text-[11px] text-slate-300">
-            <span className="text-slate-500">{idx + 1}.</span>{" "}
+            <span className="inline-flex items-center gap-2 text-slate-500"><QualityDot full={isFullDataByFixtureId(leg.fixtureId, fvPackByFixture)} />{idx + 1}</span>{" "}
             <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
             <span className="text-slate-500">—</span>{" "}
             {leg.home} vs {leg.away}{" "}
@@ -2338,7 +2376,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
                   className="rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2"
                 >
                   <div className="text-[11px] text-slate-300">
-                    <span className="text-slate-500">{idx + 1}.</span>{" "}
+                    <span className="inline-flex items-center gap-2 text-slate-500"><QualityDot full={isFullDataByFixtureId(leg.fixtureId, fvPackByFixture)} />{idx + 1}</span>{" "}
                     <span className="text-slate-100 font-semibold">{v.label || v.pick}</span>
                     {v.home && v.away ? (
                       <>
@@ -2404,7 +2442,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 
             return (
               <div key={`${p.target}-${leg.fixtureId || idx}-${idx}`} className="text-[11px] text-slate-300">
-                <span className="text-slate-500">{idx + 1}.</span>{" "}
+                <span className="inline-flex items-center gap-2 text-slate-500"><QualityDot full={isFullDataByFixtureId(leg.fixtureId, fvPackByFixture)} />{idx + 1}</span>{" "}
                 <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
                 <span className="text-slate-500">—</span>{" "}
                 {leg.home} vs {leg.away}{" "}
