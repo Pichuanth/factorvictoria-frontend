@@ -1,17 +1,11 @@
 // src/pages/Comparator.jsx
 import React, { useMemo, useState, useEffect, useCallback, useRef } from "react";
-import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { useAuth } from "../lib/auth";
-import Simulator from "../components/Simulator";
-import PriceCalculatorCard from "../components/PriceCalculatorCard";
-import RecoWeeklyCard from "../components/RecoWeeklyCard";
 import {
   buildCandidatePicks,
-  pickSafe,
-  buildGiftPickBundle,   // ✅ ESTE FALTA
-  buildParlay,
-  buildValueList,
+  buildFvOutput,
 } from "../lib/fvModel";
+import { useAuth } from "../lib/auth";
+import { useSearchParams } from "react-router-dom";
 
 const GOLD = "#E6C464";
 
@@ -131,73 +125,16 @@ function hasValidFormStr(s) {
 
 
 function dataQualityFromLast5(last5) {
-  // Prefer explicit 5-match results arrays (most reliable), then fall back to form strings.
-  const homeResults = last5?.home?.results || last5?.local?.results || null;
-  const awayResults = last5?.away?.results || last5?.visitor?.results || null;
-
-  const hasHomeResults = Array.isArray(homeResults) && homeResults.length >= 5;
-  const hasAwayResults = Array.isArray(awayResults) && awayResults.length >= 5;
-
-  if (hasHomeResults || hasAwayResults) {
-    return {
-      hasHome: hasHomeResults,
-      hasAway: hasAwayResults,
-      dataQuality: hasHomeResults && hasAwayResults ? 'full' : 'partial',
-    };
-  }
-
-  const homeForm =
-    last5?.home?.form ||
-    last5?.local?.form ||
-    last5?.home?.display ||
-    last5?.local?.display ||
-    null;
-
-  const awayForm =
-    last5?.away?.form ||
-    last5?.visitor?.form ||
-    last5?.away?.display ||
-    last5?.visitor?.display ||
-    null;
-
-  // Accept W/D/L as well as G/E/P (Spanish) just in case.
-  const hasHome = hasValidFormStr(homeForm) || /[WG][^a-zA-Z]*|[WDLGEP]/.test(String(homeForm || ''));
-  const hasAway = hasValidFormStr(awayForm) || /[WG][^a-zA-Z]*|[WDLGEP]/.test(String(awayForm || ''));
-
-  return {
-    hasHome,
-    hasAway,
-    dataQuality: hasHome && hasAway ? 'full' : (hasHome || hasAway ? 'partial' : 'none'),
-  };
+  const homeForm = last5?.home?.form || last5?.local?.form || null;
+  const awayForm = last5?.away?.form || last5?.visitor?.form || null;
+  const hasHome = hasValidFormStr(homeForm);
+  const hasAway = hasValidFormStr(awayForm);
+  return { hasHome, hasAway, full: hasHome && hasAway };
 }
 
-
-function QualityDot({ dataQuality }) {
-  const isFull = dataQuality === "full";
-  return (
-    <span
-      className={`inline-block h-2.5 w-2.5 rounded-full ${
-        isFull ? "bg-emerald-400" : "bg-yellow-400"
-      }`}
-      title={isFull ? "Datos completos" : "Datos parciales"}
-    />
-  );
-}
-
-function DataQualityBadge({ full }) {
-  const base = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border";
-  if (full) {
-    return (
-      <span className={base + " border-emerald-300/40 bg-emerald-500/10 text-emerald-100"}>
-        🟢 Datos completos
-      </span>
-    );
-  }
-  return (
-    <span className={base + " border-yellow-300/40 bg-yellow-500/10 text-yellow-100"}>
-      🟡 Datos parciales
-    </span>
-  );
+function DataQualityBadge() {
+  // Ocultamos el indicador (circulitos verdes/amarillos) para el lanzamiento.
+  return null;
 }
 
 const FORM_LEGEND = "Leyenda: 🟢G=Ganado, 🟡E=Empate, 🔴P=Perdido";
@@ -460,6 +397,11 @@ const intlAllowedIncludes = [
   "efl cup",
   "copa argentina",
   "liga colombiana",
+  "liga profesional argentina",
+  "paulista a1",
+  "paulista - a1",
+  "primera a",
+  "liga betplay",
 ];
 
 if (intlAllowedIncludes.some((k) => l.includes(k))) return true;
@@ -483,6 +425,14 @@ if (intlAllowedExact.has(l)) return true;
     { country: "mexico", league: "liga mx" },
     { country: "usa", league: "mls" },
     { country: "brazil", league: "serie a" },
+    
+    { country: "argentina", league: "liga profesional argentina" },
+    { country: "argentina", league: "liga profesional" },
+    { country: "argentina", league: "copa de la liga" },
+    { country: "colombia", league: "primera a" },
+    { country: "colombia", league: "liga betplay" },
+    { country: "brazil", league: "paulista - a1" },
+    { country: "brazil", league: "paulista a1" },
     { country: "argentina", league: "primera división argentina" },
     { country: "chile", league: "primera division" },
     { country: "chile", league: "primera división" },
@@ -1024,7 +974,8 @@ function FixtureCardCompact({ fx, isSelected, onToggle, onLoadOdds, onLoadStats,
   <span className="text-slate-100 font-semibold">
     {last5?.away?.gf ?? "--"} / {last5?.away?.ga ?? "--"}
   </span>
-</div><div>
+</div>
+<div>
   <span className="text-slate-400">Goles esperados (FV):</span>{" "}
   <span className="text-emerald-200 font-semibold">
     {(() => {
@@ -1137,7 +1088,7 @@ function ManualPicksSection() {
             >
               <div className="min-w-0">
                 <div className="text-sm text-slate-100 font-semibold truncate">{x.label}</div>
-                {x.note ? <div className="text-[11px] text-emerald-300/80">{x.note}</div> : null}
+                {x.note ? <div className="text-[11px] text-slate-400">{x.note}</div> : null}
               </div>
               <div className="text-sm font-bold text-emerald-200">x{Number(x.odd).toFixed(2)}</div>
             </div>
@@ -1779,21 +1730,6 @@ for (const fx of pool) {
     markets,
   });
 
-  // Calidad de datos: SOLO rachas (últ.5) de ambos equipos.
-  // Si falta cualquiera, marcamos como parcial.
-  const hasRacha = (v) => {
-    const s = String(v || "").trim();
-    if (!s) return false;
-    // API/BD a veces devuelve "--" o "-" cuando no hay datos
-    if (s === "--" || s === "-" || s.includes("--")) return false;
-    // esperamos letras tipo W-D-L o similares
-    return /[WDL]/i.test(s);
-  };
-  const dataQuality = (hasRacha(pack?.last5?.home?.form) && hasRacha(pack?.last5?.away?.form))
-    ? "full"
-    : "partial";
-  const __qualityRank = dataQuality === "full" ? 1 : 0;
-
   const fixedCands = (rawCands || []).map((c) => {
     const prob = Number(c?.prob);
     const probOk = Number.isFinite(prob) ? prob : null;
@@ -1829,8 +1765,7 @@ for (const fx of pool) {
 
     return {
       ...c,
-      dataQuality,
-      __qualityRank,
+      fixtureId: c.fixtureId ?? id,
       fvOdd: fvOddNum,
       marketOdd: marketOddNum ?? c?.marketOdd,
       usedOdd: usedOddNum,
@@ -1841,13 +1776,7 @@ for (const fx of pool) {
   });
 
   // ordena por prob "rank" (penaliza overs repetidos + diversifica) para que buildParlay/pickSafe elijan mejor
-  // PRIORIDAD: datos completos (racha local+visita) -> luego probRank
-  const ranked = [...fixedCands].sort((a, b) => {
-    const qa = a?.__qualityRank || 0;
-    const qb = b?.__qualityRank || 0;
-    if (qb !== qa) return qb - qa;
-    return (b.__probRank || 0) - (a.__probRank || 0);
-  });
+  const ranked = [...fixedCands].sort((a, b) => (b.__probRank || 0) - (a.__probRank || 0));
   candidatesByFixture[id] = ranked;
 }
 
@@ -1896,74 +1825,18 @@ const candidatesByFixtureSanitized = Object.fromEntries(
   })
 );
 
-// ===================== SAFE + GIFT (AQUÍ nacen safe/giftBundle) =====================
-const safe = pickSafe(candidatesByFixtureSanitized);
-const giftBundle = buildGiftPickBundle(candidatesByFixtureSanitized, 1.5, 3.0, 3);
+// ===================== SAFE + GIFT + PARLAYS (ENGINE ÚNICO, SIN CONTRADICCIONES) =====================
+// fvModel ahora se encarga del bloqueo por fixtureId y de escalar los parlays.
+// Además aplica Over/Under conservador (Over 1.5 / Under 3.5) internamente.
+const engine = buildFvOutput({
+  candidatesByFixture: candidatesByFixtureSanitized,
+  maxBoost,
+});
 
-// ===================== TARGETS + PARLAYS =====================
-const targets = [3, 5, 10, 20, 50, 100].filter((t) => t <= maxBoost);
-console.log("[PARLAY] targets =", targets);
-
-// Construimos tiers siempre (3,5,10,20,50,100) para no dejar casillas vacías.
-// Regla: prioriza VERDES; si para x50/x100 no alcanza, se muestra igualmente el mejor parlay
-// disponible con un mensaje sugeriendo ampliar rango.
-const builtParlays = targets
-  .map((t) => {
-    const r1 = buildParlay({
-      candidatesByFixture: candidatesByFixtureSanitized,
-      target: t,
-      cap: maxBoost,
-    });
-    console.log("[PARLAY] buildParlay target", t, "=>", r1);
-    if (r1) {
-      const ratio = (r1.finalOdd || 0) / (t || 1);
-      return {
-        ...r1,
-        ratio,
-        note: ratio < 1 ? `No alcanzamos x${t} con los partidos actuales. Añade 1 o 2 días más para acercarte a la cuota esperada.` : "",
-      };
-    }
-
-    const r2 = buildBoostedParlayLocal({
-      candidatesByFixture: candidatesByFixtureSanitized,
-      target: t,
-      cap: maxBoost,
-    });
-    console.log("[PARLAY] localParlay target", t, "=>", r2);
-    if (!r2 || !Number.isFinite(r2.finalOdd)) return null;
-    const ratio = (r2.finalOdd || 0) / (t || 1);
-    return {
-      ...r2,
-      ratio,
-      note: ratio < 1 ? `No alcanzamos x${t} con los partidos actuales. Añade 1 o 2 días más para acercarte a la cuota esperada.` : "",
-    };
-  })
-  .filter(Boolean);
-
-// Mejor parlay para fallback (por finalOdd)
-const bestParlay = builtParlays
-  .slice()
-  .sort((a, b) => (b.finalOdd || 0) - (a.finalOdd || 0))[0];
-
-const byTarget = new Map(builtParlays.map((p) => [p.target, p]));
-const parlays = targets
-  .map((t) => {
-    const p = byTarget.get(t);
-    if (p) return p;
-    if (!bestParlay) return null;
-    // Repite el mejor para completar tiers faltantes
-    return {
-      ...bestParlay,
-      target: t,
-      ratio: (bestParlay.finalOdd || 0) / (t || 1),
-      note: `No alcanzamos x${t} con los partidos actuales. Añade 1 o 2 días más para acercarte a la cuota esperada.`,
-      __fallback: true,
-    };
-  })
-  .filter(Boolean);
-
-  // ===================== VALUE LIST (usar SANITIZED) =====================
-const valueList = buildValueList(candidatesByFixtureSanitized, 0.06);
+const safe = engine?.safe || null;
+const giftBundle = engine?.giftBundle || null;
+const parlays = engine?.parlays || [];
+const valueList = engine?.valueList || [];
 
 console.log("parlays:", parlays);
 console.log("valueList:", valueList?.length);
@@ -1981,7 +1854,7 @@ setFvOutput({
   giftBundle,
   parlays,
   valueList,
-  candidatesByFixture: candidatesByFixtureSanitized
+  candidatesByFixture: candidatesByFixtureForParlays
 });
 
 // panel principal muestra la primera potenciadas
@@ -2403,7 +2276,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 
         return (
           <div key={`${leg.fixtureId || "fx"}-${idx}`} className="text-[11px] text-slate-300">
-            <QualityDot dataQuality={leg?.dataQuality || "partial"} />{" "}<span className="text-slate-500">{idx + 1}.</span>{" "}
+            <span className="text-slate-500">{idx + 1}.</span>{" "}
             <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
             <span className="text-slate-500">—</span>{" "}
             {leg.home} vs {leg.away}{" "}
@@ -2465,7 +2338,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
                   className="rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2"
                 >
                   <div className="text-[11px] text-slate-300">
-                    <QualityDot dataQuality={v?.dataQuality || "partial"} />{" "}<span className="text-slate-500">{idx + 1}.</span>{" "}
+                    <span className="text-slate-500">{idx + 1}.</span>{" "}
                     <span className="text-slate-100 font-semibold">{v.label || v.pick}</span>
                     {v.home && v.away ? (
                       <>
@@ -2531,7 +2404,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 
             return (
               <div key={`${p.target}-${leg.fixtureId || idx}-${idx}`} className="text-[11px] text-slate-300">
-                <QualityDot dataQuality={leg?.dataQuality || "partial"} />{" "}<span className="text-slate-500">{idx + 1}.</span>{" "}
+                <span className="text-slate-500">{idx + 1}.</span>{" "}
                 <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
                 <span className="text-slate-500">—</span>{" "}
                 {leg.home} vs {leg.away}{" "}
