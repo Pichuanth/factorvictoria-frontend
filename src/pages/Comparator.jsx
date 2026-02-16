@@ -1862,6 +1862,7 @@ console.log("[PARLAY] targets =", targets);
   // Límite de partidos por parlay (para evitar parlays enormes cuando hay muchos encuentros).
   // Ajusta si quieres: x3 con pocos legs, x100 con más legs.
   const caps = { 3: 2, 5: 3, 10: 4, 20: 5, 50: 7, 100: 8 };
+  const maxLegs = 12; // máximo de selecciones por parlay (evita combinadas gigantes)
 
 
   // ===================== PARLAYS (x3, x5, x10, x20, x50, x100)
