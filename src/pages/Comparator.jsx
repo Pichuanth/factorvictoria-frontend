@@ -5,6 +5,7 @@ import {
   buildFvOutput,
 } from "../lib/fvModel";
 import { useAuth } from "../lib/auth";
+import { useSearchParams } from "react-router-dom";
 
 const GOLD = "#E6C464";
 
