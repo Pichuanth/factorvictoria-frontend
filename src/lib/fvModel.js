@@ -77,6 +77,37 @@ function extractLast5FromFixture(fixture) {
 // We map G=Win, E=Draw, P=Loss, and ignore other characters.
 function normalizeFormTokens(s) {
   if (!s) return [];
+
+  // Accept arrays like ["W","D","L",...] or objects like [{result:"W"},...]
+  if (Array.isArray(s)) {
+    const flat = s.flat ? s.flat() : [].concat(...s);
+    const out = [];
+    for (const item of flat) {
+      if (!item) continue;
+      let v = item;
+      if (typeof item === "object") {
+        v =
+          item.result ??
+          item.res ??
+          item.outcome ??
+          item.value ??
+          item.code ??
+          item.r ??
+          item.status ??
+          "";
+      }
+      const t = String(v).trim().toUpperCase();
+      if (!t) continue;
+
+      if (t === "W" || t === "WIN" || t === "G") out.push("W");
+      else if (t === "D" || t === "DRAW" || t === "E") out.push("D");
+      else if (t === "L" || t === "LOSS" || t === "P") out.push("L");
+      else if (/^[WDL]{5,}$/.test(t)) out.push(...t.split(""));
+      else if (/^[WDL]$/.test(t)) out.push(t);
+    }
+    return out.filter((x) => x === "W" || x === "D" || x === "L");
+  }
+
   const raw = String(s);
 
   let parts = raw
@@ -86,19 +117,29 @@ function normalizeFormTokens(s) {
 
   // If we got a single chunk like "LLWLL" (rare), split into chars.
   if (parts.length === 1 && parts[0].length >= 5) {
-    const onlyLetters = parts[0].replace(/[^A-Za-z]/g, "");
-    if (onlyLetters.length >= 5) parts = onlyLetters.split("");
+    parts = parts[0].split("");
   }
 
+  // Map common Spanish (G/E/P) and English tokens to W/D/L
   return parts
-    .map((t) => String(t).replace(/[^A-Za-z]/g, "").toUpperCase())
-    .flatMap((t) => (t.length > 1 ? t.split("") : [t]))
-    .map((t) => {
-      if (t === "G") return "W";
-      if (t === "E") return "D";
-      if (t === "P") return "L";
-      return t;
+    .map((p) => String(p).trim().toUpperCase())
+    .map((p) => {
+      if (p === "W" || p === "WIN" || p === "G") return "W";
+      if (p === "D" || p === "DRAW" || p === "E") return "D";
+      if (p === "L" || p === "LOSS" || p === "P") return "L";
+      // Sometimes the UI includes emojis like 🟢G or 🔴P; keep letters only.
+      const letters = p.replace(/[^A-Z]/g, "");
+      if (letters === "G") return "W";
+      if (letters === "E") return "D";
+      if (letters === "P") return "L";
+      if (letters === "W") return "W";
+      if (letters === "D") return "D";
+      if (letters === "L") return "L";
+      // If letters are multiple like "WWDDL" keep those
+      if (/^[WDL]{2,}$/.test(letters)) return letters;
+      return "";
     })
+    .flatMap((x) => (x && x.length > 1 ? x.split("") : [x]))
     .filter((t) => t === "W" || t === "D" || t === "L");
 }
 

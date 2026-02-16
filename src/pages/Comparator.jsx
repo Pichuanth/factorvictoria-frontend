@@ -98,25 +98,43 @@ function prettyForm(formStr) {
 }
 
 function hasValidFormStr(s) {
-  // Consideramos "racha válida" SOLO si podemos extraer al menos 3 resultados (de los últimos 5)
-  // Acepta formatos: "W-D-L-W-W", "G-E-P", "🟢G 🟡E 🔴P", etc.
-  if (!s || typeof s !== "string") return false;
+  if (!s) return false;
 
-  // Normaliza separadores y tokens
-  const raw = s
-    .replace(/\(|\)|\[|\]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  // Accept arrays like ["W","D","L",...] or objects like [{result:"W"},...]
+  if (Array.isArray(s)) {
+    const flat = s.flat ? s.flat() : [].concat(...s);
+    const tokens = flat
+      .map((x) => {
+        if (!x) return "";
+        if (typeof x === "string") return x;
+        if (typeof x === "object") return x.result ?? x.res ?? x.outcome ?? x.value ?? x.code ?? x.r ?? x.status ?? "";
+        return String(x);
+      })
+      .map((x) => String(x).trim().toUpperCase())
+      .filter(Boolean)
+      .flatMap((t) => (/^[WDL]{5,}$/.test(t) ? t.split("") : [t]));
 
+    const ok = tokens
+      .map((t) => (t[0] || "").toUpperCase())
+      .map((c) => (c === "G" ? "W" : c === "E" ? "D" : c === "P" ? "L" : c))
+      .filter((c) => c === "W" || c === "D" || c === "L");
+
+    return ok.length >= 5; // we want the last-5 form
+  }
+
+  const raw = String(s);
+
+  // Keep letters only for safety (handles emojis like 🟢G, 🔴P)
+  const lettersOnly = raw.toUpperCase().replace(/[^A-Z]/g, "");
+  if (/^[WDL]{5,}$/.test(lettersOnly)) return true;
+
+  // Otherwise split by hyphen/space and count meaningful tokens
   const tokens = raw
-    .split(/\s*[-|,\s]\s*/g)
-    .map((t) => (t || "").replace(/[^A-Za-z]/g, "").toUpperCase())
+    .replace(/[()\[\]{}]/g, " ")
+    .split(/[-\s]+/)
     .filter(Boolean)
-    .slice(0, 5);
+    .map((t) => String(t).trim().toUpperCase());
 
-  if (tokens.length < 3) return false;
-
-  // Mapeo: G/E/P (español) -> W/D/L
   const mapped = tokens.map((t) => {
     const c = (t[0] || "").toUpperCase();
     if (c === "G") return "W";
@@ -126,7 +144,7 @@ function hasValidFormStr(s) {
   });
 
   const ok = mapped.filter((c) => c === "W" || c === "D" || c === "L");
-  return ok.length >= 3;
+  return ok.length >= 5;
 }
 
 
