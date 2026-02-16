@@ -1872,7 +1872,6 @@ console.log("[PARLAY] targets =", targets);
       candidatesByFixture: candidatesByFixtureForParlays,
       target: t,
       cap,
-      hardCap,
       maxLegs,
     });
     if (!r) return null;
