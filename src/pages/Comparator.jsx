@@ -1847,9 +1847,12 @@ if (safe && safe.fixtureId && candidatesByFixtureForParlays[safe.fixtureId]) {
   }
 }
 
-// Flatten final per-fixture candidates into a single list (used by fvModel.buildParlay)
-const candidates = Object.values(candidatesByFixtureForParlays || {}).flatMap((arr) => (Array.isArray(arr) ? arr : []));
-console.log('[PARLAY] candidates total =', candidates.length);
+// fvModel.buildParlay trabaja con candidatesByFixture (fixtureId -> [candidatos])
+const candidatesTotal = Object.values(candidatesByFixtureForParlays || {}).reduce(
+  (acc, arr) => acc + (Array.isArray(arr) ? arr.length : 0),
+  0
+);
+console.log('[PARLAY] candidates total =', candidatesTotal);
 
 // ===================== TARGETS + PARLAYS =====================
 const targets = [3, 5, 10, 20, 50, 100].filter((t) => t <= maxBoost);
@@ -1859,12 +1862,13 @@ console.log("[PARLAY] targets =", targets);
   // ===================== PARLAYS (x3, x5, x10, x20, x50, x100)
 
   const parlaysRaw = targets.map((t) => {
+    const cap = (caps && caps[t]) ? caps[t] : 100;
     const r = buildParlay({
-      candidates,
+      candidatesByFixture: candidatesByFixtureForParlays,
       target: t,
-      cap: 100,
-      preferComplete: true,
-      allowRepeatsAcrossParlays: true,
+      cap,
+      hardCap,
+      maxLegs,
     });
     if (!r) return null;
 
@@ -1872,14 +1876,17 @@ console.log("[PARLAY] targets =", targets);
     return { ...r, target: t };
   });
 
-  // Relleno: si un target no se puede construir, repetimos el mejor parlay disponible
+  // Relleno: si un target no se puede construir, repetimos la última parlay válida
   // para que SIEMPRE se muestren todas las secciones (x3..x100) y el usuario no piense que "se cayó".
-  const firstNonNull = parlaysRaw.find((p) => p && p.legs && p.legs.length);
+  let lastValid = null;
   const parlays = parlaysRaw
     .map((p, i) => {
-      if (p && p.legs && p.legs.length) return p;
-      if (!firstNonNull) return null;
-      return { ...firstNonNull, target: targets[i] };
+      if (p && p.legs && p.legs.length) {
+        lastValid = p;
+        return p;
+      }
+      if (!lastValid) return null;
+      return { ...lastValid, target: targets[i] };
     })
     .filter(Boolean);
 
