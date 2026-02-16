@@ -23,53 +23,15 @@ function safeNum(n) {
 }
 
 // --- Data quality helpers (form/racha) ---
-// IMPORTANT: FV packs can arrive in different shapes depending on the endpoint.
-// We have observed cases where the UI shows rachas (green) but the model ranks
-// the same fixture as "partial" because pack.last5 is missing. To keep ranking
-// consistent with the UI, we use multiple fallbacks (including fixture-side
-// last5 when available).
-
 function extractLast5(pack) {
-  // 1) Known explicit last5 blocks
-  const direct =
+  return (
     pack?.last5 ||
     pack?.data?.last5 ||
     pack?.stats?.last5 ||
     pack?.form?.last5 ||
     pack?.direct?.last5 ||
-    null;
-  if (direct) return direct;
-
-  // 2) Some packs expose last5 display under pack.recent.*
-  const rh = pack?.recent?.home?.display;
-  const ra = pack?.recent?.away?.display;
-  if (rh || ra) {
-    return { home: { display: rh }, away: { display: ra } };
-  }
-
-  // 3) Nothing found
-  return null;
-}
-
-function extractLast5FromFixture(fixture) {
-  const s = fixture?.stats || fixture?.statistics || fixture?.form || null;
-
-  // Arrays of results (preferred)
-  const hr = s?.home?.results;
-  const ar = s?.away?.results;
-  if (Array.isArray(hr) || Array.isArray(ar)) {
-    return {
-      home: { display: Array.isArray(hr) ? hr.join("-") : null, results: hr },
-      away: { display: Array.isArray(ar) ? ar.join("-") : null, results: ar },
-    };
-  }
-
-  // Strings
-  const hf = s?.home?.form || fixture?.last5Home || fixture?.formHome || null;
-  const af = s?.away?.form || fixture?.last5Away || fixture?.formAway || null;
-  if (hf || af) return { home: { display: hf }, away: { display: af } };
-
-  return null;
+    null
+  );
 }
 
 function hasValidFormStr(s) {
@@ -83,40 +45,10 @@ function hasValidFormStr(s) {
   });
 }
 
-function formQuality(pack, fixture) {
-  // 1) Highest confidence: arrays of results in pack.recent.
-  const hArr = pack?.recent?.home?.results;
-  const aArr = pack?.recent?.away?.results;
-  const hasHomeArr = Array.isArray(hArr) && hArr.length >= 5;
-  const hasAwayArr = Array.isArray(aArr) && aArr.length >= 5;
-  if (hasHomeArr || hasAwayArr) {
-    return {
-      hasHome: hasHomeArr,
-      hasAway: hasAwayArr,
-      full: hasHomeArr && hasAwayArr,
-      homeForm: hasHomeArr ? hArr.join("-") : null,
-      awayForm: hasAwayArr ? aArr.join("-") : null,
-    };
-  }
-
-  // 2) Fallback: strings from pack.*
-  let last5 = extractLast5(pack);
-  // 3) Final fallback: fixture-side last5
-  if (!last5 && fixture) last5 = extractLast5FromFixture(fixture);
-
-  const homeForm =
-    last5?.home?.form ||
-    last5?.local?.form ||
-    last5?.home?.display ||
-    last5?.local?.display ||
-    null;
-  const awayForm =
-    last5?.away?.form ||
-    last5?.visitor?.form ||
-    last5?.away?.display ||
-    last5?.visitor?.display ||
-    null;
-
+function formQuality(pack) {
+  const last5 = extractLast5(pack);
+  const homeForm = last5?.home?.form || last5?.local?.form || last5?.home?.display || last5?.local?.display || null;
+  const awayForm = last5?.away?.form || last5?.visitor?.form || last5?.away?.display || last5?.visitor?.display || null;
   const hasHome = hasValidFormStr(homeForm);
   const hasAway = hasValidFormStr(awayForm);
   return { hasHome, hasAway, full: hasHome && hasAway, homeForm, awayForm };
@@ -292,7 +224,7 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
   const out = [];
 
   // Calidad de datos: usamos la racha (W/D/L últimos 5) como señal principal.
-  const q = formQuality(pack, fixture);
+  const q = formQuality(pack);
   const confidence = q.full ? 1 : 0.7; // si falta racha en 1+ equipos, reducimos confianza (sin bloquear)
   const dataQuality = q.full ? "full" : "partial";
 
