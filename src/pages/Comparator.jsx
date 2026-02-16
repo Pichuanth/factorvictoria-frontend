@@ -1771,6 +1771,7 @@ for (const fx of pool) {
 
     return {
       ...c,
+      fixtureId: c.fixtureId ?? id,
       fvOdd: fvOddNum,
       marketOdd: marketOddNum ?? c?.marketOdd,
       usedOdd: usedOddNum,
