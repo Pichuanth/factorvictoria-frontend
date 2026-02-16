@@ -1853,7 +1853,6 @@ console.log("[PARLAY] targets =", targets);
 
 
   // ===================== PARLAYS (x3, x5, x10, x20, x50, x100)
-  const targets = [3, 5, 10, 20, 50, 100];
 
   const parlaysRaw = targets.map((t) => {
     const r = buildParlay({
