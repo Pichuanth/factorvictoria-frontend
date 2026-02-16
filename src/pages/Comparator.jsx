@@ -1,11 +1,16 @@
 // src/pages/Comparator.jsx
 import React, { useMemo, useState, useEffect, useCallback, useRef } from "react";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import Simulator from "../components/Simulator";
+import PriceCalculatorCard from "../components/PriceCalculatorCard";
+import RecoWeeklyCard from "../components/RecoWeeklyCard";
 import {
   buildCandidatePicks,
-  buildFvOutput,
+  pickSafe,
+  buildGiftPickBundle,   // ✅ ESTE FALTA
+  buildParlay,
+  buildValueList,
 } from "../lib/fvModel";
-import { useAuth } from "../lib/auth";
-import { useSearchParams } from "react-router-dom";
 
 const GOLD = "#E6C464";
 
@@ -1229,8 +1234,9 @@ function localPenalty(label) {
 }
 
 export default function Comparator() {
-  const { isLoggedIn, user } = useAuth();
-  const [searchParams] = useSearchParams();
+  const isLoggedIn = false;
+  const user = null;
+  const searchParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
 
   // Launch safeguard: hide unfinished modules for now
   const ENABLE_REFEREES = false;
@@ -1825,18 +1831,73 @@ const candidatesByFixtureSanitized = Object.fromEntries(
   })
 );
 
-// ===================== SAFE + GIFT + PARLAYS (ENGINE ÚNICO, SIN CONTRADICCIONES) =====================
-// fvModel ahora se encarga del bloqueo por fixtureId y de escalar los parlays.
-// Además aplica Over/Under conservador (Over 1.5 / Under 3.5) internamente.
-const engine = buildFvOutput({
-  candidatesByFixture: candidatesByFixtureSanitized,
-  maxBoost,
-});
+// ===================== SAFE + GIFT (AQUÍ nacen safe/giftBundle) =====================
+const safe = pickSafe(candidatesByFixtureSanitized);
+const giftBundle = buildGiftPickBundle(candidatesByFixtureSanitized, 1.5, 3.0, 3);
 
-const safe = engine?.safe || null;
-const giftBundle = engine?.giftBundle || null;
-const parlays = engine?.parlays || [];
-const valueList = engine?.valueList || [];
+// Evitar contradicciones: si la Cuota Segura usa un fixture, forzamos a que (si se reutiliza) sea con la misma selección.
+const candidatesByFixtureForParlays = { ...candidatesByFixtureSanitized };
+if (safe && safe.fixtureId && candidatesByFixtureForParlays[safe.fixtureId]) {
+  const fid = safe.fixtureId;
+  candidatesByFixtureForParlays[fid] = (candidatesByFixtureForParlays[fid] || []).filter((p) =>
+    String(p.market || "") === String(safe.market || "") &&
+    String(p.selection || "") === String(safe.selection || "")
+  );
+  if (!candidatesByFixtureForParlays[fid] || candidatesByFixtureForParlays[fid].length === 0) {
+    candidatesByFixtureForParlays[fid] = candidatesByFixtureSanitized[fid];
+  }
+}
+
+// fvModel.buildParlay trabaja con candidatesByFixture (fixtureId -> [candidatos])
+const candidatesTotal = Object.values(candidatesByFixtureForParlays || {}).reduce(
+  (acc, arr) => acc + (Array.isArray(arr) ? arr.length : 0),
+  0
+);
+console.log('[PARLAY] candidates total =', candidatesTotal);
+
+// ===================== TARGETS + PARLAYS =====================
+const targets = [3, 5, 10, 20, 50, 100].filter((t) => t <= maxBoost);
+console.log("[PARLAY] targets =", targets);
+
+
+  // Límite de partidos por parlay (para evitar parlays enormes cuando hay muchos encuentros).
+  // Ajusta si quieres: x3 con pocos legs, x100 con más legs.
+  const caps = { 3: 2, 5: 3, 10: 4, 20: 5, 50: 7, 100: 8 };
+  const maxLegs = 12; // máximo de selecciones por parlay (evita combinadas gigantes)
+
+
+  // ===================== PARLAYS (x3, x5, x10, x20, x50, x100)
+
+  const parlaysRaw = targets.map((t) => {
+    const cap = (caps && caps[t]) ? caps[t] : 100;
+    const r = buildParlay({
+      candidatesByFixture: candidatesByFixtureForParlays,
+      target: t,
+      cap,
+      maxLegs,
+    });
+    if (!r) return null;
+
+    // Si se aleja del target, igual lo mostramos (cuando hay pocos partidos es normal).
+    return { ...r, target: t };
+  });
+
+  // Relleno: si un target no se puede construir, repetimos la última parlay válida
+  // para que SIEMPRE se muestren todas las secciones (x3..x100) y el usuario no piense que "se cayó".
+  let lastValid = null;
+  const parlays = parlaysRaw
+    .map((p, i) => {
+      if (p && p.legs && p.legs.length) {
+        lastValid = p;
+        return p;
+      }
+      if (!lastValid) return null;
+      return { ...lastValid, target: targets[i] };
+    })
+    .filter(Boolean);
+
+// ===================== VALUE LIST (usar SANITIZED) =====================
+const valueList = buildValueList(candidatesByFixtureSanitized, 0.06);
 
 console.log("parlays:", parlays);
 console.log("valueList:", valueList?.length);
