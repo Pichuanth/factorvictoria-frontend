@@ -6,6 +6,11 @@ function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
 }
 
+// Clamp to [0,1] (used by probability shaping)
+function clamp01(n) {
+  return clamp(n, 0, 1);
+}
+
 function round2(n) {
   const x = Number(n);
   return Number.isFinite(x) ? Number(x.toFixed(2)) : null;
