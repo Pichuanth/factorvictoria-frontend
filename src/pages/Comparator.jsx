@@ -98,43 +98,25 @@ function prettyForm(formStr) {
 }
 
 function hasValidFormStr(s) {
-  if (!s) return false;
+  // Consideramos "racha válida" SOLO si podemos extraer al menos 3 resultados (de los últimos 5)
+  // Acepta formatos: "W-D-L-W-W", "G-E-P", "🟢G 🟡E 🔴P", etc.
+  if (!s || typeof s !== "string") return false;
 
-  // Accept arrays like ["W","D","L",...] or objects like [{result:"W"},...]
-  if (Array.isArray(s)) {
-    const flat = s.flat ? s.flat() : [].concat(...s);
-    const tokens = flat
-      .map((x) => {
-        if (!x) return "";
-        if (typeof x === "string") return x;
-        if (typeof x === "object") return x.result ?? x.res ?? x.outcome ?? x.value ?? x.code ?? x.r ?? x.status ?? "";
-        return String(x);
-      })
-      .map((x) => String(x).trim().toUpperCase())
-      .filter(Boolean)
-      .flatMap((t) => (/^[WDL]{5,}$/.test(t) ? t.split("") : [t]));
+  // Normaliza separadores y tokens
+  const raw = s
+    .replace(/\(|\)|\[|\]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
-    const ok = tokens
-      .map((t) => (t[0] || "").toUpperCase())
-      .map((c) => (c === "G" ? "W" : c === "E" ? "D" : c === "P" ? "L" : c))
-      .filter((c) => c === "W" || c === "D" || c === "L");
-
-    return ok.length >= 5; // we want the last-5 form
-  }
-
-  const raw = String(s);
-
-  // Keep letters only for safety (handles emojis like 🟢G, 🔴P)
-  const lettersOnly = raw.toUpperCase().replace(/[^A-Z]/g, "");
-  if (/^[WDL]{5,}$/.test(lettersOnly)) return true;
-
-  // Otherwise split by hyphen/space and count meaningful tokens
   const tokens = raw
-    .replace(/[()\[\]{}]/g, " ")
-    .split(/[-\s]+/)
+    .split(/\s*[-|,\s]\s*/g)
+    .map((t) => (t || "").replace(/[^A-Za-z]/g, "").toUpperCase())
     .filter(Boolean)
-    .map((t) => String(t).trim().toUpperCase());
+    .slice(0, 5);
 
+  if (tokens.length < 3) return false;
+
+  // Mapeo: G/E/P (español) -> W/D/L
   const mapped = tokens.map((t) => {
     const c = (t[0] || "").toUpperCase();
     if (c === "G") return "W";
@@ -144,7 +126,7 @@ function hasValidFormStr(s) {
   });
 
   const ok = mapped.filter((c) => c === "W" || c === "D" || c === "L");
-  return ok.length >= 5;
+  return ok.length >= 3;
 }
 
 
@@ -188,20 +170,6 @@ function dataQualityFromLast5(last5) {
     dataQuality: hasHome && hasAway ? 'full' : (hasHome || hasAway ? 'partial' : 'none'),
   };
 }
-
-// IMPORTANT: the FV pack has had a few different shapes over iterations.
-// Keep this in ONE place so cards + pick builders agree on what "last5" is.
-function extractLast5FromPack(fvPack) {
-  return (
-    fvPack?.last5 ||
-    fvPack?.data?.last5 ||
-    fvPack?.stats?.last5 ||
-    fvPack?.form?.last5 ||
-    fvPack?.direct?.last5 ||
-    null
-  );
-}
-
 
 
 function QualityDot({ dataQuality }) {
@@ -475,17 +443,11 @@ function isAllowedCompetition(countryName, leagueName) {
     "liga 3",
     "tercera division",
     "tercera division rfef",
-    "paulista a2","baiano","goiano","cearense","pernambucano",
+    "paulista","paulista a2","baiano","goiano","cearense","pernambucano",
     "matogrossense","maranhense","potiguar","acreano","ofc",
     "ofc champions league",
 
   ];
-
-  // ✅ Excepción: permitir Paulista Série A1 (Brasil)
-  if (c.includes("brazil") && l.includes("paulista") && (l.includes("a1") || l.includes("serie a1") || l.includes("série a1"))) {
-    return true;
-  }
-
   if (bannedPatterns.some((p) => l.includes(p))) return false;
 
   // ✅ Copas internacionales (permitidas)
@@ -522,9 +484,6 @@ if (intlAllowedExact.has(l)) return true;
     { country: "usa", league: "mls" },
     { country: "brazil", league: "serie a" },
     { country: "argentina", league: "primera división argentina" },
-    { country: "argentina", league: "liga profesional argentina" },
-    { country: "argentina", league: "liga profesional" },
-    { country: "argentina", league: "copa de la liga profesional" },
     { country: "chile", league: "primera division" },
     { country: "chile", league: "primera división" },
     { country: "chile", league: "primera" },         // opcional si quieres más amplio
@@ -1821,10 +1780,19 @@ for (const fx of pool) {
   });
 
   // Calidad de datos: SOLO rachas (últ.5) de ambos equipos.
-// Si falta cualquiera, marcamos como parcial.
-const last5ForQuality = extractLast5FromPack(pack);
-const dataQuality = dataQualityFromLast5(last5ForQuality).badge === "Datos completos" ? "full" : "partial";
-const __qualityRank = dataQuality === "full" ? 1 : 0;
+  // Si falta cualquiera, marcamos como parcial.
+  const hasRacha = (v) => {
+    const s = String(v || "").trim();
+    if (!s) return false;
+    // API/BD a veces devuelve "--" o "-" cuando no hay datos
+    if (s === "--" || s === "-" || s.includes("--")) return false;
+    // esperamos letras tipo W-D-L o similares
+    return /[WDL]/i.test(s);
+  };
+  const dataQuality = (hasRacha(pack?.last5?.home?.form) && hasRacha(pack?.last5?.away?.form))
+    ? "full"
+    : "partial";
+  const __qualityRank = dataQuality === "full" ? 1 : 0;
 
   const fixedCands = (rawCands || []).map((c) => {
     const prob = Number(c?.prob);
