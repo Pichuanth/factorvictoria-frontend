@@ -36,19 +36,16 @@ function extractLast5(pack) {
 
 function hasValidFormStr(s) {
   if (!s || typeof s !== "string") return false;
-  // Accept tokens like W-D-L or G-E-P
+  // Expect tokens like W-D-L (any length >= 3 tokens)
   const parts = s.split(/\s*[-|\s]\s*/).filter(Boolean);
   if (parts.length < 3) return false;
-  return parts.every((t) => {
-    const u = String(t).trim().toUpperCase();
-    return ["W", "D", "L", "G", "E", "P"].includes(u);
-  });
+  return parts.every((t) => ["W", "D", "L"].includes(String(t).trim().toUpperCase()));
 }
 
 function formQuality(pack) {
   const last5 = extractLast5(pack);
-  const homeForm = last5?.home?.form || last5?.local?.form || last5?.home?.display || last5?.local?.display || null;
-  const awayForm = last5?.away?.form || last5?.visitor?.form || last5?.away?.display || last5?.visitor?.display || null;
+  const homeForm = last5?.home?.form || last5?.local?.form || null;
+  const awayForm = last5?.away?.form || last5?.visitor?.form || null;
   const hasHome = hasValidFormStr(homeForm);
   const hasAway = hasValidFormStr(awayForm);
   return { hasHome, hasAway, full: hasHome && hasAway, homeForm, awayForm };
@@ -69,11 +66,6 @@ function pr(c) {
   const p = Number(c?.prob);
   return Number.isFinite(p) ? p : 0;
 }
-
-function qRank(p) {
-  return p?.dataQuality?.isComplete ? 1 : 0;
-}
-
 
 // stats: [{gf, ga}] últimos partidos
 function summarizeRecent(list) {
@@ -351,7 +343,7 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
   });
 
   // Orden: primero mayor prob (seguro), luego menor odd
-  cleaned.sort((a, b) => (qRank(b) - qRank(a)) || (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
+  cleaned.sort((a, b) => (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
   return cleaned;
 }
 // =====================
@@ -360,7 +352,7 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
 
 export function pickSafe(candidatesByFixture) {
   const all = Object.values(candidatesByFixture || {}).flat();
-  all.sort((a, b) => (qRank(b) - qRank(a)) || (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
+  all.sort((a, b) => (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
   return all[0] || null;
 }
 
@@ -374,7 +366,7 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
       return Number.isFinite(odd) && odd > 1;
     });
 
-  pool.sort((a, b) => (qRank(b) - qRank(a)) || (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
+  pool.sort((a, b) => (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
 
   const legs = [];
   let prod = 1;
