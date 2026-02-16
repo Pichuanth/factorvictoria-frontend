@@ -1847,6 +1847,10 @@ if (safe && safe.fixtureId && candidatesByFixtureForParlays[safe.fixtureId]) {
   }
 }
 
+// Flatten final per-fixture candidates into a single list (used by fvModel.buildParlay)
+const candidates = Object.values(candidatesByFixtureForParlays || {}).flatMap((arr) => (Array.isArray(arr) ? arr : []));
+console.log('[PARLAY] candidates total =', candidates.length);
+
 // ===================== TARGETS + PARLAYS =====================
 const targets = [3, 5, 10, 20, 50, 100].filter((t) => t <= maxBoost);
 console.log("[PARLAY] targets =", targets);
