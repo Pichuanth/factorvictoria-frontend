@@ -253,7 +253,6 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
   const under25 = under25_h ?? probUnderLine(lambdaTotal, 2.5);
 
   const over25 = clamp(1 - under25, 0.01, 0.99);
-  const over15 = clamp(1 - probUnderLine(lambdaTotal, 1.5), 0.01, 0.99);
 
   const bttsNo_h = probBTTSNoFromBttsRate(h2h?.bttsRate);
   const bttsNo = bttsNo_h ?? probBTTSNo(lambdaHome, lambdaAway);
@@ -287,12 +286,21 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
   });
 
   out.push({
-    market: "OU_15",
+    market: "OU_25",
+    selection: "under",
+    label: "Under 2.5 goles",
+    prob: under25,
+    fvOdd: fairOddFromProb(under25),
+    marketOdd: markets?.OU_25?.under ?? null,
+  });
+
+  out.push({
+    market: "OU_25",
     selection: "over",
-    label: "Over 1.5 goles",
-    prob: over15,
-    fvOdd: fairOddFromProb(over15),
-    marketOdd: markets?.OU_15?.over ?? null,
+    label: "Over 2.5 goles",
+    prob: over25,
+    fvOdd: fairOddFromProb(over25),
+    marketOdd: markets?.OU_25?.over ?? null,
   });
 
   out.push({
@@ -393,9 +401,7 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) 
   // Armado diversificado con fallback FV (si no hay marketOdd) usando usedOdd ya precalculado.
   // Objetivo: siempre intentar armar x3/x5; y para x10+ armar si el pool alcanza sin pasarse del cap del plan.
 
-  // Launch behavior: if we have at least 1 viable fixture, we ALWAYS return a parlay.
-  // When the pool is small, the UI can repeat the best parlay for higher targets.
-  const minLegs = 1;
+  const minLegs = 2;
   const t = Number(target);
   const hardCap = Number(cap);
 
