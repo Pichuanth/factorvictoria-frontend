@@ -286,8 +286,8 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
   });
 
   // Over 3.5 goles (agresivo)
-  if (Number.isFinite(under35Prob)) {
-    const over35Prob = clamp(1 - under35Prob, 0.05, 0.95);
+  if (Number.isFinite(under35)) {
+    const over35Prob = clamp(1 - under35, 0.05, 0.95);
     candidates.push({
       fixtureId,
       home,
