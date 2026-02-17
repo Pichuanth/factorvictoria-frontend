@@ -215,8 +215,7 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
   // Genera picks candidatos con: market, selection, label, prob, fvOdd, marketOdd, usedOdd, valueEdge, fixtureId, home, away
   const out = [];
 
-    const candidates = out;
-// Calidad de datos: usamos la racha (W/D/L últimos 5) como señal principal.
+  // Calidad de datos: usamos la racha (W/D/L últimos 5) como señal principal.
   const q = formQuality(pack);
   const confidence = q.full ? 1 : 0.7; // si falta racha en 1+ equipos, reducimos confianza (sin bloquear)
   const dataQuality = q.full ? "full" : "partial";
@@ -286,22 +285,6 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
     marketOdd: markets?.OU_35?.under ?? null,
   });
 
-  // Over 3.5 goles (agresivo)
-  if (Number.isFinite(under35)) {
-    const over35Prob = clamp(1 - under35, 0.05, 0.95);
-    candidates.push({
-      fixtureId,
-      home,
-      away,
-      dataQuality,
-      market: "OU_35",
-      selection: "over",
-      label: "Over 3.5 goles",
-      prob: over35Prob,
-      fvOdd: fairOddFromProb(over35Prob),
-    });
-  }
-
   out.push({
     market: "OU_25",
     selection: "under",
@@ -328,22 +311,6 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
     fvOdd: fairOddFromProb(bttsNo),
     marketOdd: markets?.BTTS?.no ?? null,
   });
-
-  // Ambos marcan: Sí (agresivo, útil para targets altos)
-  if (Number.isFinite(bttsNo)) {
-    const bttsYes = clamp(1 - bttsNo, 0.05, 0.95);
-    candidates.push({
-      fixtureId,
-      home,
-      away,
-      dataQuality,
-      market: "BTTS",
-      selection: "yes",
-      label: "Ambos marcan: Sí",
-      prob: bttsYes,
-      fvOdd: fairOddFromProb(bttsYes),
-    });
-  }
 
   // ---------- limpieza + métricas ----------
   const cleaned = out
