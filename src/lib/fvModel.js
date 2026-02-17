@@ -215,7 +215,8 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
   // Genera picks candidatos con: market, selection, label, prob, fvOdd, marketOdd, usedOdd, valueEdge, fixtureId, home, away
   const out = [];
 
-  // Calidad de datos: usamos la racha (W/D/L últimos 5) como señal principal.
+    const candidates = out;
+// Calidad de datos: usamos la racha (W/D/L últimos 5) como señal principal.
   const q = formQuality(pack);
   const confidence = q.full ? 1 : 0.7; // si falta racha en 1+ equipos, reducimos confianza (sin bloquear)
   const dataQuality = q.full ? "full" : "partial";
