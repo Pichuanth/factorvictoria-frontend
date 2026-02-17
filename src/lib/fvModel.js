@@ -219,6 +219,10 @@ export function estimateLambdasFromPack(pack) {
 }
 
 export function buildCandidatePicks({ fixture, pack, markets }) {
+
+  const fixtureId = Number(fixture?.fixture?.id || fixture?.id || pack?.fixtureId);
+  const homeName = fixture?.teams?.home?.name || pack?.teams?.home?.name || fixture?.home || "Home";
+  const awayName = fixture?.teams?.away?.name || pack?.teams?.away?.name || fixture?.away || "Away";
   
   // Genera picks candidatos con: market, selection, label, prob, fvOdd, marketOdd, usedOdd, valueEdge, fixtureId, home, away
   const out = [];
@@ -317,8 +321,8 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
   });
   out.push({
     fixtureId,
-    home: fixture.home,
-    away: fixture.away,
+    home: homeName,
+    away: awayName,
     market: "OU_15",
     selection: "over",
     label: "Over 1.5 goles",
@@ -338,8 +342,8 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
   });
   out.push({
     fixtureId,
-    home: fixture.home,
-    away: fixture.away,
+    home: homeName,
+    away: awayName,
     market: "BTTS",
     selection: "yes",
     label: "Ambos marcan: SÍ",
