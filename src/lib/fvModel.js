@@ -8,18 +8,18 @@ function clamp(n, a, b) {
 }
 
 function round2(n) {
-  const x = Number(n);
+  var x = Number(n);
   return Number.isFinite(x) ? Number(x.toFixed(2)) : null;
 }
 
 function avg(arr) {
   if (!arr?.length) return null;
-  const s = arr.reduce((a, b) => a + b, 0);
+  var s = arr.reduce((a, b) => a + b, 0);
   return s / arr.length;
 }
 
 function safeNum(n) {
-  const x = Number(n);
+  var x = Number(n);
   return Number.isFinite(x) ? x : null;
 }
 
@@ -38,36 +38,36 @@ function extractLast5(pack) {
 function hasValidFormStr(s) {
   if (!s || typeof s !== "string") return false;
   // Accept tokens like W-D-L or G-E-P
-  const parts = s.split(/\s*[-|\s]\s*/).filter(Boolean);
+  var parts = s.split(/\s*[-|\s]\s*/).filter(Boolean);
   if (parts.length < 3) return false;
   return parts.every((t) => {
-    const u = String(t).trim().toUpperCase();
+    var u = String(t).trim().toUpperCase();
     return ["W", "D", "L", "G", "E", "P"].includes(u);
   });
 }
 
 function formQuality(pack) {
-  const last5 = extractLast5(pack);
-  const homeForm = last5?.home?.form || last5?.local?.form || last5?.home?.display || last5?.local?.display || null;
-  const awayForm = last5?.away?.form || last5?.visitor?.form || last5?.away?.display || last5?.visitor?.display || null;
-  const hasHome = hasValidFormStr(homeForm);
-  const hasAway = hasValidFormStr(awayForm);
+  var last5 = extractLast5(pack);
+  var homeForm = last5?.home?.form || last5?.local?.form || last5?.home?.display || last5?.local?.display || null;
+  var awayForm = last5?.away?.form || last5?.visitor?.form || last5?.away?.display || last5?.visitor?.display || null;
+  var hasHome = hasValidFormStr(homeForm);
+  var hasAway = hasValidFormStr(awayForm);
   return { hasHome, hasAway, full: hasHome && hasAway, homeForm, awayForm };
 }
 
 function applyConfidence(p, multiplier) {
   // shrink toward 0.5 to be conservative when data is partial
-  const prob = Number(p);
+  var prob = Number(p);
   if (!Number.isFinite(prob)) return prob;
-  const m = clamp(Number(multiplier), 0, 1);
+  var m = clamp(Number(multiplier), 0, 1);
   return clamp(0.5 + (prob - 0.5) * m, 0.01, 0.99);
 }
 
 
 function pr(c) {
-  const v = Number(c?.__probRank);
+  var v = Number(c?.__probRank);
   if (Number.isFinite(v)) return v;
-  const p = Number(c?.prob);
+  var p = Number(c?.prob);
   return Number.isFinite(p) ? p : 0;
 }
 
@@ -79,17 +79,17 @@ function qRank(p) {
 // stats: [{gf, ga}] últimos partidos
 function summarizeRecent(list) {
   if (!Array.isArray(list) || !list.length) return null;
-  const gf = avg(list.map((x) => safeNum(x.gf) ?? 0));
-  const ga = avg(list.map((x) => safeNum(x.ga) ?? 0));
-  const total = (gf ?? 0) + (ga ?? 0);
+  var gf = avg(list.map((x) => safeNum(x.gf) ?? 0));
+  var ga = avg(list.map((x) => safeNum(x.ga) ?? 0));
+  var total = (gf ?? 0) + (ga ?? 0);
   return { gf: gf ?? 0, ga: ga ?? 0, total };
 }
 
 // h2h: [{hg, ag}]
 function summarizeH2H(list) {
   if (!Array.isArray(list) || !list.length) return null;
-  const totals = list.map((x) => (safeNum(x.hg) ?? 0) + (safeNum(x.ag) ?? 0));
-  const btts = list.map((x) =>
+  var totals = list.map((x) => (safeNum(x.hg) ?? 0) + (safeNum(x.ag) ?? 0));
+  var btts = list.map((x) =>
     (safeNum(x.hg) ?? 0) > 0 && (safeNum(x.ag) ?? 0) > 0 ? 1 : 0
   );
   return {
@@ -100,8 +100,8 @@ function summarizeH2H(list) {
 
 function probUnderFromAvgGoals(avgGoals, line) {
   if (!Number.isFinite(avgGoals)) return null;
-  const diff = line - avgGoals; // positivo = favorece Under
-  const p = 1 / (1 + Math.exp(-1.4 * diff));
+  var diff = line - avgGoals; // positivo = favorece Under
+  var p = 1 / (1 + Math.exp(-1.4 * diff));
   return clamp(p, 0.05, 0.95);
 }
 
@@ -111,13 +111,13 @@ function probBTTSNoFromBttsRate(bttsRate) {
 }
 
 export function fairOddFromProb(p) {
-  const pp = clamp(Number(p || 0), 1e-6, 0.999999);
+  var pp = clamp(Number(p || 0), 1e-6, 0.999999);
   return 1 / pp;
 }
 
 function factorial(n) {
-  let x = 1;
-  for (let i = 2; i <= n; i++) x *= i;
+  var x = 1;
+  for (var i = 2; i <= n; i++) x *= i;
   return x;
 }
 
@@ -127,27 +127,27 @@ function poissonP(k, lambda) {
 }
 
 export function probUnderLine(lambdaTotal, line) {
-  const maxGoals = 10;
-  const thr = Math.floor(Number(line)); // 3.5 -> 3
-  let s = 0;
-  for (let g = 0; g <= maxGoals; g++) {
-    const p = poissonP(g, lambdaTotal);
+  var maxGoals = 10;
+  var thr = Math.floor(Number(line)); // 3.5 -> 3
+  var s = 0;
+  for (var g = 0; g <= maxGoals; g++) {
+    var p = poissonP(g, lambdaTotal);
     if (g <= thr) s += p;
   }
   return clamp(s, 0, 1);
 }
 
 export function probBTTSNo(lambdaHome, lambdaAway) {
-  const pH0 = poissonP(0, lambdaHome);
-  const pA0 = poissonP(0, lambdaAway);
-  const pBoth0 = pH0 * pA0;
+  var pH0 = poissonP(0, lambdaHome);
+  var pA0 = poissonP(0, lambdaAway);
+  var pBoth0 = pH0 * pA0;
   return clamp(pH0 + pA0 - pBoth0, 0, 1);
 }
 
 export function scoreMatrix(lambdaHome, lambdaAway, maxG = 6) {
-  const mat = [];
-  for (let i = 0; i <= maxG; i++) {
-    for (let j = 0; j <= maxG; j++) {
+  var mat = [];
+  for (var i = 0; i <= maxG; i++) {
+    for (var j = 0; j <= maxG; j++) {
       mat.push({ hg: i, ag: j, p: poissonP(i, lambdaHome) * poissonP(j, lambdaAway) });
     }
   }
@@ -155,16 +155,16 @@ export function scoreMatrix(lambdaHome, lambdaAway, maxG = 6) {
 }
 
 export function probs1X2(lambdaHome, lambdaAway) {
-  const mat = scoreMatrix(lambdaHome, lambdaAway, 6);
-  let pH = 0,
+  var mat = scoreMatrix(lambdaHome, lambdaAway, 6);
+  var pH = 0,
     pD = 0,
     pA = 0;
-  for (const c of mat) {
+  for (var c of mat) {
     if (c.hg > c.ag) pH += c.p;
     else if (c.hg === c.ag) pD += c.p;
     else pA += c.p;
   }
-  const s = pH + pD + pA;
+  var s = pH + pD + pA;
   if (s > 0) {
     pH /= s;
     pD /= s;
@@ -174,7 +174,7 @@ export function probs1X2(lambdaHome, lambdaAway) {
 }
 
 export function probsDoubleChance(lambdaHome, lambdaAway) {
-  const p = probs1X2(lambdaHome, lambdaAway);
+  var p = probs1X2(lambdaHome, lambdaAway);
   return {
     home_draw: clamp(p.home + p.draw, 0, 1),
     home_away: clamp(p.home + p.away, 0, 1),
@@ -183,90 +183,99 @@ export function probsDoubleChance(lambdaHome, lambdaAway) {
 }
 
 export function estimateLambdasFromPack(pack) {
+  try {
+
   // El backend puede enviar llaves en camelCase o PascalCase.
   // Ej: { model: { LambdaHome, LambdaAway, LambdaTotal } }
   function safeNum(v) {
-    const n = Number(v);
+    var n = Number(v);
     return Number.isFinite(n) ? n : null;
   }
   function pick(...vals) {
-    for (const v of vals) {
-      const n = safeNum(v);
+    for (var v of vals) {
+      var n = safeNum(v);
       if (n != null) return n;
     }
     return null;
   }
-  const m = pack?.model || pack?.data?.model || pack?.stats?.model || null;
+  var m = pack?.model || pack?.data?.model || pack?.stats?.model || null;
 
-  const lhRaw = pick(m?.lambdaHome, m?.lambda_home, m?.homeLambda, m?.LambdaHome, m?.lambdaH);
-  const laRaw = pick(m?.lambdaAway, m?.lambda_away, m?.awayLambda, m?.LambdaAway, m?.lambdaA);
-  const ltRaw = pick(m?.lambdaTotal, m?.lambda_total, m?.LambdaTotal, m?.totalLambda);
+  var lhRaw = pick(m?.lambdaHome, m?.lambda_home, m?.homeLambda, m?.LambdaHome, m?.lambdaH);
+  var laRaw = pick(m?.lambdaAway, m?.lambda_away, m?.awayLambda, m?.LambdaAway, m?.lambdaA);
+  var ltRaw = pick(m?.lambdaTotal, m?.lambda_total, m?.LambdaTotal, m?.totalLambda);
 
   // Defaults (conservadores) si no llega modelo
-  let lambdaHome = lhRaw != null ? clamp(lhRaw, 0.2, 3.2) : 1.25;
-  let lambdaAway = laRaw != null ? clamp(laRaw, 0.2, 3.2) : 1.05;
+  var lambdaHome = lhRaw != null ? clamp(lhRaw, 0.2, 3.2) : 1.25;
+  var lambdaAway = laRaw != null ? clamp(laRaw, 0.2, 3.2) : 1.05;
 
   // Si llega total pero falta home/away, repartimos.
   if (ltRaw != null && (lhRaw == null || laRaw == null)) {
-    const lt = clamp(ltRaw, 0.4, 6.0);
-    const wH = lhRaw != null ? clamp(lhRaw / lt, 0.25, 0.75) : 0.55;
+    var lt = clamp(ltRaw, 0.4, 6.0);
+    var wH = lhRaw != null ? clamp(lhRaw / lt, 0.25, 0.75) : 0.55;
     lambdaHome = clamp(lt * wH, 0.2, 3.2);
     lambdaAway = clamp(lt - lambdaHome, 0.2, 3.2);
   }
 
-  const lambdaTotal = clamp(lambdaHome + lambdaAway, 0.4, 6.0);
+  var lambdaTotal = clamp(lambdaHome + lambdaAway, 0.4, 6.0);
   return { lambdaHome, lambdaAway, lambdaTotal };
+
+  } catch (e) {
+    console.warn('[FV] estimateLambdasFromPack failed', e);
+    return { home: 1.35, away: 1.15 };
+  }
 }
 
 export function buildCandidatePicks({ fixture, pack, markets }) {
+  try {
+
   
   // Genera picks candidatos con: market, selection, label, prob, fvOdd, marketOdd, usedOdd, valueEdge, fixtureId, home, away
-  const out = [];
+  var out = [];
 
   // Calidad de datos: usamos la racha (W/D/L últimos 5) como señal principal.
-  const q = formQuality(pack);
-  const confidence = q.full ? 1 : 0.7; // si falta racha en 1+ equipos, reducimos confianza (sin bloquear)
-  const dataQuality = q.full ? "full" : "partial";
+  var q = formQuality(pack);
+  var confidence = q.full ? 1 : 0.7; // si falta racha en 1+ equipos, reducimos confianza (sin bloquear)
+  var dataQuality = q.full ? "full" : "partial";
 
-  const { lambdaHome, lambdaAway, lambdaTotal } = estimateLambdasFromPack(pack);
+  var { lambdaHome, lambdaAway, lambdaTotal } = estimateLambdasFromPack(pack);
 
   // --- NUEVO: forma + h2h ---
-  const recentHome = summarizeRecent(pack?.recent?.home);
-  const recentAway = summarizeRecent(pack?.recent?.away);
-  const h2h = summarizeH2H(pack?.h2h);
+  var recentHome = summarizeRecent(pack?.recent?.home);
+  var recentAway = summarizeRecent(pack?.recent?.away);
+  var h2h = summarizeH2H(pack?.h2h);
 
-  const recentTotal =
+  var recentTotal =
     Number.isFinite(recentHome?.total) && Number.isFinite(recentAway?.total)
       ? (recentHome.total + recentAway.total) / 2
       : null;
 
-  const h2hTotal = Number.isFinite(h2h?.avgTotal) ? h2h.avgTotal : null;
+  var h2hTotal = Number.isFinite(h2h?.avgTotal) ? h2h.avgTotal : null;
 
   // Mezcla final de goles esperados (para Under/Over)
-  const blendTotal =
+  var blendTotal =
     (Number.isFinite(recentTotal) ? 0.45 * recentTotal : 0) +
     (Number.isFinite(h2hTotal) ? 0.35 * h2hTotal : 0) +
     (Number.isFinite(lambdaTotal) ? 0.20 * lambdaTotal : 0);
 
-  const usableTotal = blendTotal > 0.2 ? blendTotal : lambdaTotal;
+  var usableTotal = blendTotal > 0.2 ? blendTotal : lambdaTotal;
 
   // probabilidades base
-  const dc = probsDoubleChance(lambdaHome, lambdaAway);
+  var dc = probsDoubleChance(lambdaHome, lambdaAway);
 
-  const under35_h = probUnderFromAvgGoals(usableTotal, 3.5);
-  const under25_h = probUnderFromAvgGoals(usableTotal, 2.5);
-  const under15_h = probUnderFromAvgGoals(usableTotal, 1.5);
+  var under35_h = probUnderFromAvgGoals(usableTotal, 3.5);
+  var under25_h = probUnderFromAvgGoals(usableTotal, 2.5);
+  var under15_h = probUnderFromAvgGoals(usableTotal, 1.5);
 
   // fallback: si heurística da null, usa Poisson
-  const under35 = under35_h ?? probUnderLine(lambdaTotal, 3.5);
-  const under25 = under25_h ?? probUnderLine(lambdaTotal, 2.5);
-  const under15 = under15_h ?? probUnderLine(lambdaTotal, 1.5);
+  var under35 = under35_h ?? probUnderLine(lambdaTotal, 3.5);
+  var under25 = under25_h ?? probUnderLine(lambdaTotal, 2.5);
+  var under15 = under15_h ?? probUnderLine(lambdaTotal, 1.5);
 
-  const over25 = clamp(1 - under25, 0.01, 0.99);
-  const over15 = clamp(1 - under15, 0.01, 0.99);
+  var over25 = clamp(1 - under25, 0.01, 0.99);
+  var over15 = clamp(1 - under15, 0.01, 0.99);
 
-  const bttsNo_h = probBTTSNoFromBttsRate(h2h?.bttsRate);
-  const bttsNo = bttsNo_h ?? probBTTSNo(lambdaHome, lambdaAway);
+  var bttsNo_h = probBTTSNoFromBttsRate(h2h?.bttsRate);
+  var bttsNo = bttsNo_h ?? probBTTSNo(lambdaHome, lambdaAway);
 
   // ---------- picks ----------
   out.push({
@@ -335,15 +344,15 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
   });
 
   // ---------- limpieza + métricas ----------
-  const cleaned = out
+  var cleaned = out
   .filter((x) => Number.isFinite(x.prob) && pr(x) > 0.01 && pr(x) < 0.999)
   .map((x) => {
-    const fvOddNum = Number(x.fvOdd);
-    const mkOddNum = Number(x.marketOdd);
+    var fvOddNum = Number(x.fvOdd);
+    var mkOddNum = Number(x.marketOdd);
 
-    const bestOddRaw = Number.isFinite(mkOddNum) ? mkOddNum : fvOddNum;
+    var bestOddRaw = Number.isFinite(mkOddNum) ? mkOddNum : fvOddNum;
 
-    const valueEdgeRaw =
+    var valueEdgeRaw =
       Number.isFinite(mkOddNum) && Number.isFinite(fvOddNum) && fvOddNum > 0
         ? (mkOddNum / fvOddNum) - 1
         : null;
@@ -367,39 +376,44 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
   // Orden: primero mayor prob (seguro), luego menor odd
   cleaned.sort((a, b) => (qRank(b) - qRank(a)) || (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
   return cleaned;
+
+  } catch (e) {
+    console.warn('[FV] buildCandidatePicks failed', e);
+    return [];
+  }
 }
 // =====================
 // Helpers de armado FV
 // =====================
 
 export function pickSafe(candidatesByFixture) {
-  const all = Object.values(candidatesByFixture || {}).flat();
+  var all = Object.values(candidatesByFixture || {}).flat();
   all.sort((a, b) => (qRank(b) - qRank(a)) || (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
   return all[0] || null;
 }
 
 export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 3.0, maxLegs = 3) {
-  const pool = Object.values(candidatesByFixture || {})
+  var pool = Object.values(candidatesByFixture || {})
     .map((list) => (list || [])[0])
     .filter(Boolean)
     .filter((x) => Number.isFinite(x.prob) && pr(x) >= 0.85)
     .filter((x) => {
-      const odd = Number(x.usedOdd);
+      var odd = Number(x.usedOdd);
       return Number.isFinite(odd) && odd > 1;
     });
 
   pool.sort((a, b) => (qRank(b) - qRank(a)) || (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
 
-  const legs = [];
-  let prod = 1;
+  var legs = [];
+  var prod = 1;
 
-  for (const cand of pool) {
+  for (var cand of pool) {
     if (legs.some((l) => l.fixtureId === cand.fixtureId)) continue;
 
-    const odd = Number(cand.usedOdd);
+    var odd = Number(cand.usedOdd);
     if (!Number.isFinite(odd) || odd <= 1) continue;
 
-    const next = prod * odd;
+    var next = prod * odd;
     if (next > maxOdd * 1.03) continue;
 
     legs.push(cand);
@@ -420,32 +434,34 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
 }
 
 export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 26 }) {
+  try {
+
   // Armado diversificado con fallback FV (si no hay marketOdd) usando usedOdd ya precalculado.
   // Objetivo: siempre intentar armar x3/x5; y para x10+ armar si el pool alcanza sin pasarse del cap del plan.
 
-  const minLegs = t >= 50 ? 6 : t >= 20 ? 4 : 2;
-  const t = Number(target);
-  const hardCap = Number(cap);
+  var minLegs = t >= 50 ? 6 : t >= 20 ? 4 : 2;
+  var t = Number(target);
+  var hardCap = Number(cap);
 
   if (!Number.isFinite(t) || t <= 1) return null;
   if (!Number.isFinite(hardCap) || hardCap <= 1) return null;
 
   // --- parámetros por target (relaja filtros para x3/x5) ---
-  const minProb =
+  var minProb =
     t <= 5 ? 0.72 :
     t <= 10 ? 0.66 :
     t <= 20 ? 0.62 :
     t <= 50 ? 0.58 :
     0.55;
 
-  const perTypeLimitBase = {
+  var perTypeLimitBase = {
     DC: 6,     // 1X/X2
     OU: 6,     // Under/Over
     BTTS: 1,   // evitar "todo BTTS"
     OTHER: 2,
   }
   function typeOf(p) {
-    const mk = String(p?.market || p?.marketKey || "").toUpperCase();
+    var mk = String(p?.market || p?.marketKey || "").toUpperCase();
     if (mk.includes("DC")) return "DC";
     if (mk.includes("OU")) return "OU";
     if (mk.includes("BTTS")) return "BTTS";
@@ -453,29 +469,29 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 26 }) 
   }
 
   function oddOf(p) {
-    const o = Number(p?.usedOdd ?? p?.usedOddDisplay ?? p?.marketOdd ?? p?.fvOdd);
+    var o = Number(p?.usedOdd ?? p?.usedOddDisplay ?? p?.marketOdd ?? p?.fvOdd);
     return Number.isFinite(o) ? o : null;
   }
 
   function scoreOf(p) {
     // mezcla de probRank / prob + (ligero) incentivo por subir odd para targets altos
-    const prob = Number(p?.__probRank);
-    const p0 = Number.isFinite(prob) ? prob : Number(p?.prob);
-    const pp = Number.isFinite(p0) ? p0 : 0;
-    const o = oddOf(p) ?? 1;
-    const logO = Math.log(Math.max(1.0001, o));
-    const wOdd = t >= 100 ? 0.42 : t >= 50 ? 0.36 : t >= 20 ? 0.28 : t >= 10 ? 0.18 : 0.10;
+    var prob = Number(p?.__probRank);
+    var p0 = Number.isFinite(prob) ? prob : Number(p?.prob);
+    var pp = Number.isFinite(p0) ? p0 : 0;
+    var o = oddOf(p) ?? 1;
+    var logO = Math.log(Math.max(1.0001, o));
+    var wOdd = t >= 100 ? 0.42 : t >= 50 ? 0.36 : t >= 20 ? 0.28 : t >= 10 ? 0.18 : 0.10;
     return pp * (1 - wOdd) + logO * wOdd;
   }
 
   // --- arma opciones por fixture ---
-  const byFx = Object.entries(candidatesByFixture || {})
+  var byFx = Object.entries(candidatesByFixture || {})
     .map(([fid, list]) => {
-      const arr = (list || [])
+      var arr = (list || [])
         .filter(Boolean)
         .filter((p) => Number.isFinite(Number(p?.prob)) || Number.isFinite(Number(p?.__probRank)))
         .filter((p) => {
-          const o = oddOf(p);
+          var o = oddOf(p);
           return Number.isFinite(o) && o > 1.0001;
         })
         .map((p) => ({
@@ -488,7 +504,7 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 26 }) 
         .sort((a, b) => (b.__score - a.__score));
 
       // toma top-N por fixture, para permitir swaps (diversidad / subir cuota)
-      const topN = arr.slice(0, 5);
+      var topN = arr.slice(0, 5);
 
       if (!topN.length) return null;
       return { fid, options: topN };
@@ -502,24 +518,24 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 26 }) 
 
   // --- greedy con restricciones de diversidad ---
   function buildWithLimits(perTypeLimit, allowLowProb = false) {
-    const legs = [];
-    const typeCount = { DC: 0, OU: 0, BTTS: 0, OTHER: 0 };
-    let prod = 1;
+    var legs = [];
+    var typeCount = { DC: 0, OU: 0, BTTS: 0, OTHER: 0 };
+    var prod = 1;
 
-    for (const fx of byFx) {
-      let picked = null;
+    for (var fx of byFx) {
+      var picked = null;
 
-      for (const cand of fx.options) {
+      for (var cand of fx.options) {
         // filtro probabilidad (relajable)
-        const pRank = Number.isFinite(Number(cand.__probRank)) ? Number(cand.__probRank) : Number(cand.prob);
-        const pOk = Number.isFinite(pRank) ? pRank : 0;
+        var pRank = Number.isFinite(Number(cand.__probRank)) ? Number(cand.__probRank) : Number(cand.prob);
+        var pOk = Number.isFinite(pRank) ? pRank : 0;
         if (!allowLowProb && pOk < minProb) continue;
 
         // evita repetir BTTS "NO" como default (1 máximo, ya controlado por tipo)
-        const typ = cand.__type || "OTHER";
+        var typ = cand.__type || "OTHER";
         if ((typeCount[typ] || 0) >= (perTypeLimit[typ] ?? 99)) continue;
 
-        const next = prod * cand.__odd;
+        var next = prod * cand.__odd;
         if (next > hardCap * 1.02) continue;
 
         picked = cand;
@@ -542,11 +558,11 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 26 }) 
   }
 
   // 1) intento normal con límites base
-  let attempt = buildWithLimits(perTypeLimitBase, false);
+  var attempt = buildWithLimits(perTypeLimitBase, false);
 
   // 2) si no llega al target, relaja límites (más OU/DC) y permite picks un poco menos "seguros"
   if (!attempt || attempt.prod < t * 0.85) {
-    const relaxed = {
+    var relaxed = {
       ...perTypeLimitBase,
       DC: perTypeLimitBase.DC + 1,
       OU: perTypeLimitBase.OU + 1,
@@ -557,7 +573,7 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 26 }) 
   }
 
   if (!attempt || attempt.prod < t * 0.80) {
-    const relaxed2 = {
+    var relaxed2 = {
       ...perTypeLimitBase,
       DC: perTypeLimitBase.DC + 2,
       OU: perTypeLimitBase.OU + 2,
@@ -570,12 +586,12 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 26 }) 
   if (!attempt) return null;
 
   // --- expansión: permite 2 legs por fixture (compatibles) para targets altos ---
-  const maxPerFixture = t >= 20 ? 2 : 1;
+  var maxPerFixture = t >= 20 ? 2 : 1;
 
   function isContradict(a, b) {
     if (!a || !b) return false;
-    const mkA = String(a.market || "").toUpperCase();
-    const mkB = String(b.market || "").toUpperCase();
+    var mkA = String(a.market || "").toUpperCase();
+    var mkB = String(b.market || "").toUpperCase();
     if (mkA.includes("DC") && mkB.includes("DC")) {
       // no permitir home_draw vs draw_away
       return String(a.selection) !== String(b.selection);
@@ -592,35 +608,35 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 26 }) 
 
   function canAdd(extra, currentLegs) {
     if (!extra) return false;
-    const fx = extra.__fx ?? extra.fixtureId;
-    const same = currentLegs.filter((l) => (l.__fx ?? l.fixtureId) === fx);
+    var fx = extra.__fx ?? extra.fixtureId;
+    var same = currentLegs.filter((l) => (l.__fx ?? l.fixtureId) === fx);
     if (same.length >= maxPerFixture) return false;
-    for (const s of same) {
+    for (var s of same) {
       if (isContradict(s, extra) || isContradict(extra, s)) return false;
     }
     return true;
   }
 
   // Si no alcanzó target, hacemos una segunda pasada buscando "boosters" compatibles
-  let legs = attempt.legs.slice();
-  let prod = attempt.prod;
+  var legs = attempt.legs.slice();
+  var prod = attempt.prod;
 
   if (prod < t * 0.92 && maxPerFixture > 1) {
     // ordenar todas las opciones por odds desc (pero con score decente)
-    const allOpts = byFx.flatMap((fx) => fx.options.map((o) => o));
+    var allOpts = byFx.flatMap((fx) => fx.options.map((o) => o));
     allOpts.sort((a, b) => (b.__odd - a.__odd) || (b.__score - a.__score));
 
-    for (const cand of allOpts) {
+    for (var cand of allOpts) {
       if (prod >= t * 0.95) break;
       if (!canAdd(cand, legs)) continue;
 
-      const pRank = Number.isFinite(Number(cand.__probRank)) ? Number(cand.__probRank) : Number(cand.prob);
-      const pOk = Number.isFinite(pRank) ? pRank : 0;
+      var pRank = Number.isFinite(Number(cand.__probRank)) ? Number(cand.__probRank) : Number(cand.prob);
+      var pOk = Number.isFinite(pRank) ? pRank : 0;
       // booster acepta un poco menos de prob
-      const boosterMinProb = t >= 100 ? 0.52 : t >= 50 ? 0.54 : 0.56;
+      var boosterMinProb = t >= 100 ? 0.52 : t >= 50 ? 0.54 : 0.56;
       if (pOk < boosterMinProb) continue;
 
-      const next = prod * cand.__odd;
+      var next = prod * cand.__odd;
       if (next > hardCap * 1.02) continue;
 
       legs.push(cand);
@@ -641,17 +657,22 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 26 }) 
     picks: legs,
     reached: prod >= t * 0.90,
   }
+
+  } catch (e) {
+    console.warn('[FV] buildParlay failed', e);
+    return { target: target||0, cap: cap||0, games: 0, finalOdd: null, impliedProb: null, legs: [], picks: [], reached: false };
+  }
 }
 
 export function buildValueList(candidatesByFixture, minEdge = 0.06) {
-  const all = Object.values(candidatesByFixture || {}).flat();
+  var all = Object.values(candidatesByFixture || {}).flat();
 
-  const value = all
+  var value = all
     .filter((x) => Number.isFinite(Number(x.marketOdd)) && Number.isFinite(Number(x.fvOdd)))
     .map((x) => {
-      const mk = Number(x.marketOdd);
-      const fv = Number(x.fvOdd);
-      const edge = fv > 0 ? (mk / fv) - 1 : null;
+      var mk = Number(x.marketOdd);
+      var fv = Number(x.fvOdd);
+      var edge = fv > 0 ? (mk / fv) - 1 : null;
       return { ...x, valueEdge: edge === null ? null : round2(edge) };
     })
     .filter((x) => Number.isFinite(x.valueEdge) && x.valueEdge >= minEdge && pr(x) >= 0.80)
