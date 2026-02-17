@@ -1,3 +1,4 @@
+// FV_MODEL_VERSION: 2026-02-16-fix-no-tdz
 // src/lib/fvModel.js
 // Motor MVP de probabilidades + armado de parlays para Factor Victoria.
 // Objetivo: simple, interpretable, con fallbacks (si no hay odds o stats).
@@ -94,7 +95,7 @@ function summarizeH2H(list) {
   return {
     avgTotal: avg(totals) ?? null,
     bttsRate: avg(btts) ?? null,
-  };
+  }
 }
 
 function probUnderFromAvgGoals(avgGoals, line) {
@@ -178,26 +179,28 @@ export function probsDoubleChance(lambdaHome, lambdaAway) {
     home_draw: clamp(p.home + p.draw, 0, 1),
     home_away: clamp(p.home + p.away, 0, 1),
     draw_away: clamp(p.draw + p.away, 0, 1),
-  };
+  }
 }
 
 export function estimateLambdasFromPack(pack) {
   // El backend puede enviar llaves en camelCase o PascalCase.
   // Ej: { model: { LambdaHome, LambdaAway, LambdaTotal } }
-
-  function pickNum(...vals) {
+  function safeNum(v) {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  function pick(...vals) {
     for (const v of vals) {
       const n = safeNum(v);
       if (n != null) return n;
     }
     return null;
   }
-
   const m = pack?.model || pack?.data?.model || pack?.stats?.model || null;
 
-  const lhRaw = pickNum(m?.lambdaHome, m?.lambda_home, m?.homeLambda, m?.LambdaHome, m?.lambdaH);
-  const laRaw = pickNum(m?.lambdaAway, m?.lambda_away, m?.awayLambda, m?.LambdaAway, m?.lambdaA);
-  const ltRaw = pickNum(m?.lambdaTotal, m?.lambda_total, m?.LambdaTotal, m?.totalLambda);
+  const lhRaw = pick(m?.lambdaHome, m?.lambda_home, m?.homeLambda, m?.LambdaHome, m?.lambdaH);
+  const laRaw = pick(m?.lambdaAway, m?.lambda_away, m?.awayLambda, m?.LambdaAway, m?.lambdaA);
+  const ltRaw = pick(m?.lambdaTotal, m?.lambda_total, m?.LambdaTotal, m?.totalLambda);
 
   // Defaults (conservadores) si no llega modelo
   let lambdaHome = lhRaw != null ? clamp(lhRaw, 0.2, 3.2) : 1.25;
@@ -358,7 +361,7 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
       fixtureId: Number(fixture?.fixture?.id || fixture?.id || pack?.fixtureId),
       home: fixture?.teams?.home?.name || pack?.teams?.home?.name || "Home",
       away: fixture?.teams?.away?.name || pack?.teams?.away?.name || "Away",
-    };
+    }
   });
 
   // Orden: primero mayor prob (seguro), luego menor odd
@@ -413,7 +416,7 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
     finalOdd: round2(prod),
     legs,
     reached: prod >= minOdd && prod <= maxOdd * 1.05,
-  };
+  }
 }
 
 export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 26 }) {
@@ -440,8 +443,7 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 26 }) 
     OU: 6,     // Under/Over
     BTTS: 1,   // evitar "todo BTTS"
     OTHER: 2,
-  };
-
+  }
   function typeOf(p) {
     const mk = String(p?.market || p?.marketKey || "").toUpperCase();
     if (mk.includes("DC")) return "DC";
@@ -550,7 +552,7 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 26 }) 
       OU: perTypeLimitBase.OU + 1,
       BTTS: 1,
       OTHER: perTypeLimitBase.OTHER + 1,
-    };
+    }
     attempt = buildWithLimits(relaxed, false) || attempt;
   }
 
@@ -561,7 +563,7 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 26 }) 
       OU: perTypeLimitBase.OU + 2,
       BTTS: 1,
       OTHER: perTypeLimitBase.OTHER + 2,
-    };
+    }
     attempt = buildWithLimits(relaxed2, true) || attempt;
   }
 
@@ -638,7 +640,7 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 26 }) 
     legs,
     picks: legs,
     reached: prod >= t * 0.90,
-  };
+  }
 }
 
 export function buildValueList(candidatesByFixture, minEdge = 0.06) {
