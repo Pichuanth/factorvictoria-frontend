@@ -13,10 +13,6 @@ import {
   buildValueList,
 } from "../lib/fvModel";
 
-// UI toggles
-const SHOW_QUALITY_BADGES = false; // set true if you want the green/yellow indicators
-
-
 const GOLD = "#E6C464";
 
 const API_BASE =
@@ -135,49 +131,15 @@ function hasValidFormStr(s) {
 
 
 function dataQualityFromLast5(last5) {
-  // Prefer explicit 5-match results arrays (most reliable), then fall back to form strings.
-  const homeResults = last5?.home?.results || last5?.local?.results || null;
-  const awayResults = last5?.away?.results || last5?.visitor?.results || null;
-
-  const hasHomeResults = Array.isArray(homeResults) && homeResults.length >= 5;
-  const hasAwayResults = Array.isArray(awayResults) && awayResults.length >= 5;
-
-  if (hasHomeResults || hasAwayResults) {
-    return {
-      hasHome: hasHomeResults,
-      hasAway: hasAwayResults,
-      dataQuality: hasHomeResults && hasAwayResults ? 'full' : 'partial',
-    };
-  }
-
-  const homeForm =
-    last5?.home?.form ||
-    last5?.local?.form ||
-    last5?.home?.display ||
-    last5?.local?.display ||
-    null;
-
-  const awayForm =
-    last5?.away?.form ||
-    last5?.visitor?.form ||
-    last5?.away?.display ||
-    last5?.visitor?.display ||
-    null;
-
-  // Accept W/D/L as well as G/E/P (Spanish) just in case.
-  const hasHome = hasValidFormStr(homeForm) || /[WG][^a-zA-Z]*|[WDLGEP]/.test(String(homeForm || ''));
-  const hasAway = hasValidFormStr(awayForm) || /[WG][^a-zA-Z]*|[WDLGEP]/.test(String(awayForm || ''));
-
-  return {
-    hasHome,
-    hasAway,
-    dataQuality: hasHome && hasAway ? 'full' : (hasHome || hasAway ? 'partial' : 'none'),
-  };
+  const homeForm = last5?.home?.form || last5?.local?.form || null;
+  const awayForm = last5?.away?.form || last5?.visitor?.form || null;
+  const hasHome = hasValidFormStr(homeForm);
+  const hasAway = hasValidFormStr(awayForm);
+  return { hasHome, hasAway, full: hasHome && hasAway };
 }
 
 
 function QualityDot({ dataQuality }) {
-  if (!SHOW_QUALITY_BADGES) return null;
   const isFull = dataQuality === "full";
   return (
     <span
@@ -452,10 +414,6 @@ function isAllowedCompetition(countryName, leagueName) {
     "matogrossense","maranhense","potiguar","acreano","ofc",
     "ofc champions league",
 
-    { country: "colombia", league: "primera a" },
-    { country: "colombia", league: "categoría primera a" },
-    { country: "colombia", league: "liga betplay" },
-    { country: "colombia", league: "liga betplay dimayor" },
   ];
   if (bannedPatterns.some((p) => l.includes(p))) return false;
 
@@ -1907,14 +1865,26 @@ const candidatesByFixtureSanitized = Object.fromEntries(
 
 // ===================== SAFE + GIFT (AQUÍ nacen safe/giftBundle) =====================
 const safe = pickSafe(candidatesByFixtureSanitized);
-        const lockedByFixture = (() => {
-          if (!safe?.fixtureId || !safe?.label) return {};
-          const label = String(safe.label);
-          const dc = /\b1X\b/i.test(label) ? "1X" : (/\bX2\b/i.test(label) ? "X2" : (/\b12\b/i.test(label) ? "12" : null));
-          return dc ? { [safe.fixtureId]: { dc } } : {};
-        })();
-
 const giftBundle = buildGiftPickBundle(candidatesByFixtureSanitized, 1.5, 3.0, 3);
+
+  // --- Lock gift pick to avoid contradictions in parlays (e.g., 1X vs X2 on same fixture) ---
+  const giftLeg = giftBundle?.legs?.[0] || null;
+  const applyGiftLock = (byFx, lockLeg) => {
+    if (!lockLeg || !lockLeg.fixtureId) return byFx;
+    const fx = String(lockLeg.fixtureId);
+    const list = Array.isArray(byFx?.[fx]) ? byFx[fx] : null;
+    if (!list) return byFx;
+
+    // Only DC can contradict DC in our current market set
+    if (lockLeg.market !== "DC") return byFx;
+
+    const keepSelection = lockLeg.selection;
+    const next = { ...byFx };
+    next[fx] = list.filter((c) => !(c.market === "DC" && c.selection !== keepSelection));
+    return next;
+  };
+
+  const candidatesByFixtureLocked = applyGiftLock(candidatesByFixture, giftLeg);
 
 // ===================== TARGETS + PARLAYS =====================
 const targets = [3, 5, 10, 20, 50, 100].filter((t) => t <= maxBoost);
@@ -2418,8 +2388,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
         const oddToShow = oddNum && oddNum > 1 ? oddNum : null;
 
         return (
-          <div key={`${leg.fixtureId || "fx"}-${idx}`} className="text-[11px] text-slate-300">
-            <QualityDot dataQuality={leg?.dataQuality || "partial"} />{" "}<span className="text-slate-500">{idx + 1}.</span>{" "}
+          <div key={`${leg.fixtureId || "fx"}-${idx}`} className="text-[11px] text-slate-300"> {" "}<span className="text-slate-500">{idx + 1}.</span>{" "}
             <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
             <span className="text-slate-500">—</span>{" "}
             {leg.home} vs {leg.away}{" "}
@@ -2480,8 +2449,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
                   key={`${v.fixtureId || "fx"}-${v.label || v.pick || idx}-${idx}`}
                   className="rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2"
                 >
-                  <div className="text-[11px] text-slate-300">
-                    <QualityDot dataQuality={v?.dataQuality || "partial"} />{" "}<span className="text-slate-500">{idx + 1}.</span>{" "}
+                  <div className="text-[11px] text-slate-300"> {" "}<span className="text-slate-500">{idx + 1}.</span>{" "}
                     <span className="text-slate-100 font-semibold">{v.label || v.pick}</span>
                     {v.home && v.away ? (
                       <>
@@ -2546,8 +2514,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
                 : null;
 
             return (
-              <div key={`${p.target}-${leg.fixtureId || idx}-${idx}`} className="text-[11px] text-slate-300">
-                <QualityDot dataQuality={leg?.dataQuality || "partial"} />{" "}<span className="text-slate-500">{idx + 1}.</span>{" "}
+              <div key={`${p.target}-${leg.fixtureId || idx}-${idx}`} className="text-[11px] text-slate-300"> {" "}<span className="text-slate-500">{idx + 1}.</span>{" "}
                 <span className="text-slate-100 font-semibold">{leg.label}</span>{" "}
                 <span className="text-slate-500">—</span>{" "}
                 {leg.home} vs {leg.away}{" "}
