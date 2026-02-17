@@ -1234,8 +1234,37 @@ function localPenalty(label) {
 }
 
 export default function Comparator() {
-  const isLoggedIn = false;
-  const user = null;
+  // ✅ Auth sin hook (evita pantallas en blanco por problemas de import/provider)
+  const [user, setUser] = useState(() => {
+    try {
+      const raw = localStorage.getItem("fv:user");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+  const isLoggedIn = !!user;
+
+  // Re-sincroniza al volver a la pestaña / cambiar storage
+  useEffect(() => {
+    const reload = () => {
+      try {
+        const raw = localStorage.getItem("fv:user");
+        setUser(raw ? JSON.parse(raw) : null);
+      } catch {
+        setUser(null);
+      }
+    };
+    const onStorage = (e) => {
+      if (!e || e.key === "fv:user") reload();
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("focus", reload);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("focus", reload);
+    };
+  }, []);
   const searchParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
 
   // Launch safeguard: hide unfinished modules for now
