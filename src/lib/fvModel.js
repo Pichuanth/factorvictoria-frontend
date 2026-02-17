@@ -356,9 +356,59 @@ export function pickSafe(candidatesByFixture) {
   return all[0] || null;
 }
 
+// --- Module-scoped memory (self-contained patch) ---
+// Used to:
+// 1) Prevent contradictions between "Cuota segura (regalo)" and generated parlays.
+// 2) Differentiate x50 vs x100 when the pool is small.
+let __fv_lastGiftLegs = null;
+let __fv_lastParlay50 = null;
+
+function __fv_isContradictoryPick(a, b) {
+  if (!a || !b) return false;
+  if (a.fixtureId == null || b.fixtureId == null) return false;
+  if (String(a.fixtureId) !== String(b.fixtureId)) return false;
+
+  // Double chance: 1X (home_draw) vs X2 (draw_away)
+  if (a.market === "DC" && b.market === "DC") {
+    return (
+      (a.selection === "home_draw" && b.selection === "draw_away") ||
+      (a.selection === "draw_away" && b.selection === "home_draw")
+    );
+  }
+
+  // Over/Under: same line, opposite selection
+  const am = String(a.market || "");
+  const bm = String(b.market || "");
+  if (am.startsWith("OU_") && am === bm) {
+    return a.selection !== b.selection;
+  }
+
+  // BTTS: yes vs no
+  if (a.market === "BTTS" && b.market === "BTTS") {
+    return a.selection !== b.selection;
+  }
+
+  return false;
+}
+
+function __fv_sameLegSet(aLegs, bLegs) {
+  if (!Array.isArray(aLegs) || !Array.isArray(bLegs)) return false;
+  if (aLegs.length !== bLegs.length) return false;
+  const key = (x) => `${x.fixtureId}|${x.market}|${x.selection}`;
+  const a = aLegs.map(key).sort();
+  const b = bLegs.map(key).sort();
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
 export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 3.0, maxLegs = 3) {
   const pool = Object.values(candidatesByFixture || {})
-    .map((list) => (list || [])[0])
+    .map((list) => {
+      const arr = Array.isArray(list) ? list : [];
+      // Prioriza "full" (círculo verde) si existe.
+      const full = arr.filter((p) => p?.dataQuality === "full");
+      return (full.length ? full : arr)[0] || null;
+    })
     .filter(Boolean)
     .filter((x) => Number.isFinite(x.prob) && pr(x) >= 0.85)
     .filter((x) => {
@@ -388,6 +438,9 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
   }
 
   if (!legs.length) return null;
+
+  // Guardar el regalo para evitar contradicciones con parlays.
+  __fv_lastGiftLegs = legs.slice();
 
   return {
     games: legs.length,
@@ -465,8 +518,14 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) 
         }))
         .sort((a, b) => (b.__score - a.__score));
 
+      // 🔒 Anti-contradicción (regalo vs parlays): filtra picks que contradicen al regalo
+      // para el mismo fixture.
+      const gift = Array.isArray(__fv_lastGiftLegs) ? __fv_lastGiftLegs : [];
+      const giftLeg = gift.find((l) => String(l.fixtureId) === String(fid));
+      const arr2 = giftLeg ? arr.filter((p) => !__fv_isContradictoryPick(giftLeg, p)) : arr;
+
       // toma top-N por fixture, para permitir swaps (diversidad / subir cuota)
-      const topN = arr.slice(0, 5);
+      const topN = arr2.slice(0, 5);
 
       if (!topN.length) return null;
       return { fid, options: topN };
@@ -479,10 +538,11 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) 
   byFx.sort((a, b) => (b.options[0].__score - a.options[0].__score));
 
   // --- greedy con restricciones de diversidad ---
-  function buildWithLimits(perTypeLimit, allowLowProb = false) {
+  function buildWithLimits(perTypeLimit, allowLowProb = false, capMul = 1.0) {
     const legs = [];
     const typeCount = { DC: 0, OU: 0, BTTS: 0, OTHER: 0 };
     let prod = 1;
+    const capEff = hardCap * capMul;
 
     for (const fx of byFx) {
       let picked = null;
@@ -498,7 +558,7 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) 
         if ((typeCount[typ] || 0) >= (perTypeLimit[typ] ?? 99)) continue;
 
         const next = prod * cand.__odd;
-        if (next > hardCap * 1.02) continue;
+        if (next > capEff * 1.02) continue;
 
         picked = cand;
         break;
@@ -520,7 +580,7 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) 
   }
 
   // 1) intento normal con límites base
-  let attempt = buildWithLimits(perTypeLimitBase, false);
+  let attempt = buildWithLimits(perTypeLimitBase, false, 1.0);
 
   // 2) si no llega al target, relaja límites (más OU/DC) y permite picks un poco menos "seguros"
   if (!attempt || attempt.prod < t * 0.85) {
@@ -531,7 +591,7 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) 
       BTTS: 1,
       OTHER: perTypeLimitBase.OTHER + 1,
     };
-    attempt = buildWithLimits(relaxed, false) || attempt;
+    attempt = buildWithLimits(relaxed, false, 1.0) || attempt;
   }
 
   if (!attempt || attempt.prod < t * 0.80) {
@@ -542,12 +602,33 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) 
       BTTS: 1,
       OTHER: perTypeLimitBase.OTHER + 2,
     };
-    attempt = buildWithLimits(relaxed2, true) || attempt;
+    attempt = buildWithLimits(relaxed2, true, 1.0) || attempt;
   }
 
   if (!attempt) return null;
 
-  const { legs, prod } = attempt;
+  let { legs, prod } = attempt;
+
+  // 🎯 Diferenciación x50 vs x100:
+  // Si x100 termina idéntico a x50 (mismas legs), reintenta más agresivo.
+  if (t === 50) {
+    __fv_lastParlay50 = { legs: legs.slice(), finalOdd: round2(prod) };
+  }
+
+  if (t === 100 && __fv_lastParlay50 && __fv_sameLegSet(legs, __fv_lastParlay50.legs)) {
+    const moreAggressive = {
+      ...perTypeLimitBase,
+      DC: perTypeLimitBase.DC + 2,
+      OU: perTypeLimitBase.OU + 2,
+      BTTS: 1,
+      OTHER: perTypeLimitBase.OTHER + 2,
+    };
+    const attempt2 = buildWithLimits(moreAggressive, true, 1.25);
+    if (attempt2 && attempt2.prod > prod * 1.05) {
+      legs = attempt2.legs;
+      prod = attempt2.prod;
+    }
+  }
 
   // retorna con alias picks para compatibilidad con UI
   return {
