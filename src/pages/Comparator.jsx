@@ -13,6 +13,10 @@ import {
   buildValueList,
 } from "../lib/fvModel";
 
+// UI toggles
+const SHOW_QUALITY_BADGES = false; // set true if you want the green/yellow indicators
+
+
 const GOLD = "#E6C464";
 
 const API_BASE =
@@ -131,15 +135,49 @@ function hasValidFormStr(s) {
 
 
 function dataQualityFromLast5(last5) {
-  const homeForm = last5?.home?.form || last5?.local?.form || null;
-  const awayForm = last5?.away?.form || last5?.visitor?.form || null;
-  const hasHome = hasValidFormStr(homeForm);
-  const hasAway = hasValidFormStr(awayForm);
-  return { hasHome, hasAway, full: hasHome && hasAway };
+  // Prefer explicit 5-match results arrays (most reliable), then fall back to form strings.
+  const homeResults = last5?.home?.results || last5?.local?.results || null;
+  const awayResults = last5?.away?.results || last5?.visitor?.results || null;
+
+  const hasHomeResults = Array.isArray(homeResults) && homeResults.length >= 5;
+  const hasAwayResults = Array.isArray(awayResults) && awayResults.length >= 5;
+
+  if (hasHomeResults || hasAwayResults) {
+    return {
+      hasHome: hasHomeResults,
+      hasAway: hasAwayResults,
+      dataQuality: hasHomeResults && hasAwayResults ? 'full' : 'partial',
+    };
+  }
+
+  const homeForm =
+    last5?.home?.form ||
+    last5?.local?.form ||
+    last5?.home?.display ||
+    last5?.local?.display ||
+    null;
+
+  const awayForm =
+    last5?.away?.form ||
+    last5?.visitor?.form ||
+    last5?.away?.display ||
+    last5?.visitor?.display ||
+    null;
+
+  // Accept W/D/L as well as G/E/P (Spanish) just in case.
+  const hasHome = hasValidFormStr(homeForm) || /[WG][^a-zA-Z]*|[WDLGEP]/.test(String(homeForm || ''));
+  const hasAway = hasValidFormStr(awayForm) || /[WG][^a-zA-Z]*|[WDLGEP]/.test(String(awayForm || ''));
+
+  return {
+    hasHome,
+    hasAway,
+    dataQuality: hasHome && hasAway ? 'full' : (hasHome || hasAway ? 'partial' : 'none'),
+  };
 }
 
 
 function QualityDot({ dataQuality }) {
+  if (!SHOW_QUALITY_BADGES) return null;
   const isFull = dataQuality === "full";
   return (
     <span
@@ -414,6 +452,10 @@ function isAllowedCompetition(countryName, leagueName) {
     "matogrossense","maranhense","potiguar","acreano","ofc",
     "ofc champions league",
 
+    { country: "colombia", league: "primera a" },
+    { country: "colombia", league: "categoría primera a" },
+    { country: "colombia", league: "liga betplay" },
+    { country: "colombia", league: "liga betplay dimayor" },
   ];
   if (bannedPatterns.some((p) => l.includes(p))) return false;
 
@@ -1865,6 +1907,13 @@ const candidatesByFixtureSanitized = Object.fromEntries(
 
 // ===================== SAFE + GIFT (AQUÍ nacen safe/giftBundle) =====================
 const safe = pickSafe(candidatesByFixtureSanitized);
+        const lockedByFixture = (() => {
+          if (!safe?.fixtureId || !safe?.label) return {};
+          const label = String(safe.label);
+          const dc = /\b1X\b/i.test(label) ? "1X" : (/\bX2\b/i.test(label) ? "X2" : (/\b12\b/i.test(label) ? "12" : null));
+          return dc ? { [safe.fixtureId]: { dc } } : {};
+        })();
+
 const giftBundle = buildGiftPickBundle(candidatesByFixtureSanitized, 1.5, 3.0, 3);
 
 // ===================== TARGETS + PARLAYS =====================
