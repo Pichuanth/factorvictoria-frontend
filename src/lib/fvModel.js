@@ -681,19 +681,30 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) 
   return {
     target: T,
     cap: softCap,
+    finalOdd: round2(odds),
     odds: round2(odds),
-    legs: legs.map((c) => ({
+    legs: legs.map((c) => {
+    const home = c.home ?? c.fixture?.teams?.home?.name ?? c.fixture?.home ?? c.fixture?.teams?.home;
+    const away = c.away ?? c.fixture?.teams?.away?.name ?? c.fixture?.away ?? c.fixture?.teams?.away;
+    const usedOddSafe = Number.isFinite(Number(c.usedOdd))
+      ? Number(c.usedOdd)
+      : (Number.isFinite(Number(c.marketOdd)) ? Number(c.marketOdd)
+        : (Number.isFinite(Number(c.fvOdd)) ? Number(c.fvOdd) : 1.01));
+    return {
       fixtureId: c.fixtureId,
       fixture: c.fixture,
+      home,
+      away,
       market: c.market,
       key: c.key,
       label: c.label,
       prob: round2(c.prob),
       fvOdd: round2(c.fvOdd),
       marketOdd: round2(c.marketOdd),
-      usedOdd: round2(c.usedOdd),
+      usedOdd: round2(usedOddSafe),
       valueEdge: round2(c.valueEdge),
-    })),
+    };
+  })),
   };
 }
 
