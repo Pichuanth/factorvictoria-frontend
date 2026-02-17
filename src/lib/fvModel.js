@@ -258,23 +258,38 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
   const bttsNo = bttsNo_h ?? probBTTSNo(lambdaHome, lambdaAway);
 
   // ---------- picks ----------
-  out.push({
-    market: "DC",
-    selection: "home_draw",
-    label: "Doble oportunidad 1X",
-    prob: dc.home_draw,
-    fvOdd: fairOddFromProb(dc.home_draw),
-    marketOdd: markets?.DC?.home_draw ?? null,
-  });
+  // DC: para evitar contradicciones (1X en una sección y X2 en otra),
+  // dejamos SOLO la mejor dirección por fixture.
+  const dcCand = [
+    {
+      market: "DC",
+      selection: "home_draw",
+      label: "Doble oportunidad 1X",
+      prob: dc.home_draw,
+      fvOdd: fairOddFromProb(dc.home_draw),
+      marketOdd: markets?.DC?.home_draw ?? null,
+    },
+    {
+      market: "DC",
+      selection: "draw_away",
+      label: "Doble oportunidad X2",
+      prob: dc.draw_away,
+      fvOdd: fairOddFromProb(dc.draw_away),
+      marketOdd: markets?.DC?.draw_away ?? null,
+    },
+  ].filter((p) => Number.isFinite(p.prob) && p.prob > 0);
 
-  out.push({
-    market: "DC",
-    selection: "draw_away",
-    label: "Doble oportunidad X2",
-    prob: dc.draw_away,
-    fvOdd: fairOddFromProb(dc.draw_away),
-    marketOdd: markets?.DC?.draw_away ?? null,
-  });
+  if (dcCand.length) {
+    const dcScore = (p) => {
+      const edge = Number(p.marketOdd) && Number(p.fvOdd) ? (Number(p.marketOdd) / Number(p.fvOdd) - 1) : 0;
+      const odd = Number(p.marketOdd) || Number(p.fvOdd) || 99;
+      const oddPenalty = odd >= 3 ? 0.02 : odd >= 2.2 ? 0.01 : 0;
+      return (p.prob + Math.max(0, edge) * 0.05 - oddPenalty);
+    };
+
+    dcCand.sort((a, b) => dcScore(b) - dcScore(a));
+    out.push(dcCand[0]);
+  }
 
   out.push({
     market: "OU_35",
@@ -352,7 +367,14 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
 
 export function pickSafe(candidatesByFixture) {
   const all = Object.values(candidatesByFixture || {}).flat();
-  all.sort((a, b) => (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
+
+  // Prefer fixtures with full stats (círculo verde), then probability, then lower odd.
+  const scoreSafe = (p) => {
+    const fullBoost = p?.dataQuality === "full" ? 0.02 : 0;
+    return (pr(p) + fullBoost);
+  };
+
+  all.sort((a, b) => (scoreSafe(b) - scoreSafe(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
   return all[0] || null;
 }
 
@@ -363,35 +385,58 @@ export function pickSafe(candidatesByFixture) {
 let __fv_lastGiftLegs = null;
 let __fv_lastParlay50 = null;
 
+function __fv_normSel(s) {
+  return String(s || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function __fv_dcKind(p) {
+  if (!p || p.market !== "DC") return null;
+  const sel = __fv_normSel(p.selection);
+  if (sel === "1x" || sel === "x1" || sel.includes("homedraw") || sel.includes("home_draw")) return "HOME_DRAW";
+  if (sel === "x2" || sel === "2x" || sel.includes("drawaway") || sel.includes("draw_away") || sel.includes("awaydraw")) return "DRAW_AWAY";
+  if (sel === "12" || sel.includes("homeaway") || sel.includes("home_away")) return "HOME_AWAY";
+  return null;
+}
+
+function __fv_preferredDCKind(picks) {
+  const best = { HOME_DRAW: null, DRAW_AWAY: null, HOME_AWAY: null };
+  for (const p of picks || []) {
+    const k = __fv_dcKind(p);
+    if (!k) continue;
+    const score = pr(p) * (1 + (Number(p.valueEdge) || 0)) * (1 + (p.dataQuality === "full" ? 0.03 : 0));
+    if (!best[k] || score > best[k].score) best[k] = { score, p };
+  }
+  const entries = Object.entries(best).filter(([, v]) => v);
+  if (entries.length <= 1) return null;
+  entries.sort((a, b) => b[1].score - a[1].score);
+  const top = entries[0];
+  const second = entries[1];
+  if (top[1].score >= second[1].score * 1.01) return top[0];
+  return null;
+}
+
 function __fv_isContradictoryPick(a, b) {
   if (!a || !b) return false;
-  if (a.fixtureId == null || b.fixtureId == null) return false;
-  if (String(a.fixtureId) !== String(b.fixtureId)) return false;
+  if (a.fixtureId !== b.fixtureId) return false;
 
-  // Double chance: 1X (home_draw) vs X2 (draw_away)
-  if (a.market === "DC" && b.market === "DC") {
-    return (
-      (a.selection === "home_draw" && b.selection === "draw_away") ||
-      (a.selection === "draw_away" && b.selection === "home_draw")
-    );
+  const aDCKind = __fv_dcKind(a);
+  const bDCKind = __fv_dcKind(b);
+  if (aDCKind && bDCKind && aDCKind !== bDCKind) return true;
+
+  if (a.market === "ML" && b.market === "ML" && a.selection !== b.selection) return true;
+
+  if (a.market === "OU" && b.market === "OU") {
+    if (String(a.line) === String(b.line) && a.selection !== b.selection) return true;
   }
 
-  // Over/Under: same line, opposite selection
-  const am = String(a.market || "");
-  const bm = String(b.market || "");
-  if (am.startsWith("OU_") && am === bm) {
-    return a.selection !== b.selection;
-  }
-
-  // BTTS: yes vs no
-  if (a.market === "BTTS" && b.market === "BTTS") {
-    return a.selection !== b.selection;
-  }
+  if (a.market === "BTTS" && b.market === "BTTS" && a.selection !== b.selection) return true;
 
   return false;
 }
 
-function __fv_sameLegSet(aLegs, bLegs) {
+function __fv_sameLegSetfunction __fv_sameLegSet(aLegs, bLegs) {
   if (!Array.isArray(aLegs) || !Array.isArray(bLegs)) return false;
   if (aLegs.length !== bLegs.length) return false;
   const key = (x) => `${x.fixtureId}|${x.market}|${x.selection}`;
@@ -454,19 +499,36 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) 
   // Armado diversificado con fallback FV (si no hay marketOdd) usando usedOdd ya precalculado.
   // Objetivo: siempre intentar armar x3/x5; y para x10+ armar si el pool alcanza sin pasarse del cap del plan.
 
-  const minLegs = 2;
   const t = Number(target);
   const hardCap = Number(cap);
 
   if (!Number.isFinite(t) || t <= 1) return null;
   if (!Number.isFinite(hardCap) || hardCap <= 1) return null;
 
-  // --- parámetros por target (relaja filtros para x3/x5) ---
-  const minProb =
-    t <= 5 ? 0.72 :
-    t <= 10 ? 0.68 :
-    t <= 20 ? 0.66 :
-    0.64;
+  // --- parámetros dinámicos (target-aware + tamaño del pool) ---
+  const fixtureCount = Object.keys(candidatesByFixture || {}).length;
+
+  const baseMinProbByTarget = { 3: 0.78, 5: 0.74, 10: 0.70, 20: 0.66, 50: 0.60, 100: 0.55 };
+  let minProb = baseMinProbByTarget[t] ?? 0.70;
+  if (fixtureCount >= 20) minProb += 0.03;
+  else if (fixtureCount >= 12) minProb += 0.015;
+
+  const baseMinLegsByTarget = { 3: 2, 5: 3, 10: 4, 20: 5, 50: 6, 100: 7 };
+  let minLegs = baseMinLegsByTarget[t] ?? 3;
+  if (fixtureCount >= 20 && t >= 50) minLegs += 2;
+  else if (fixtureCount >= 12 && t >= 20) minLegs += 1;
+
+  const sizeAdj = fixtureCount >= 25 ? 0.80 : fixtureCount >= 15 ? 0.90 : 1.00;
+  const baseMaxLegOddByTarget = { 3: 2.6, 5: 3.2, 10: 4.0, 20: 4.6, 50: 5.8, 100: 6.8 };
+  let maxLegOdd = (baseMaxLegOddByTarget[t] ?? 4.0) * sizeAdj;
+  if (fixtureCount >= 20) maxLegOdd = Math.min(maxLegOdd, 3.2);
+  else if (fixtureCount >= 12) maxLegOdd = Math.min(maxLegOdd, 4.2);
+
+  // Diferenciación x50 vs x100 (si el pool lo permite)
+  const effectiveTarget =
+    t === 100 && fixtureCount >= 10 ? t * 1.12 :
+    t === 50 && fixtureCount >= 10 ? t * 1.06 :
+    t;
 
   const perTypeLimitBase = {
     DC: 3,     // 1X/X2
@@ -571,7 +633,7 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) 
       prod *= picked.__odd;
 
       if (legs.length >= maxLegs) break;
-      if (prod >= t * 0.95) break;
+      if (prod >= effectiveTargeeffectiveTarget * 0.95) break;
     }
 
     if (legs.length < minLegs) return null;
@@ -583,7 +645,7 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) 
   let attempt = buildWithLimits(perTypeLimitBase, false, 1.0);
 
   // 2) si no llega al target, relaja límites (más OU/DC) y permite picks un poco menos "seguros"
-  if (!attempt || attempt.prod < t * 0.85) {
+  if (!attempt || attempt.prod < effectiveTarget * 0.85) {
     const relaxed = {
       ...perTypeLimitBase,
       DC: perTypeLimitBase.DC + 1,
@@ -594,7 +656,7 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) 
     attempt = buildWithLimits(relaxed, false, 1.0) || attempt;
   }
 
-  if (!attempt || attempt.prod < t * 0.80) {
+  if (!attempt || attempt.prod < effectiveTarget * 0.80) {
     const relaxed2 = {
       ...perTypeLimitBase,
       DC: perTypeLimitBase.DC + 2,
@@ -639,7 +701,7 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) 
     impliedProb: round2(1 / prod),
     legs,
     picks: legs,
-    reached: prod >= t * 0.90,
+    reached: prod >= effectiveTarget * 0.90,
   };
 }
 
