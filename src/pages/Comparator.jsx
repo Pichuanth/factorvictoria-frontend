@@ -1,6 +1,7 @@
 // src/pages/Comparator.jsx
 import React, { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { useAuth } from "../lib/auth";
 import Simulator from "../components/Simulator";
 import PriceCalculatorCard from "../components/PriceCalculatorCard";
 import RecoWeeklyCard from "../components/RecoWeeklyCard";
@@ -1234,38 +1235,8 @@ function localPenalty(label) {
 }
 
 export default function Comparator() {
-  // ✅ Auth sin hook (evita pantallas en blanco por problemas de import/provider)
-  const [user, setUser] = useState(() => {
-    try {
-      const raw = localStorage.getItem("fv:user");
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  });
-  const isLoggedIn = !!user;
-
-  // Re-sincroniza al volver a la pestaña / cambiar storage
-  useEffect(() => {
-    const reload = () => {
-      try {
-        const raw = localStorage.getItem("fv:user");
-        setUser(raw ? JSON.parse(raw) : null);
-      } catch {
-        setUser(null);
-      }
-    };
-    const onStorage = (e) => {
-      if (!e || e.key === "fv:user") reload();
-    };
-    window.addEventListener("storage", onStorage);
-    window.addEventListener("focus", reload);
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener("focus", reload);
-    };
-  }, []);
-  const searchParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+  const { isLoggedIn, user } = useAuth();
+  const [searchParams] = useSearchParams();
 
   // Launch safeguard: hide unfinished modules for now
   const ENABLE_REFEREES = false;
