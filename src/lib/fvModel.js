@@ -184,23 +184,20 @@ export function probsDoubleChance(lambdaHome, lambdaAway) {
 export function estimateLambdasFromPack(pack) {
   // El backend puede enviar llaves en camelCase o PascalCase.
   // Ej: { model: { LambdaHome, LambdaAway, LambdaTotal } }
-  const safeNum = (v) => {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
-  };
-  const pick = (...vals) => {
+
+  function pickNum(...vals) {
     for (const v of vals) {
       const n = safeNum(v);
       if (n != null) return n;
     }
     return null;
-  };
+  }
 
   const m = pack?.model || pack?.data?.model || pack?.stats?.model || null;
 
-  const lhRaw = pick(m?.lambdaHome, m?.lambda_home, m?.homeLambda, m?.LambdaHome, m?.lambdaH);
-  const laRaw = pick(m?.lambdaAway, m?.lambda_away, m?.awayLambda, m?.LambdaAway, m?.lambdaA);
-  const ltRaw = pick(m?.lambdaTotal, m?.lambda_total, m?.LambdaTotal, m?.totalLambda);
+  const lhRaw = pickNum(m?.lambdaHome, m?.lambda_home, m?.homeLambda, m?.LambdaHome, m?.lambdaH);
+  const laRaw = pickNum(m?.lambdaAway, m?.lambda_away, m?.awayLambda, m?.LambdaAway, m?.lambdaA);
+  const ltRaw = pickNum(m?.lambdaTotal, m?.lambda_total, m?.LambdaTotal, m?.totalLambda);
 
   // Defaults (conservadores) si no llega modelo
   let lambdaHome = lhRaw != null ? clamp(lhRaw, 0.2, 3.2) : 1.25;
