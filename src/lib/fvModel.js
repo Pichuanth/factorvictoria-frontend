@@ -420,229 +420,325 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
 }
 
 export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 26 }) {
-  // Armado diversificado con fallback FV (si no hay marketOdd) usando usedOdd ya precalculado.
-  // Objetivo: siempre intentar armar x3/x5; y para x10+ armar si el pool alcanza sin pasarse del cap del plan.
+  // Armado de parlays con:
+  // - Consistencia por fixture (no contradicciones entre targets)
+  // - Posibilidad de 2 legs por fixture (solo compatibles) para targets altos
+  // - Booster pass para intentar llegar a x20/x50/x100 cuando el pool lo permite
 
-  const minLegs = t >= 50 ? 6 : t >= 20 ? 4 : 2;
-  const t = Number(target);
-  const hardCap = Number(cap);
+  var t = Number(target);
+  var hardCap = Number(cap);
 
   if (!Number.isFinite(t) || t <= 1) return null;
   if (!Number.isFinite(hardCap) || hardCap <= 1) return null;
 
-  // --- parámetros por target (relaja filtros para x3/x5) ---
-  const minProb =
+  // minLegs por target (más legs cuando el objetivo es alto)
+  var minLegs = t >= 100 ? 6 : t >= 50 ? 6 : t >= 20 ? 4 : 2;
+
+  // Prob mínima por target (relaja a medida que sube el objetivo)
+  var minProb =
     t <= 5 ? 0.72 :
     t <= 10 ? 0.66 :
     t <= 20 ? 0.62 :
     t <= 50 ? 0.58 :
     0.55;
 
-  const perTypeLimitBase = {
-    DC: 6,     // 1X/X2
-    OU: 6,     // Under/Over
-    BTTS: 1,   // evitar "todo BTTS"
+  // Para el "booster pass" (x50/x100), permitimos un poco menos prob si hace falta
+  var minProbBoost =
+    t >= 100 ? Math.max(0.50, minProb - 0.08) :
+    t >= 50 ? Math.max(0.52, minProb - 0.06) :
+    t >= 20 ? Math.max(0.55, minProb - 0.04) :
+    minProb;
+
+  // Límites por tipo (evitar "todo DC" o "todo OU")
+  var perTypeLimitBase = {
+    DC: 8,
+    OU: 8,
+    BTTS: 2,
     OTHER: 2,
-  }
+  };
+
   function typeOf(p) {
-    const mk = String(p?.market || p?.marketKey || "").toUpperCase();
-    if (mk.includes("DC")) return "DC";
-    if (mk.includes("OU")) return "OU";
-    if (mk.includes("BTTS")) return "BTTS";
+    var mk = String(p && (p.market || p.marketKey) || "").toUpperCase();
+    if (mk.indexOf("DC") >= 0) return "DC";
+    if (mk.indexOf("OU") >= 0) return "OU";
+    if (mk.indexOf("BTTS") >= 0) return "BTTS";
     return "OTHER";
   }
 
   function oddOf(p) {
-    const o = Number(p?.usedOdd ?? p?.usedOddDisplay ?? p?.marketOdd ?? p?.fvOdd);
+    var o = Number(p && (p.usedOdd != null ? p.usedOdd : (p.marketOdd != null ? p.marketOdd : p.fvOdd)));
     return Number.isFinite(o) ? o : null;
   }
 
-  function scoreOf(p) {
-    // mezcla de probRank / prob + (ligero) incentivo por subir odd para targets altos
-    const prob = Number(p?.__probRank);
-    const p0 = Number.isFinite(prob) ? prob : Number(p?.prob);
-    const pp = Number.isFinite(p0) ? p0 : 0;
-    const o = oddOf(p) ?? 1;
-    const logO = Math.log(Math.max(1.0001, o));
-    const wOdd = t >= 100 ? 0.42 : t >= 50 ? 0.36 : t >= 20 ? 0.28 : t >= 10 ? 0.18 : 0.10;
-    return pp * (1 - wOdd) + logO * wOdd;
+  function probRankOf(p) {
+    var pr = Number(p && (p.__probRank != null ? p.__probRank : p.prob));
+    return Number.isFinite(pr) ? pr : 0;
   }
 
-  // --- arma opciones por fixture ---
-  const byFx = Object.entries(candidatesByFixture || {})
-    .map(([fid, list]) => {
-      const arr = (list || [])
-        .filter(Boolean)
-        .filter((p) => Number.isFinite(Number(p?.prob)) || Number.isFinite(Number(p?.__probRank)))
-        .filter((p) => {
-          const o = oddOf(p);
-          return Number.isFinite(o) && o > 1.0001;
-        })
-        .map((p) => ({
-          ...p,
-          __type: typeOf(p),
-          __odd: oddOf(p),
-          __score: scoreOf(p),
-          __fx: fid,
-        }))
-        .sort((a, b) => (b.__score - a.__score));
+  function dirKey(p) {
+    // Dirección para bloquear contradicciones dentro de un mismo mercado
+    // DC: 1X / X2 / 12
+    // OU: O (over) / U (under)
+    // BTTS: Y / N
+    var mk = String(p && (p.market || p.marketKey) || "").toUpperCase();
+    var out = String(p && (p.outcome || p.pick || p.label) || "").toUpperCase();
 
-      // toma top-N por fixture, para permitir swaps (diversidad / subir cuota)
-      const topN = arr.slice(0, 5);
-
-      if (!topN.length) return null;
-      return { fid, options: topN };
-    })
-    .filter(Boolean);
-
-  if (byFx.length < minLegs) return null;
-
-  // ordenar fixtures: primero los que tienen mejor opción
-  byFx.sort((a, b) => (b.options[0].__score - a.options[0].__score));
-
-  // --- greedy con restricciones de diversidad ---
-  function buildWithLimits(perTypeLimit, allowLowProb = false) {
-    const legs = [];
-    const typeCount = { DC: 0, OU: 0, BTTS: 0, OTHER: 0 };
-    let prod = 1;
-
-    for (const fx of byFx) {
-      let picked = null;
-
-      for (const cand of fx.options) {
-        // filtro probabilidad (relajable)
-        const pRank = Number.isFinite(Number(cand.__probRank)) ? Number(cand.__probRank) : Number(cand.prob);
-        const pOk = Number.isFinite(pRank) ? pRank : 0;
-        if (!allowLowProb && pOk < minProb) continue;
-
-        // evita repetir BTTS "NO" como default (1 máximo, ya controlado por tipo)
-        const typ = cand.__type || "OTHER";
-        if ((typeCount[typ] || 0) >= (perTypeLimit[typ] ?? 99)) continue;
-
-        const next = prod * cand.__odd;
-        if (next > hardCap * 1.02) continue;
-
-        picked = cand;
-        break;
-      }
-
-      if (!picked) continue;
-
-      legs.push(picked);
-      typeCount[picked.__type] = (typeCount[picked.__type] || 0) + 1;
-      prod *= picked.__odd;
-
-      if (legs.length >= maxLegs) break;
-      if (prod >= t * 0.95) break;
+    if (mk.indexOf("DC") >= 0) {
+      if (out.indexOf("1X") >= 0) return "DC:1X";
+      if (out.indexOf("X2") >= 0) return "DC:X2";
+      if (out.indexOf("12") >= 0) return "DC:12";
+      // fallback: si viene como "HOME_OR_DRAW" etc.
+      if (out.indexOf("HOME") >= 0 && out.indexOf("DRAW") >= 0) return "DC:1X";
+      if (out.indexOf("AWAY") >= 0 && out.indexOf("DRAW") >= 0) return "DC:X2";
+      return "DC:UNK";
     }
 
-    if (legs.length < minLegs) return null;
+    if (mk.indexOf("OU") >= 0) {
+      if (out.indexOf("OVER") >= 0) return "OU:O";
+      if (out.indexOf("UNDER") >= 0) return "OU:U";
+      // fallback por key
+      if (mk.indexOf("OVER") >= 0) return "OU:O";
+      if (mk.indexOf("UNDER") >= 0) return "OU:U";
+      return "OU:UNK";
+    }
 
-    return { legs, prod, typeCount };
+    if (mk.indexOf("BTTS") >= 0) {
+      if (out.indexOf("YES") >= 0 || out.indexOf("SI") >= 0) return "BTTS:Y";
+      if (out.indexOf("NO") >= 0) return "BTTS:N";
+      return "BTTS:UNK";
+    }
+
+    return "OTHER";
   }
 
-  // 1) intento normal con límites base
-  let attempt = buildWithLimits(perTypeLimitBase, false);
+  function incompatible(a, b) {
+    // Contradicciones duras dentro del MISMO fixture
+    var ka = dirKey(a);
+    var kb = dirKey(b);
 
-  // 2) si no llega al target, relaja límites (más OU/DC) y permite picks un poco menos "seguros"
-  if (!attempt || attempt.prod < t * 0.85) {
-    const relaxed = {
-      ...perTypeLimitBase,
-      DC: perTypeLimitBase.DC + 1,
-      OU: perTypeLimitBase.OU + 1,
-      BTTS: 1,
-      OTHER: perTypeLimitBase.OTHER + 1,
+    // DC
+    if (ka.indexOf("DC:") === 0 && kb.indexOf("DC:") === 0) {
+      // 1X vs X2 es contradicción
+      if ((ka === "DC:1X" && kb === "DC:X2") || (ka === "DC:X2" && kb === "DC:1X")) return true;
+      // 12 contradice con 1X o X2? No necesariamente, pero suele ser agresivo; lo tratamos como incompatible con 1X/X2 para estabilidad
+      if (ka === "DC:12" && (kb === "DC:1X" || kb === "DC:X2")) return true;
+      if (kb === "DC:12" && (ka === "DC:1X" || ka === "DC:X2")) return true;
+      return false;
     }
-    attempt = buildWithLimits(relaxed, false) || attempt;
-  }
 
-  if (!attempt || attempt.prod < t * 0.80) {
-    const relaxed2 = {
-      ...perTypeLimitBase,
-      DC: perTypeLimitBase.DC + 2,
-      OU: perTypeLimitBase.OU + 2,
-      BTTS: 1,
-      OTHER: perTypeLimitBase.OTHER + 2,
+    // OU
+    if (ka.indexOf("OU:") === 0 && kb.indexOf("OU:") === 0) {
+      if ((ka === "OU:O" && kb === "OU:U") || (ka === "OU:U" && kb === "OU:O")) return true;
+      return false;
     }
-    attempt = buildWithLimits(relaxed2, true) || attempt;
-  }
 
-  if (!attempt) return null;
+    // BTTS
+    if (ka.indexOf("BTTS:") === 0 && kb.indexOf("BTTS:") === 0) {
+      if ((ka === "BTTS:Y" && kb === "BTTS:N") || (ka === "BTTS:N" && kb === "BTTS:Y")) return true;
+      return false;
+    }
 
-  // --- expansión: permite 2 legs por fixture (compatibles) para targets altos ---
-  const maxPerFixture = t >= 20 ? 2 : 1;
-
-  function isContradict(a, b) {
-    if (!a || !b) return false;
-    const mkA = String(a.market || "").toUpperCase();
-    const mkB = String(b.market || "").toUpperCase();
-    if (mkA.includes("DC") && mkB.includes("DC")) {
-      // no permitir home_draw vs draw_away
-      return String(a.selection) !== String(b.selection);
-    }
-    if (mkA.includes("OU") && mkB.includes("OU")) {
-      // over vs under en cualquier línea
-      return String(a.selection) !== String(b.selection);
-    }
-    if (mkA.includes("BTTS") && mkB.includes("BTTS")) {
-      return String(a.selection) !== String(b.selection);
-    }
     return false;
   }
 
-  function canAdd(extra, currentLegs) {
-    if (!extra) return false;
-    const fx = extra.__fx ?? extra.fixtureId;
-    const same = currentLegs.filter((l) => (l.__fx ?? l.fixtureId) === fx);
-    if (same.length >= maxPerFixture) return false;
-    for (const s of same) {
-      if (isContradict(s, extra) || isContradict(extra, s)) return false;
-    }
-    return true;
+  function scoreOf(p) {
+    // Score balanceado: prob fuerte + incentivo por odd (más peso en x50/x100)
+    var pp = probRankOf(p);
+    var o = oddOf(p) || 1;
+    var logO = Math.log(Math.max(1.0001, o));
+    var wOdd = t >= 100 ? 0.45 : t >= 50 ? 0.38 : t >= 20 ? 0.30 : t >= 10 ? 0.18 : 0.10;
+    return pp * (1 - wOdd) + logO * wOdd;
   }
 
-  // Si no alcanzó target, hacemos una segunda pasada buscando "boosters" compatibles
-  let legs = attempt.legs.slice();
-  let prod = attempt.prod;
+  // --- construir opciones por fixture + lock primario (consistencia entre targets) ---
+  var byFx = Object.entries(candidatesByFixture || {}).map(function (entry) {
+    var fid = entry[0];
+    var list = entry[1] || [];
 
-  if (prod < t * 0.92 && maxPerFixture > 1) {
-    // ordenar todas las opciones por odds desc (pero con score decente)
-    const allOpts = byFx.flatMap((fx) => fx.options.map((o) => o));
-    allOpts.sort((a, b) => (b.__odd - a.__odd) || (b.__score - a.__score));
+    var arr = list
+      .filter(Boolean)
+      .filter(function (p) {
+        var pr = Number(p && (p.__probRank != null ? p.__probRank : p.prob));
+        return Number.isFinite(pr);
+      })
+      .map(function (p) {
+        var o = oddOf(p);
+        return Object.assign({}, p, {
+          __type: typeOf(p),
+          __odd: o,
+          __probR: probRankOf(p),
+          __score: scoreOf(p),
+          __fx: fid,
+          __dir: dirKey(p),
+        });
+      })
+      .filter(function (p) {
+        return Number.isFinite(p.__odd) && p.__odd > 1.0001;
+      })
+      .sort(function (a, b) {
+        return b.__score - a.__score;
+      });
 
-    for (const cand of allOpts) {
-      if (prod >= t * 0.95) break;
-      if (!canAdd(cand, legs)) continue;
+    if (!arr.length) return null;
 
-      const pRank = Number.isFinite(Number(cand.__probRank)) ? Number(cand.__probRank) : Number(cand.prob);
-      const pOk = Number.isFinite(pRank) ? pRank : 0;
-      // booster acepta un poco menos de prob
-      const boosterMinProb = t >= 100 ? 0.52 : t >= 50 ? 0.54 : 0.56;
-      if (pOk < boosterMinProb) continue;
+    // Lock primario = la mejor opción por score (igual para todos los targets)
+    var primary = arr[0];
 
-      const next = prod * cand.__odd;
-      if (next > hardCap * 1.02) continue;
+    // Filtrar opciones incompatibles con primary (evita X1 vs X2 entre x3/x5/x100)
+    var filtered = arr.filter(function (p) {
+      return !incompatible(p, primary);
+    });
 
-      legs.push(cand);
-      prod = next;
+    // Mantener top-N por fixture (más opciones para boosters)
+    var topN = filtered.slice(0, 8);
+
+    if (!topN.length) return null;
+    return { fid: fid, options: topN, primary: primary };
+  }).filter(Boolean);
+
+  if (byFx.length < minLegs) return null;
+
+  // Ordenar fixtures: primero los que tienen mejor primary
+  byFx.sort(function (a, b) {
+    return (b.primary.__score || 0) - (a.primary.__score || 0);
+  });
+
+  function wouldExceedCap(prod, odd) {
+    return prod * odd > hardCap * 1.02;
+  }
+
+  function pickLegFromFixture(fx, allowLowProb, usedMarkets, currentProd, typeCount) {
+    // Selecciona 1 leg para este fixture respetando prob y límites por tipo
+    for (var i = 0; i < fx.options.length; i++) {
+      var cand = fx.options[i];
+      var pOk = cand.__probR || 0;
+      if (!allowLowProb && pOk < minProb) continue;
+      if (allowLowProb && pOk < minProbBoost) continue;
+
+      var mk = String(cand.market || cand.marketKey || "");
+      if (usedMarkets && usedMarkets[mk]) continue;
+
+      var typ = cand.__type || "OTHER";
+      if ((typeCount[typ] || 0) >= (perTypeLimitBase[typ] || 99)) continue;
+
+      if (wouldExceedCap(currentProd, cand.__odd)) continue;
+      return cand;
+    }
+    return null;
+  }
+
+  // --- Pass 1: 1 pick por fixture (primarios compatibles por defecto) ---
+  var legs = [];
+  var prod = 1;
+  var typeCount = { DC: 0, OU: 0, BTTS: 0, OTHER: 0 };
+  var fxLegCount = {}; // fid -> cantidad
+  var fxLegs = {};     // fid -> array legs
+
+  for (var f = 0; f < byFx.length; f++) {
+    var fx = byFx[f];
+    var usedMarkets = {};
+    var picked = pickLegFromFixture(fx, false, usedMarkets, prod, typeCount);
+    if (!picked) continue;
+
+    legs.push(picked);
+    prod *= picked.__odd;
+    typeCount[picked.__type] = (typeCount[picked.__type] || 0) + 1;
+    fxLegCount[fx.fid] = (fxLegCount[fx.fid] || 0) + 1;
+    fxLegs[fx.fid] = (fxLegs[fx.fid] || []);
+    fxLegs[fx.fid].push(picked);
+
+    if (legs.length >= maxLegs) break;
+    if (prod >= t * 0.95 && legs.length >= minLegs) break;
+  }
+
+  if (legs.length < minLegs) return null;
+
+  // --- Pass 2: boosters (agrega más legs para intentar llegar a target) ---
+  var allowSecondLeg = t >= 20; // para x20+ permitimos 2 legs por fixture
+  if (prod < t * 0.95 && legs.length < maxLegs) {
+    // Creamos un pool ordenado por "impacto" (odd alto + prob aceptable)
+    var boosterPool = [];
+
+    for (var bf = 0; bf < byFx.length; bf++) {
+      var fx2 = byFx[bf];
+      var already = fxLegs[fx2.fid] || [];
+      var count = fxLegCount[fx2.fid] || 0;
+      if (!allowSecondLeg && count >= 1) continue;
+      if (allowSecondLeg && count >= 2) continue;
+
+      for (var j = 0; j < fx2.options.length; j++) {
+        var c = fx2.options[j];
+
+        // evitar duplicar el mismo mercado en el mismo fixture
+        var dup = false;
+        for (var k = 0; k < already.length; k++) {
+          var mkA = String(already[k].market || already[k].marketKey || "");
+          var mkB = String(c.market || c.marketKey || "");
+          if (mkA === mkB) { dup = true; break; }
+          if (incompatible(already[k], c)) { dup = true; break; }
+        }
+        if (dup) continue;
+
+        var pOk2 = c.__probR || 0;
+        if (pOk2 < minProbBoost) continue;
+
+        // Preferir boosters con odds decentes para subir producto
+        if (c.__odd < (t >= 50 ? 1.20 : 1.15)) continue;
+
+        boosterPool.push(c);
+      }
+    }
+
+    boosterPool.sort(function (a, b) {
+      // Mayor impacto: log(odd) + score
+      var ia = Math.log(Math.max(1.0001, a.__odd)) + (a.__score || 0) * 0.25;
+      var ib = Math.log(Math.max(1.0001, b.__odd)) + (b.__score || 0) * 0.25;
+      return ib - ia;
+    });
+
+    for (var bp = 0; bp < boosterPool.length; bp++) {
+      var candB = boosterPool[bp];
+      var fidB = String(candB.__fx);
+      var countB = fxLegCount[fidB] || 0;
+      if (!allowSecondLeg && countB >= 1) continue;
+      if (allowSecondLeg && countB >= 2) continue;
+
+      if (wouldExceedCap(prod, candB.__odd)) continue;
+
+      // type limit
+      var typB = candB.__type || "OTHER";
+      if ((typeCount[typB] || 0) >= (perTypeLimitBase[typB] || 99)) continue;
+
+      // compat con legs existentes del mismo fixture (redundante, pero seguro)
+      var ok = true;
+      var already2 = fxLegs[fidB] || [];
+      for (var kk = 0; kk < already2.length; kk++) {
+        if (incompatible(already2[kk], candB)) { ok = false; break; }
+        var mk1 = String(already2[kk].market || already2[kk].marketKey || "");
+        var mk2 = String(candB.market || candB.marketKey || "");
+        if (mk1 === mk2) { ok = false; break; }
+      }
+      if (!ok) continue;
+
+      legs.push(candB);
+      prod *= candB.__odd;
+      typeCount[typB] = (typeCount[typB] || 0) + 1;
+      fxLegCount[fidB] = (fxLegCount[fidB] || 0) + 1;
+      fxLegs[fidB] = (fxLegs[fidB] || []);
+      fxLegs[fidB].push(candB);
 
       if (legs.length >= maxLegs) break;
+      if (prod >= t * 0.97) break;
     }
   }
 
-  // retorna con alias picks para compatibilidad con UI
+  // output
   return {
-    target: t,
-    cap: hardCap,
-    games: legs.length,
-    finalOdd: round2(prod),
-    impliedProb: round2(1 / prod),
-    legs,
-    picks: legs,
-    reached: prod >= t * 0.90,
-  }
+    legs: legs,
+    prod: prod,
+    typeCount: typeCount,
+  };
 }
-
 export function buildValueList(candidatesByFixture, minEdge = 0.06) {
   const all = Object.values(candidatesByFixture || {}).flat();
 
