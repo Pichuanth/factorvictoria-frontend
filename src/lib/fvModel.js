@@ -687,7 +687,7 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     t >= 100 ? { min: 9,  max: 15 } :
     t >= 50  ? { min: 7,  max: 10 } :
     t >= 20  ? { min: 5,  max: 8  } :
-    t >= 10  ? { min: 3,  max: 6  } :
+    t >= 10  ? { min: 4,  max: 6  } :
     t >= 5   ? { min: 2,  max: 5  } :
                { min: 2,  max: 4  };
 
@@ -699,7 +699,7 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     else if (t >= 50) { minLegs = 10; maxLegs = 12; }
     else if (t >= 20) { minLegs = 8;  maxLegs = 10; }
     else {
-      if (t >= 10) { minLegs = Math.max(minLegs, 4); maxLegs = Math.max(maxLegs, 7); }
+      if (t >= 10) { minLegs = Math.max(minLegs, 4); maxLegs = Math.max(maxLegs, 8); }
       else if (t >= 5) { minLegs = Math.max(minLegs, 3); maxLegs = Math.max(maxLegs, 6); }
       else { minLegs = Math.max(minLegs, 3); maxLegs = Math.max(maxLegs, 5); }
     }
@@ -708,7 +708,7 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     else if (t >= 50) { minLegs = 9; maxLegs = 11; }
     else if (t >= 20) { minLegs = 7; maxLegs = 9; }
     else {
-      if (t >= 10) { minLegs = Math.max(minLegs, 4); maxLegs = Math.max(maxLegs, 7); }
+      if (t >= 10) { minLegs = Math.max(minLegs, 4); maxLegs = Math.max(maxLegs, 8); }
       else if (t >= 5) { minLegs = Math.max(minLegs, 3); maxLegs = Math.max(maxLegs, 6); }
       else { minLegs = Math.max(minLegs, 3); maxLegs = Math.max(maxLegs, 5); }
     }
@@ -738,8 +738,8 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     let want = minLegs;
 
     if (poolMatches >= 30) {
-      if (t >= 100) want = 13;
-      else if (t >= 50) want = 11;
+      if (t >= 100) want = 14;
+      else if (t >= 50) want = 12;
       else if (t >= 20) want = 9;
       else if (t >= 10) want = 5;
       else if (t >= 5)  want = 4;
@@ -771,9 +771,9 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     // Hard cap: never allow legs above 3.50 (user requirement).
     // On large pools, cap tighter (especially for x50/x100) to force adding more legs.
     if (poolMatches >= 30) {
-      if (t >= 100) return 2.20;
-      if (t >= 50)  return 2.45;
-      if (t >= 20)  return 2.70;
+      if (t >= 100) return 2.00;
+      if (t >= 50)  return 2.10;
+      if (t >= 20)  return 2.30;
       return 3.10;
     }
     if (poolMatches >= 20) {
