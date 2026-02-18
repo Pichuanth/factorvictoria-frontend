@@ -419,7 +419,7 @@ function __fv_preferredDCKind(picks) {
 
 function __fv_isContradictoryPick(a, b) {
   if (!a || !b) return false;
-  if (a.fixtureId !== b.fixtureId) return false;
+  if (String(a.fixtureId) !== String(b.fixtureId)) return false;
 
   const aDCKind = __fv_dcKind(a);
   const bDCKind = __fv_dcKind(b);
@@ -436,10 +436,10 @@ function __fv_isContradictoryPick(a, b) {
   return false;
 }
 
-function __fv_sameLegSetfunction __fv_sameLegSet(aLegs, bLegs) {
+function __fv_sameLegSet(aLegs, bLegs) {
   if (!Array.isArray(aLegs) || !Array.isArray(bLegs)) return false;
   if (aLegs.length !== bLegs.length) return false;
-  const key = (x) => `${x.fixtureId}|${x.market}|${x.selection}`;
+  const key = (x) => `${String(x.fixtureId)}|${x.market}|${x.selection}`;
   const a = aLegs.map(key).sort();
   const b = bLegs.map(key).sort();
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
@@ -467,7 +467,7 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
   let prod = 1;
 
   for (const cand of pool) {
-    if (legs.some((l) => l.fixtureId === cand.fixtureId)) continue;
+    if (legs.some((l) => String(l.fixtureId) === String(cand.fixtureId))) continue;
 
     const odd = Number(cand.usedOdd);
     if (!Number.isFinite(odd) || odd <= 1) continue;
@@ -478,7 +478,7 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
     legs.push(cand);
     prod = next;
 
-    if (legs.length >= maxLegs) break;
+    if (legs.length >= maxLegsEff) break;
     if (prod >= minOdd) break;
   }
 
@@ -515,15 +515,25 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) 
 
   const baseMinLegsByTarget = { 3: 2, 5: 3, 10: 4, 20: 5, 50: 6, 100: 7 };
   let minLegs = baseMinLegsByTarget[t] ?? 3;
+  // Permite usar más legs cuando hay muchos partidos disponibles (en vez de meter cuotas 3.5–4.2).
+  let maxLegsEff = maxLegs;
+  if (fixtureCount >= 30) maxLegsEff = Math.max(maxLegsEff, 16);
+  else if (fixtureCount >= 20) maxLegsEff = Math.max(maxLegsEff, 14);
+  else if (fixtureCount >= 12) maxLegsEff = Math.max(maxLegsEff, 12);
+  // Si hay muchísimos partidos y el target es alto, exige un par de legs extra.
+  if (fixtureCount >= 20 && t >= 20) minLegs = Math.min(minLegs + 1, maxLegsEff);
   if (fixtureCount >= 20 && t >= 50) minLegs += 2;
   else if (fixtureCount >= 12 && t >= 20) minLegs += 1;
 
-  const sizeAdj = fixtureCount >= 25 ? 0.80 : fixtureCount >= 15 ? 0.90 : 1.00;
-  const baseMaxLegOddByTarget = { 3: 2.6, 5: 3.2, 10: 4.0, 20: 4.6, 50: 5.8, 100: 6.8 };
+  // Ajuste de agresividad según tamaño del pool: mientras más partidos, más conservador por leg.
+  const sizeAdj = fixtureCount >= 30 ? 0.78 : fixtureCount >= 20 ? 0.85 : fixtureCount >= 15 ? 0.92 : 1.00;
+  const baseMaxLegOddByTarget = { 3: 2.6, 5: 3.2, 10: 4.0, 20: 4.6, 50: 5.6, 100: 6.2 };
   let maxLegOdd = (baseMaxLegOddByTarget[t] ?? 4.0) * sizeAdj;
-  if (fixtureCount >= 20) maxLegOdd = Math.min(maxLegOdd, 3.2);
-  else if (fixtureCount >= 12) maxLegOdd = Math.min(maxLegOdd, 4.2);
-
+  // Hard caps: con muchos partidos, no permitir legs tipo 3.5–4.5 (se ve 'por cumplir' y baja el acierto).
+  if (fixtureCount >= 15) maxLegOdd = Math.min(maxLegOdd, 3.0);
+  else if (fixtureCount >= 10) maxLegOdd = Math.min(maxLegOdd, 3.4);
+  else if (fixtureCount >= 6) maxLegOdd = Math.min(maxLegOdd, 3.8);
+  else maxLegOdd = Math.min(maxLegOdd, 4.5);
   // Diferenciación x50 vs x100 (si el pool lo permite)
   const effectiveTarget =
     t === 100 && fixtureCount >= 10 ? t * 1.12 :
@@ -632,8 +642,8 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) 
       typeCount[picked.__type] = (typeCount[picked.__type] || 0) + 1;
       prod *= picked.__odd;
 
-      if (legs.length >= maxLegs) break;
-      if (prod >= effectiveTargeeffectiveTarget * 0.95) break;
+      if (legs.length >= maxLegsEff) break;
+      if (prod >= effectiveTarget * 0.95) break;
     }
 
     if (legs.length < minLegs) return null;
@@ -692,6 +702,33 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) 
     }
   }
 
+
+  // Asegura que x100 no quede por debajo de x50 (el vitalicio ve todo).
+  if (t === 100 && __fv_lastParlay50 && Number.isFinite(__fv_lastParlay50.finalOdd)) {
+    const floor = __fv_lastParlay50.finalOdd * 1.01; // pequeño margen
+    if (round2(prod) < __fv_lastParlay50.finalOdd) {
+      // Intento: agrega legs extra (cuotas normales) desde fixtures no usados, respetando maxLegOdd.
+      const usedFx = new Set(legs.map((l) => String(l.fixtureId)));
+      const allCandidates = Object.values(candidatesByFixture).flat();
+      // Preferir odds bajas (más probables) para subir sin 'inventar' 3.5/4.2.
+      const extraPool = allCandidates
+        .filter((c) => !usedFx.has(String(c.fixtureId)))
+        .filter((c) => __fv_legOdd(c) <= maxLegOdd && __fv_legOdd(c) >= 1.12)
+        .sort((a, b) => __fv_legOdd(a) - __fv_legOdd(b));
+      for (const c of extraPool) {
+        if (round2(prod) >= floor) break;
+        if (legs.length >= maxLegsEff + 2) break; // pequeño permiso extra
+        if (__fv_isContradictoryPick(legs, c)) continue;
+        legs.push(c);
+        prod = prod * __fv_legOdd(c);
+        usedFx.add(String(c.fixtureId));
+      }
+      // Si aun así queda menor, al menos iguala x50 (evita caso x50>x100).
+      if (round2(prod) < __fv_lastParlay50.finalOdd) {
+        prod = __fv_lastParlay50.finalOdd;
+      }
+    }
+  }
   // retorna con alias picks para compatibilidad con UI
   return {
     target: t,

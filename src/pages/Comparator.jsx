@@ -2321,9 +2321,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
       <section className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
         <FeatureCard title="Cuota segura (regalo)" badge="Alta probabilidad" locked={!features.giftPick}>
           <div className="text-xs text-slate-300">
-   Pick con mayor probabilidad de acierto. Prioriza partidos con estadísticas completas de ambos equipos.
-   Si uno no presenta datos, el acierto se reduce al 70%. Recarga y genera nuevamente para un análisis óptimo, 
-   ya que este es nuestro último filtro de validación. Consulta las estadísticas en la parte superior. 
+   Pick con mayor probabilidad de acierto. Prioriza partidos con estadísticas y datos completos. 
 </div>
 
 {fvOutput?.safe ? (
@@ -2491,8 +2489,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
         )}
 
         <FeatureCard title="Parlays potenciados" badge="Parlays" locked={!features.boosted} lockText="Disponible en todos los planes.">
-          <div className="text-xs text-slate-300">Parlays potenciados que genera el modelo ( x3, x5, x10, x20, x50, x100.)
-            Recuerda revisar nuestro filtro de validación. Consulta las estadísticas en la parte superior. </div>
+          <div className="text-xs text-slate-300">Parlays potenciados que genera el modelo ( x3, x5, x10, x20, x50, x100.) </div>
 
           {fvOutput?.parlays?.length ? (
          <div className="mt-3 space-y-3">
