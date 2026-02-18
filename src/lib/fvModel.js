@@ -543,7 +543,14 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
   const candAll = Object.values(candidatesByFixture || {}).flat();
 
   // helpers local to avoid undefineds in future edits
-  const safeNum = (x, d=0) => (typeof x === "number" && Number.isFinite(x) ? x : d);
+  const safeNum = (x, d=0) => {
+    if (typeof x === "number" && Number.isFinite(x)) return x;
+    if (typeof x === "string") {
+      const v = Number(String(x).replace(",", "."));
+      if (Number.isFinite(v)) return v;
+    }
+    return d;
+  };
 
   // Pool size should represent *available matches*, not raw candidate count.
   // Using match-count makes the leg-scaling behave correctly when each match has multiple candidate markets.
@@ -596,13 +603,56 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
   minLegs = clamp(minLegs, 2, 15);
   maxLegs = clamp(maxLegs, minLegs, 15);
 
+
+  // Prefer using MORE legs when the pool is large (even if we hit the multiplier early).
+  // This avoids "2–6 legs with huge odds" and instead builds realistic parlays with many conservative legs.
+  const targetLegs = (() => {
+    // default: just satisfy min legs
+    let want = minLegs;
+
+    if (poolMatches >= 30) {
+      if (t >= 100) want = 13;
+      else if (t >= 50) want = 11;
+      else if (t >= 20) want = 9;
+    } else if (poolMatches >= 20) {
+      if (t >= 100) want = 12;
+      else if (t >= 50) want = 10;
+      else if (t >= 20) want = 8;
+    } else if (poolMatches >= 10) {
+      if (t >= 100) want = Math.max(minLegs, 8);
+      else if (t >= 50) want = Math.max(minLegs, 7);
+      else if (t >= 20) want = Math.max(minLegs, 6);
+    }
+
+    // keep inside range
+    return clamp(want, minLegs, maxLegs);
+  })();
+
+
   // ---------- Odds cap per leg (tighter on big pools to force conservative legs) ----------
   // With more matches available, we can cap odds harder and still reach targets by adding legs.
-  const capLegOddBase =
-    poolMatches >= 30 ? 2.65 :
-    poolMatches >= 20 ? 2.90 :
-    poolMatches >= 12 ? 3.10 :
-    3.50;
+  const capLegOddBase = (() => {
+    // Hard cap: never allow legs above 3.50 (user requirement).
+    // On large pools, cap tighter (especially for x50/x100) to force adding more legs.
+    if (poolMatches >= 30) {
+      if (t >= 100) return 2.20;
+      if (t >= 50)  return 2.45;
+      if (t >= 20)  return 2.70;
+      return 3.10;
+    }
+    if (poolMatches >= 20) {
+      if (t >= 100) return 2.35;
+      if (t >= 50)  return 2.55;
+      if (t >= 20)  return 2.85;
+      return 3.20;
+    }
+    if (poolMatches >= 12) {
+      if (t >= 100) return 2.75;
+      if (t >= 50)  return 2.95;
+      return 3.20;
+    }
+    return 3.50;
+  })();
   const capLegOdd = safeNum(opts.capLegOdd, capLegOddBase);
 
   // ---------- Target range (avoid x50 exploding to x90) ----------
@@ -671,7 +721,7 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     const legs = [];
     let prod = 1;
 
-    const maxLegOddEff = relax ? Math.max(capLegOdd, 3.75) : capLegOdd;
+    const maxLegOddEff = relax ? 3.50 : capLegOdd;
     const maxFactorEff = relax ? maxFactor * 1.25 : maxFactor;
     const minFactorEff = relax ? minFactor * 0.95 : minFactor;
 
@@ -695,7 +745,7 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
       prod = projected;
 
       // Break if we achieved a good range and enough legs
-      if (legs.length >= minLegs && prod >= minFactorEff) {
+      if (legs.length >= targetLegs && prod >= minFactorEff) {
         // If we are inside maxFactorEff, stop. Otherwise keep trying to add smaller odds legs.
         if (prod <= maxFactorEff) break;
       }
@@ -714,7 +764,7 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
         usedFixture.add(fixtureId);
         prod *= odd;
         if (legs.length >= maxLegs) break;
-        if (legs.length >= minLegs && prod >= minFactorEff) break;
+        if (legs.length >= targetLegs && prod >= minFactorEff) break;
       }
     }
 
