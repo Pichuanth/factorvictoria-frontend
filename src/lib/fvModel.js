@@ -327,40 +327,44 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
   }
 
   out.push({
-    market: "OU_35",
+    market: "OU",
+    line: 3.5,
     selection: "under",
     label: "Under 3.5 goles",
     prob: under35,
     fvOdd: fairOddFromProb(under35),
-    marketOdd: markets?.OU_35?.under ?? null,
+    marketOdd: markets?.OU_35?.under ?? markets?.OU_35?.u ?? markets?.OU?.u35 ?? null,
   });
 
   out.push({
-    market: "OU_25",
+    market: "OU",
+    line: 2.5,
     selection: "under",
     label: "Under 2.5 goles",
     prob: under25,
     fvOdd: fairOddFromProb(under25),
-    marketOdd: markets?.OU_25?.under ?? null,
+    marketOdd: markets?.OU_25?.under ?? markets?.OU_25?.u ?? markets?.OU?.u25 ?? null,
   });
 
   out.push({
-    market: "OU_25",
+    market: "OU",
+    line: 2.5,
     selection: "over",
     label: "Over 2.5 goles",
     prob: over25,
     fvOdd: fairOddFromProb(over25),
-    marketOdd: markets?.OU_25?.over ?? null,
+    marketOdd: markets?.OU_25?.over ?? markets?.OU_25?.o ?? markets?.OU?.o25 ?? null,
   });
 
   // Over 1.5 goles (más conservador, útil para ajustar cuotas con muchos partidos)
   out.push({
-    type: "OU_15",
+    market: "OU",
+    line: 1.5,
     selection: "over",
     label: "Over 1.5 goles",
     prob: over15,
     fvOdd: fairOddFromProb(over15),
-    marketOdd: markets?.OU_15?.over ?? markets?.OU_15?.o ?? null,
+    marketOdd: markets?.OU_15?.over ?? markets?.OU_15?.o ?? markets?.OU?.o15 ?? null,
   });
   // Hándicap +2 / +3 (relleno conservador cuando hay muchos partidos)
   // Se calcula con aproximación Poisson (no pierde por más de N goles).
@@ -435,8 +439,21 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
       ...x,
       dataQuality,
       confidence,
-      __probRank: applyConfidence(Number(x?.prob), confidence),
-      fvOdd: round2(fvOddNum),
+      prob: Number.isFinite(probRaw) ? probRaw : x?.prob,
+      // If prob is missing (common when stats are partial), derive a conservative proxy from odds so the fixture still participates in the pool.
+      const probRaw = (() => {
+        const p0 = Number(x?.prob);
+        if (Number.isFinite(p0) && p0 > 0) return clamp(p0, 0.02, 0.98);
+        const o1 = mkOddNum;
+        if (Number.isFinite(o1) && o1 > 1.01) return clamp(1 / o1, 0.05, 0.95);
+        const o2 = bestOddRaw;
+        if (Number.isFinite(o2) && o2 > 1.01) return clamp(1 / o2, 0.05, 0.95);
+        return null;
+      })();
+      const fvOddEff = Number.isFinite(fvOddNum) ? fvOddNum : (Number.isFinite(probRaw) ? fairOddFromProb(probRaw) : null);
+
+      __probRank: applyConfidence(Number.isFinite(probRaw) ? probRaw : Number(x?.prob), confidence),
+      fvOdd: fvOddEff === null ? null : round2(fvOddEff),
       marketOdd: Number.isFinite(mkOddNum) ? round2(mkOddNum) : null,
       usedOdd: bestOddRaw,
       usedOddDisplay: round2(bestOddRaw),
@@ -623,8 +640,13 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
   const safeNum = (x, d=0) => {
     if (typeof x === "number" && Number.isFinite(x)) return x;
     if (typeof x === "string") {
-      const v = Number(String(x).replace(",", "."));
-      if (Number.isFinite(v)) return v;
+      // Accept values like "3.6", "x3.6", "3,6", "odd: 3.6"
+      const s = String(x).trim().replace(",", ".");
+      const m = s.match(/-?\d+(?:\.\d+)?/);
+      if (m) {
+        const v = Number(m[0]);
+        if (Number.isFinite(v)) return v;
+      }
     }
     return d;
   };
@@ -834,9 +856,16 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
 
       // Prefer higher prob + positive edge + LOWER odds.
       // When pool is large, penalize high odds more aggressively and slightly boost safe fillers.
-      const oddPenalty = poolMatches >= 20 ? 0.35 : 0.25;
-      const fillerBonus = (poolMatches >= 20 && isSafeFiller(c)) ? 0.06 : 0;
-      const score = (prob * 1.2) + (edge * 0.8) - (Math.log(odd) * oddPenalty) + fillerBonus;
+      const oddPenalty = poolMatches >= 20 ? 0.38 : 0.26;
+      const fillerBonus = (poolMatches >= 15 && isSafeFiller(c)) ? 0.10 : 0;
+      const isBttsNo = (() => {
+        const lbl = String(c?.label || "").toLowerCase();
+        const mkt = String(c?.market || c?.type || "").toLowerCase();
+        const sel = String(c?.selection || "").toLowerCase();
+        return (lbl.includes("ambos marcan") && lbl.includes("no")) || (mkt === "btts" && sel.includes("no"));
+      })();
+      const bttsPenalty = (poolMatches >= 12 && isBttsNo) ? 0.08 : 0;
+      const score = (prob * 1.2) + (edge * 0.8) - (Math.log(odd) * oddPenalty) + fillerBonus - bttsPenalty;
 
       // Safety: ensure names are never empty (prevents "— vs" in UI)
       const home = (c.home && String(c.home).trim()) || (c.fixture?.teams?.home?.name) || "Local";
@@ -872,7 +901,7 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     const caps = (() => {
       // Caps are tighter on big pools where we have many options.
       if (poolMatches >= 15) {
-        const btts = 2; // max 2 btts-no per parlay
+        const btts = poolMatches >= 20 ? 1 : 2; // keep BTTS_NO low on big pools
         const dc = clamp(Math.ceil(targetLegs * 0.45), 2, 4);
         const ou = clamp(Math.ceil(targetLegs * 0.35), 1, 4);
         const ah = clamp(Math.ceil(targetLegs * 0.30), 1, 4);
@@ -915,25 +944,32 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
       if (legs.length >= maxLegs) break;
     }
 
-    // If still below minFactor and we have room, try to add more even if it overshoots a bit.
+    // If still below minFactor and we have room, try to add more legs (preferring low odds)
+    // IMPORTANT: keep the same mix-caps here too (otherwise it fills with BTTS_NO and looks ugly).
     if (prod < minFactorEff && legs.length < maxLegs) {
       for (const c of scored) {
         const fixtureId = c.fixtureId ?? c.fixture?.id ?? c.fixture_id;
         if (fixtureId == null || usedFixture.has(fixtureId)) continue;
+
         const odd = getOdd(c, 1.0);
         if (odd > maxLegOddEff) continue;
 
+        const key = normKey(c);
+        if ((mCount[key] || 0) >= (caps[key] ?? targetLegs)) continue;
+
+        // Prefer safe fillers when we need extra legs (OU1.5 / U3.5 / AH +2/+3)
+        // and avoid stuffing BTTS_NO.
+        if (key === "BTTS_NO" && poolMatches >= 12 && (mCount[key] || 0) >= 1) continue;
+
         legs.push(c);
-      mCount[normKey(c)] = (mCount[normKey(c)] || 0) + 1;
+        mCount[key] = (mCount[key] || 0) + 1;
         usedFixture.add(fixtureId);
-        prod *= odd;
+        prod = prod * odd;
+
+        if (legs.length >= targetLegs && prod >= minFactorEff && prod <= maxFactorEff) break;
         if (legs.length >= maxLegs) break;
-        if (legs.length >= targetLegs && prod >= minFactorEff) break;
       }
     }
-
-    // Basic validity
-    if (legs.length < Math.min(minLegs, maxLegs)) return null;
     return { legs, prod };
   }
 
