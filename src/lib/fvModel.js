@@ -467,6 +467,8 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
       return Number.isFinite(odd) && odd > 1;
     });
 
+
+  const maxLegsEff = Math.max(1, Math.min((Number(maxLegs) || 5), pool.length || (Number(maxLegs) || 5)));
   pool.sort((a, b) => (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
 
   const legs = [];
