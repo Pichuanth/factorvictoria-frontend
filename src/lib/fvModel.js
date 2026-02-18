@@ -564,11 +564,9 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
   // - ~10 matches: 6–8 legs max
   // - 30–40 matches: x20 8–10, x50 10–12, x100 12–15
   const baseRange =
-    // Baseline: prevent x100 from defaulting to too many legs on small pools;
-    // upscale is handled by poolMatches rules below.
-    t >= 100 ? { min: 6, max: 10 } :
-    t >= 50  ? { min: 5, max: 9 } :
-    t >= 20  ? { min: 4, max: 8 } :
+    t >= 100 ? { min: 9, max: 15 } :
+    t >= 50  ? { min: 7, max: 10 } :
+    t >= 20  ? { min: 5, max: 8 } :
                { min: 2, max: 6 };
 
   let minLegs = baseRange.min;
@@ -580,16 +578,14 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     else if (t >= 20) { minLegs = 8;  maxLegs = 10; }
     else { minLegs = Math.max(minLegs, 6); maxLegs = Math.max(maxLegs, 9); }
   } else if (poolMatches >= 20) {
-    // 20–29 matches: upscale legs notably (more conservative odds per leg).
-    if (t >= 100) { minLegs = 12; maxLegs = 15; }
-    else if (t >= 50) { minLegs = 10; maxLegs = 12; }
-    else if (t >= 20) { minLegs = 8;  maxLegs = 10; }
-    else { minLegs = Math.max(minLegs, 6); maxLegs = Math.max(maxLegs, 9); }
+    if (t >= 100) { minLegs = 10; maxLegs = 14; }
+    else if (t >= 50) { minLegs = 9; maxLegs = 11; }
+    else if (t >= 20) { minLegs = 7; maxLegs = 9; }
+    else { minLegs = Math.max(minLegs, 5); maxLegs = Math.max(maxLegs, 8); }
   } else if (poolMatches >= 10) {
-    // ~10–19 matches: we have enough variety to build longer parlays with LOWER odds per leg.
-    // User target: if ~10 matches, x100 should prefer ~7–8 legs (not 2–5 legs with huge odds).
-    if (t >= 100) { minLegs = 7; maxLegs = 9; }
-    else if (t >= 50) { minLegs = 7; maxLegs = 8; }
+    // ~10 matches: avoid trying to build huge legs; keep 6–8 reasonable.
+    if (t >= 100) { minLegs = 9; maxLegs = 12; }
+    else if (t >= 50) { minLegs = 7; maxLegs = 9; }
     else if (t >= 20) { minLegs = 6; maxLegs = 8; }
     else { minLegs = Math.max(minLegs, 4); maxLegs = Math.min(maxLegs, 8); }
   } else {
@@ -602,30 +598,12 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
 
   // ---------- Odds cap per leg (tighter on big pools to force conservative legs) ----------
   // With more matches available, we can cap odds harder and still reach targets by adding legs.
-  const capLegOddBase = (() => {
-    // Hard rule: never exceed 3.50 (user requirement).
-    // On bigger pools (and higher targets), cap lower so the model prefers adding legs instead of taking huge odds.
-    if (t >= 100) {
-      return poolMatches >= 30 ? 2.20 :
-             poolMatches >= 20 ? 2.35 :
-             poolMatches >= 10 ? 2.60 :
-             3.10;
-    }
-    if (t >= 50) {
-      return poolMatches >= 30 ? 2.40 :
-             poolMatches >= 20 ? 2.60 :
-             poolMatches >= 10 ? 2.85 :
-             3.20;
-    }
-    if (t >= 20) {
-      return poolMatches >= 30 ? 2.70 :
-             poolMatches >= 20 ? 2.85 :
-             poolMatches >= 10 ? 3.10 :
-             3.35;
-    }
-    return 3.50;
-  })();
-  const capLegOdd = clamp(safeNum(opts.capLegOdd, capLegOddBase), 1.10, 3.50);
+  const capLegOddBase =
+    poolMatches >= 30 ? 2.65 :
+    poolMatches >= 20 ? 2.90 :
+    poolMatches >= 12 ? 3.10 :
+    3.50;
+  const capLegOdd = safeNum(opts.capLegOdd, capLegOddBase);
 
   // ---------- Target range (avoid x50 exploding to x90) ----------
   const targetMinBase = safeNum(opts.targetMinMul, 0.92);
@@ -693,7 +671,7 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     const legs = [];
     let prod = 1;
 
-    const maxLegOddEff = relax ? clamp(capLegOdd + 0.15, 1.10, 3.50) : capLegOdd;
+    const maxLegOddEff = relax ? Math.max(capLegOdd, 3.75) : capLegOdd;
     const maxFactorEff = relax ? maxFactor * 1.25 : maxFactor;
     const minFactorEff = relax ? minFactor * 0.95 : minFactor;
 
