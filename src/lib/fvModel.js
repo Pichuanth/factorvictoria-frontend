@@ -128,7 +128,40 @@ export function probUnderLine(lambdaTotal, line) {
   return clamp(s, 0, 1);
 }
 
-export function probBTTSNo(lambdaHome, lambdaAway) {
+export 
+// --- Handicap helpers (approx via truncated Poisson convolution) ---
+// Probability that "forTeam" does NOT lose by more than `margin` goals.
+// For home +2: P(home - away >= -2). For away +2: P(away - home >= -2) == P(home - away <= 2).
+function __fv_poissonPmf(k, lambda) {
+  if (k < 0) return 0;
+  const l = Number(lambda);
+  if (!Number.isFinite(l) || l <= 0) return k === 0 ? 1 : 0;
+  // compute iteratively to avoid factorial overflow for small k (k<=12 typical)
+  let p0 = Math.exp(-l);
+  if (k === 0) return p0;
+  let p = p0;
+  for (let i = 1; i <= k; i++) p = (p * l) / i;
+  return p;
+}
+
+function probNotLoseByMoreThan(lambdaFor, lambdaAgainst, margin, maxGoals = 8) {
+  const m = Number(margin);
+  const maxG = Math.max(6, Math.min(12, Number(maxGoals) || 8));
+  const lf = clamp(Number(lambdaFor) || 0, 0.2, 3.2);
+  const la = clamp(Number(lambdaAgainst) || 0, 0.2, 3.2);
+
+  let prob = 0;
+  for (let gf = 0; gf <= maxG; gf++) {
+    const pf = __fv_poissonPmf(gf, lf);
+    for (let ga = 0; ga <= maxG; ga++) {
+      const pa = __fv_poissonPmf(ga, la);
+      if ((gf - ga) >= (-m)) prob += pf * pa;
+    }
+  }
+  return clamp(prob, 0.01, 0.99);
+}
+
+function probBTTSNo(lambdaHome, lambdaAway) {
   const pH0 = poissonP(0, lambdaHome);
   const pA0 = poissonP(0, lambdaAway);
   const pBoth0 = pH0 * pA0;
@@ -329,6 +362,50 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
     fvOdd: fairOddFromProb(over15),
     marketOdd: markets?.OU_15?.over ?? markets?.OU_15?.o ?? null,
   });
+  // Hándicap +2 / +3 (relleno conservador cuando hay muchos partidos)
+  // Se calcula con aproximación Poisson (no pierde por más de N goles).
+  const hHome2 = probNotLoseByMoreThan(lambdaHome, lambdaAway, 2);
+  const hAway2 = probNotLoseByMoreThan(lambdaAway, lambdaHome, 2);
+  const hHome3 = probNotLoseByMoreThan(lambdaHome, lambdaAway, 3);
+  const hAway3 = probNotLoseByMoreThan(lambdaAway, lambdaHome, 3);
+
+  out.push({
+    market: "AH",
+    selection: "home+2",
+    label: "Hándicap +2 (Local)",
+    prob: hHome2,
+    fvOdd: fairOddFromProb(hHome2),
+    marketOdd: markets?.AH?.home_plus2 ?? markets?.AH?.home_p2 ?? markets?.AH?.["+2_home"] ?? null,
+  });
+
+  out.push({
+    market: "AH",
+    selection: "away+2",
+    label: "Hándicap +2 (Visita)",
+    prob: hAway2,
+    fvOdd: fairOddFromProb(hAway2),
+    marketOdd: markets?.AH?.away_plus2 ?? markets?.AH?.away_p2 ?? markets?.AH?.["+2_away"] ?? null,
+  });
+
+  out.push({
+    market: "AH",
+    selection: "home+3",
+    label: "Hándicap +3 (Local)",
+    prob: hHome3,
+    fvOdd: fairOddFromProb(hHome3),
+    marketOdd: markets?.AH?.home_plus3 ?? markets?.AH?.home_p3 ?? markets?.AH?.["+3_home"] ?? null,
+  });
+
+  out.push({
+    market: "AH",
+    selection: "away+3",
+    label: "Hándicap +3 (Visita)",
+    prob: hAway3,
+    fvOdd: fairOddFromProb(hAway3),
+    marketOdd: markets?.AH?.away_plus3 ?? markets?.AH?.away_p3 ?? markets?.AH?.["+3_away"] ?? null,
+  });
+
+
 
 
   out.push({
@@ -571,10 +648,12 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
   // - ~10 matches: 6–8 legs max
   // - 30–40 matches: x20 8–10, x50 10–12, x100 12–15
   const baseRange =
-    t >= 100 ? { min: 9, max: 15 } :
-    t >= 50  ? { min: 7, max: 10 } :
-    t >= 20  ? { min: 5, max: 8 } :
-               { min: 2, max: 6 };
+    t >= 100 ? { min: 9,  max: 15 } :
+    t >= 50  ? { min: 7,  max: 10 } :
+    t >= 20  ? { min: 5,  max: 8  } :
+    t >= 10  ? { min: 3,  max: 6  } :
+    t >= 5   ? { min: 2,  max: 5  } :
+               { min: 2,  max: 4  };
 
   let minLegs = baseRange.min;
   let maxLegs = baseRange.max;
@@ -583,18 +662,30 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     if (t >= 100) { minLegs = 12; maxLegs = 15; }
     else if (t >= 50) { minLegs = 10; maxLegs = 12; }
     else if (t >= 20) { minLegs = 8;  maxLegs = 10; }
-    else { minLegs = Math.max(minLegs, 6); maxLegs = Math.max(maxLegs, 9); }
+    else {
+      if (t >= 10) { minLegs = Math.max(minLegs, 4); maxLegs = Math.max(maxLegs, 7); }
+      else if (t >= 5) { minLegs = Math.max(minLegs, 3); maxLegs = Math.max(maxLegs, 6); }
+      else { minLegs = Math.max(minLegs, 3); maxLegs = Math.max(maxLegs, 5); }
+    }
   } else if (poolMatches >= 20) {
     if (t >= 100) { minLegs = 10; maxLegs = 14; }
     else if (t >= 50) { minLegs = 9; maxLegs = 11; }
     else if (t >= 20) { minLegs = 7; maxLegs = 9; }
-    else { minLegs = Math.max(minLegs, 5); maxLegs = Math.max(maxLegs, 8); }
+    else {
+      if (t >= 10) { minLegs = Math.max(minLegs, 4); maxLegs = Math.max(maxLegs, 7); }
+      else if (t >= 5) { minLegs = Math.max(minLegs, 3); maxLegs = Math.max(maxLegs, 6); }
+      else { minLegs = Math.max(minLegs, 3); maxLegs = Math.max(maxLegs, 5); }
+    }
   } else if (poolMatches >= 10) {
     // ~10 matches: avoid trying to build huge legs; keep 6–8 reasonable.
     if (t >= 100) { minLegs = 9; maxLegs = 12; }
     else if (t >= 50) { minLegs = 7; maxLegs = 9; }
     else if (t >= 20) { minLegs = 6; maxLegs = 8; }
-    else { minLegs = Math.max(minLegs, 4); maxLegs = Math.min(maxLegs, 8); }
+    else {
+      if (t >= 10) { minLegs = Math.max(minLegs, 4); maxLegs = Math.min(Math.max(maxLegs, 6), 9); }
+      else if (t >= 5) { minLegs = Math.max(minLegs, 3); maxLegs = Math.min(Math.max(maxLegs, 5), 8); }
+      else { minLegs = Math.max(minLegs, 3); maxLegs = Math.min(Math.max(maxLegs, 4), 7); }
+    }
   } else {
     // small pool: allow fewer legs so it doesn't fail
     minLegs = Math.max(2, minLegs - 1);
@@ -614,14 +705,23 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
       if (t >= 100) want = 13;
       else if (t >= 50) want = 11;
       else if (t >= 20) want = 9;
+      else if (t >= 10) want = 5;
+      else if (t >= 5)  want = 4;
+      else              want = 3;
     } else if (poolMatches >= 20) {
       if (t >= 100) want = 12;
       else if (t >= 50) want = 10;
       else if (t >= 20) want = 8;
+      else if (t >= 10) want = 5;
+      else if (t >= 5)  want = 4;
+      else              want = 3;
     } else if (poolMatches >= 10) {
       if (t >= 100) want = Math.max(minLegs, 8);
       else if (t >= 50) want = Math.max(minLegs, 7);
       else if (t >= 20) want = Math.max(minLegs, 6);
+      else if (t >= 10) want = Math.max(minLegs, 4);
+      else if (t >= 5)  want = Math.max(minLegs, 3);
+      else              want = Math.max(minLegs, 3);
     }
 
     // keep inside range
@@ -653,7 +753,16 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     }
     return 3.50;
   })();
-  const capLegOdd = safeNum(opts.capLegOdd, capLegOddBase);
+  // Additional dynamic cap derived from desired leg count:
+  // if we want more legs, we must keep per-leg odds lower so the product stays realistic.
+  const capFromTargetLegs = (() => {
+    const want = Math.max(2, Number(targetLegs) || 2);
+    const base = Math.pow(Math.max(1.01, t), 1 / want); // geometric mean needed
+    // allow some slack but keep conservative
+    return clamp(base * (poolMatches >= 15 ? 1.30 : 1.38), 1.35, 3.50);
+  })();
+
+  const capLegOdd = safeNum(opts.capLegOdd, Math.min(3.50, capLegOddBase, capFromTargetLegs));
 
   // ---------- Target range (avoid x50 exploding to x90) ----------
   const targetMinBase = safeNum(opts.targetMinMul, 0.92);
@@ -690,7 +799,8 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     const line = Number(c?.line);
     const over15 = (market === "OU" || label.includes("over")) && (line === 1.5 || label.includes("over 1.5") || (sel.includes("over") && sel.includes("1.5")));
     const under35 = (market === "OU" || label.includes("under")) && (line === 3.5 || label.includes("under 3.5") || (sel.includes("under") && sel.includes("3.5")));
-    return over15 || under35;
+    const handicapSafe = label.includes("hándicap +2") || label.includes("handicap +2") || label.includes("hándicap +3") || label.includes("handicap +3");
+    return over15 || under35 || handicapSafe;
   };
 
   const scored = candAll
