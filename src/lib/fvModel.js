@@ -447,9 +447,15 @@ function __fv_sameLegSet(aLegs, bLegs) {
 }
 
 export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 3.0, maxLegs = 3) {
+  const hasAnyFull = Object.values(candidatesByFixture || {}).some((list) => {
+    const arr = Array.isArray(list) ? list : [];
+    return arr.some((c) => c && c.dataQuality === "full");
+  });
+
   const pool = Object.values(candidatesByFixture || {})
     .map((list) => {
       const arr = Array.isArray(list) ? list : [];
+      if (hasAnyFull && !arr.some((c) => c && c.dataQuality === "full")) return null;
       // Prioriza "full" (círculo verde) si existe.
       const full = arr.filter((p) => p?.dataQuality === "full");
       return (full.length ? full : arr)[0] || null;
@@ -513,22 +519,26 @@ export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) 
   if (fixtureCount >= 20) minProb += 0.03;
   else if (fixtureCount >= 12) minProb += 0.015;
 
-  const baseMinLegsByTarget = { 3: 2, 5: 3, 10: 4, 20: 5, 50: 6, 100: 7 };
-  let minLegs = baseMinLegsByTarget[t] ?? 3;
-  // Permite usar más legs cuando hay muchos partidos disponibles (en vez de meter cuotas 3.5–4.2).
-  let maxLegsEff = maxLegs;
-  if (fixtureCount >= 30) maxLegsEff = Math.max(maxLegsEff, 16);
-  else if (fixtureCount >= 20) maxLegsEff = Math.max(maxLegsEff, 14);
-  else if (fixtureCount >= 12) maxLegsEff = Math.max(maxLegsEff, 12);
-  // Si hay muchísimos partidos y el target es alto, exige un par de legs extra.
-  if (fixtureCount >= 20 && t >= 20) minLegs = Math.min(minLegs + 1, maxLegsEff);
-  if (fixtureCount >= 20 && t >= 50) minLegs += 2;
-  else if (fixtureCount >= 12 && t >= 20) minLegs += 1;
+  const baseMinLegsByTarget = { 3: 2, 5: 3, 10: 4, 20: 5, 50: 7, 100: 9 };
+const baseMaxLegsByTarget = { 3: 4, 5: 5, 10: 6, 20: 7, 50: 9, 100: 15 };
 
-  // Ajuste de agresividad según tamaño del pool: mientras más partidos, más conservador por leg.
-  const sizeAdj = fixtureCount >= 30 ? 0.78 : fixtureCount >= 20 ? 0.85 : fixtureCount >= 15 ? 0.92 : 1.00;
-  const baseMaxLegOddByTarget = { 3: 2.6, 5: 3.2, 10: 4.0, 20: 4.6, 50: 5.6, 100: 6.2 };
-  let maxLegOdd = (baseMaxLegOddByTarget[t] ?? 4.0) * sizeAdj;
+// Si el caller sugiere un mínimo, respetamos el más conservador (menor) solo en targets bajos.
+let minLegs = Math.min(minLegsHint, baseMinLegsByTarget[t] ?? minLegsHint);
+let maxLegsEff = Math.max(maxLegs, baseMaxLegsByTarget[t] ?? maxLegs);
+
+// Escalado dinámico por tamaño del pool:
+// con más fixtures disponibles, preferimos más legs (más conservador por selección, menos necesidad de cuotas 3.5+).
+const poolBoost = fixtureCount >= 45 ? 4 : fixtureCount >= 35 ? 3 : fixtureCount >= 25 ? 2 : fixtureCount >= 18 ? 1 : 0;
+if (t >= 20 && poolBoost > 0) {
+  maxLegsEff += poolBoost;
+  minLegs += Math.min(2, poolBoost);
+}
+
+// Cap por fixtures disponibles (1 leg por fixture)
+maxLegsEff = Math.min(maxLegsEff, Math.max(2, fixtureCount));
+minLegs = Math.min(minLegs, maxLegsEff);
+
+maxLegOdd = (baseMaxLegOddByTarget[t] ?? 4.0) * sizeAdj;
   // Hard caps: con muchos partidos, no permitir legs tipo 3.5–4.5 (se ve 'por cumplir' y baja el acierto).
   if (fixtureCount >= 15) maxLegOdd = Math.min(maxLegOdd, 3.0);
   else if (fixtureCount >= 10) maxLegOdd = Math.min(maxLegOdd, 3.4);
