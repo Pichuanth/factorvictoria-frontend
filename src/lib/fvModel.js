@@ -629,6 +629,21 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     return d;
   };
 
+  const getOdd = (c, d=1.0) => {
+    // IMPORTANT: UI often displays usedOdd/usedOddDisplay; we must cap/filter using the SAME odd.
+    return safeNum(
+      c?.usedOdd,
+      safeNum(c?.usedOddDisplay,
+        safeNum(c?.marketOdd,
+          safeNum(c?.fvOdd,
+            safeNum(c?.odd, d)
+          )
+        )
+      ),
+      d
+    );
+  };
+
   // Pool size should represent *available matches*, not raw candidate count.
   // Using match-count makes the leg-scaling behave correctly when each match has multiple candidate markets.
   const poolMatches = (() => {
@@ -642,42 +657,6 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     return s.size;
   })();
 
-  // IMPORTANT: candidates expose odds as usedOdd/marketOdd/fvOdd (often strings).
-  // buildParlay MUST evaluate caps using the same odd that is later displayed.
-  const getOdd = (c) => {
-    const v =
-      (Number.isFinite(safeNum(c?.usedOdd, NaN)) ? safeNum(c?.usedOdd, NaN) : NaN) ||
-      (Number.isFinite(safeNum(c?.usedOddDisplay, NaN)) ? safeNum(c?.usedOddDisplay, NaN) : NaN) ||
-      (Number.isFinite(safeNum(c?.marketOdd, NaN)) ? safeNum(c?.marketOdd, NaN) : NaN) ||
-      (Number.isFinite(safeNum(c?.fvOdd, NaN)) ? safeNum(c?.fvOdd, NaN) : NaN) ||
-      (Number.isFinite(safeNum(c?.odd, NaN)) ? safeNum(c?.odd, NaN) : NaN);
-    return Number.isFinite(v) ? v : 1.0;
-  };
-
-  const marketKey = (c) => {
-    const mkt = String(c?.market || c?.type || c?.label || "").toLowerCase();
-    const sel = String(c?.selection || c?.pick || "").toLowerCase();
-    if (mkt.includes("ambos") && mkt.includes("marcan") && sel.includes("no")) return "BTTS_NO";
-    if (mkt.includes("ambos") && mkt.includes("marcan") && (sel.includes("si") || sel.includes("sí"))) return "BTTS_YES";
-    if (mkt.includes("doble") || mkt.includes("double") || mkt.includes("1x") || mkt.includes("x2")) return "DOUBLE_CHANCE";
-    if (mkt.includes("over") || mkt.includes("under") || mkt.includes("goles") || mkt.includes("goals")) return "OU";
-    if (mkt.includes("handicap") || mkt.includes("hándicap") || mkt.includes("ah")) return "AH";
-    return "OTHER";
-  };
-
-  // Soft diversity caps to avoid "muchos ambos no anotan" when the pool is big.
-  // These caps are intentionally loose; they only kick in when we have enough matches to choose from.
-  const maxPerMarket = (() => {
-    if (poolMatches >= 20) {
-      if (t >= 100) return { BTTS_NO: 2, BTTS_YES: 2, DOUBLE_CHANCE: 4, OU: 4, AH: 4, OTHER: 99 };
-      if (t >= 50)  return { BTTS_NO: 2, BTTS_YES: 2, DOUBLE_CHANCE: 3, OU: 4, AH: 3, OTHER: 99 };
-      return          { BTTS_NO: 2, BTTS_YES: 2, DOUBLE_CHANCE: 3, OU: 3, AH: 3, OTHER: 99 };
-    }
-    return { BTTS_NO: 99, BTTS_YES: 99, DOUBLE_CHANCE: 99, OU: 99, AH: 99, OTHER: 99 };
-  })();
-
-
-
   // ---------- Dynamic legs range (pool-aware, more aggressive on big pools) ----------
   // Goal: with many matches available, use MORE legs with LOWER odds (more conservative & realistic).
   // (User intent examples)
@@ -687,7 +666,7 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     t >= 100 ? { min: 9,  max: 15 } :
     t >= 50  ? { min: 7,  max: 10 } :
     t >= 20  ? { min: 5,  max: 8  } :
-    t >= 10  ? { min: 4,  max: 6  } :
+    t >= 10  ? { min: 3,  max: 6  } :
     t >= 5   ? { min: 2,  max: 5  } :
                { min: 2,  max: 4  };
 
@@ -699,7 +678,7 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     else if (t >= 50) { minLegs = 10; maxLegs = 12; }
     else if (t >= 20) { minLegs = 8;  maxLegs = 10; }
     else {
-      if (t >= 10) { minLegs = Math.max(minLegs, 4); maxLegs = Math.max(maxLegs, 8); }
+      if (t >= 10) { minLegs = Math.max(minLegs, 4); maxLegs = Math.max(maxLegs, 7); }
       else if (t >= 5) { minLegs = Math.max(minLegs, 3); maxLegs = Math.max(maxLegs, 6); }
       else { minLegs = Math.max(minLegs, 3); maxLegs = Math.max(maxLegs, 5); }
     }
@@ -708,7 +687,7 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     else if (t >= 50) { minLegs = 9; maxLegs = 11; }
     else if (t >= 20) { minLegs = 7; maxLegs = 9; }
     else {
-      if (t >= 10) { minLegs = Math.max(minLegs, 4); maxLegs = Math.max(maxLegs, 8); }
+      if (t >= 10) { minLegs = Math.max(minLegs, 4); maxLegs = Math.max(maxLegs, 7); }
       else if (t >= 5) { minLegs = Math.max(minLegs, 3); maxLegs = Math.max(maxLegs, 6); }
       else { minLegs = Math.max(minLegs, 3); maxLegs = Math.max(maxLegs, 5); }
     }
@@ -738,8 +717,8 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     let want = minLegs;
 
     if (poolMatches >= 30) {
-      if (t >= 100) want = 14;
-      else if (t >= 50) want = 12;
+      if (t >= 100) want = 13;
+      else if (t >= 50) want = 11;
       else if (t >= 20) want = 9;
       else if (t >= 10) want = 5;
       else if (t >= 5)  want = 4;
@@ -771,9 +750,9 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     // Hard cap: never allow legs above 3.50 (user requirement).
     // On large pools, cap tighter (especially for x50/x100) to force adding more legs.
     if (poolMatches >= 30) {
-      if (t >= 100) return 2.00;
-      if (t >= 50)  return 2.10;
-      if (t >= 20)  return 2.30;
+      if (t >= 100) return 2.20;
+      if (t >= 50)  return 2.45;
+      if (t >= 20)  return 2.70;
       return 3.10;
     }
     if (poolMatches >= 20) {
@@ -840,9 +819,16 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
   };
 
   const scored = candAll
-    .filter(c => safeNum(c.prob, 0) >= probFloor && safeNum(c.odd, 0) >= 1.05)
+    .filter(c => {
+      const odd = getOdd(c, 0);
+      const prob = safeNum(c.prob, 0);
+      // Keep conservative fillers even if prob is missing/low (fallback later), as long as odds are low.
+      if (odd < 1.05) return false;
+      if (prob >= probFloor) return true;
+      return (poolMatches >= 15 && isSafeFiller(c) && prob >= 0.35 && odd <= 2.25);
+    })
     .map(c => {
-      const odd = getOdd(c);
+      const odd = getOdd(c, 1.0);
       const prob = safeNum(c.prob, 0);
       const edge = safeNum(c.edge, 0);
 
@@ -866,22 +852,48 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
   function greedyBuild({ relax = false } = {}) {
     const legs = [];
     let prod = 1;
-    const mCount = { BTTS_NO:0, BTTS_YES:0, DOUBLE_CHANCE:0, OU:0, AH:0, OTHER:0 };
 
     const maxLegOddEff = relax ? 3.50 : capLegOdd;
     const maxFactorEff = relax ? maxFactor * 1.25 : maxFactor;
     const minFactorEff = relax ? minFactor * 0.95 : minFactor;
+
+    // Market-mix caps to avoid ugly repetition (e.g., too many "Ambos marcan: NO")
+    const normKey = (c) => {
+      const lbl = String(c?.label || "").toLowerCase();
+      const mkt = String(c?.market || c?.type || "").toLowerCase();
+      if (lbl.includes("ambos marcan") && (lbl.includes("no") || lbl.includes("no—") || lbl.includes("no "))) return "BTTS_NO";
+      if (mkt === "btts" && (String(c?.selection || "").toLowerCase().includes("no"))) return "BTTS_NO";
+      if (lbl.includes("doble oportunidad") || mkt === "dc") return "DC";
+      if (lbl.includes("over") || lbl.includes("under") || mkt === "ou") return "OU";
+      if (lbl.includes("hándicap") || lbl.includes("handicap") || mkt === "ah") return "AH";
+      return "OTHER";
+    };
+
+    const caps = (() => {
+      // Caps are tighter on big pools where we have many options.
+      if (poolMatches >= 15) {
+        const btts = 2; // max 2 btts-no per parlay
+        const dc = clamp(Math.ceil(targetLegs * 0.45), 2, 4);
+        const ou = clamp(Math.ceil(targetLegs * 0.35), 1, 4);
+        const ah = clamp(Math.ceil(targetLegs * 0.30), 1, 4);
+        return { BTTS_NO: btts, DC: dc, OU: ou, AH: ah, OTHER: targetLegs };
+      }
+      return { BTTS_NO: 2, DC: targetLegs, OU: targetLegs, AH: targetLegs, OTHER: targetLegs };
+    })();
+
+    const mCount = { BTTS_NO: 0, DC: 0, OU: 0, AH: 0, OTHER: 0 };
 
     for (const c of scored) {
       const fixtureId = c.fixtureId ?? c.fixture?.id ?? c.fixture_id;
       if (fixtureId == null) continue;
       if (usedFixture.has(fixtureId)) continue;
 
-      const odd = getOdd(c);
+      const odd = getOdd(c, 1.0);
       if (odd > maxLegOddEff) continue;
 
-      const mk = marketKey(c);
-      if ((mCount[mk] || 0) >= (maxPerMarket[mk] || 99)) continue;
+      // Enforce mix caps
+      const key = normKey(c);
+      if ((mCount[key] || 0) >= (caps[key] ?? targetLegs)) continue;
 
       // If we're already close to target, avoid huge overshoot (keep x50 ~ x50)
       const projected = prod * odd;
@@ -891,8 +903,8 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
       }
 
       legs.push(c);
+      mCount[normKey(c)] = (mCount[normKey(c)] || 0) + 1;
       usedFixture.add(fixtureId);
-      mCount[mk] = (mCount[mk] || 0) + 1;
       prod = projected;
 
       // Break if we achieved a good range and enough legs
@@ -908,15 +920,12 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
       for (const c of scored) {
         const fixtureId = c.fixtureId ?? c.fixture?.id ?? c.fixture_id;
         if (fixtureId == null || usedFixture.has(fixtureId)) continue;
-        const odd = getOdd(c);
+        const odd = getOdd(c, 1.0);
         if (odd > maxLegOddEff) continue;
 
-        const mk = marketKey(c);
-        if ((mCount[mk] || 0) >= (maxPerMarket[mk] || 99)) continue;
-
         legs.push(c);
+      mCount[normKey(c)] = (mCount[normKey(c)] || 0) + 1;
         usedFixture.add(fixtureId);
-        mCount[mk] = (mCount[mk] || 0) + 1;
         prod *= odd;
         if (legs.length >= maxLegs) break;
         if (legs.length >= targetLegs && prod >= minFactorEff) break;
@@ -944,7 +953,7 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     fixtureId: l.fixtureId ?? l.fixture?.id ?? l.fixture_id,
     type: l.type,
     label: l.label,
-    odd: safeNum(l.odd, 1.0),
+    odd: getOdd(l, 1.0),
     prob: safeNum(l.prob, null),
     edge: safeNum(l.edge, null),
     home: l.home,
