@@ -545,33 +545,64 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
   // helpers local to avoid undefineds in future edits
   const safeNum = (x, d=0) => (typeof x === "number" && Number.isFinite(x) ? x : d);
 
-  const poolSize = candAll.length;
+  // Pool size should represent *available matches*, not raw candidate count.
+  // Using match-count makes the leg-scaling behave correctly when each match has multiple candidate markets.
+  const poolMatches = (() => {
+    const keys = Object.keys(candidatesByFixture || {});
+    if (keys.length) return keys.length;
+    const s = new Set();
+    for (const c of candAll) {
+      const id = c?.fixtureId ?? c?.fixture?.id ?? c?.fixture_id;
+      if (id != null) s.add(String(id));
+    }
+    return s.size;
+  })();
 
-  // ---------- Dynamic legs range (pool-aware) ----------
+  // ---------- Dynamic legs range (pool-aware, more aggressive on big pools) ----------
+  // Goal: with many matches available, use MORE legs with LOWER odds (more conservative & realistic).
+  // (User intent examples)
+  // - ~10 matches: 6–8 legs max
+  // - 30–40 matches: x20 8–10, x50 10–12, x100 12–15
   const baseRange =
     t >= 100 ? { min: 9, max: 15 } :
-    t >= 50  ? { min: 7, max: 9 } :
-    t >= 20  ? { min: 5, max: 7 } :
+    t >= 50  ? { min: 7, max: 10 } :
+    t >= 20  ? { min: 5, max: 8 } :
                { min: 2, max: 6 };
 
   let minLegs = baseRange.min;
   let maxLegs = baseRange.max;
 
-  // When pool is large, force more legs (more conservative, avoids 3.5–4.5 legs)
-  if (poolSize >= 20) {
-    if (t >= 50) minLegs += 2;            // x50: 9, x100: 11
-    else if (t >= 20) minLegs += 1;       // x20: 6
-  } else if (poolSize >= 14) {
-    if (t >= 50) minLegs += 1;            // x50: 8, x100: 10
-  } else if (poolSize <= 10) {
+  if (poolMatches >= 30) {
+    if (t >= 100) { minLegs = 12; maxLegs = 15; }
+    else if (t >= 50) { minLegs = 10; maxLegs = 12; }
+    else if (t >= 20) { minLegs = 8;  maxLegs = 10; }
+    else { minLegs = Math.max(minLegs, 6); maxLegs = Math.max(maxLegs, 9); }
+  } else if (poolMatches >= 20) {
+    if (t >= 100) { minLegs = 10; maxLegs = 14; }
+    else if (t >= 50) { minLegs = 9; maxLegs = 11; }
+    else if (t >= 20) { minLegs = 7; maxLegs = 9; }
+    else { minLegs = Math.max(minLegs, 5); maxLegs = Math.max(maxLegs, 8); }
+  } else if (poolMatches >= 10) {
+    // ~10 matches: avoid trying to build huge legs; keep 6–8 reasonable.
+    if (t >= 100) { minLegs = 9; maxLegs = 12; }
+    else if (t >= 50) { minLegs = 7; maxLegs = 9; }
+    else if (t >= 20) { minLegs = 6; maxLegs = 8; }
+    else { minLegs = Math.max(minLegs, 4); maxLegs = Math.min(maxLegs, 8); }
+  } else {
     // small pool: allow fewer legs so it doesn't fail
     minLegs = Math.max(2, minLegs - 1);
   }
+
   minLegs = clamp(minLegs, 2, 15);
   maxLegs = clamp(maxLegs, minLegs, 15);
 
-  // ---------- Odds cap per leg (prefer <= 3.0 when pool is decent) ----------
-  const capLegOddBase = poolSize >= 18 ? 3.0 : poolSize >= 12 ? 3.25 : 3.5;
+  // ---------- Odds cap per leg (tighter on big pools to force conservative legs) ----------
+  // With more matches available, we can cap odds harder and still reach targets by adding legs.
+  const capLegOddBase =
+    poolMatches >= 30 ? 2.65 :
+    poolMatches >= 20 ? 2.90 :
+    poolMatches >= 12 ? 3.10 :
+    3.50;
   const capLegOdd = safeNum(opts.capLegOdd, capLegOddBase);
 
   // ---------- Target range (avoid x50 exploding to x90) ----------
@@ -601,6 +632,17 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
 
   const probFloor = safeNum(opts.probFloor, probFloorBase);
 
+  const isSafeFiller = (c) => {
+    // Prefer Over 1.5 / Under 3.5 as "relleno seguro" when we need more legs.
+    const market = String(c?.market || c?.type || "").toUpperCase();
+    const label = String(c?.label || "").toLowerCase();
+    const sel = String(c?.selection || "").toLowerCase();
+    const line = Number(c?.line);
+    const over15 = (market === "OU" || label.includes("over")) && (line === 1.5 || label.includes("over 1.5") || (sel.includes("over") && sel.includes("1.5")));
+    const under35 = (market === "OU" || label.includes("under")) && (line === 3.5 || label.includes("under 3.5") || (sel.includes("under") && sel.includes("3.5")));
+    return over15 || under35;
+  };
+
   const scored = candAll
     .filter(c => safeNum(c.prob, 0) >= probFloor && safeNum(c.odd, 0) >= 1.05)
     .map(c => {
@@ -608,8 +650,11 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
       const prob = safeNum(c.prob, 0);
       const edge = safeNum(c.edge, 0);
 
-      // Prefer higher prob + positive edge + lower odds
-      const score = (prob * 1.2) + (edge * 0.8) - (Math.log(odd) * 0.25);
+      // Prefer higher prob + positive edge + LOWER odds.
+      // When pool is large, penalize high odds more aggressively and slightly boost safe fillers.
+      const oddPenalty = poolMatches >= 20 ? 0.35 : 0.25;
+      const fillerBonus = (poolMatches >= 20 && isSafeFiller(c)) ? 0.06 : 0;
+      const score = (prob * 1.2) + (edge * 0.8) - (Math.log(odd) * oddPenalty) + fillerBonus;
 
       // Safety: ensure names are never empty (prevents "— vs" in UI)
       const home = (c.home && String(c.home).trim()) || (c.fixture?.teams?.home?.name) || "Local";
@@ -713,6 +758,11 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
   // Persist last x50 for monotonic x100
   if (typeof window !== "undefined" && t >= 50 && t < 100) {
     window.__fv_lastParlay50 = finalOdd;
+  }
+
+  // Also persist in module-scope memory (used by other helpers / future sessions)
+  if (t >= 50 && t < 100) {
+    __fv_lastParlay50 = finalOdd;
   }
 
   return out;
