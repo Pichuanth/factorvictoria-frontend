@@ -1,3 +1,15 @@
+// ====== HELPERS GLOBALES ======
+
+function clamp01(x) {
+  if (typeof x !== "number" || isNaN(x)) return 0;
+  return Math.max(0, Math.min(1, x));
+}
+
+function clamp(x, min, max) {
+  if (typeof x !== "number" || isNaN(x)) return min;
+  return Math.max(min, Math.min(max, x));
+}
+
 // src/lib/fvModel.js
 // Motor MVP de probabilidades + armado de parlays para Factor Victoria.
 // Objetivo: simple, interpretable, con fallbacks (si no hay odds o stats).
