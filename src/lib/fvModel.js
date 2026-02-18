@@ -435,23 +435,25 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
         ? (mkOddNum / fvOddNum) - 1
         : null;
 
+    
+// If prob is missing (common when stats are partial), derive a conservative proxy from odds so the fixture still participates in the pool.
+    const probRaw = (() => {
+      const p0 = Number(x?.prob);
+      if (Number.isFinite(p0) && p0 > 0) return clamp(p0, 0.02, 0.98);
+      const o1 = mkOddNum;
+      if (Number.isFinite(o1) && o1 > 1.01) return clamp(1 / o1, 0.05, 0.95);
+      const o2 = bestOddRaw;
+      if (Number.isFinite(o2) && o2 > 1.01) return clamp(1 / o2, 0.05, 0.95);
+      return null;
+    })();
+
+    const fvOddEff = Number.isFinite(fvOddNum) ? fvOddNum : (Number.isFinite(probRaw) ? fairOddFromProb(probRaw) : null);
+
     return {
       ...x,
       dataQuality,
       confidence,
       prob: Number.isFinite(probRaw) ? probRaw : x?.prob,
-      // If prob is missing (common when stats are partial), derive a conservative proxy from odds so the fixture still participates in the pool.
-      const probRaw = (() => {
-        const p0 = Number(x?.prob);
-        if (Number.isFinite(p0) && p0 > 0) return clamp(p0, 0.02, 0.98);
-        const o1 = mkOddNum;
-        if (Number.isFinite(o1) && o1 > 1.01) return clamp(1 / o1, 0.05, 0.95);
-        const o2 = bestOddRaw;
-        if (Number.isFinite(o2) && o2 > 1.01) return clamp(1 / o2, 0.05, 0.95);
-        return null;
-      })();
-      const fvOddEff = Number.isFinite(fvOddNum) ? fvOddNum : (Number.isFinite(probRaw) ? fairOddFromProb(probRaw) : null);
-
       __probRank: applyConfidence(Number.isFinite(probRaw) ? probRaw : Number(x?.prob), confidence),
       fvOdd: fvOddEff === null ? null : round2(fvOddEff),
       marketOdd: Number.isFinite(mkOddNum) ? round2(mkOddNum) : null,
