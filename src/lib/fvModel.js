@@ -642,6 +642,42 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     return s.size;
   })();
 
+  // IMPORTANT: candidates expose odds as usedOdd/marketOdd/fvOdd (often strings).
+  // buildParlay MUST evaluate caps using the same odd that is later displayed.
+  const getOdd = (c) => {
+    const v =
+      (Number.isFinite(safeNum(c?.usedOdd, NaN)) ? safeNum(c?.usedOdd, NaN) : NaN) ||
+      (Number.isFinite(safeNum(c?.usedOddDisplay, NaN)) ? safeNum(c?.usedOddDisplay, NaN) : NaN) ||
+      (Number.isFinite(safeNum(c?.marketOdd, NaN)) ? safeNum(c?.marketOdd, NaN) : NaN) ||
+      (Number.isFinite(safeNum(c?.fvOdd, NaN)) ? safeNum(c?.fvOdd, NaN) : NaN) ||
+      (Number.isFinite(safeNum(c?.odd, NaN)) ? safeNum(c?.odd, NaN) : NaN);
+    return Number.isFinite(v) ? v : 1.0;
+  };
+
+  const marketKey = (c) => {
+    const mkt = String(c?.market || c?.type || c?.label || "").toLowerCase();
+    const sel = String(c?.selection || c?.pick || "").toLowerCase();
+    if (mkt.includes("ambos") && mkt.includes("marcan") && sel.includes("no")) return "BTTS_NO";
+    if (mkt.includes("ambos") && mkt.includes("marcan") && (sel.includes("si") || sel.includes("sí"))) return "BTTS_YES";
+    if (mkt.includes("doble") || mkt.includes("double") || mkt.includes("1x") || mkt.includes("x2")) return "DOUBLE_CHANCE";
+    if (mkt.includes("over") || mkt.includes("under") || mkt.includes("goles") || mkt.includes("goals")) return "OU";
+    if (mkt.includes("handicap") || mkt.includes("hándicap") || mkt.includes("ah")) return "AH";
+    return "OTHER";
+  };
+
+  // Soft diversity caps to avoid "muchos ambos no anotan" when the pool is big.
+  // These caps are intentionally loose; they only kick in when we have enough matches to choose from.
+  const maxPerMarket = (() => {
+    if (poolMatches >= 20) {
+      if (t >= 100) return { BTTS_NO: 2, BTTS_YES: 2, DOUBLE_CHANCE: 4, OU: 4, AH: 4, OTHER: 99 };
+      if (t >= 50)  return { BTTS_NO: 2, BTTS_YES: 2, DOUBLE_CHANCE: 3, OU: 4, AH: 3, OTHER: 99 };
+      return          { BTTS_NO: 2, BTTS_YES: 2, DOUBLE_CHANCE: 3, OU: 3, AH: 3, OTHER: 99 };
+    }
+    return { BTTS_NO: 99, BTTS_YES: 99, DOUBLE_CHANCE: 99, OU: 99, AH: 99, OTHER: 99 };
+  })();
+
+
+
   // ---------- Dynamic legs range (pool-aware, more aggressive on big pools) ----------
   // Goal: with many matches available, use MORE legs with LOWER odds (more conservative & realistic).
   // (User intent examples)
@@ -806,7 +842,7 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
   const scored = candAll
     .filter(c => safeNum(c.prob, 0) >= probFloor && safeNum(c.odd, 0) >= 1.05)
     .map(c => {
-      const odd = safeNum(c.odd, 1.0);
+      const odd = getOdd(c);
       const prob = safeNum(c.prob, 0);
       const edge = safeNum(c.edge, 0);
 
@@ -830,6 +866,7 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
   function greedyBuild({ relax = false } = {}) {
     const legs = [];
     let prod = 1;
+    const mCount = { BTTS_NO:0, BTTS_YES:0, DOUBLE_CHANCE:0, OU:0, AH:0, OTHER:0 };
 
     const maxLegOddEff = relax ? 3.50 : capLegOdd;
     const maxFactorEff = relax ? maxFactor * 1.25 : maxFactor;
@@ -840,8 +877,11 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
       if (fixtureId == null) continue;
       if (usedFixture.has(fixtureId)) continue;
 
-      const odd = safeNum(c.odd, 1.0);
+      const odd = getOdd(c);
       if (odd > maxLegOddEff) continue;
+
+      const mk = marketKey(c);
+      if ((mCount[mk] || 0) >= (maxPerMarket[mk] || 99)) continue;
 
       // If we're already close to target, avoid huge overshoot (keep x50 ~ x50)
       const projected = prod * odd;
@@ -852,6 +892,7 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
 
       legs.push(c);
       usedFixture.add(fixtureId);
+      mCount[mk] = (mCount[mk] || 0) + 1;
       prod = projected;
 
       // Break if we achieved a good range and enough legs
@@ -867,11 +908,15 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
       for (const c of scored) {
         const fixtureId = c.fixtureId ?? c.fixture?.id ?? c.fixture_id;
         if (fixtureId == null || usedFixture.has(fixtureId)) continue;
-        const odd = safeNum(c.odd, 1.0);
+        const odd = getOdd(c);
         if (odd > maxLegOddEff) continue;
+
+        const mk = marketKey(c);
+        if ((mCount[mk] || 0) >= (maxPerMarket[mk] || 99)) continue;
 
         legs.push(c);
         usedFixture.add(fixtureId);
+        mCount[mk] = (mCount[mk] || 0) + 1;
         prod *= odd;
         if (legs.length >= maxLegs) break;
         if (legs.length >= targetLegs && prod >= minFactorEff) break;
