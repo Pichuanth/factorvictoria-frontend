@@ -135,6 +135,39 @@ export function probBTTSNo(lambdaHome, lambdaAway) {
   return clamp(pH0 + pA0 - pBoth0, 0, 1);
 }
 
+function probHandicapPlus(lh, la, plus, side) {
+  // Probability that (side) with +plus Asian handicap does NOT lose by more than 'plus'.
+  // side: 'home' => P(homeGoals + plus >= awayGoals)
+  // side: 'away' => P(awayGoals + plus >= homeGoals)
+  lh = Number.isFinite(lh) ? lh : 1.1;
+  la = Number.isFinite(la) ? la : 1.05;
+  plus = Number.isFinite(plus) ? plus : 2;
+  side = side === "away" ? "away" : "home";
+
+  const lt = lh + la;
+  const N = Math.max(10, Math.min(16, Math.ceil(lt * 3)));
+  let p = 0;
+
+  const pmfH = [];
+  const pmfA = [];
+  let sumH = 0, sumA = 0;
+  for (let i = 0; i <= N; i++) { const v = poissonPMF(lh, i); pmfH.push(v); sumH += v; }
+  for (let j = 0; j <= N; j++) { const v = poissonPMF(la, j); pmfA.push(v); sumA += v; }
+
+  for (let i = 0; i <= N; i++) pmfH[i] = pmfH[i] / (sumH || 1);
+  for (let j = 0; j <= N; j++) pmfA[j] = pmfA[j] / (sumA || 1);
+
+  for (let hg = 0; hg <= N; hg++) {
+    for (let ag = 0; ag <= N; ag++) {
+      const ok = side === "home" ? (hg + plus >= ag) : (ag + plus >= hg);
+      if (ok) p += pmfH[hg] * pmfA[ag];
+    }
+  }
+  return clamp01(p);
+}
+
+
+
 export function scoreMatrix(lambdaHome, lambdaAway, maxG = 6) {
   const mat = [];
   for (let i = 0; i <= maxG; i++) {
@@ -319,6 +352,97 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
   });
 
   out.push({
+
+  // Over 0.5 / 1.5 goals (muy seguros para sumar legs)
+  const pOver05 = probOverLine(lh, la, 0.5);
+  const oOver05 = fairOddFromProb(pOver05);
+  if (oOver05 <= capMax && pOver05 >= 0.70) {
+    cand.push({
+      fixtureId,
+      market: "OU",
+      selection: "over0.5",
+      label: "Over 0.5 goles",
+      prob: pOver05,
+      fvOdd: oOver05,
+      source: "fv",
+      dataQuality,
+    });
+  }
+
+  const pOver15 = probOverLine(lh, la, 1.5);
+  const oOver15 = fairOddFromProb(pOver15);
+  if (oOver15 <= capMax && pOver15 >= 0.60) {
+    cand.push({
+      fixtureId,
+      market: "OU",
+      selection: "over1.5",
+      label: "Over 1.5 goles",
+      prob: pOver15,
+      fvOdd: oOver15,
+      source: "fv",
+      dataQuality,
+    });
+  }
+
+  // Hándicap asiático (+2 / +3) - muy "creíble" para el usuario
+  const pH2 = probHandicapPlus(lh, la, 2, "home");
+  const oH2 = fairOddFromProb(pH2);
+  if (oH2 <= capMax && pH2 >= 0.70) {
+    cand.push({
+      fixtureId,
+      market: "AH",
+      selection: "home+2",
+      label: "Hándicap +2 (Local)",
+      prob: pH2,
+      fvOdd: oH2,
+      source: "fv",
+      dataQuality,
+    });
+  }
+  const pH3 = probHandicapPlus(lh, la, 3, "home");
+  const oH3 = fairOddFromProb(pH3);
+  if (oH3 <= capMax && pH3 >= 0.78) {
+    cand.push({
+      fixtureId,
+      market: "AH",
+      selection: "home+3",
+      label: "Hándicap +3 (Local)",
+      prob: pH3,
+      fvOdd: oH3,
+      source: "fv",
+      dataQuality,
+    });
+  }
+
+  const pA2 = probHandicapPlus(lh, la, 2, "away");
+  const oA2 = fairOddFromProb(pA2);
+  if (oA2 <= capMax && pA2 >= 0.70) {
+    cand.push({
+      fixtureId,
+      market: "AH",
+      selection: "away+2",
+      label: "Hándicap +2 (Visita)",
+      prob: pA2,
+      fvOdd: oA2,
+      source: "fv",
+      dataQuality,
+    });
+  }
+  const pA3 = probHandicapPlus(lh, la, 3, "away");
+  const oA3 = fairOddFromProb(pA3);
+  if (oA3 <= capMax && pA3 >= 0.78) {
+    cand.push({
+      fixtureId,
+      market: "AH",
+      selection: "away+3",
+      label: "Hándicap +3 (Visita)",
+      prob: pA3,
+      fvOdd: oA3,
+      source: "fv",
+      dataQuality,
+    });
+  }
+
     market: "BTTS",
     selection: "no",
     label: "Ambos marcan: NO",
@@ -522,6 +646,14 @@ function __fv_legScore(c, oddWeight = 0.35) {
   const e = Number.isFinite(edge) ? edge : 0;
   const oddTerm = odd > 1 ? Math.log(odd) : 0;
   return p + Math.max(0, e) * 0.06 + oddWeight * oddTerm;
+  // Penaliza BTTS NO (se usa como condimento, no como base del modelo)
+  const isBttsNo = (c.market === "BTTS" && c.selection === "no") || (c.marketKey === "BTTS_NO");
+  if (isBttsNo) score -= 0.12;
+  // Bonifica mercados conservadores y 'creíbles' para el usuario
+  const isHandicapPlus = (c.market === "AH");
+  const isOUConservative = (c.market === "OU" && (c.selection === "under3.5" || c.selection === "over0.5" || c.selection === "over1.5"));
+  if (isHandicapPlus) score += 0.07;
+  if (isOUConservative) score += 0.05;
 }
 
 
