@@ -3,6 +3,8 @@
 // Objetivo: simple, interpretable, con fallbacks (si no hay odds o stats).
 // FV_BUILD_MARK: 2026-02-19_1234 (cambia el número cada vez)
 
+const CAP_MAX = 2.5; // tope máximo profesional de cuota individual
+
 function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
 }
@@ -259,6 +261,7 @@ export function estimateLambdasFromPack(pack) {
 }
 
 export function buildCandidatePicks({ fixture, pack, markets }) {
+  const capMax = CAP_MAX;
   
   // Genera picks candidatos con: market, selection, label, prob, fvOdd, marketOdd, usedOdd, valueEdge, fixtureId, home, away
   const out = [];
