@@ -128,6 +128,20 @@ export function probUnderLine(lambdaTotal, line) {
   return clamp(s, 0, 1);
 }
 
+// Over X.5 goals = 1 - P(total <= floor(X.5))
+export function probOverLine(a, b, c) {
+  /*
+   * Backwards compatible signature:
+   * - probOverLine(lambdaTotal, line)
+   * - probOverLine(lambdaHome, lambdaAway, line)
+   */
+  const lambdaTotal = (c === undefined) ? a : (Number(a) + Number(b));
+  const line = (c === undefined) ? b : c;
+  const u = probUnderLine(lambdaTotal, line);
+  if (!Number.isFinite(u)) return null;
+  return clamp(1 - u, 0, 1);
+}
+
 export function probBTTSNo(lambdaHome, lambdaAway) {
   const pH0 = poissonP(0, lambdaHome);
   const pA0 = poissonP(0, lambdaAway);
