@@ -259,6 +259,7 @@ export function estimateLambdasFromPack(pack) {
 }
 
 export function buildCandidatePicks({ fixture, pack, markets }) {
+  const capMax = 2.5; // tope máximo de cuota individual profesional
   
   // Genera picks candidatos con: market, selection, label, prob, fvOdd, marketOdd, usedOdd, valueEdge, fixtureId, home, away
   const out = [];
