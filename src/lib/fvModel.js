@@ -330,7 +330,6 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
     market: "OU_35",
     selection: "under",
     label: "Under 3.5 goles",
-    line: 3.5,
     prob: under35,
     fvOdd: fairOddFromProb(under35),
     marketOdd: markets?.OU_35?.under ?? null,
@@ -359,7 +358,6 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
     type: "OU_15",
     selection: "over",
     label: "Over 1.5 goles",
-    line: 1.5,
     prob: over15,
     fvOdd: fairOddFromProb(over15),
     marketOdd: markets?.OU_15?.over ?? markets?.OU_15?.o ?? null,
@@ -625,11 +623,10 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
   const safeNum = (x, d=0) => {
     if (typeof x === "number" && Number.isFinite(x)) return x;
     if (typeof x === "string") {
-      // Accept formats like "3.6", "3,6", "x3.6", "odd:3.6"
-      const s = String(x).trim().replace(",", ".");
-      const m = s.match(/-?\d+(?:\.\d+)?/);
+      // Accept formats like "3.6", "x3.6", "odd: 3,6"
+      const m = String(x).match(/-?\d+(?:[\.,]\d+)?/);
       if (m) {
-        const v = Number(m[0]);
+        const v = Number(m[0].replace(",", "."));
         if (Number.isFinite(v)) return v;
       }
     }
@@ -655,12 +652,13 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
   // Using match-count makes the leg-scaling behave correctly when each match has multiple candidate markets.
   const poolMatches = (() => {
     const keys = Object.keys(candidatesByFixture || {});
+    if (keys.length) return keys.length;
     const s = new Set();
     for (const c of candAll) {
       const id = c?.fixtureId ?? c?.fixture?.id ?? c?.fixture_id;
       if (id != null) s.add(String(id));
     }
-    return Math.max(keys.length || 0, s.size);
+    return s.size;
   })();
 
   // ---------- Dynamic legs range (pool-aware, more aggressive on big pools) ----------
@@ -827,33 +825,24 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
   const scored = candAll
     .filter(c => {
       const odd = getOdd(c, 0);
-      const prob = safeNum(c.prob, 0);
-      // Keep conservative fillers even if prob is missing/low (fallback later), as long as odds are low.
+      const probRaw = safeNum(c.prob, NaN);
+      const probEff = Number.isFinite(probRaw) ? probRaw : clamp(1 / Math.max(1.01, odd), 0.20, 0.92);
+      // Keep conservative fillers even if prob is missing/low, as long as odds are low.
       if (odd < 1.05) return false;
-      if (prob >= probFloor) return true;
-      return (poolMatches >= 15 && isSafeFiller(c) && prob >= 0.35 && odd <= 2.25);
+      if (probEff >= probFloor) return true;
+      return (poolMatches >= 12 && isSafeFiller(c) && probEff >= 0.25 && odd <= 2.35);
     })
     .map(c => {
       const odd = getOdd(c, 1.0);
-      const prob = safeNum(c.prob, 0);
+      const probRaw = safeNum(c.prob, NaN);
+      const prob = Number.isFinite(probRaw) ? probRaw : clamp(1 / Math.max(1.01, odd), 0.20, 0.92);
       const edge = safeNum(c.edge, 0);
 
       // Prefer higher prob + positive edge + LOWER odds.
       // When pool is large, penalize high odds more aggressively and slightly boost safe fillers.
-      const oddPenalty = poolMatches >= 20 ? 0.42 : (poolMatches >= 12 ? 0.34 : 0.25);
-
-      // Penalize high odds more aggressively when we have many matches (we can add legs instead).
-      const highOddPenalty = poolMatches >= 15 ? Math.max(0, odd - 2.10) * 0.20 : 0;
-
-      // Prefer conservative fillers (Over 1.5 / Under 3.5 / Handicap +2/+3) on big pools.
-      const fillerBonus = (poolMatches >= 12 && isSafeFiller(c)) ? 0.14 : (poolMatches >= 12 ? 0.02 : 0);
-
-      // Avoid ugly repetition: down-rank "Ambos marcan: NO" so it doesn't dominate.
-      const lblL = String(c?.label || "").toLowerCase();
-      const isBttsNo = lblL.includes("ambos marcan") && lblL.includes("no");
-      const bttsPenalty = (poolMatches >= 12 && isBttsNo) ? 0.22 : 0;
-
-      const score = (prob * 1.25) + (edge * 0.75) - (Math.log(odd) * oddPenalty) - highOddPenalty + fillerBonus - bttsPenalty;
+      const oddPenalty = poolMatches >= 20 ? 0.35 : 0.25;
+      const fillerBonus = (poolMatches >= 20 && isSafeFiller(c)) ? 0.06 : 0;
+      const score = (prob * 1.2) + (edge * 0.8) - (Math.log(odd) * oddPenalty) + fillerBonus;
 
       // Safety: ensure names are never empty (prevents "— vs" in UI)
       const home = (c.home && String(c.home).trim()) || (c.fixture?.teams?.home?.name) || "Local";
@@ -881,15 +870,15 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
       if (lbl.includes("ambos marcan") && (lbl.includes("no") || lbl.includes("no—") || lbl.includes("no "))) return "BTTS_NO";
       if (mkt === "btts" && (String(c?.selection || "").toLowerCase().includes("no"))) return "BTTS_NO";
       if (lbl.includes("doble oportunidad") || mkt === "dc") return "DC";
-      if (lbl.includes("over") || lbl.includes("under") || mkt === "ou" || mkt.startsWith("ou")) return "OU";
-      if (lbl.includes("hándicap") || lbl.includes("handicap") || mkt === "ah" || mkt.startsWith("ah")) return "AH";
+      if (lbl.includes("over") || lbl.includes("under") || mkt === "ou") return "OU";
+      if (lbl.includes("hándicap") || lbl.includes("handicap") || mkt === "ah") return "AH";
       return "OTHER";
     };
 
     const caps = (() => {
       // Caps are tighter on big pools where we have many options.
       if (poolMatches >= 15) {
-        const btts = poolMatches >= 20 ? 1 : 2; // cap "Ambos marcan: NO" harder on big pools
+        const btts = 1; // max 1 btts-no per parlay (big pool)
         const dc = clamp(Math.ceil(targetLegs * 0.45), 2, 4);
         const ou = clamp(Math.ceil(targetLegs * 0.35), 1, 4);
         const ah = clamp(Math.ceil(targetLegs * 0.30), 1, 4);
@@ -932,31 +921,24 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
       if (legs.length >= maxLegs) break;
     }
 
-    // If still below minFactor and we have room, try to add more legs (still respecting caps).
-    // This is the "fill" step to avoid finishing with too few legs on big pools.
+    // If still below minFactor and we have room, try to add more even if it overshoots a bit.
     if (prod < minFactorEff && legs.length < maxLegs) {
       for (const c of scored) {
         const fixtureId = c.fixtureId ?? c.fixture?.id ?? c.fixture_id;
         if (fixtureId == null || usedFixture.has(fixtureId)) continue;
-
         const odd = getOdd(c, 1.0);
         if (odd > maxLegOddEff) continue;
 
-        // Respect mix caps in fill step too
-        const key = normKey(c);
-        if ((mCount[key] || 0) >= (caps[key] ?? targetLegs)) continue;
-
         legs.push(c);
-        mCount[key] = (mCount[key] || 0) + 1;
+      mCount[normKey(c)] = (mCount[normKey(c)] || 0) + 1;
         usedFixture.add(fixtureId);
         prod *= odd;
-
         if (legs.length >= maxLegs) break;
         if (legs.length >= targetLegs && prod >= minFactorEff) break;
       }
     }
 
-// Basic validity
+    // Basic validity
     if (legs.length < Math.min(minLegs, maxLegs)) return null;
     return { legs, prod };
   }
