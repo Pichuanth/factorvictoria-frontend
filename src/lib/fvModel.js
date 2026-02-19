@@ -708,15 +708,6 @@ minLegs = clamp(minLegs, 2, 15);
   const isSafeFiller = (c) => (
     ['AH_PLUS2_HOME','AH_PLUS2_AWAY','AH_PLUS3_HOME','AH_PLUS3_AWAY','OU_OVER05','OU_OVER15','OU_UNDER35','OU_UNDER25'].includes(String(c.market))
   );
-    return (
-      label.includes("over 1.5") ||
-      label.includes("under 3.5") ||
-      label.includes("hándicap +2") ||
-      label.includes("handicap +2") ||
-      label.includes("hándicap +3") ||
-      label.includes("handicap +3")
-    );
-  };
   const isBttsNo = (c) => {
     const blob = [c?.label, c?.name, c?.marketName, c?.pick, c?.selection].filter(Boolean).join(" | ").toLowerCase();
     // Accept variants like "Ambos marcan: NO", "Ambos marcan NO", "BTTS NO"
