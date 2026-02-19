@@ -221,10 +221,10 @@ export function estimateLambdasFromPack(pack) {
 
   // Si llega total pero falta home/away, repartimos.
   if (ltRaw != null && (lhRaw == null || laRaw == null)) {
-    const lt = clamp(ltRaw, 0.4, 6.0);
-    const wH = lhRaw != null ? clamp(lhRaw / lt, 0.25, 0.75) : 0.55;
-    lambdaHome = clamp(lt * wH, 0.2, 3.2);
-    lambdaAway = clamp(lt - lambdaHome, 0.2, 3.2);
+    const lambdaT = clamp(ltRaw, 0.4, 6.0);
+    const wH = lhRaw != null ? clamp(lhRaw / lambdaT, 0.25, 0.75) : 0.55;
+    lambdaHome = clamp(lambdaT * wH, 0.2, 3.2);
+    lambdaAway = clamp(lambdaT - lambdaHome, 0.2, 3.2);
   }
 
   const lambdaTotal = clamp(lambdaHome + lambdaAway, 0.4, 6.0);
@@ -356,7 +356,7 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
     market: "OU_05",
     selection: "over",
     label: "Over 0.5 goles",
-    p: (lt && lt > 0) ? (1 - Math.exp(-lt)) : null,
+    p: (lT && lT > 0) ? (1 - Math.exp(-lT)) : null,
     prBoost: 0.6,
   });
 
