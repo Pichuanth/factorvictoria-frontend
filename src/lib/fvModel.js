@@ -149,7 +149,7 @@ export function probBTTSNo(lambdaHome, lambdaAway) {
   return clamp(pH0 + pA0 - pBoth0, 0, 1);
 }
 
-function probHandicapPlus(lh, la, plus, side) {
+function probHandicapPlus(lambdaHome, lambdaAway, plus, side) {
   // Probability that (side) with +plus Asian handicap does NOT lose by more than 'plus'.
   // side: 'home' => P(homeGoals + plus >= awayGoals)
   // side: 'away' => P(awayGoals + plus >= homeGoals)
@@ -366,7 +366,7 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
   });
 
   // Over 0.5 / 1.5 goals (muy seguros para sumar legs)
-  const pOver05 = probOverLine(lh, la, 0.5);
+  const pOver05 = probOverLine(lambdaHome, lambdaAway, 0.5);
   const oOver05 = fairOddFromProb(pOver05);
   if (oOver05 <= capMax && pOver05 >= 0.70) {
     cand.push({
@@ -381,7 +381,7 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
     });
   }
 
-  const pOver15 = probOverLine(lh, la, 1.5);
+  const pOver15 = probOverLine(lambdaHome, lambdaAway, 1.5);
   const oOver15 = fairOddFromProb(pOver15);
   if (oOver15 <= capMax && pOver15 >= 0.60) {
     cand.push({
@@ -397,7 +397,7 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
   }
 
   // Hándicap asiático (+2 / +3) - muy "creíble" para el usuario
-  const pH2 = probHandicapPlus(lh, la, 2, "home");
+  const pH2 = probHandicapPlus(lambdaHome, lambdaAway, 2, "home");
   const oH2 = fairOddFromProb(pH2);
   if (oH2 <= capMax && pH2 >= 0.70) {
     cand.push({
@@ -411,7 +411,7 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
       dataQuality,
     });
   }
-  const pH3 = probHandicapPlus(lh, la, 3, "home");
+  const pH3 = probHandicapPlus(lambdaHome, lambdaAway, 3, "home");
   const oH3 = fairOddFromProb(pH3);
   if (oH3 <= capMax && pH3 >= 0.78) {
     cand.push({
@@ -426,7 +426,7 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
     });
   }
 
-  const pA2 = probHandicapPlus(lh, la, 2, "away");
+  const pA2 = probHandicapPlus(lambdaHome, lambdaAway, 2, "away");
   const oA2 = fairOddFromProb(pA2);
   if (oA2 <= capMax && pA2 >= 0.70) {
     cand.push({
@@ -440,7 +440,7 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
       dataQuality,
     });
   }
-  const pA3 = probHandicapPlus(lh, la, 3, "away");
+  const pA3 = probHandicapPlus(lambdaHome, lambdaAway, 3, "away");
   const oA3 = fairOddFromProb(pA3);
   if (oA3 <= capMax && pA3 >= 0.78) {
     cand.push({
