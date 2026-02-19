@@ -440,14 +440,20 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
       dataQuality,
     });
   }
-
-    market: "BTTS",
-    selection: "no",
-    label: "Ambos marcan: NO",
-    prob: bttsNo,
-    fvOdd: fairOddFromProb(bttsNo),
-    marketOdd: markets?.BTTS?.no ?? null,
-  });
+  // BTTS NO (limitado por reglas; usa solo si hay soporte estadístico)
+  if (typeof bttsNo === "number" && Number.isFinite(bttsNo)) {
+    const oBttsNo = fairOddFromProb(bttsNo);
+    if (oBttsNo <= capMax && bttsNo >= 0.55) {
+      cand.push({
+        market: "BTTS",
+        selection: "no",
+        label: "Ambos marcan: NO",
+        prob: bttsNo,
+        fvOdd: oBttsNo,
+        marketOdd: markets?.BTTS?.no ?? null,
+      });
+    }
+  }
 
   // ---------- limpieza + métricas ----------
   const cleaned = out
