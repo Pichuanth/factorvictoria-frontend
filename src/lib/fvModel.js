@@ -664,11 +664,9 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
 
   const getMarketTag = (c) => {
     const m = String(c?.market || c?.type || "").toUpperCase();
-    // Label/name strings can vary across generators; scan a few common fields.
-    const blob = [c?.label, c?.name, c?.marketName, c?.marketLabel, c?.pick, c?.pickLabel, c?.selection].filter(Boolean).join(" | ");
-    const label = String(blob || "").toLowerCase();
+    const label = String(c?.label || "").toLowerCase();
 
-    if (label.includes("ambos marcan") || label.includes("btts") || m.includes("BTTS")) return "BTTS";
+    if (label.includes("ambos marcan") || m.includes("BTTS")) return "BTTS";
     if (label.includes("hándicap") || label.includes("handicap") || m === "AH") return "AH";
     if (label.includes("over") || label.includes("under") || m.includes("OU")) return "OU";
     if (label.includes("doble oportunidad") || m === "DC") return "DC";
@@ -727,24 +725,7 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     minLegs = Math.max(2, minLegs - 1);
   }
 
-  
-  // --- User tuning: enforce stronger minimum legs when pool is large ---
-  // If there are many matches, prefer adding more low-odds legs instead of using 3.x picks.
-  if (poolMatches > 18) {
-    if (t >= 100) minLegs = Math.max(minLegs, 9);
-    else if (t >= 50) minLegs = Math.max(minLegs, 8);
-    else if (t >= 20) minLegs = Math.max(minLegs, 7);
-    else if (t >= 10) minLegs = Math.max(minLegs, 6);
-  } else if (poolMatches > 10) {
-    if (t >= 100) minLegs = Math.max(minLegs, 8);
-    else if (t >= 50) minLegs = Math.max(minLegs, 7);
-    else if (t >= 20) minLegs = Math.max(minLegs, 6);
-    else if (t >= 10) minLegs = Math.max(minLegs, 5);
-  }
-
-  // Make sure we allow enough headroom to reach the desired legs
-  maxLegs = Math.max(maxLegs, Math.min(15, minLegs + (poolMatches > 18 ? 6 : 5)));
-minLegs = clamp(minLegs, 2, 15);
+  minLegs = clamp(minLegs, 2, 15);
   maxLegs = clamp(maxLegs, minLegs, 15);
 
   // Desired legs (push higher on large pools so we don't rely on high odds)
@@ -777,7 +758,7 @@ minLegs = clamp(minLegs, 2, 15);
 
   // ---------- Odds cap per leg ----------
   // User intent: when pool is big, avoid 3.x odds; add legs with 1.2–1.8 instead.
-  const hardCap = poolMatches >= 18 ? 2.45 : (poolMatches >= 10 ? 2.50 : 3.00);
+  const hardCap = poolMatches >= 10 ? 2.90 : 3.50;
 
   const capLegOddBase = (() => {
     // Geometric targeting: for a desired number of legs, the "ideal" per-leg odd is target^(1/legs).
@@ -789,7 +770,7 @@ minLegs = clamp(minLegs, 2, 15);
     const slack = poolMatches >= 30 ? 1.12 : poolMatches >= 20 ? 1.15 : poolMatches >= 12 ? 1.20 : 1.28;
 
     // Extra clamp to avoid 3.x when pool has enough matches
-    const poolCap = poolMatches >= 18 ? 2.35 : (poolMatches >= 10 ? 2.45 : hardCap);
+    const poolCap = poolMatches >= 20 ? 2.60 : poolMatches >= 10 ? 2.90 : hardCap;
 
     return clamp(ideal * slack, 1.25, Math.min(hardCap, poolCap));
   })();
@@ -839,11 +820,7 @@ minLegs = clamp(minLegs, 2, 15);
     );
   };
 
-  const isBttsNo = (c) => {
-    const blob = [c?.label, c?.name, c?.marketName, c?.pick, c?.selection].filter(Boolean).join(" | ").toLowerCase();
-    // Accept variants like "Ambos marcan: NO", "Ambos marcan NO", "BTTS NO"
-    return (blob.includes("ambos marcan") && (blob.includes(": no") || blob.includes(" no") || blob.includes("=no"))) || blob.includes("btts no");
-  };
+  const isBttsNo = (c) => String(c?.label || "").toLowerCase().includes("ambos marcan: no");
 
   const scored = candAll
     .map(c => {
@@ -890,7 +867,6 @@ minLegs = clamp(minLegs, 2, 15);
 
     const usedFixture = new Set();
     const marketCount = { BTTS: 0, DC: 0, OU: 0, AH: 0, OTHER: 0 };
-    let bttsNoCount = 0;
 
     const maxLegOddEff = relax ? hardCap : capLegOdd;
     const maxFactorEff = relax ? maxFactor * 1.20 : maxFactor;
