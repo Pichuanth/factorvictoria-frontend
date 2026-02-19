@@ -1,6 +1,7 @@
 // src/lib/fvModel.js
 // Motor MVP de probabilidades + armado de parlays para Factor Victoria.
 // Objetivo: simple, interpretable, con fallbacks (si no hay odds o stats).
+// FV_BUILD_MARK: 2026-02-19_1234 (cambia el número cada vez)
 
 function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
