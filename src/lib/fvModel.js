@@ -351,8 +351,6 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
     marketOdd: markets?.OU_25?.over ?? null,
   });
 
-  out.push({
-
   // Over 0.5 / 1.5 goals (muy seguros para sumar legs)
   const pOver05 = probOverLine(lh, la, 0.5);
   const oOver05 = fairOddFromProb(pOver05);
