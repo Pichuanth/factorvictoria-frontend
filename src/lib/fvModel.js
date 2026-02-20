@@ -1,9 +1,3 @@
-// ===== Professional constants (module scope) =====
-const CAP_MAX_NORMAL = 2.5;
-const CAP_MAX_STRICT = 2.45;
-const MAX_BTTS_PER_PARLAY = 1;
-// ===============================================
-
 // src/lib/fvModel.js
 // Motor MVP de probabilidades + armado de parlays para Factor Victoria.
 // Objetivo: simple, interpretable, con fallbacks (si no hay odds o stats).
@@ -135,13 +129,28 @@ export function probUnderLine(lambdaTotal, line) {
 }
 
 export function probBTTSNo(lambdaHome, lambdaAway) {
-  // P(BTTS NO) = P(home=0 OR away=0) = P(home=0)+P(away=0)-P(home=0 AND away=0)
   const pH0 = poissonP(0, lambdaHome);
   const pA0 = poissonP(0, lambdaAway);
   const pBoth0 = pH0 * pA0;
-  const p = (pH0 + pA0 - pBoth0);
-  return clamp(p, 0, 1);
-}) {
+  return clamp(pH0 + pA0 - pBoth0, 0, 1);
+}
+
+export function scoreMatrix(lambdaHome, lambdaAway, maxG = 6) {
+  const mat = [];
+  for (let i = 0; i <= maxG; i++) {
+    for (let j = 0; j <= maxG; j++) {
+      mat.push({ hg: i, ag: j, p: poissonP(i, lambdaHome) * poissonP(j, lambdaAway) });
+    }
+  }
+  return mat;
+}
+
+export function probs1X2(lambdaHome, lambdaAway) {
+  const mat = scoreMatrix(lambdaHome, lambdaAway, 6);
+  let pH = 0,
+    pD = 0,
+    pA = 0;
+  for (const c of mat) {
     if (c.hg > c.ag) pH += c.p;
     else if (c.hg === c.ag) pD += c.p;
     else pA += c.p;
@@ -438,23 +447,13 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
 export function pickSafe(candidatesByFixture) {
   const all = Object.values(candidatesByFixture || {}).flat();
 
-  const full = all.filter((p) => p?.dataQuality === "full");
+  // REGLA: si existe al menos 1 partido con datos completos (racha home+away),
+  // la cuota segura (regalo) DEBE salir de ese subconjunto.
+  const full = all.filter(p => p?.dataQuality === "full");
   const pool = full.length ? full : all;
 
-  const mWeight = (p) => {
-    const m = String(p?.market || "").toUpperCase();
-    if (m === "AH" && String(p?.label || "").includes("+3")) return 6;
-    if (m === "AH") return 5;
-    if (m === "OU_05") return 4.5;
-    if (m === "OU_15") return 4.0;
-    if (m === "OU_35") return 3.8;
-    if (m === "OU_25") return 3.6;
-    if (m === "DC") return 3.0;
-    if (m === "BTTS") return 0.5;
-    return 2.0;
-  };
-
-  pool.sort((a, b) => (mWeight(b) - mWeight(a)) || (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
+  // Orden: mayor probabilidad (conservadora) y luego menor cuota.
+  pool.sort((a, b) => (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
   return pool[0] || null;
 }
 
@@ -532,59 +531,24 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
     return arr.some((c) => c && c.dataQuality === "full");
   });
 
-  // Pool base: 1 mejor pick por fixture, priorizando full-data si existe en ese fixture.
-  let pool = Object.values(candidatesByFixture || {})
+  const pool = Object.values(candidatesByFixture || {})
     .map((list) => {
       const arr = Array.isArray(list) ? list : [];
       if (hasAnyFull && !arr.some((c) => c && c.dataQuality === "full")) return null;
+      // Prioriza "full" (círculo verde) si existe.
       const full = arr.filter((p) => p?.dataQuality === "full");
       return (full.length ? full : arr)[0] || null;
     })
-    .filter(Boolean);
-
-  // Conteo de fixtures FULL disponibles (verde)
-  const fullFixtureCount = Object.values(candidatesByFixture || {}).filter((list) => {
-    const arr = Array.isArray(list) ? list : [];
-    return arr.some((c) => c && c.dataQuality === "full");
-  }).length;
-
-  // ===== Reglas CUOTA SEGURA (regalo) =====
-  // - Si >=10 fixtures full => mini combinada 3 a 4 legs
-  // - Si <=3 fixtures disponibles => solo 1 pick
-  const giftMinLegs = fullFixtureCount >= 10 ? 3 : 1;
-  const giftMaxLegs = fullFixtureCount >= 10 ? 4 : Math.max(1, Number(maxLegs) || 3);
-  const giftProbMin = fullFixtureCount >= 10 ? 0.80 : 0.85;
-  // ======================================
-
-  const poolFixCount = pool.length;
-
-  // Si hay 3 o menos fixtures => SOLO 1 pick
-  if (poolFixCount <= 3) {
-    const one = pool[0] || null;
-    if (!one) return null;
-    __fv_lastGiftLegs = [one];
-    return {
-      games: 1,
-      finalOdd: round2(__fv_legOdd(one)),
-      legs: [one],
-      reached: true,
-    };
-  }
-
-  // Filtro adicional por prob mínima y odds válidas
-  pool = pool
-    .filter((x) => Number.isFinite(x.prob) && pr(x) >= giftProbMin)
+    .filter(Boolean)
+    .filter((x) => Number.isFinite(x.prob) && pr(x) >= 0.85)
     .filter((x) => {
       const odd = Number(x.usedOdd);
       return Number.isFinite(odd) && odd > 1;
     });
 
-  if (!pool.length) return null;
 
-  // Orden: más seguro primero
+  const maxLegsEff = Math.max(1, Math.min((Number(maxLegs) || 5), pool.length || (Number(maxLegs) || 5)));
   pool.sort((a, b) => (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
-
-  const maxLegsEff = Math.max(1, Math.min(giftMaxLegs, pool.length || giftMaxLegs));
 
   const legs = [];
   let prod = 1;
@@ -602,25 +566,12 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
     prod = next;
 
     if (legs.length >= maxLegsEff) break;
-    if (prod >= minOdd && legs.length >= giftMinLegs) break;
+    if (prod >= minOdd) break;
   }
 
   if (!legs.length) return null;
 
-  // Asegurar mínimo de legs cuando hay pool grande
-  if (giftMinLegs > 1 && legs.length < giftMinLegs) {
-    for (const cand of pool) {
-      if (legs.length >= giftMinLegs) break;
-      if (legs.some((l) => String(l.fixtureId) === String(cand.fixtureId))) continue;
-      const odd = __fv_legOdd(cand);
-      if (!Number.isFinite(odd) || odd <= 1) continue;
-      const next = prod * odd;
-      if (next > maxOdd * 1.05) continue;
-      legs.push(cand);
-      prod = next;
-    }
-  }
-
+  // Guardar el regalo para evitar contradicciones con parlays.
   __fv_lastGiftLegs = legs.slice();
 
   return {
@@ -663,9 +614,9 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
 
   // ====== Reglas EXACTAS del usuario ======
   const capLegOdd =
-    poolFixtures > 18 ? CAP_MAX_STRICT :
-    poolFixtures > 10 ? CAP_MAX_NORMAL :
-    CAP_MAX_NORMAL;
+    poolFixtures > 18 ? FV_GLOBALS.CAP_MAX_STRICT :
+    poolFixtures > 10 ? FV_GLOBALS.CAP_MAX_NORMAL :
+    FV_GLOBALS.CAP_MAX_NORMAL;
 
   function minLegsForTarget() {
     if (poolFixtures > 18) {
