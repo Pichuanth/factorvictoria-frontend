@@ -1,8 +1,8 @@
-// ===== Professional constants (module scope fallback) =====
+// ===== Professional constants (module scope) =====
 const CAP_MAX_NORMAL = 2.5;
 const CAP_MAX_STRICT = 2.45;
 const MAX_BTTS_PER_PARLAY = 1;
-// ==========================================================
+// ===============================================
 
 // src/lib/fvModel.js
 // Motor MVP de probabilidades + armado de parlays para Factor Victoria.
@@ -137,26 +137,254 @@ export function probUnderLine(lambdaTotal, line) {
 export function probBTTSNo(lambdaHome, lambdaAway) {
   const pH0 = poissonP(0, lambdaHome);
   const pA0 = poissonP(0, lambdaAway);
-  const pBoth0 = pH0 * pA0;
-  return clamp(pH0 + pA0 - pBoth0, 0, 1);
-}
+  const pBoth0 = pH0 * pAexport function buildParlay(candidatesByFixture, target, opts = {}) {
+  const t = Number(target);
+  const byFix = candidatesByFixture || {};
+  const poolFixtures = Object.keys(byFix).length;
+  const candAll = Object.values(byFix).flat();
 
-export function scoreMatrix(lambdaHome, lambdaAway, maxG = 6) {
-  const mat = [];
-  for (let i = 0; i <= maxG; i++) {
-    for (let j = 0; j <= maxG; j++) {
-      mat.push({ hg: i, ag: j, p: poissonP(i, lambdaHome) * poissonP(j, lambdaAway) });
+  const safeNum = (x, d = 0) => (Number.isFinite(Number(x)) ? Number(x) : d);
+
+  // ====== Reglas EXACTAS del usuario ======
+  const capLegOdd =
+    poolFixtures > 18 ? CAP_MAX_STRICT :
+    poolFixtures > 10 ? CAP_MAX_NORMAL :
+    CAP_MAX_NORMAL;
+
+  function minLegsForTarget() {
+    if (poolFixtures > 18) {
+      if (t >= 100) return 9;
+      if (t >= 50)  return 8;
+      if (t >= 20)  return 7;
+      if (t >= 10)  return 6;
+    }
+    if (poolFixtures > 10) {
+      if (t >= 100) return 8;
+      if (t >= 50)  return 7;
+      if (t >= 20)  return 6;
+      if (t >= 10)  return 5;
+    }
+    // Default conservador para pools pequeños
+    if (t >= 100) return 7;
+    if (t >= 50)  return 6;
+    if (t >= 20)  return 5;
+    if (t >= 10)  return 3;
+    return 2;
+  }
+
+  const minLegs = minLegsForTarget();
+  const maxLegs = clamp(minLegs + 6, minLegs, 15);
+
+  // Rango de cuota final (mantener x50/x100 en rango profesional)
+  const targetMinMul = safeNum(opts.targetMinMul, 0.92);
+  const targetMaxMul =
+    t >= 100 ? 1.60 :
+    t >= 50  ? 1.35 :
+    t >= 20  ? 1.35 : 2.00;
+
+  let minFactor = t * targetMinMul;
+  let maxFactor = t * targetMaxMul;
+
+  // x100 debe ser > x50 (no clon)
+  if (typeof window !== "undefined" && t >= 100) {
+    const last50 = safeNum(window.__fv_lastParlay50, 0);
+    if (last50 > 0) minFactor = Math.max(minFactor, last50 * 1.10);
+  }
+
+  const probFloor =
+    t >= 100 ? 0.54 :
+    t >= 50  ? 0.56 :
+    t >= 20  ? 0.58 : 0.60;
+
+  const norm = (s) => String(s || "").toLowerCase();
+
+  const isBTTSNo = (c) => {
+    const mRaw = String(c?.market ?? c?.marketKey ?? c?.type ?? "").toLowerCase();
+    const sel = String(c?.selection ?? c?.pick ?? c?.outcome ?? "").toLowerCase();
+    const lab = String(c?.label ?? c?.name ?? "").toLowerCase();
+
+    const looksLikeBTTS =
+      mRaw.includes("btts") ||
+      mRaw.includes("both_teams_to_score") ||
+      lab.includes("ambos") && lab.includes("marcan") ||
+      lab.includes("both teams");
+
+    const isNo =
+      sel === "no" ||
+      sel === "n" ||
+      lab.includes(": no") ||
+      (lab.includes(" no") && !lab.includes("hándicap")) ||
+      lab.includes("not");
+
+    return looksLikeBTTS && isNo;
+  };
+
+  const marketKey = (c) => `${String(c.fixtureId)}|${String(c.market)}|${String(c.selection)}`;
+
+  // scoring: prob + pequeño bonus por variedad (OU_05/OU_15/AH) y penalizar BTTS para que no domine
+  function score(c) {
+    const p = pr(c);
+    const odd = __fv_legOdd(c);
+    const edge = safeNum(c?.valueEdge, 0);
+
+    let s = p + Math.max(0, edge) * 0.06;
+
+    const m = String(c?.market || "").toUpperCase();
+    if (m === "AH") s += 0.06;
+    if (m === "OU_05" || m === "OU_15" || m === "OU_35" || m === "OU_25") s += 0.04;
+    if (isBTTSNo(c)) s -= 0.08; // BTTS solo complemento
+
+    // odds suaves: preferir cuotas bajas para alta precisión
+    s -= Math.log(Math.max(1.01, odd)) * 0.20;
+
+    return s;
+  }
+
+  // pool filtrado (prob y cap)
+  const scored = candAll
+    .filter(c => safeNum(c?.fixtureId, null) != null)
+    .filter(c => pr(c) >= probFloor)
+    .filter(c => __fv_legOdd(c) >= 1.05 && __fv_legOdd(c) <= capLegOdd)
+    .sort((a,b) => score(b) - score(a));
+
+  // ===== BTTS CONTROL (hard): BTTS cannot dominate. Keep only the best BTTS as optional filler. =====
+  const bttsBest = scored.find(isBTTSNo) || null;
+  const scoredNoBTTS = scored.filter(c => !isBTTSNo(c));
+  // =============================================================================================
+
+  if (!scored.length) return null;
+
+  // ====== Build con reglas: 1 pick por fixture + BTTS max 1 + mix ======
+  const usedFixture = new Set();
+  const usedLeg = new Set();
+  let bttsCount = 0;
+
+  const legs = [];
+  let prod = 1;
+
+  function tryAdd(c) {
+    const fid = c.fixtureId;
+    if (usedFixture.has(fid)) return false;
+    const key = marketKey(c);
+    if (usedLeg.has(key)) return false;
+
+    const odd = __fv_legOdd(c);
+    if (odd > capLegOdd) return false;
+
+    if (isBTTSNo(c)) {
+      if (bttsCount >= MAX_BTTS_PER_PARLAY) return false;
+    }
+
+    // ok add
+    legs.push(c);
+    usedFixture.add(fid);
+    usedLeg.add(key);
+    prod *= odd;
+    if (isBTTSNo(c)) bttsCount++;
+
+    return true;
+  }
+
+  // 1) Seed mix: AH (+3/+2), OU (O0.5 / O1.5), luego DC (si falta)
+  const preferOrders = [
+    (c) => String(c.market).toUpperCase() === "AH",
+    (c) => ["OU_05","OU_15"].includes(String(c.market).toUpperCase()) && String(c.selection).toLowerCase()==="over",
+    (c) => String(c.market).toUpperCase() === "DC",
+  ];
+
+  for (const pred of preferOrders) {
+    const pick = scoredNoBTTS.find(c => pred(c) && !usedFixture.has(c.fixtureId) && __fv_legOdd(c) <= capLegOdd);
+    if (pick) tryAdd(pick);
+  }
+
+  // 2) Greedy fill
+  for (const c of scoredNoBTTS) {
+    if (legs.length >= maxLegs) break;
+
+    // If we're already close, avoid huge overshoot
+    const odd = __fv_legOdd(c);
+    const projected = prod * odd;
+    const close = prod >= (t * 0.70);
+    if (close && projected > maxFactor) continue;
+
+    tryAdd(c);
+
+    if (legs.length >= minLegs && prod >= minFactor && prod <= maxFactor) break;
+  }
+
+  // 3) If still below minFactor, relax overshoot a bit (but keep capLegOdd)
+  if (prod < minFactor) {
+    for (const c of scoredNoBTTS) {
+      if (legs.length >= maxLegs) break;
+      if (usedFixture.has(c.fixtureId)) continue;
+      tryAdd(c);
+      if (legs.length >= minLegs && prod >= minFactor) break;
     }
   }
-  return mat;
-}
 
-export function probs1X2(lambdaHome, lambdaAway) {
-  const mat = scoreMatrix(lambdaHome, lambdaAway, 6);
-  let pH = 0,
-    pD = 0,
-    pA = 0;
-  for (const c of mat) {
+  if (legs.length < minLegs) return null;
+
+  // 4) HARD LIMIT: BTTS NO max 1 (última barrera, por label + market)
+  const legsHard = [];
+  let hardBTTS = 0;
+  for (const c of legs) {
+    const lab = norm(c?.label);
+    const isHardBTTS = isBTTSNo(c) || (lab.includes("ambos") && lab.includes("marcan") && lab.includes("no"));
+    if (isHardBTTS) {
+      if (hardBTTS >= MAX_BTTS_PER_PARLAY) continue;
+      hardBTTS++;
+    }
+    legsHard.push(c);
+  }
+
+  // Si al remover BTTS extra quedamos bajo minLegs, rellenamos con los mejores NO-BTTS disponibles.
+  if (legsHard.length < minLegs) {
+    const usedHard = new Set(legsHard.map(x => String(x.fixtureId)));
+    for (const c of scoredNoBTTS) {
+      if (legsHard.length >= minLegs) break;
+      if (!c?.fixtureId) continue;
+      const fid = String(c.fixtureId);
+      if (usedHard.has(fid)) continue;
+      const odd = __fv_legOdd(c);
+      if (odd > capLegOdd) continue;
+      if (pr(c) < probFloor) continue;
+      legsHard.push(c);
+      usedHard.add(fid);
+    }
+  }
+
+  // Recalcular producto final (después de hard limit)
+  prod = 1;
+  for (const c of legsHard) prod *= __fv_legOdd(c);
+
+  const picks = legsHard.map(l => ({
+    fixtureId: l.fixtureId,
+    type: l.market,
+    label: l.label,
+    odd: round2(__fv_legOdd(l)),
+    prob: round2(Number(l.prob)),
+    edge: l.valueEdge,
+    home: l.home,
+    away: l.away,
+  }));
+
+  const finalOdd = prod;
+
+  const out = {
+    target: t,
+    finalOdd,
+    legs: picks,
+    legsCount: picks.length,
+    final: `x${round2(finalOdd)}`,
+  };
+
+  // Persist last x50 for monotonic x100
+  if (typeof window !== "undefined" && t >= 50 && t < 100) {
+    window.__fv_lastParlay50 = finalOdd;
+  }
+
+  return out;
+}) {
     if (c.hg > c.ag) pH += c.p;
     else if (c.hg === c.ag) pD += c.p;
     else pA += c.p;
@@ -217,12 +445,6 @@ export function estimateLambdasFromPack(pack) {
 }
 
 export function buildCandidatePicks({ fixture, pack, markets }) {
-  // === Professional constants (local scope, no globals) ===
-  const CAP_MAX_NORMAL = 2.5;
-  const CAP_MAX_STRICT = 2.45;
-  const MAX_BTTS_PER_PARLAY = 1;
-  // =======================================================
-
   
   // Genera picks candidatos con: market, selection, label, prob, fvOdd, marketOdd, usedOdd, valueEdge, fixtureId, home, away
   const out = [];
@@ -459,25 +681,13 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
 export function pickSafe(candidatesByFixture) {
   const all = Object.values(candidatesByFixture || {}).flat();
 
-  // Si existe al menos 1 partido con datos completos (racha home+away), la cuota segura DEBE salir de ese subconjunto.
-  const full = all.filter((p) => p?.dataQuality === "full");
+  // REGLA: si existe al menos 1 partido con datos completos (racha home+away),
+  // la cuota segura (regalo) DEBE salir de ese subconjunto.
+  const full = all.filter(p => p?.dataQuality === "full");
   const pool = full.length ? full : all;
 
-  const mWeight = (p) => {
-    const m = String(p?.market || "").toUpperCase();
-    // Prioridad: AH(+3/+2) > OU_05/OU_15/OU_35 > DC > resto, y BTTS al final.
-    if (m === "AH" && String(p?.label || "").includes("+3")) return 6;
-    if (m === "AH") return 5;
-    if (m === "OU_05") return 4.5;
-    if (m === "OU_15") return 4.0;
-    if (m === "OU_35") return 3.8;
-    if (m === "DC") return 3.0;
-    if (m === "BTTS") return 0.5;
-    return 2.0;
-  };
-
-  // Orden: primero full-data, luego preferencia de mercado, luego probabilidad, luego cuota baja.
-  pool.sort((a, b) => (mWeight(b) - mWeight(a)) || (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
+  // Orden: mayor probabilidad (conservadora) y luego menor cuota.
+  pool.sort((a, b) => (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
   return pool[0] || null;
 }
 
@@ -564,22 +774,24 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
       return (full.length ? full : arr)[0] || null;
     })
     .filter(Boolean)
-    .filter((x) => Number.isFinite(x.prob) && pr(x) >= 0.85)
-    .filter((x) => {
-      const odd = Number(x.usedOdd);
-      return Number.isFinite(odd) && odd > 1;
-    });
 
+  // ===== Reglas CUOTA SEGURA (regalo) =====
+  // - Si hay >=10 partidos con datos completos (verde) => mini combinada 3 a 4 legs
+  // - Si hay <=3 partidos disponibles => solo 1 pick
+  const fullFixtureCount = Object.values(candidatesByFixture || {}).filter((list) => {
+    const arr = Array.isArray(list) ? list : [];
+    return arr.some((c) => c && c.dataQuality === "full");
+  }).length;
 
-  // ===== Gift rules (user requirements) =====
-  const poolFixtureSet = new Set(pool.map(x => String(x.fixtureId)));
-  const poolFixCount = poolFixtureSet.size;
+  const giftMinLegs = fullFixtureCount >= 10 ? 3 : 1;
+  const giftMaxLegs = fullFixtureCount >= 10 ? 4 : maxLegs;
+  const giftProbMin = fullFixtureCount >= 10 ? 0.80 : 0.85;
+  // ======================================
 
-  // If <=3 fixtures available => ONLY 1 safe pick
+  const poolFixCount = pool.length;
   if (poolFixCount <= 3) {
     const one = pool[0] || null;
     if (!one) return null;
-    __fv_lastGiftLegs = [one];
     return {
       games: 1,
       finalOdd: round2(__fv_legOdd(one)),
@@ -588,12 +800,15 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
     };
   }
 
-  // If >=10 fixtures available => min 3, max 4 legs (all full-data already enforced above)
-  const giftMinLegs = poolFixCount >= 10 ? 3 : 1;
-  const giftMaxLegs = poolFixCount >= 10 ? 4 : Math.min(3, poolFixCount);
-  // ============================================
 
-  const maxLegsEff = Math.max(1, Math.min(giftMaxLegs, pool.length || giftMaxLegs));
+    .filter((x) => Number.isFinite(x.prob) && pr(x) >= giftProbMin)
+    .filter((x) => {
+      const odd = Number(x.usedOdd);
+      return Number.isFinite(odd) && odd > 1;
+    });
+
+
+  const maxLegsEff = Math.max(1, Math.min((Number(giftMaxLegs) || 4), pool.length || (Number(giftMaxLegs) || 4)));
   pool.sort((a, b) => (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
 
   const legs = [];
@@ -617,12 +832,12 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
 
   if (!legs.length) return null;
 
-  // Ensure minimum legs for gift when pool is large (>=10 fixtures)
-  if (typeof giftMinLegs === "number" && legs.length < giftMinLegs) {
+  // Asegurar mínimo de legs cuando hay pool grande
+  if (giftMinLegs > 1 && legs.length < giftMinLegs) {
     for (const cand of pool) {
       if (legs.length >= giftMinLegs) break;
-      if (legs.some((l) => String(l.fixtureId) === String(cand.fixtureId))) continue;
-      const odd = Number(cand.usedOdd);
+      if (legs.some(l => String(l.fixtureId) === String(cand.fixtureId))) continue;
+      const odd = __fv_legOdd(cand);
       if (!Number.isFinite(odd) || odd <= 1) continue;
       const next = prod * odd;
       if (next > maxOdd * 1.05) continue;
@@ -630,7 +845,6 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
       prod = next;
     }
   }
-
 
   // Guardar el regalo para evitar contradicciones con parlays.
   __fv_lastGiftLegs = legs.slice();
@@ -666,12 +880,6 @@ function __fv_legScore(c, oddWeight = 0.35) {
 
 
 export function buildParlay(candidatesByFixture, target, opts = {}) {
-  // === Professional constants (local scope, no globals) ===
-  const CAP_MAX_NORMAL = 2.5;
-  const CAP_MAX_STRICT = 2.45;
-  const MAX_BTTS_PER_PARLAY = 1;
-  // =======================================================
-
   const t = Number(target);
   const byFix = candidatesByFixture || {};
   const poolFixtures = Object.keys(byFix).length;
@@ -733,24 +941,11 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
   const norm = (s) => String(s || "").toLowerCase();
 
   const isBTTSNo = (c) => {
-    const mRaw = String(c?.market ?? c?.marketKey ?? c?.type ?? "").toLowerCase();
-    const sel = String(c?.selection ?? c?.pick ?? c?.outcome ?? "").toLowerCase();
-    const lab = String(c?.label ?? c?.name ?? "").toLowerCase();
-
-    const looksLikeBTTS =
-      mRaw.includes("btts") ||
-      mRaw.includes("both_teams_to_score") ||
-      lab.includes("ambos marcan") ||
-      lab.includes("both teams");
-
-    const isNo =
-      sel === "no" ||
-      sel === "n" ||
-      lab.includes(": no") ||
-      lab.includes(" no") ||
-      lab.includes("not");
-
-    return looksLikeBTTS && isNo;
+    const m = norm(c?.market);
+    const sel = norm(c?.selection);
+    const lab = norm(c?.label);
+    return (m === "btts" && (sel === "no" || sel.includes("no"))) ||
+           (lab.includes("ambos") && lab.includes("marcan") && lab.includes("no"));
   };
 
   const marketKey = (c) => `${String(c.fixtureId)}|${String(c.market)}|${String(c.selection)}`;
@@ -780,15 +975,8 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     .filter(c => pr(c) >= probFloor)
     .filter(c => __fv_legOdd(c) >= 1.05 && __fv_legOdd(c) <= capLegOdd)
     .sort((a,b) => score(b) - score(a));
-  // ====== BTTS CONTROL (hard, cannot dominate) ======
-  // We REMOVE BTTS picks from the main pool and keep only 1 best BTTS candidate as an optional last-resort filler.
-  const bttsCandidates = scored.filter(isBTTSNo);
-  const bttsBest = bttsCandidates.length ? bttsCandidates[0] : null; // scored is already sorted by score desc
-  const scoredNoBTTS = scored.filter(c => !isBTTSNo(c));
-  // ==================================================
 
-
-  if (!scoredNoBTTS.length) return null;
+  if (!scored.length) return null;
 
   // ====== Build con reglas: 1 pick por fixture + BTTS max 1 + mix ======
   const usedFixture = new Set();
@@ -824,31 +1012,18 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
 
   // 1) Seed mix: AH (+3/+2), OU (O0.5 / O1.5), luego DC (si falta)
   const preferOrders = [
-    // 1) AH +3 first
-    (c) => String(c.market).toUpperCase() === "AH" && String(c.label || "").includes("+3"),
-    // 2) Any AH (+2/+3)
     (c) => String(c.market).toUpperCase() === "AH",
-    // 3) Over 0.5
-    (c) => String(c.market).toUpperCase() === "OU_05" && String(c.selection).toLowerCase() === "over",
-    // 4) Over 1.5
-    (c) => String(c.market).toUpperCase() === "OU_15" && String(c.selection).toLowerCase() === "over",
-    // 5) Under 3.5
-    (c) => String(c.market).toUpperCase() === "OU_35" && String(c.selection).toLowerCase() === "under",
+    (c) => ["OU_05","OU_15"].includes(String(c.market).toUpperCase()) && String(c.selection).toLowerCase()==="over",
+    (c) => String(c.market).toUpperCase() === "DC",
   ];
 
   for (const pred of preferOrders) {
-    const pick = scoredNoBTTS.find(c => pred(c) && !usedFixture.has(c.fixtureId) && __fv_legOdd(c) <= capLegOdd);
+    const pick = scored.find(c => pred(c) && !usedFixture.has(c.fixtureId) && __fv_legOdd(c) <= capLegOdd);
     if (pick) tryAdd(pick);
   }
 
-  // 1.5) DC fallback seed (only if we still need legs)
-  if (legs.length < Math.min(2, minLegs)) {
-    const dcPick = scoredNoBTTS.find(c => String(c.market).toUpperCase() === "DC" && !usedFixture.has(c.fixtureId) && __fv_legOdd(c) <= capLegOdd);
-    if (dcPick) tryAdd(dcPick);
-  }
-
   // 2) Greedy fill
-  for (const c of scoredNoBTTS) {
+  for (const c of scored) {
     if (legs.length >= maxLegs) break;
 
     // If we're already close, avoid huge overshoot
@@ -864,20 +1039,13 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
 
   // 3) If still below minFactor, relax overshoot a bit (but keep capLegOdd)
   if (prod < minFactor) {
-    for (const c of scoredNoBTTS) {
+    for (const c of scored) {
       if (legs.length >= maxLegs) break;
       if (usedFixture.has(c.fixtureId)) continue;
       tryAdd(c);
       if (legs.length >= minLegs && prod >= minFactor) break;
     }
   }
-  // 3.5) LAST RESORT: allow at most ONE BTTS NO to help reach target if still short.
-  // Only if we still haven't used BTTS and we are meaningfully below minFactor.
-  if (bttsBest && bttsCount === 0 && prod < minFactor * 0.95 && legs.length < maxLegs && pr(bttsBest) >= 0.60) {
-    // Ensure it's not contradictory with gift leg (same fixture) and not already used fixture.
-    tryAdd(bttsBest);
-  }
-
 
   if (legs.length < minLegs) return null;
 
@@ -891,57 +1059,12 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     }
     legsHard.push(c);
   }
-  // If we removed extra BTTS and fell below minLegs, refill with best non-BTTS unused legs.
-  if (legsHard.length < minLegs) {
-    for (const c of scoredNoBTTS) {
-      if (legsHard.length >= minLegs) break;
-      if (!c || isBTTSNo(c)) continue;
-      if (legsHard.some(l => String(l.fixtureId) === String(c.fixtureId))) continue;
-      // reuse cap and prob constraints
-      const odd = __fv_legOdd(c);
-      if (odd > capLegOdd) continue;
-      legsHard.push(c);
-    }
-  }
-
 
   // Recalcular producto por si sacamos BTTS extra
   prod = 1;
   for (const c of legsHard) prod *= __fv_legOdd(c);
 
-  // 4.5) FINAL DISPLAY SAFE: ensure at most 1 BTTS NO even if upstream detection fails somewhere.
-  let __bttsOut = 0;
-  const legsHard2 = [];
-  for (const c of legsHard) {
-    const lab = String(c?.label || "").toLowerCase();
-    const isOutBTTS = isBTTSNo(c) || (lab.includes("ambos") && lab.includes("marcan") && lab.includes("no"));
-    if (isOutBTTS) {
-      if (__bttsOut >= 1) continue;
-      __bttsOut++;
-    }
-    legsHard2.push(c);
-  }
-  // If we removed and dropped below minLegs, refill with best non-BTTS unused legs.
-  if (legsHard2.length < minLegs) {
-    for (const c of scoredNoBTTS) {
-      if (legsHard2.length >= minLegs) break;
-      if (!c) continue;
-      const fid = String(c.fixtureId);
-      if (legsHard2.some(l => String(l.fixtureId) === fid)) continue;
-      const odd = __fv_legOdd(c);
-      if (odd > capLegOdd) continue;
-      legsHard2.push(c);
-    }
-  }
-
-  // Swap in the final filtered legs
-  const legsFinal = legsHard2;
-
-  // Recalcular producto final
-  prod = 1;
-  for (const c of legsFinal) prod *= __fv_legOdd(c);
-
-  const picks = legsFinal.map(l => ({
+  const picks = legsHard.map(l => ({
     fixtureId: l.fixtureId,
     type: l.market,
     label: l.label,
