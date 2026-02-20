@@ -146,7 +146,11 @@ function factorial(n) {
   for (let i = 2; i <= n; i++) x *= i;
   return x;
 }
-
+// Poisson PMF
+function poissonPmf(lambda, k) {
+  if (lambda <= 0) return 0;
+  return (Math.pow(lambda, k) * Math.exp(-lambda)) / factorial(k);
+}
 function poissonP(k, lambda) {
   if (lambda <= 0) return k === 0 ? 1 : 0;
   return (Math.exp(-lambda) * Math.pow(lambda, k)) / factorial(k);
