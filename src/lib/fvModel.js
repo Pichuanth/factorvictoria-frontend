@@ -575,6 +575,26 @@ let __fv_lastGiftLegs = null;
 let __fv_lastParlay50 = null;
 let __fv_lastGiftCat = null;
 
+
+// Categoría de pick (para controlar diversidad y evitar repetición excesiva de un mismo mercado)
+function getPickCategory(p) {
+  const m = String(p?.market || "").toUpperCase();
+  const lbl = String(p?.label || p?.name || p?.pick || "").toUpperCase();
+
+  if (m.includes("BTTS") || lbl.includes("AMBOS")) return "BTTS";
+  if (m === "DC" || m.includes("DOUBLE") || lbl.includes("DOBLE OPORTUNIDAD")) return "DC";
+  if (m === "AH" || lbl.includes("HANDICAP")) return "AH";
+  if (m === "OU" || lbl.includes("OVER") || lbl.includes("UNDER") || m.includes("OVER") || m.includes("UNDER")) return "OU";
+  if (m === "1X2" || lbl.includes("1X2") || lbl.includes("GANADOR")) return "1X2";
+
+  return m || (lbl ? lbl.split(/\s+/)[0] : "OTHER");
+}
+
+// Helper compacto para el último pick del regalo (legacy)
+function _cat(p) {
+  return getPickCategory(p);
+}
+
 function __fv_normSel(s) {
   return String(s || "")
     .toLowerCase()
