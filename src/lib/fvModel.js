@@ -1,4 +1,17 @@
 
+  // Si hay suficiente pool con datos completos, generamos una "cuota segura" compuesta (3-4 picks)
+  // para que no quede siempre en 1 solo partido.
+  try {
+    const bundle = buildGiftPickBundle(candidatesByFixture, minOdd, maxOdd, {
+      giftProbMin: 0.78, // conservador
+      giftMinLegs: 1,
+      giftMaxLegs: 4,
+    });
+    if (bundle && Array.isArray(bundle.legs) && bundle.legs.length >= 3) return bundle;
+  } catch (e) {
+    // fallback a single pick
+  }
+
 function __fv_extendParlay(base, extraPool, minExtra=1){
   const used = new Set(base.map(p=>p.fixtureId));
   const extra = extraPool.filter(p=>p && !used.has(p.fixtureId));
@@ -670,7 +683,9 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
   const pool = Object.values(candidatesByFixture || {})
     .map((list) => {
       const arr = Array.isArray(list) ? list : [];
-      if (hasAnyFull && !arr.some((c) => c && c.dataQuality === "full")) return null;
+      // Antes: si existe al menos 1 fixture full, se descartaban los no-full.
+      // Eso reduce demasiado el pool cuando eliges 2+ días. En vez de descartar, preferimos full si existe.
+
       // Prioriza "full" (círculo verde) si existe.
       const full = arr.filter((p) => p?.dataQuality === "full");
       return (full.length ? full : arr)[0] || null;
@@ -699,10 +714,14 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
   // Rotación simple de tipo de pick (para que no salga siempre AH +3).
   const _cat = (c) => {
     const t = String(c?.pickType || "");
+    const lab = String(c?.label ?? "").toUpperCase();
     if (t.startsWith("AH")) return "AH";
     if (t.startsWith("OU")) return "OU";
     if (t.startsWith("DC")) return "DC";
-    if (t.startsWith("BTTS")) return "BTTS";
+    if (t.startsWith("BTTS")) {
+      if (lab.includes("NO")) return "BTTS_NO";
+      return "BTTS_YES";
+    }
     return "OTHER";
   };
   const lastGiftCat = (__fv_lastGiftCat || null);
@@ -811,10 +830,23 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
   const bucket = (c) => {
     const m = marketKey(c);
     const lab = String(c?.label ?? "").toUpperCase();
-    if (m.includes("BTTS") || lab.includes("AMBOS")) return "BTTS";
+
+    // ---- BTTS (Ambos marcan) ----
+    if (m.includes("BTTS") || lab.includes("AMBOS")) {
+      // Normalizamos: "NO" / "SI"
+      if (lab.includes("NO")) return "BTTS_NO";
+      return "BTTS_YES";
+    }
+
+    // ---- Handicap ----
     if (m === "AH" || lab.includes("HÁNDICAP") || lab.includes("HANDICAP")) return "AH";
-    if (m.includes("OU") || m.includes("O/U") || lab.includes("OVER") || lab.includes("UNDER")) return "OU";
+
+    // ---- Totales (Over/Under) ----
+    if (m === "OU" || lab.includes("OVER") || lab.includes("UNDER")) return "OU";
+
+    // ---- Doble oportunidad ----
     if (m.includes("DC") || lab.includes("DOBLE")) return "DC";
+
     return "OTHER";
   };
 
@@ -881,7 +913,9 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
   const chosen = [];
   let prod = 1;
 
-  let bttsCount = 0;
+  let bttsCount = 0; // total BTTS picks
+  let bttsNoCount = 0; // BTTS NO (max 1)
+  let bttsYesCount = 0; // BTTS YES (max 1)
   let ouCount = 0;
   let ahCount = 0;
 
@@ -899,7 +933,12 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     if (o > capLegOdd && prod < t) return false;
 
     const b = bucket(c);
-    if (b === "BTTS" && bttsCount >= MAX_BTTS_PER_PARLAY) return false;
+
+    // Hard limit: BTTS NO (Ambos marcan: NO) máximo 1 por parlay
+    if (b === "BTTS_NO" && bttsNoCount >= 1) return false;
+
+    // Soft limits (diversidad)
+    if ((b === "BTTS_YES" || b === "BTTS") && bttsCount >= 1) return false;
     if (b === "OU" && ouCount >= MAX_OU_PER_PARLAY) return false;
     if (b === "AH" && ahCount >= MAX_AH_PER_PARLAY) return false;
 
@@ -914,7 +953,8 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     usedFix.add(fx);
 
     const b = bucket(c);
-    if (b === "BTTS") bttsCount += 1;
+    if (b === "BTTS_NO") { bttsCount += 1; bttsNoCount += 1; }
+    else if (b === "BTTS_YES" || b === "BTTS") { bttsCount += 1; bttsYesCount += 1; }
     if (b === "OU") ouCount += 1;
     if (b === "AH") ahCount += 1;
   };
