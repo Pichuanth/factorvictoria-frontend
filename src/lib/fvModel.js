@@ -678,7 +678,7 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
   const minOddEff = Math.max(minOdd, giftCanMulti ? 1.6 : 1.5);
   const maxOddEff = giftCanMulti ? Math.min(maxOdd, 2.6) : maxOdd;
 
- cuando hay mucho pool (para obligar a cuotas seguras)
+  // cuando hay mucho pool (para obligar a cuotas seguras)
   // Regla: pool <= 18: ~2.15 | pool 19–30: ~2.05 | pool > 30: ~1.95–2.00
   const capMax =
     totalFixtures > 50 ? 1.95 :
