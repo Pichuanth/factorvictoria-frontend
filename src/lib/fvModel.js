@@ -1,54 +1,5 @@
-
-  // Si hay suficiente pool con datos completos, generamos una "cuota segura" compuesta (3-4 picks)
-  // para que no quede siempre en 1 solo partido.
-  try {
-    const bundle = buildGiftPickBundle(candidatesByFixture, minOdd, maxOdd, {
-      giftProbMin: 0.78, // conservador
-      giftMinLegs: 1,
-      giftMaxLegs: 4,
-    });
-    if (bundle && Array.isArray(bundle.legs) && bundle.legs.length >= 3) return bundle;
-  } catch (e) {
-    // fallback a single pick
-  }
-
-function __fv_extendParlay(base, extraPool, minExtra=1){
-  const used = new Set(base.map(p=>p.fixtureId));
-  const extra = extraPool.filter(p=>p && !used.has(p.fixtureId));
-  return base.concat(extra.slice(0,minExtra));
-}
-
-
-function __fv_prioritizeGreenData(pool){
-  const full = pool.filter(p => p && p.hasFullData === true);
-  if(full.length > 0) return full;
-  return pool;
-}
-
-
-function __fv_hardLimitBTTS(picks){
-  let count = 0;
-  return picks.filter(p=>{
-    if(p && p.pickType === "BTTS_NO"){
-      if(count >= 1) return false;
-      count++;
-    }
-    return true;
-  });
-}
-
-
-// ================= PROFESSIONAL GLOBAL CONSTANTS =================
-const FV_GLOBALS = {
-  CAP_MAX_NORMAL: 2.5,
-  CAP_MAX_STRICT: 2.45,
-  MAX_BTTS_PER_PARLAY: 1
-};
-// =================================================================
-
 // src/lib/fvModel.js
 // Motor MVP de probabilidades + armado de parlays para Factor Victoria.
-// Objetivo: simple, interpretable, con fallbacks (si no hay odds o stats).
 
 function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
