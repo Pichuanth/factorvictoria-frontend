@@ -1,3 +1,12 @@
+
+// ================= PROFESSIONAL GLOBAL CONSTANTS =================
+const FV_GLOBALS = {
+  CAP_MAX_NORMAL: 2.5,
+  CAP_MAX_STRICT: 2.45,
+  MAX_BTTS_PER_PARLAY: 1
+};
+// =================================================================
+
 // src/lib/fvModel.js
 // Motor MVP de probabilidades + armado de parlays para Factor Victoria.
 // Objetivo: simple, interpretable, con fallbacks (si no hay odds o stats).
