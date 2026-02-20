@@ -670,9 +670,9 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
   const hasAnyFull = fullFixtureCount > 0;
 
   // Reglas: si hay suficientes fixtures con datos completos, mostrar 3–4 picks.
-  const giftCanMulti = (fullFixtureCount >= 3) && (totalFixtures >= 8);
+  const giftCanMulti = totalFixtures >= 5 && fullFixtureCount >= 3;
   const giftMinLegsEff = giftCanMulti ? 3 : 1;
-  const giftMaxLegsEff = giftCanMulti ? 4 : 1;
+  const giftMaxLegsEff = giftCanMulti ? (totalFixtures >= 10 ? 4 : 3) : 1;
 
   // Cap más estricto cuando hay mucho pool (para obligar a cuotas seguras)
   const capMax =
@@ -767,7 +767,20 @@ function __fv_legScore(c, oddWeight = 0.35) {
 }
 
 
-export function buildParlay(candidatesByFixture, target, opts = {}) {
+export function buildParlay(arg1, arg2, arg3) {
+  // Soportar ambas firmas:
+  // 1) buildParlay(candidatesByFixture, target, opts)
+  // 2) buildParlay({ candidatesByFixture, target, ...opts })
+  let candidatesByFixture = arg1;
+  let target = arg2;
+  let opts = arg3 || {};
+
+  if (arg1 && typeof arg1 === "object" && arg1.candidatesByFixture && (arg1.target != null)) {
+    candidatesByFixture = arg1.candidatesByFixture;
+    target = arg1.target;
+    opts = arg1;
+  }
+
   const t = Number(target);
 
   // Flatten candidates
@@ -795,10 +808,9 @@ const capLegOdd =
   poolFixtures >= 11 ? CAP_MAX_NORMAL :
   CAP_MAX_SMALL;
 
-// Hard cap for individual odds (avoid cuotas 4–5). Default 2.5.
-const __optMaxLegOddRaw = Number(opts?.maxLegOdd);
-const __optMaxLegOdd = Number.isFinite(__optMaxLegOddRaw) ? __optMaxLegOddRaw : 2.5;
-const legOddMax = Math.min(capLegOdd, __optMaxLegOdd);
+// Hard cap absoluto (evita cuotas 4–5 “coladas”)
+const hardMaxOdd = Number.isFinite(Number(opts?.hardMaxOdd)) ? Number(opts.hardMaxOdd) : 2.5;
+const capHard = Math.min(capLegOdd, hardMaxOdd);
 
 // BTTS NO se ve poco profesional si se repite.
 // Permitimos 2 cuando el pool es chico, y 1 cuando hay suficientes partidos.
@@ -844,7 +856,7 @@ const MAX_BTTSNO_PER_PARLAY = (poolFixtures >= 10 ? 1 : 2);
   };
 
   const pr = (c) => safeNum(c?.probFV, safeNum(c?.prob, 0));
-  const odd = (c) => safeNum(c?.usedOdd, safeNum(c?.odd, safeNum(c?.useodd, safeNum(c?.usedodd, NaN))));
+  const odd = (c) => __fv_legOdd(c);
 
   // score: probability first, then lower odds (more conservative)
   const score = (c) => pr(c) * 1000 - odd(c);
@@ -856,8 +868,8 @@ const MAX_BTTSNO_PER_PARLAY = (poolFixtures >= 10 ? 1 : 2);
 
   if (!pool.length) return null;
 
-  // Conservative: cap individual odds strictly (default max 2.5)
-  pool = pool.filter((c) => odd(c) <= legOddMax);
+  // Conservative: avoid >3 always.
+  pool = pool.filter((c) => odd(c) <= capHard);
 
   // Sort best-first
   pool.sort((a, b) => score(b) - score(a));
@@ -921,7 +933,7 @@ const MAX_BTTSNO_PER_PARLAY = (poolFixtures >= 10 ? 1 : 2);
     if (!Number.isFinite(o) || o <= 1) return false;
 
     // keep legs conservative; allow small slack when reaching target
-    if (o > legOddMax) return false;
+    if (o > capHard) return false;
 
     const b = bucket(c);
 
@@ -946,7 +958,18 @@ const MAX_BTTSNO_PER_PARLAY = (poolFixtures >= 10 ? 1 : 2);
     if (b === "AH") ahCount += 1;
   };
 
-  // --- Variety pass: try to include at least 1 OU and 1 AH when available ---
+  
+  // --- Selected fixtures lock: include at least 1 pick from each selected fixture (si se pide) ---
+  const mustFix = Array.isArray(opts?.mustIncludeFixtures) ? opts.mustIncludeFixtures.map((x) => String(x)) : [];
+  if (mustFix.length) {
+    for (const fxWant of mustFix) {
+      if (!fxWant) continue;
+      const cand = pool.find((c) => String(getFixtureId(c)) === fxWant && canTake(c));
+      if (cand) add(cand);
+    }
+  }
+
+// --- Variety pass: try to include at least 1 OU and 1 AH when available ---
   const bestOf = (b) => pool.find((c) => bucket(c) === b && canTake(c));
   const wantOU = bestOf("OU");
   if (wantOU) add(wantOU);
@@ -987,7 +1010,7 @@ const MAX_BTTSNO_PER_PARLAY = (poolFixtures >= 10 ? 1 : 2);
       if (!fx || usedFix.has(fx)) continue;
 
       const o = odd(c);
-      if (!Number.isFinite(o) || o <= 1 || o > legOddMax) continue;
+      if (!Number.isFinite(o) || o <= 1 || o > capHard) continue;
 
       const b = bucket(c);
       if (b === "BTTS" && isBttsNo(c) && bttsNoCount >= MAX_BTTSNO_PER_PARLAY) continue;

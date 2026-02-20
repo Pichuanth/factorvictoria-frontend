@@ -1662,9 +1662,21 @@ const ensureFvPack = useCallback(
         return;
       }
 
+      // Pool de trabajo:
+      // - auto: usa un subconjunto para velocidad
+      // - selected: incluye seleccionados, pero también agrega más fixtures del rango para poder armar x10/x20 con cuotas bajas
+      const basePool = fixtures.slice(0, Math.min(60, fixtures.length));
+      const selectedPool = fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)));
+
       const pool =
         mode === "selected"
-          ? fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)))
+          ? Array.from(
+              new Map(
+                [...selectedPool, ...basePool]
+                  .map((fx) => [String(getFixtureId(fx) || ""), fx])
+                  .filter(([id]) => id)
+              ).values()
+            )
           : fixtures.slice(0, Math.min(28, fixtures.length));
 
       if (mode === "selected" && pool.length < 2) {
@@ -1899,6 +1911,8 @@ const builtParlays = targets
       candidatesByFixture: candidatesByFixtureSanitized,
       target: t,
       cap: maxBoost,
+      hardMaxOdd: 2.5,
+      mustIncludeFixtures: mode === "selected" ? selectedIds : [],
     });
     console.log("[PARLAY] buildParlay target", t, "=>", r1);
     if (r1) {
