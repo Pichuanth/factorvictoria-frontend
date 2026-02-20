@@ -1,9 +1,6 @@
 // src/lib/fvModel.js
 // Motor MVP de probabilidades + armado de parlays para Factor Victoria.
 // Objetivo: simple, interpretable, con fallbacks (si no hay odds o stats).
-// FV_BUILD_MARK: 2026-02-19_1234 (cambia el número cada vez)
-
-const CAP_MAX = 2.5; // tope máximo profesional de cuota individual
 
 function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
@@ -131,59 +128,12 @@ export function probUnderLine(lambdaTotal, line) {
   return clamp(s, 0, 1);
 }
 
-// Over X.5 goals = 1 - P(total <= floor(X.5))
-export function probOverLine(a, b, c) {
-  /*
-   * Backwards compatible signature:
-   * - probOverLine(lambdaTotal, line)
-   * - probOverLine(lambdaHome, lambdaAway, line)
-   */
-  const lambdaTotal = (c === undefined) ? a : (Number(a) + Number(b));
-  const line = (c === undefined) ? b : c;
-  const u = probUnderLine(lambdaTotal, line);
-  if (!Number.isFinite(u)) return null;
-  return clamp(1 - u, 0, 1);
-}
-
 export function probBTTSNo(lambdaHome, lambdaAway) {
   const pH0 = poissonP(0, lambdaHome);
   const pA0 = poissonP(0, lambdaAway);
   const pBoth0 = pH0 * pA0;
   return clamp(pH0 + pA0 - pBoth0, 0, 1);
 }
-
-function probHandicapPlus(lambdaHome, lambdaAway, plus, side) {
-  // Probability that (side) with +plus Asian handicap does NOT lose by more than 'plus'.
-  // side: 'home' => P(homeGoals + plus >= awayGoals)
-  // side: 'away' => P(awayGoals + plus >= homeGoals)
-  lh = Number.isFinite(lh) ? lh : 1.1;
-  la = Number.isFinite(la) ? la : 1.05;
-  plus = Number.isFinite(plus) ? plus : 2;
-  side = side === "away" ? "away" : "home";
-
-  const lt = lh + la;
-  const N = Math.max(10, Math.min(16, Math.ceil(lt * 3)));
-  let p = 0;
-
-  const pmfH = [];
-  const pmfA = [];
-  let sumH = 0, sumA = 0;
-  for (let i = 0; i <= N; i++) { const v = poissonPMF(lh, i); pmfH.push(v); sumH += v; }
-  for (let j = 0; j <= N; j++) { const v = poissonPMF(la, j); pmfA.push(v); sumA += v; }
-
-  for (let i = 0; i <= N; i++) pmfH[i] = pmfH[i] / (sumH || 1);
-  for (let j = 0; j <= N; j++) pmfA[j] = pmfA[j] / (sumA || 1);
-
-  for (let hg = 0; hg <= N; hg++) {
-    for (let ag = 0; ag <= N; ag++) {
-      const ok = side === "home" ? (hg + plus >= ag) : (ag + plus >= hg);
-      if (ok) p += pmfH[hg] * pmfA[ag];
-    }
-  }
-  return clamp01(p);
-}
-
-
 
 export function scoreMatrix(lambdaHome, lambdaAway, maxG = 6) {
   const mat = [];
@@ -261,11 +211,9 @@ export function estimateLambdasFromPack(pack) {
 }
 
 export function buildCandidatePicks({ fixture, pack, markets }) {
-  const capMax = CAP_MAX;
   
   // Genera picks candidatos con: market, selection, label, prob, fvOdd, marketOdd, usedOdd, valueEdge, fixtureId, home, away
   const out = [];
-  const cand = out; // alias para compatibilidad (evita "cand is not defined")
 
   // Calidad de datos: usamos la racha (W/D/L últimos 5) como señal principal.
   const q = formQuality(pack);
@@ -303,6 +251,8 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
   // fallback: si heurística da null, usa Poisson
   const under35 = under35_h ?? probUnderLine(lambdaTotal, 3.5);
   const under25 = under25_h ?? probUnderLine(lambdaTotal, 2.5);
+  const under15 = probUnderLine(lambdaTotal, 1.5);
+  const over15 = 1 - under15;
 
   const over25 = clamp(1 - under25, 0.01, 0.99);
 
@@ -370,109 +320,25 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
     marketOdd: markets?.OU_25?.over ?? null,
   });
 
-  // Over 0.5 / 1.5 goals (muy seguros para sumar legs)
-  const pOver05 = probOverLine(lambdaHome, lambdaAway, 0.5);
-  const oOver05 = fairOddFromProb(pOver05);
-  if (oOver05 <= capMax && pOver05 >= 0.70) {
-    cand.push({
-      fixtureId,
-      market: "OU",
-      selection: "over0.5",
-      label: "Over 0.5 goles",
-      prob: pOver05,
-      fvOdd: oOver05,
-      source: "fv",
-      dataQuality,
-    });
-  }
+  // Over 1.5 goles (más conservador, útil para ajustar cuotas con muchos partidos)
+  out.push({
+    type: "OU_15",
+    selection: "over",
+    label: "Over 1.5 goles",
+    prob: over15,
+    fvOdd: fairOddFromProb(over15),
+    marketOdd: markets?.OU_15?.over ?? markets?.OU_15?.o ?? null,
+  });
 
-  const pOver15 = probOverLine(lambdaHome, lambdaAway, 1.5);
-  const oOver15 = fairOddFromProb(pOver15);
-  if (oOver15 <= capMax && pOver15 >= 0.60) {
-    cand.push({
-      fixtureId,
-      market: "OU",
-      selection: "over1.5",
-      label: "Over 1.5 goles",
-      prob: pOver15,
-      fvOdd: oOver15,
-      source: "fv",
-      dataQuality,
-    });
-  }
 
-  // Hándicap asiático (+2 / +3) - muy "creíble" para el usuario
-  const pH2 = probHandicapPlus(lambdaHome, lambdaAway, 2, "home");
-  const oH2 = fairOddFromProb(pH2);
-  if (oH2 <= capMax && pH2 >= 0.70) {
-    cand.push({
-      fixtureId,
-      market: "AH",
-      selection: "home+2",
-      label: "Hándicap +2 (Local)",
-      prob: pH2,
-      fvOdd: oH2,
-      source: "fv",
-      dataQuality,
-    });
-  }
-  const pH3 = probHandicapPlus(lambdaHome, lambdaAway, 3, "home");
-  const oH3 = fairOddFromProb(pH3);
-  if (oH3 <= capMax && pH3 >= 0.78) {
-    cand.push({
-      fixtureId,
-      market: "AH",
-      selection: "home+3",
-      label: "Hándicap +3 (Local)",
-      prob: pH3,
-      fvOdd: oH3,
-      source: "fv",
-      dataQuality,
-    });
-  }
-
-  const pA2 = probHandicapPlus(lambdaHome, lambdaAway, 2, "away");
-  const oA2 = fairOddFromProb(pA2);
-  if (oA2 <= capMax && pA2 >= 0.70) {
-    cand.push({
-      fixtureId,
-      market: "AH",
-      selection: "away+2",
-      label: "Hándicap +2 (Visita)",
-      prob: pA2,
-      fvOdd: oA2,
-      source: "fv",
-      dataQuality,
-    });
-  }
-  const pA3 = probHandicapPlus(lambdaHome, lambdaAway, 3, "away");
-  const oA3 = fairOddFromProb(pA3);
-  if (oA3 <= capMax && pA3 >= 0.78) {
-    cand.push({
-      fixtureId,
-      market: "AH",
-      selection: "away+3",
-      label: "Hándicap +3 (Visita)",
-      prob: pA3,
-      fvOdd: oA3,
-      source: "fv",
-      dataQuality,
-    });
-  }
-  // BTTS NO (limitado por reglas; usa solo si hay soporte estadístico)
-  if (typeof bttsNo === "number" && Number.isFinite(bttsNo)) {
-    const oBttsNo = fairOddFromProb(bttsNo);
-    if (oBttsNo <= capMax && bttsNo >= 0.55) {
-      cand.push({
-        market: "BTTS",
-        selection: "no",
-        label: "Ambos marcan: NO",
-        prob: bttsNo,
-        fvOdd: oBttsNo,
-        marketOdd: markets?.BTTS?.no ?? null,
-      });
-    }
-  }
+  out.push({
+    market: "BTTS",
+    selection: "no",
+    label: "Ambos marcan: NO",
+    prob: bttsNo,
+    fvOdd: fairOddFromProb(bttsNo),
+    marketOdd: markets?.BTTS?.no ?? null,
+  });
 
   // ---------- limpieza + métricas ----------
   const cleaned = out
@@ -669,184 +535,184 @@ function __fv_legScore(c, oddWeight = 0.35) {
   const e = Number.isFinite(edge) ? edge : 0;
   const oddTerm = odd > 1 ? Math.log(odd) : 0;
   return p + Math.max(0, e) * 0.06 + oddWeight * oddTerm;
-  // Penaliza BTTS NO (se usa como condimento, no como base del modelo)
-  const isBttsNo = (c.market === "BTTS" && c.selection === "no") || (c.marketKey === "BTTS_NO");
-  if (isBttsNo) score -= 0.12;
-  // Bonifica mercados conservadores y 'creíbles' para el usuario
-  const isHandicapPlus = (c.market === "AH");
-  const isOUConservative = (c.market === "OU" && (c.selection === "under3.5" || c.selection === "over0.5" || c.selection === "over1.5"));
-  if (isHandicapPlus) score += 0.07;
-  if (isOUConservative) score += 0.05;
 }
 
 
-export function buildParlay({ candidatesByFixture, target, cap, maxLegs = 12 }) {
+export function buildParlay(candidatesByFixture, target, opts = {}) {
   const t = Number(target);
-  const hardCap = Number(cap);
+  const candAll = Object.values(candidatesByFixture || {}).flat();
 
-  if (!Number.isFinite(t) || t <= 1) return null;
-  if (!Number.isFinite(hardCap) || hardCap <= 1) return null;
+  // helpers local to avoid undefineds in future edits
+  const safeNum = (x, d=0) => (typeof x === "number" && Number.isFinite(x) ? x : d);
 
-  const byFx = candidatesByFixture || {};
-  const fixtureIds = Object.keys(byFx);
-  const fixtureCount = fixtureIds.length;
+  const poolSize = candAll.length;
 
-  if (!fixtureCount) return null;
+  // ---------- Dynamic legs range (pool-aware) ----------
+  const baseRange =
+    t >= 100 ? { min: 9, max: 15 } :
+    t >= 50  ? { min: 7, max: 9 } :
+    t >= 20  ? { min: 5, max: 7 } :
+               { min: 2, max: 6 };
 
-  // ----------------------------
-  // Dynamic scaling by pool size
-  // ----------------------------
-  const baseMinProbByTarget = { 3: 0.78, 5: 0.74, 10: 0.70, 20: 0.66, 50: 0.60, 100: 0.55 };
-  let minProb = baseMinProbByTarget[t] ?? 0.70;
+  let minLegs = baseRange.min;
+  let maxLegs = baseRange.max;
 
-  // With large pools, we can be stricter (more conservative per-leg).
-  if (fixtureCount >= 30) minProb += 0.04;
-  else if (fixtureCount >= 20) minProb += 0.03;
-  else if (fixtureCount >= 12) minProb += 0.015;
+  // When pool is large, force more legs (more conservative, avoids 3.5–4.5 legs)
+  if (poolSize >= 20) {
+    if (t >= 50) minLegs += 2;            // x50: 9, x100: 11
+    else if (t >= 20) minLegs += 1;       // x20: 6
+  } else if (poolSize >= 14) {
+    if (t >= 50) minLegs += 1;            // x50: 8, x100: 10
+  } else if (poolSize <= 10) {
+    // small pool: allow fewer legs so it doesn't fail
+    minLegs = Math.max(2, minLegs - 1);
+  }
+  minLegs = clamp(minLegs, 2, 15);
+  maxLegs = clamp(maxLegs, minLegs, 15);
 
-  // Legs bounds (user spec) + pool-based nudges (raise min legs when there are many options).
-  const baseLegs = {
-    3:  { min: 2,  max: 4 },
-    5:  { min: 3,  max: 5 },
-    10: { min: 4,  max: 6 },
-    20: { min: 5,  max: 7 },   // x20: 5–7
-    50: { min: 7,  max: 9 },   // x50: 7–9
-    100:{ min: 9,  max: 15 }   // x100: 9–15
-  };
+  // ---------- Odds cap per leg (prefer <= 3.0 when pool is decent) ----------
+  const capLegOddBase = poolSize >= 18 ? 3.0 : poolSize >= 12 ? 3.25 : 3.5;
+  const capLegOdd = safeNum(opts.capLegOdd, capLegOddBase);
 
-  const baseMin = baseLegs[t]?.min ?? 3;
-  const baseMax = baseLegs[t]?.max ?? Math.max(6, Number(maxLegs) || 6);
+  // ---------- Target range (avoid x50 exploding to x90) ----------
+  const targetMinBase = safeNum(opts.targetMinMul, 0.92);
+  const targetMaxMul =
+    t >= 100 ? 1.60 :
+    t >= 50  ? 1.35 :
+    t >= 20  ? 1.35 : 2.00;
 
-  const poolBoost =
-    fixtureCount >= 45 ? 3 :
-    fixtureCount >= 35 ? 2 :
-    fixtureCount >= 25 ? 1 :
-    fixtureCount >= 18 ? 1 : 0;
+  let minFactor = t * targetMinBase;
+  let maxFactor = t * targetMaxMul;
 
-  // For high tiers, increase min legs with pool size (more diversification).
-  let minLegs = baseMin + (t >= 20 ? poolBoost : 0);
-  let maxLegsEff = Math.max(baseMax, Number(maxLegs) || baseMax);
-
-  // Keep within the allowed window for each tier
-  minLegs = clamp(minLegs, 2, baseMax);
-  maxLegsEff = clamp(maxLegsEff, baseMin, baseMax);
-
-  // Can never exceed available fixtures (1 leg per fixture)
-  maxLegsEff = Math.min(maxLegsEff, Math.max(2, fixtureCount));
-  minLegs = Math.min(minLegs, maxLegsEff);
-
-  // Max odd per leg (avoid 3.5–4.2 "to comply" when pool is large)
-  let maxLegOdd = 3.5;
-  if (fixtureCount >= 30) maxLegOdd = 2.8;
-  else if (fixtureCount >= 20) maxLegOdd = 3.0;
-  else if (fixtureCount >= 15) maxLegOdd = 3.0;
-  else if (fixtureCount >= 10) maxLegOdd = 3.4;
-  else if (fixtureCount >= 6) maxLegOdd = 3.8;
-
-  // Differentiate x50 vs x100: if x50 exists, x100 should aim a bit higher when possible.
-  const effectiveTarget =
-    t === 100 && __fv_lastParlay50?.finalOdd
-      ? Math.max(100, round2(__fv_lastParlay50.finalOdd * 1.03))
-      : t;
-
-  // Collect candidates (flatten)
-  let candidates = [];
-  for (const fx of fixtureIds) {
-    const arr = Array.isArray(byFx[fx]) ? byFx[fx] : [];
-    for (const c of arr) {
-      if (!c) continue;
-      const p = pr(c);
-      const odd = __fv_legOdd(c);
-      if (!Number.isFinite(p) || p <= 0) continue;
-      if (!Number.isFinite(odd) || odd <= 1) continue;
-      if (p < minProb) continue;
-      if (odd > maxLegOdd) continue;
-
-      // Respect the last gift legs to avoid contradictions (same fixture opposite)
-      if (__fv_lastGiftLegs?.length && __fv_isContradictoryPick(__fv_lastGiftLegs[0], c)) continue;
-
-      candidates.push(c);
+  // Monotonic guarantee: x100 should be strictly above last x50
+  // (stored in global for simplicity; survives across calls)
+  if (t >= 100 && typeof window !== "undefined") {
+    const last50 = safeNum(window.__fv_lastParlay50, 0);
+    if (last50 > 0) {
+      minFactor = Math.max(minFactor, last50 * 1.10); // at least +10%
     }
   }
 
-  if (!candidates.length) return null;
+  // ---------- Scoring / ordering ----------
+  const probFloorBase =
+    t >= 100 ? 0.54 :
+    t >= 50  ? 0.56 :
+    t >= 20  ? 0.58 : 0.60;
 
-  // De-duplicate by (fixtureId, market group) so we don't overweight one fixture/market
-  const seenKey = new Set();
-  candidates = candidates.filter((c) => {
-    const k = `${String(c.fixtureId)}|${String(c.market)}|${String(c.selection)}`;
-    if (seenKey.has(k)) return false;
-    seenKey.add(k);
-    return true;
-  });
+  const probFloor = safeNum(opts.probFloor, probFloorBase);
 
-  // Sort best-first. For high tiers, increase odds weight slightly.
-  const oddWeight = t >= 50 ? 0.55 : t >= 20 ? 0.45 : 0.30;
-  candidates.sort((a, b) => __fv_legScore(b, oddWeight) - __fv_legScore(a, oddWeight));
+  const scored = candAll
+    .filter(c => safeNum(c.prob, 0) >= probFloor && safeNum(c.odd, 0) >= 1.05)
+    .map(c => {
+      const odd = safeNum(c.odd, 1.0);
+      const prob = safeNum(c.prob, 0);
+      const edge = safeNum(c.edge, 0);
 
-  // Build legs
-  const legs = [];
-  const usedFx = new Set();
-  let prod = 1;
+      // Prefer higher prob + positive edge + lower odds
+      const score = (prob * 1.2) + (edge * 0.8) - (Math.log(odd) * 0.25);
 
-  for (const cand of candidates) {
-    const fxId = String(cand.fixtureId);
-    if (usedFx.has(fxId)) continue;
+      // Safety: ensure names are never empty (prevents "— vs" in UI)
+      const home = (c.home && String(c.home).trim()) || (c.fixture?.teams?.home?.name) || "Local";
+      const away = (c.away && String(c.away).trim()) || (c.fixture?.teams?.away?.name) || "Visita";
 
-    // Extra safety: never add a contradictory pick of same fixture vs existing legs
-    if (__fv_isContradictoryPick(legs[legs.length - 1], cand)) continue;
-    if (__fv_isContradictoryPick(legs[0], cand)) continue;
+      return { ...c, home, away, __score: score };
+    })
+    .sort((a, b) => b.__score - a.__score);
 
-    const odd = __fv_legOdd(cand);
-    const next = prod * odd;
+  // Avoid contradictions: only one pick per fixture
+  const usedFixture = new Set();
 
-    // Don't blow past plan cap too much. Allow small slack for reaching.
-    if (next > hardCap * 1.08) continue;
+  function greedyBuild({ relax = false } = {}) {
+    const legs = [];
+    let prod = 1;
 
-    legs.push(cand);
-    usedFx.add(fxId);
-    prod = next;
+    const maxLegOddEff = relax ? Math.max(capLegOdd, 3.75) : capLegOdd;
+    const maxFactorEff = relax ? maxFactor * 1.25 : maxFactor;
+    const minFactorEff = relax ? minFactor * 0.95 : minFactor;
 
-    // Stop early if we've reached (or close) and have enough legs.
-    if (legs.length >= minLegs && prod >= effectiveTarget * 0.98) break;
-    if (legs.length >= maxLegsEff) break;
-  }
+    for (const c of scored) {
+      const fixtureId = c.fixtureId ?? c.fixture?.id ?? c.fixture_id;
+      if (fixtureId == null) continue;
+      if (usedFixture.has(fixtureId)) continue;
 
-  if (!legs.length) return null;
+      const odd = safeNum(c.odd, 1.0);
+      if (odd > maxLegOddEff) continue;
 
-  // If we reached target but with too few legs (looks too aggressive), add more legs when pool is large.
-  if (fixtureCount >= 20 && t >= 20 && legs.length < minLegs) {
-    const extra = candidates
-      .filter((c) => !usedFx.has(String(c.fixtureId)))
-      .filter((c) => __fv_legOdd(c) <= maxLegOdd && __fv_legOdd(c) >= 1.12)
-      .sort((a, b) => __fv_legOdd(a) - __fv_legOdd(b)); // add safer odds first
-    for (const c of extra) {
-      if (legs.length >= minLegs) break;
-      const next = prod * __fv_legOdd(c);
-      if (next > hardCap * 1.10) continue;
+      // If we're already close to target, avoid huge overshoot (keep x50 ~ x50)
+      const projected = prod * odd;
+      const close = prod >= (t * 0.70);
+      if (!relax && close && projected > maxFactorEff) {
+        continue;
+      }
+
       legs.push(c);
-      usedFx.add(String(c.fixtureId));
-      prod = next;
+      usedFixture.add(fixtureId);
+      prod = projected;
+
+      // Break if we achieved a good range and enough legs
+      if (legs.length >= minLegs && prod >= minFactorEff) {
+        // If we are inside maxFactorEff, stop. Otherwise keep trying to add smaller odds legs.
+        if (prod <= maxFactorEff) break;
+      }
+      if (legs.length >= maxLegs) break;
     }
+
+    // If still below minFactor and we have room, try to add more even if it overshoots a bit.
+    if (prod < minFactorEff && legs.length < maxLegs) {
+      for (const c of scored) {
+        const fixtureId = c.fixtureId ?? c.fixture?.id ?? c.fixture_id;
+        if (fixtureId == null || usedFixture.has(fixtureId)) continue;
+        const odd = safeNum(c.odd, 1.0);
+        if (odd > maxLegOddEff) continue;
+
+        legs.push(c);
+        usedFixture.add(fixtureId);
+        prod *= odd;
+        if (legs.length >= maxLegs) break;
+        if (legs.length >= minLegs && prod >= minFactorEff) break;
+      }
+    }
+
+    // Basic validity
+    if (legs.length < Math.min(minLegs, maxLegs)) return null;
+    return { legs, prod };
   }
 
-  // Track x50 for x100 differentiation
+  // First pass: conservative (high prob, low odds)
+  let built = greedyBuild({ relax: false });
+
+  // Second pass: relax a bit if we failed to reach x100 minFactor
+  if (!built && t >= 50) {
+    usedFixture.clear();
+    built = greedyBuild({ relax: true });
+  }
+
+  if (!built) return null;
+
+  const finalOdd = built.prod;
+  const picks = built.legs.map(l => ({
+    fixtureId: l.fixtureId ?? l.fixture?.id ?? l.fixture_id,
+    type: l.type,
+    label: l.label,
+    odd: safeNum(l.odd, 1.0),
+    prob: safeNum(l.prob, null),
+    edge: safeNum(l.edge, null),
+    home: l.home,
+    away: l.away,
+  }));
+
   const out = {
     target: t,
-    cap: hardCap,
-    games: legs.length,
-    finalOdd: round2(prod),
-    impliedProb: round2(1 / prod),
-    legs,
-    picks: legs,
-    reached: prod >= effectiveTarget * 0.90,
+    finalOdd,
+    legs: picks,
+    legsCount: picks.length,
+    // keep UI compatibility:
+    final: `x${round2(finalOdd)}`,
   };
 
-  if (t === 50) __fv_lastParlay50 = out;
-
-  // Ensure monotonic: x100 must not be below x50
-  if (t === 100 && __fv_lastParlay50?.finalOdd && out.finalOdd < __fv_lastParlay50.finalOdd) {
-    out.finalOdd = __fv_lastParlay50.finalOdd;
+  // Persist last x50 for monotonic x100
+  if (typeof window !== "undefined" && t >= 50 && t < 100) {
+    window.__fv_lastParlay50 = finalOdd;
   }
 
   return out;
