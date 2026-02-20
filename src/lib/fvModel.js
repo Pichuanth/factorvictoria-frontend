@@ -636,98 +636,84 @@ function __fv_sameLegSet(aLegs, bLegs) {
   return true;
 }
 
-export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 3.0, maxLegs = 3) {
-  const hasAnyFull = Object.values(candidatesByFixture || {}).some((list) => {
-    const arr = Array.isArray(list) ? list : [];
-    return arr.some((c) => c && c.dataQuality === "full");
-  });
+export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 3.0) {
+  const byFix = candidatesByFixture || {};
+  const totalFixtures = Object.keys(byFix).length;
+  const all = Object.values(byFix).flat().filter(Boolean);
 
-  const pool = Object.values(candidatesByFixture || {})
-    .map((list) => {
-      const arr = Array.isArray(list) ? list : [];
-      // Antes: si existe al menos 1 fixture full, se descartaban los no-full.
-      // Eso reduce demasiado el pool cuando eliges 2+ días. En vez de descartar, preferimos full si existe.
-
-      // Prioriza "full" (círculo verde) si existe.
-      const full = arr.filter((p) => p?.dataQuality === "full");
-      return (full.length ? full : arr)[0] || null;
-    })
-    .filter(Boolean)
-    .filter((x) => Number.isFinite(x.prob) && pr(x) >= 0.85)
-    .filter((x) => {
-      const odd = Number(x.usedOdd);
-      return Number.isFinite(odd) && odd > 1;
-    });
-
-
-  // Reglas: si hay >=10 fixtures con datos completos (verde), el regalo debe ser combinada de 3 a 4 picks.
-  // Si no, mostrar solo 1 pick (el más seguro) y siempre priorizar fixtures con dataQuality === "full".
-  const fullFixtureCount = Object.values(candidatesByFixture || {}).filter((list) => {
+  // Conteo de fixtures con "datos completos" (verde)
+  const fullFixtureCount = Object.values(byFix).filter((list) => {
     const arr = Array.isArray(list) ? list : [];
     return arr.some((c) => c && c.dataQuality === "full");
   }).length;
 
-  const totalFixtureCount = Object.keys(candidatesByFixture || {}).length;
+  const hasAnyFull = fullFixtureCount > 0;
 
-  // Si hay buen volumen (>=10 fixtures) y suficientes "full" (>=3), arma 3-4 picks.
-  // Si no, cae a 1 pick (para evitar inconsistencias / falta de data).
-  const giftCanMulti = totalFixtureCount >= 10 && fullFixtureCount >= 3;
+  // Reglas: si hay suficientes fixtures con datos completos, mostrar 3–4 picks.
+  const giftCanMulti = totalFixtures >= 10 && fullFixtureCount >= 3;
   const giftMinLegsEff = giftCanMulti ? 3 : 1;
-  const giftMaxLegsEff = giftCanMulti ? Math.min(4, pool.length || 4, fullFixtureCount >= 4 ? 4 : 3) : 1;
+  const giftMaxLegsEff = giftCanMulti ? 4 : 1;
 
-  // Evitar repetir demasiados BTTS NO en el regalo (máximo 1).
-  let giftBttsCount = 0;
+  // Cap más estricto cuando hay mucho pool (para obligar a cuotas seguras)
+  const capMax =
+    totalFixtures >= 31 ? 2.0 :
+    totalFixtures >= 18 ? 2.15 :
+    2.5;
 
-  // Rotación simple de tipo de pick (para que no salga siempre AH +3).
-  const _cat = (c) => {
-    const t = String(c?.pickType || "");
-    const lab = String(c?.label ?? "").toUpperCase();
-    if (t.startsWith("AH")) return "AH";
-    if (t.startsWith("OU")) return "OU";
-    if (t.startsWith("DC")) return "DC";
-    if (t.startsWith("BTTS")) {
-      if (lab.includes("NO")) return "BTTS_NO";
-      return "BTTS_YES";
-    }
-    return "OTHER";
-  };
-  const lastGiftCat = (__fv_lastGiftCat || null);
-  // Orden: mayor prob, luego preferir categoría distinta a la anterior.
-  pool.sort((a, b) => {
-    const pa = pr(a), pb = pr(b);
-    if (pb !== pa) return pb - pa;
-    const da = (_cat(a) === lastGiftCat) ? 1 : 0;
-    const db = (_cat(b) === lastGiftCat) ? 1 : 0;
-    if (da !== db) return da - db; // el que NO repite va primero
-    return (Number(a.usedOdd) || 9) - (Number(b.usedOdd) || 9);
-  });
+  // Pool: preferir FULL si existe; filtrar por prob mínima y odds válidas
+  let pool = hasAnyFull ? all.filter((c) => c && c.dataQuality === "full") : all.slice();
 
-  const maxLegsEff = giftMaxLegsEff;
+  const probMin = giftCanMulti ? 0.78 : 0.85;
+
+  pool = pool
+    .filter((c) => Number.isFinite(pr(c)) && pr(c) >= probMin)
+    .filter((c) => {
+      const o = __fv_legOdd(c);
+      return Number.isFinite(o) && o > 1 && o <= capMax;
+    });
+
+  if (!pool.length) return null;
+
+  // Orden: mayor prob (y luego menor cuota)
+  pool.sort((a, b) => (pr(b) - pr(a)) || (__fv_legOdd(a) - __fv_legOdd(b)));
 
   const legs = [];
   let prod = 1;
+  let bttsNoCount = 0;
 
   for (const cand of pool) {
+    if (legs.length >= giftMaxLegsEff) break;
+
     const fixtureId = getFixtureId(cand);
-   if (!fixtureId) continue;
-   if (legs.some((l) => String(l.fixtureId) === String(fixtureId))) continue;
+    if (!fixtureId) continue;
+    if (legs.some((l) => String(getFixtureId(l)) === String(fixtureId))) continue;
 
-    const odd = Number(cand.usedOdd);
-    if (!Number.isFinite(odd) || odd <= 1) continue;
+    // Evitar "Ambos marcan: NO" en exceso
+    if (isBttsNo(cand) && bttsNoCount >= 1) continue;
 
+    const odd = __fv_legOdd(cand);
     const next = prod * odd;
+
     if (next > maxOdd * 1.03) continue;
 
-    legs.push(cand);
+    legs.push({ ...cand, fixtureId });
     prod = next;
+    if (isBttsNo(cand)) bttsNoCount++;
 
-    if (legs.length >= maxLegsEff) break;
     if (prod >= minOdd && legs.length >= giftMinLegsEff) break;
+  }
+
+  // Si no alcanzó 3 legs cuando debería, caer a 1 pick (mejor que forzar picks malos)
+  if (giftCanMulti && legs.length < 3) {
+    const best = pool[0];
+    if (!best) return null;
+    legs.length = 0;
+    legs.push({ ...best, fixtureId: getFixtureId(best) });
+    prod = __fv_legOdd(best);
   }
 
   if (!legs.length) return null;
 
-  // Guardar el regalo para evitar contradicciones con parlays.
   __fv_lastGiftLegs = legs.slice();
   __fv_lastGiftCat = _cat(legs[0]);
 
@@ -791,7 +777,7 @@ const capLegOdd =
 
 // BTTS NO se ve poco profesional si se repite.
 // Permitimos 2 cuando el pool es chico, y 1 cuando hay suficientes partidos.
-const MAX_BTTSNO_PER_PARLAY = (poolFixtures <= 12 ? 2 : 1);
+const MAX_BTTSNO_PER_PARLAY = (poolFixtures >= 10 ? 1 : 2);
   const MAX_OU_PER_PARLAY = 3;
   const MAX_AH_PER_PARLAY = 3;
 
@@ -910,12 +896,12 @@ const MAX_BTTSNO_PER_PARLAY = (poolFixtures <= 12 ? 2 : 1);
     if (!Number.isFinite(o) || o <= 1) return false;
 
     // keep legs conservative; allow small slack when reaching target
-    if (o > capLegOdd && prod < t) return false;
+    if (o > capLegOdd) return false;
 
     const b = bucket(c);
 
     // Hard limit: BTTS NO (Ambos marcan: NO) máximo 1 por parlay
-    if (b === "BTTS" && isBttsNo(cand) && bttsNoCount >= MAX_BTTSNO_PER_PARLAY) return false;
+    if (b === "BTTS" && isBttsNo(c) && bttsNoCount >= MAX_BTTSNO_PER_PARLAY) return false;
     if (b === "OU" && ouCount >= MAX_OU_PER_PARLAY) return false;
     if (b === "AH" && ahCount >= MAX_AH_PER_PARLAY) return false;
 
