@@ -614,9 +614,9 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
 
   // ====== Reglas EXACTAS del usuario ======
   const capLegOdd =
-    poolFixtures > 18 ? FV_GLOBALS.CAP_MAX_STRICT :
-    poolFixtures > 10 ? FV_GLOBALS.CAP_MAX_NORMAL :
-    FV_GLOBALS.CAP_MAX_NORMAL;
+    poolFixtures > 18 ? CAP_MAX_STRICT :
+    poolFixtures > 10 ? CAP_MAX_NORMAL :
+    CAP_MAX_NORMAL;
 
   function minLegsForTarget() {
     if (poolFixtures > 18) {
@@ -721,7 +721,7 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     if (odd > capLegOdd) return false;
 
     if (isBTTSNo(c)) {
-      if (bttsCount >= FV_GLOBALS.MAX_BTTS_PER_PARLAY) return false;
+      if (bttsCount >= MAX_BTTS_PER_PARLAY) return false;
     }
 
     // ok add
