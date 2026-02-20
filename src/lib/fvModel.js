@@ -598,6 +598,7 @@ export function pickSafe(candidatesByFixture) {
 // 2) Differentiate x50 vs x100 when the pool is small.
 let __fv_lastGiftLegs = null;
 let __fv_lastParlay50 = null;
+let __fv_lastGiftCat = null;
 
 function __fv_normSel(s) {
   return String(s || "")
@@ -704,7 +705,7 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
     if (t.startsWith("BTTS")) return "BTTS";
     return "OTHER";
   };
-  const lastGiftCat = (_fv_lastGiftCat || null);
+  const lastGiftCat = (__fv_lastGiftCat || null);
   // Orden: mayor prob, luego preferir categoría distinta a la anterior.
   pool.sort((a, b) => {
     const pa = pr(a), pb = pr(b);
@@ -712,11 +713,10 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
     const da = (_cat(a) === lastGiftCat) ? 1 : 0;
     const db = (_cat(b) === lastGiftCat) ? 1 : 0;
     if (da !== db) return da - db; // el que NO repite va primero
-    return (Number(a.usedodd) || 9) - (Number(b.usedodd) || 9);
+    return (Number(a.usedOdd) || 9) - (Number(b.usedOdd) || 9);
   });
 
-const maxLegsEff = Math.max(1, Math.min((Number(maxLegs) || 5), pool.length || (Number(maxLegs) || 5)));
-  pool.sort((a, b) => (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
+  const maxLegsEff = giftMaxLegsEff;
 
   const legs = [];
   let prod = 1;
@@ -743,6 +743,7 @@ const maxLegsEff = Math.max(1, Math.min((Number(maxLegs) || 5), pool.length || (
 
   // Guardar el regalo para evitar contradicciones con parlays.
   __fv_lastGiftLegs = legs.slice();
+  __fv_lastGiftCat = _cat(legs[0]);
 
   return {
     games: legs.length,
