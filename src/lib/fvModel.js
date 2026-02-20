@@ -718,8 +718,15 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     .filter(c => pr(c) >= probFloor)
     .filter(c => __fv_legOdd(c) >= 1.05 && __fv_legOdd(c) <= capLegOdd)
     .sort((a,b) => score(b) - score(a));
+  // ====== BTTS CONTROL (hard, cannot dominate) ======
+  // We REMOVE BTTS picks from the main pool and keep only 1 best BTTS candidate as an optional last-resort filler.
+  const bttsCandidates = scored.filter(isBTTSNo);
+  const bttsBest = bttsCandidates.length ? bttsCandidates[0] : null; // scored is already sorted by score desc
+  const scoredNoBTTS = scored.filter(c => !isBTTSNo(c));
+  // ==================================================
 
-  if (!scored.length) return null;
+
+  if (!scoredNoBTTS.length) return null;
 
   // ====== Build con reglas: 1 pick por fixture + BTTS max 1 + mix ======
   const usedFixture = new Set();
@@ -755,18 +762,27 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
 
   // 1) Seed mix: AH (+3/+2), OU (O0.5 / O1.5), luego DC (si falta)
   const preferOrders = [
+    // Prefer AH +3 first (most conservative)
+    (c) => String(c.market).toUpperCase() === "AH" && String(c.label || "").includes("+3"),
+    // Then any AH (including +2) if +3 not available
     (c) => String(c.market).toUpperCase() === "AH",
-    (c) => ["OU_05","OU_15"].includes(String(c.market).toUpperCase()) && String(c.selection).toLowerCase()==="over",
+    // Over 0.5 (ultra safe)
+    (c) => String(c.market).toUpperCase() === "OU_05" && String(c.selection).toLowerCase()==="over",
+    // Over 1.5 (safe)
+    (c) => String(c.market).toUpperCase() === "OU_15" && String(c.selection).toLowerCase()==="over",
+    // Under 3.5 (safe ceiling)
+    (c) => String(c.market).toUpperCase() === "OU_35" && String(c.selection).toLowerCase()==="under",
+    // Then DC to stabilize
     (c) => String(c.market).toUpperCase() === "DC",
   ];
 
   for (const pred of preferOrders) {
-    const pick = scored.find(c => pred(c) && !usedFixture.has(c.fixtureId) && __fv_legOdd(c) <= capLegOdd);
+    const pick = scoredNoBTTS.find(c => pred(c) && !usedFixture.has(c.fixtureId) && __fv_legOdd(c) <= capLegOdd);
     if (pick) tryAdd(pick);
   }
 
   // 2) Greedy fill
-  for (const c of scored) {
+  for (const c of scoredNoBTTS) {
     if (legs.length >= maxLegs) break;
 
     // If we're already close, avoid huge overshoot
@@ -782,13 +798,20 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
 
   // 3) If still below minFactor, relax overshoot a bit (but keep capLegOdd)
   if (prod < minFactor) {
-    for (const c of scored) {
+    for (const c of scoredNoBTTS) {
       if (legs.length >= maxLegs) break;
       if (usedFixture.has(c.fixtureId)) continue;
       tryAdd(c);
       if (legs.length >= minLegs && prod >= minFactor) break;
     }
   }
+  // 3.5) LAST RESORT: allow at most ONE BTTS NO to help reach target if still short.
+  // Only if we still haven't used BTTS and we are meaningfully below minFactor.
+  if (bttsBest && bttsCount === 0 && prod < minFactor * 0.95 && legs.length < maxLegs && pr(bttsBest) >= 0.60) {
+    // Ensure it's not contradictory with gift leg (same fixture) and not already used fixture.
+    tryAdd(bttsBest);
+  }
+
 
   if (legs.length < minLegs) return null;
 
@@ -802,6 +825,19 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     }
     legsHard.push(c);
   }
+  // If we removed extra BTTS and fell below minLegs, refill with best non-BTTS unused legs.
+  if (legsHard.length < minLegs) {
+    for (const c of scoredNoBTTS) {
+      if (legsHard.length >= minLegs) break;
+      if (!c || isBTTSNo(c)) continue;
+      if (legsHard.some(l => String(l.fixtureId) === String(c.fixtureId))) continue;
+      // reuse cap and prob constraints
+      const odd = __fv_legOdd(c);
+      if (odd > capLegOdd) continue;
+      legsHard.push(c);
+    }
+  }
+
 
   // Recalcular producto por si sacamos BTTS extra
   prod = 1;
