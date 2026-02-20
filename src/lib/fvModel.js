@@ -1,3 +1,9 @@
+// ===== Professional constants (module scope fallback) =====
+const CAP_MAX_NORMAL = 2.5;
+const CAP_MAX_STRICT = 2.45;
+const MAX_BTTS_PER_PARLAY = 1;
+// ==========================================================
+
 // src/lib/fvModel.js
 // Motor MVP de probabilidades + armado de parlays para Factor Victoria.
 // Objetivo: simple, interpretable, con fallbacks (si no hay odds o stats).
@@ -211,6 +217,12 @@ export function estimateLambdasFromPack(pack) {
 }
 
 export function buildCandidatePicks({ fixture, pack, markets }) {
+  // === Professional constants (local scope, no globals) ===
+  const CAP_MAX_NORMAL = 2.5;
+  const CAP_MAX_STRICT = 2.45;
+  const MAX_BTTS_PER_PARLAY = 1;
+  // =======================================================
+
   
   // Genera picks candidatos con: market, selection, label, prob, fvOdd, marketOdd, usedOdd, valueEdge, fixtureId, home, away
   const out = [];
@@ -605,6 +617,12 @@ function __fv_legScore(c, oddWeight = 0.35) {
 
 
 export function buildParlay(candidatesByFixture, target, opts = {}) {
+  // === Professional constants (local scope, no globals) ===
+  const CAP_MAX_NORMAL = 2.5;
+  const CAP_MAX_STRICT = 2.45;
+  const MAX_BTTS_PER_PARLAY = 1;
+  // =======================================================
+
   const t = Number(target);
   const byFix = candidatesByFixture || {};
   const poolFixtures = Object.keys(byFix).length;
@@ -721,7 +739,8 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
     if (odd > capLegOdd) return false;
 
     if (isBTTSNo(c)) {
-      if (bttsCount >= MAX_BTTS_PER_PARLAY) return false;
+      if (bttsCount >= MAX_BTTS_PER_PARLAY)
+      return false;
     }
 
     // ok add
