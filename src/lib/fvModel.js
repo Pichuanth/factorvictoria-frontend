@@ -1,4 +1,4 @@
-// fvModel patch marker v2
+
   function isBttsNo(c) {
     const m = String(c?.market ?? c?.type ?? "").toUpperCase();
     const lab = String(c?.label ?? "").toUpperCase();
@@ -670,21 +670,15 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
   const hasAnyFull = fullFixtureCount > 0;
 
   // Reglas: si hay suficientes fixtures con datos completos, mostrar 3–4 picks.
-  const giftCanMulti = totalFixtures >= 10 && fullFixtureCount >= 3;
+  const giftCanMulti = (fullFixtureCount >= 3) && (totalFixtures >= 8);
   const giftMinLegsEff = giftCanMulti ? 3 : 1;
   const giftMaxLegsEff = giftCanMulti ? 4 : 1;
 
-  // Cap más estricto  // Odds objetivo del regalo: dentro de x1.5–x3 (ideal x1.6–x2.5)
-  const minOddEff = Math.max(minOdd, giftCanMulti ? 1.6 : 1.5);
-  const maxOddEff = giftCanMulti ? Math.min(maxOdd, 2.6) : maxOdd;
-
-  // cuando hay mucho pool (para obligar a cuotas seguras)
-  // Regla: pool <= 18: ~2.15 | pool 19–30: ~2.05 | pool > 30: ~1.95–2.00
+  // Cap más estricto cuando hay mucho pool (para obligar a cuotas seguras)
   const capMax =
-    totalFixtures > 50 ? 1.95 :
-    totalFixtures > 30 ? 2.0 :
-    totalFixtures >= 19 ? 2.05 :
-    2.15;
+    totalFixtures >= 31 ? 2.0 :
+    totalFixtures >= 18 ? 2.15 :
+    2.5;
 
   // Pool: preferir FULL si existe; filtrar por prob mínima y odds válidas
   let pool = hasAnyFull ? all.filter((c) => c && c.dataQuality === "full") : all.slice();
@@ -720,13 +714,13 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
     const odd = __fv_legOdd(cand);
     const next = prod * odd;
 
-    if (next > maxOddEff * 1.03) continue;
+    if (next > maxOdd * 1.03) continue;
 
     legs.push({ ...cand, fixtureId });
     prod = next;
     if (isBttsNo(cand)) bttsNoCount++;
 
-    if (prod >= minOddEff && legs.length >= giftMinLegsEff) break;
+    if (prod >= minOdd && legs.length >= giftMinLegsEff) break;
   }
 
   // Si no alcanzó 3 legs cuando debería, caer a 1 pick (mejor que forzar picks malos)
@@ -747,7 +741,7 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
     games: legs.length,
     finalOdd: round2(prod),
     legs,
-    reached: prod >= minOddEff && prod <= maxOddEff * 1.05,
+    reached: prod >= minOdd && prod <= maxOdd * 1.05,
   };
 }
 
@@ -783,25 +777,34 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
   const poolFixtures = Object.keys(byFix).length;
 
 
-// Caps dinámicos por tamaño del pool (evita que se cuelen cuotas 4–5 en pools grandes).
-// Regla: pool <= 18: ~2.15 | pool 19–30: ~2.05 | pool > 30: ~1.95–2.00
-const capLegOdd =
-  poolFixtures > 50 ? 1.95 :
-  poolFixtures > 30 ? 2.0  :
-  poolFixtures >= 19 ? 2.05 :
-  2.15;
+// Caps: when there are many fixtures, prefer lower individual odds.
+// Pools muy grandes (>=31 fixtures): cap ~2.0 (más conservador).
+// Pools grandes (>=19 fixtures): cap ~2.15.
+const CAP_MAX_SMALL  = 2.5;   // pool chico
+const CAP_MAX_NORMAL = 2.3;   // pool normal
+const CAP_MAX_MEDIUM = 2.15;  // pool medio
+const CAP_MAX_BIG    = 2.0;   // pool grande
+const CAP_MAX_HUGE   = 1.95;  // pool muy grande (muchos partidos)
+const CAP_MAX_ULTRA  = 1.9;   // pool ultra grande
 
+const capLegOdd =
+  poolFixtures >= 70 ? CAP_MAX_ULTRA :
+  poolFixtures >= 50 ? CAP_MAX_HUGE  :
+  poolFixtures >= 31 ? CAP_MAX_BIG   :
+  poolFixtures >= 19 ? CAP_MAX_MEDIUM :
+  poolFixtures >= 11 ? CAP_MAX_NORMAL :
+  CAP_MAX_SMALL;
+
+// Hard cap for individual odds (avoid cuotas 4–5). Default 2.5.
+const __optMaxLegOddRaw = Number(opts?.maxLegOdd);
+const __optMaxLegOdd = Number.isFinite(__optMaxLegOddRaw) ? __optMaxLegOddRaw : 2.5;
+const legOddMax = Math.min(capLegOdd, __optMaxLegOdd);
 
 // BTTS NO se ve poco profesional si se repite.
 // Permitimos 2 cuando el pool es chico, y 1 cuando hay suficientes partidos.
 const MAX_BTTSNO_PER_PARLAY = (poolFixtures >= 10 ? 1 : 2);
-const MAX_OU_PER_PARLAY = 3;
-const MAX_AH_PER_PARLAY = 3;
-
-// Doble oportunidad: puede repetirse, pero con límites para evitar 4–5 seguidas.
-const MAX_DC_PER_PARLAY = (poolFixtures >= 19 ? 3 : 4);
-const MAX_CONSEC_DC = 2;
-
+  const MAX_OU_PER_PARLAY = 3;
+  const MAX_AH_PER_PARLAY = 3;
 
   const safeNum = (x, d = 0) => (Number.isFinite(Number(x)) ? Number(x) : d);
 
@@ -853,8 +856,8 @@ const MAX_CONSEC_DC = 2;
 
   if (!pool.length) return null;
 
-  // Conservative: avoid >3 always.
-  pool = pool.filter((c) => odd(c) <= 3);
+  // Conservative: cap individual odds strictly (default max 2.5)
+  pool = pool.filter((c) => odd(c) <= legOddMax);
 
   // Sort best-first
   pool.sort((a, b) => score(b) - score(a));
@@ -903,12 +906,9 @@ const MAX_CONSEC_DC = 2;
   const chosen = [];
   let prod = 1;
 
-  let bttsNoCount = 0; // total BTTS_NO (máx según pool)
+  let bttsNoCount = 0; // total BTTS picks (max 1)
   let ouCount = 0;
   let ahCount = 0;
-  let dcCount = 0;
-
-  const lastBuckets = [];
 
   const usedFix = new Set();
 
@@ -921,7 +921,7 @@ const MAX_CONSEC_DC = 2;
     if (!Number.isFinite(o) || o <= 1) return false;
 
     // keep legs conservative; allow small slack when reaching target
-    if (o > capLegOdd) return false;
+    if (o > legOddMax) return false;
 
     const b = bucket(c);
 
@@ -929,14 +929,6 @@ const MAX_CONSEC_DC = 2;
     if (b === "BTTS" && isBttsNo(c) && bttsNoCount >= MAX_BTTSNO_PER_PARLAY) return false;
     if (b === "OU" && ouCount >= MAX_OU_PER_PARLAY) return false;
     if (b === "AH" && ahCount >= MAX_AH_PER_PARLAY) return false;
-
-    // Doble oportunidad: limitar repetición y consecutivos
-    if (b === "DC") {
-      if (dcCount >= MAX_DC_PER_PARLAY) return false;
-      const n = lastBuckets.length;
-      const consec = (n >= 1 && lastBuckets[n - 1] === "DC" ? 1 : 0) + (n >= 2 && lastBuckets[n - 2] === "DC" ? 1 : 0);
-      if (consec >= MAX_CONSEC_DC) return false;
-    }
 
     return true;
   };
@@ -949,13 +941,9 @@ const MAX_CONSEC_DC = 2;
     usedFix.add(fx);
 
     const b = bucket(c);
-    lastBuckets.push(b);
-    if (lastBuckets.length > 6) lastBuckets.shift();
-
     if (b === "BTTS" && isBttsNo(c)) { bttsNoCount += 1; }
     if (b === "OU") ouCount += 1;
     if (b === "AH") ahCount += 1;
-    if (b === "DC") dcCount += 1;
   };
 
   // --- Variety pass: try to include at least 1 OU and 1 AH when available ---
@@ -991,8 +979,7 @@ const MAX_CONSEC_DC = 2;
     if (next <= prod * 1.2) add(c);
   }
 
-  // If not enough legs selected (e.g., tight constraints), relax capLegOdd a bit (pero sin romper caps en pools grandes)
-  const relaxMaxOdd = Math.min(3, capLegOdd + (poolFixtures > 30 ? 0.05 : poolFixtures >= 19 ? 0.10 : 0.20));
+  // If not enough legs selected (e.g., tight constraints), relax capLegOdd slightly up to 3
   if (chosen.length < minLegs) {
     for (const c of pool) {
       if (chosen.length >= minLegs) break;
@@ -1000,18 +987,12 @@ const MAX_CONSEC_DC = 2;
       if (!fx || usedFix.has(fx)) continue;
 
       const o = odd(c);
-      if (!Number.isFinite(o) || o <= 1 || o > relaxMaxOdd) continue;
+      if (!Number.isFinite(o) || o <= 1 || o > legOddMax) continue;
 
       const b = bucket(c);
       if (b === "BTTS" && isBttsNo(c) && bttsNoCount >= MAX_BTTSNO_PER_PARLAY) continue;
       if (b === "OU" && ouCount >= MAX_OU_PER_PARLAY) continue;
       if (b === "AH" && ahCount >= MAX_AH_PER_PARLAY) continue;
-      if (b === "DC") {
-        if (dcCount >= MAX_DC_PER_PARLAY) continue;
-        const n = lastBuckets.length;
-        const consec = (n >= 1 && lastBuckets[n - 1] === "DC" ? 1 : 0) + (n >= 2 && lastBuckets[n - 2] === "DC" ? 1 : 0);
-        if (consec >= MAX_CONSEC_DC) continue;
-      }
 
       add(c);
     }
