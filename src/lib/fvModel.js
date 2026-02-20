@@ -135,255 +135,12 @@ export function probUnderLine(lambdaTotal, line) {
 }
 
 export function probBTTSNo(lambdaHome, lambdaAway) {
+  // P(BTTS NO) = P(home=0 OR away=0) = P(home=0)+P(away=0)-P(home=0 AND away=0)
   const pH0 = poissonP(0, lambdaHome);
   const pA0 = poissonP(0, lambdaAway);
-  const pBoth0 = pH0 * pAexport function buildParlay(candidatesByFixture, target, opts = {}) {
-  const t = Number(target);
-  const byFix = candidatesByFixture || {};
-  const poolFixtures = Object.keys(byFix).length;
-  const candAll = Object.values(byFix).flat();
-
-  const safeNum = (x, d = 0) => (Number.isFinite(Number(x)) ? Number(x) : d);
-
-  // ====== Reglas EXACTAS del usuario ======
-  const capLegOdd =
-    poolFixtures > 18 ? CAP_MAX_STRICT :
-    poolFixtures > 10 ? CAP_MAX_NORMAL :
-    CAP_MAX_NORMAL;
-
-  function minLegsForTarget() {
-    if (poolFixtures > 18) {
-      if (t >= 100) return 9;
-      if (t >= 50)  return 8;
-      if (t >= 20)  return 7;
-      if (t >= 10)  return 6;
-    }
-    if (poolFixtures > 10) {
-      if (t >= 100) return 8;
-      if (t >= 50)  return 7;
-      if (t >= 20)  return 6;
-      if (t >= 10)  return 5;
-    }
-    // Default conservador para pools pequeños
-    if (t >= 100) return 7;
-    if (t >= 50)  return 6;
-    if (t >= 20)  return 5;
-    if (t >= 10)  return 3;
-    return 2;
-  }
-
-  const minLegs = minLegsForTarget();
-  const maxLegs = clamp(minLegs + 6, minLegs, 15);
-
-  // Rango de cuota final (mantener x50/x100 en rango profesional)
-  const targetMinMul = safeNum(opts.targetMinMul, 0.92);
-  const targetMaxMul =
-    t >= 100 ? 1.60 :
-    t >= 50  ? 1.35 :
-    t >= 20  ? 1.35 : 2.00;
-
-  let minFactor = t * targetMinMul;
-  let maxFactor = t * targetMaxMul;
-
-  // x100 debe ser > x50 (no clon)
-  if (typeof window !== "undefined" && t >= 100) {
-    const last50 = safeNum(window.__fv_lastParlay50, 0);
-    if (last50 > 0) minFactor = Math.max(minFactor, last50 * 1.10);
-  }
-
-  const probFloor =
-    t >= 100 ? 0.54 :
-    t >= 50  ? 0.56 :
-    t >= 20  ? 0.58 : 0.60;
-
-  const norm = (s) => String(s || "").toLowerCase();
-
-  const isBTTSNo = (c) => {
-    const mRaw = String(c?.market ?? c?.marketKey ?? c?.type ?? "").toLowerCase();
-    const sel = String(c?.selection ?? c?.pick ?? c?.outcome ?? "").toLowerCase();
-    const lab = String(c?.label ?? c?.name ?? "").toLowerCase();
-
-    const looksLikeBTTS =
-      mRaw.includes("btts") ||
-      mRaw.includes("both_teams_to_score") ||
-      lab.includes("ambos") && lab.includes("marcan") ||
-      lab.includes("both teams");
-
-    const isNo =
-      sel === "no" ||
-      sel === "n" ||
-      lab.includes(": no") ||
-      (lab.includes(" no") && !lab.includes("hándicap")) ||
-      lab.includes("not");
-
-    return looksLikeBTTS && isNo;
-  };
-
-  const marketKey = (c) => `${String(c.fixtureId)}|${String(c.market)}|${String(c.selection)}`;
-
-  // scoring: prob + pequeño bonus por variedad (OU_05/OU_15/AH) y penalizar BTTS para que no domine
-  function score(c) {
-    const p = pr(c);
-    const odd = __fv_legOdd(c);
-    const edge = safeNum(c?.valueEdge, 0);
-
-    let s = p + Math.max(0, edge) * 0.06;
-
-    const m = String(c?.market || "").toUpperCase();
-    if (m === "AH") s += 0.06;
-    if (m === "OU_05" || m === "OU_15" || m === "OU_35" || m === "OU_25") s += 0.04;
-    if (isBTTSNo(c)) s -= 0.08; // BTTS solo complemento
-
-    // odds suaves: preferir cuotas bajas para alta precisión
-    s -= Math.log(Math.max(1.01, odd)) * 0.20;
-
-    return s;
-  }
-
-  // pool filtrado (prob y cap)
-  const scored = candAll
-    .filter(c => safeNum(c?.fixtureId, null) != null)
-    .filter(c => pr(c) >= probFloor)
-    .filter(c => __fv_legOdd(c) >= 1.05 && __fv_legOdd(c) <= capLegOdd)
-    .sort((a,b) => score(b) - score(a));
-
-  // ===== BTTS CONTROL (hard): BTTS cannot dominate. Keep only the best BTTS as optional filler. =====
-  const bttsBest = scored.find(isBTTSNo) || null;
-  const scoredNoBTTS = scored.filter(c => !isBTTSNo(c));
-  // =============================================================================================
-
-  if (!scored.length) return null;
-
-  // ====== Build con reglas: 1 pick por fixture + BTTS max 1 + mix ======
-  const usedFixture = new Set();
-  const usedLeg = new Set();
-  let bttsCount = 0;
-
-  const legs = [];
-  let prod = 1;
-
-  function tryAdd(c) {
-    const fid = c.fixtureId;
-    if (usedFixture.has(fid)) return false;
-    const key = marketKey(c);
-    if (usedLeg.has(key)) return false;
-
-    const odd = __fv_legOdd(c);
-    if (odd > capLegOdd) return false;
-
-    if (isBTTSNo(c)) {
-      if (bttsCount >= MAX_BTTS_PER_PARLAY) return false;
-    }
-
-    // ok add
-    legs.push(c);
-    usedFixture.add(fid);
-    usedLeg.add(key);
-    prod *= odd;
-    if (isBTTSNo(c)) bttsCount++;
-
-    return true;
-  }
-
-  // 1) Seed mix: AH (+3/+2), OU (O0.5 / O1.5), luego DC (si falta)
-  const preferOrders = [
-    (c) => String(c.market).toUpperCase() === "AH",
-    (c) => ["OU_05","OU_15"].includes(String(c.market).toUpperCase()) && String(c.selection).toLowerCase()==="over",
-    (c) => String(c.market).toUpperCase() === "DC",
-  ];
-
-  for (const pred of preferOrders) {
-    const pick = scoredNoBTTS.find(c => pred(c) && !usedFixture.has(c.fixtureId) && __fv_legOdd(c) <= capLegOdd);
-    if (pick) tryAdd(pick);
-  }
-
-  // 2) Greedy fill
-  for (const c of scoredNoBTTS) {
-    if (legs.length >= maxLegs) break;
-
-    // If we're already close, avoid huge overshoot
-    const odd = __fv_legOdd(c);
-    const projected = prod * odd;
-    const close = prod >= (t * 0.70);
-    if (close && projected > maxFactor) continue;
-
-    tryAdd(c);
-
-    if (legs.length >= minLegs && prod >= minFactor && prod <= maxFactor) break;
-  }
-
-  // 3) If still below minFactor, relax overshoot a bit (but keep capLegOdd)
-  if (prod < minFactor) {
-    for (const c of scoredNoBTTS) {
-      if (legs.length >= maxLegs) break;
-      if (usedFixture.has(c.fixtureId)) continue;
-      tryAdd(c);
-      if (legs.length >= minLegs && prod >= minFactor) break;
-    }
-  }
-
-  if (legs.length < minLegs) return null;
-
-  // 4) HARD LIMIT: BTTS NO max 1 (última barrera, por label + market)
-  const legsHard = [];
-  let hardBTTS = 0;
-  for (const c of legs) {
-    const lab = norm(c?.label);
-    const isHardBTTS = isBTTSNo(c) || (lab.includes("ambos") && lab.includes("marcan") && lab.includes("no"));
-    if (isHardBTTS) {
-      if (hardBTTS >= MAX_BTTS_PER_PARLAY) continue;
-      hardBTTS++;
-    }
-    legsHard.push(c);
-  }
-
-  // Si al remover BTTS extra quedamos bajo minLegs, rellenamos con los mejores NO-BTTS disponibles.
-  if (legsHard.length < minLegs) {
-    const usedHard = new Set(legsHard.map(x => String(x.fixtureId)));
-    for (const c of scoredNoBTTS) {
-      if (legsHard.length >= minLegs) break;
-      if (!c?.fixtureId) continue;
-      const fid = String(c.fixtureId);
-      if (usedHard.has(fid)) continue;
-      const odd = __fv_legOdd(c);
-      if (odd > capLegOdd) continue;
-      if (pr(c) < probFloor) continue;
-      legsHard.push(c);
-      usedHard.add(fid);
-    }
-  }
-
-  // Recalcular producto final (después de hard limit)
-  prod = 1;
-  for (const c of legsHard) prod *= __fv_legOdd(c);
-
-  const picks = legsHard.map(l => ({
-    fixtureId: l.fixtureId,
-    type: l.market,
-    label: l.label,
-    odd: round2(__fv_legOdd(l)),
-    prob: round2(Number(l.prob)),
-    edge: l.valueEdge,
-    home: l.home,
-    away: l.away,
-  }));
-
-  const finalOdd = prod;
-
-  const out = {
-    target: t,
-    finalOdd,
-    legs: picks,
-    legsCount: picks.length,
-    final: `x${round2(finalOdd)}`,
-  };
-
-  // Persist last x50 for monotonic x100
-  if (typeof window !== "undefined" && t >= 50 && t < 100) {
-    window.__fv_lastParlay50 = finalOdd;
-  }
-
-  return out;
+  const pBoth0 = pH0 * pA0;
+  const p = (pH0 + pA0 - pBoth0);
+  return clamp(p, 0, 1);
 }) {
     if (c.hg > c.ag) pH += c.p;
     else if (c.hg === c.ag) pD += c.p;
@@ -681,13 +438,23 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
 export function pickSafe(candidatesByFixture) {
   const all = Object.values(candidatesByFixture || {}).flat();
 
-  // REGLA: si existe al menos 1 partido con datos completos (racha home+away),
-  // la cuota segura (regalo) DEBE salir de ese subconjunto.
-  const full = all.filter(p => p?.dataQuality === "full");
+  const full = all.filter((p) => p?.dataQuality === "full");
   const pool = full.length ? full : all;
 
-  // Orden: mayor probabilidad (conservadora) y luego menor cuota.
-  pool.sort((a, b) => (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
+  const mWeight = (p) => {
+    const m = String(p?.market || "").toUpperCase();
+    if (m === "AH" && String(p?.label || "").includes("+3")) return 6;
+    if (m === "AH") return 5;
+    if (m === "OU_05") return 4.5;
+    if (m === "OU_15") return 4.0;
+    if (m === "OU_35") return 3.8;
+    if (m === "OU_25") return 3.6;
+    if (m === "DC") return 3.0;
+    if (m === "BTTS") return 0.5;
+    return 2.0;
+  };
+
+  pool.sort((a, b) => (mWeight(b) - mWeight(a)) || (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
   return pool[0] || null;
 }
 
@@ -765,33 +532,37 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
     return arr.some((c) => c && c.dataQuality === "full");
   });
 
-  const pool = Object.values(candidatesByFixture || {})
+  // Pool base: 1 mejor pick por fixture, priorizando full-data si existe en ese fixture.
+  let pool = Object.values(candidatesByFixture || {})
     .map((list) => {
       const arr = Array.isArray(list) ? list : [];
       if (hasAnyFull && !arr.some((c) => c && c.dataQuality === "full")) return null;
-      // Prioriza "full" (círculo verde) si existe.
       const full = arr.filter((p) => p?.dataQuality === "full");
       return (full.length ? full : arr)[0] || null;
     })
-    .filter(Boolean)
+    .filter(Boolean);
 
-  // ===== Reglas CUOTA SEGURA (regalo) =====
-  // - Si hay >=10 partidos con datos completos (verde) => mini combinada 3 a 4 legs
-  // - Si hay <=3 partidos disponibles => solo 1 pick
+  // Conteo de fixtures FULL disponibles (verde)
   const fullFixtureCount = Object.values(candidatesByFixture || {}).filter((list) => {
     const arr = Array.isArray(list) ? list : [];
     return arr.some((c) => c && c.dataQuality === "full");
   }).length;
 
+  // ===== Reglas CUOTA SEGURA (regalo) =====
+  // - Si >=10 fixtures full => mini combinada 3 a 4 legs
+  // - Si <=3 fixtures disponibles => solo 1 pick
   const giftMinLegs = fullFixtureCount >= 10 ? 3 : 1;
-  const giftMaxLegs = fullFixtureCount >= 10 ? 4 : maxLegs;
+  const giftMaxLegs = fullFixtureCount >= 10 ? 4 : Math.max(1, Number(maxLegs) || 3);
   const giftProbMin = fullFixtureCount >= 10 ? 0.80 : 0.85;
   // ======================================
 
   const poolFixCount = pool.length;
+
+  // Si hay 3 o menos fixtures => SOLO 1 pick
   if (poolFixCount <= 3) {
     const one = pool[0] || null;
     if (!one) return null;
+    __fv_lastGiftLegs = [one];
     return {
       games: 1,
       finalOdd: round2(__fv_legOdd(one)),
@@ -800,16 +571,20 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
     };
   }
 
-
+  // Filtro adicional por prob mínima y odds válidas
+  pool = pool
     .filter((x) => Number.isFinite(x.prob) && pr(x) >= giftProbMin)
     .filter((x) => {
       const odd = Number(x.usedOdd);
       return Number.isFinite(odd) && odd > 1;
     });
 
+  if (!pool.length) return null;
 
-  const maxLegsEff = Math.max(1, Math.min((Number(giftMaxLegs) || 4), pool.length || (Number(giftMaxLegs) || 4)));
+  // Orden: más seguro primero
   pool.sort((a, b) => (pr(b) - pr(a)) || (Number(a.usedOdd) - Number(b.usedOdd)));
+
+  const maxLegsEff = Math.max(1, Math.min(giftMaxLegs, pool.length || giftMaxLegs));
 
   const legs = [];
   let prod = 1;
@@ -836,7 +611,7 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
   if (giftMinLegs > 1 && legs.length < giftMinLegs) {
     for (const cand of pool) {
       if (legs.length >= giftMinLegs) break;
-      if (legs.some(l => String(l.fixtureId) === String(cand.fixtureId))) continue;
+      if (legs.some((l) => String(l.fixtureId) === String(cand.fixtureId))) continue;
       const odd = __fv_legOdd(cand);
       if (!Number.isFinite(odd) || odd <= 1) continue;
       const next = prod * odd;
@@ -846,7 +621,6 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
     }
   }
 
-  // Guardar el regalo para evitar contradicciones con parlays.
   __fv_lastGiftLegs = legs.slice();
 
   return {
