@@ -22,6 +22,16 @@ function safeNum(n) {
   return Number.isFinite(x) ? x : null;
 }
 
+// ---- Globals / Constantes FV (evita ReferenceErrors por scope) ----
+// CAP_MAX_NORMAL: tope profesional por leg cuando pool >=10
+// CAP_MAX_STRICT: tope aún más conservador cuando pool >=18
+export const FV_GLOBALS = Object.freeze({
+  CAP_MAX_NORMAL: 2.5,
+  CAP_MAX_STRICT: 2.45,
+});
+
+
+
 // --- Data quality helpers (form/racha) ---
 function extractLast5(pack) {
   return (
