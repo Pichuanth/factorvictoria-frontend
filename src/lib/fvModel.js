@@ -702,7 +702,9 @@ const maxLegsEff = Math.max(1, Math.min((Number(maxLegs) || 5), pool.length || (
   let prod = 1;
 
   for (const cand of pool) {
-    if (legs.some((l) => String(l.fixtureId) === String(cand.fixtureId))) continue;
+    const fixtureId = getFixtureId(cand);
+   if (!fixtureId) continue;
+   if (legs.some((l) => String(l.fixtureId) === String(fixtureId))) continue;
 
     const odd = Number(cand.usedOdd);
     if (!Number.isFinite(odd) || odd <= 1) continue;
