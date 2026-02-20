@@ -1,3 +1,14 @@
+
+  function isBttsNo(c) {
+    const m = String(c?.market ?? c?.type ?? "").toUpperCase();
+    const lab = String(c?.label ?? "").toUpperCase();
+    const sel = String(c?.selection ?? c?.pick ?? c?.outcome ?? "").toUpperCase();
+    const isBTTS = m.includes("BTTS") || lab.includes("AMBOS");
+    if (!isBTTS) return false;
+    // Identificamos específicamente "Ambos marcan: NO"
+    return sel.includes("NO") || lab.includes("NO");
+  }
+
 // src/lib/fvModel.js
 // Motor MVP de probabilidades + armado de parlays para Factor Victoria.
 
@@ -763,18 +774,24 @@ export function buildParlay(candidatesByFixture, target, opts = {}) {
 // Caps: when there are many fixtures, prefer lower individual odds.
 // Pools muy grandes (>=31 fixtures): cap ~2.0 (más conservador).
 // Pools grandes (>=19 fixtures): cap ~2.15.
-const CAP_MAX_NORMAL = 2.5;   // pool chico/normal
-const CAP_MAX_STRICT = 2.3;   // pool medio (más conservador)
-const CAP_MAX_BIG    = 2.15;  // pool grande
-const CAP_MAX_HUGE   = 2.0;   // pool muy grande
+const CAP_MAX_SMALL  = 2.5;   // pool chico
+const CAP_MAX_NORMAL = 2.3;   // pool normal
+const CAP_MAX_MEDIUM = 2.15;  // pool medio
+const CAP_MAX_BIG    = 2.0;   // pool grande
+const CAP_MAX_HUGE   = 1.95;  // pool muy grande (muchos partidos)
+const CAP_MAX_ULTRA  = 1.9;   // pool ultra grande
 
 const capLegOdd =
-  poolFixtures >= 31 ? CAP_MAX_HUGE :
-  poolFixtures >= 19 ? CAP_MAX_BIG  :
-  poolFixtures >= 11 ? CAP_MAX_STRICT :
-  CAP_MAX_NORMAL;
+  poolFixtures >= 70 ? CAP_MAX_ULTRA :
+  poolFixtures >= 50 ? CAP_MAX_HUGE  :
+  poolFixtures >= 31 ? CAP_MAX_BIG   :
+  poolFixtures >= 19 ? CAP_MAX_MEDIUM :
+  poolFixtures >= 11 ? CAP_MAX_NORMAL :
+  CAP_MAX_SMALL;
 
-const MAX_BTTS_PER_PARLAY = 1;
+// BTTS NO se ve poco profesional si se repite.
+// Permitimos 2 cuando el pool es chico, y 1 cuando hay suficientes partidos.
+const MAX_BTTSNO_PER_PARLAY = (poolFixtures <= 12 ? 2 : 1);
   const MAX_OU_PER_PARLAY = 3;
   const MAX_AH_PER_PARLAY = 3;
 
@@ -878,7 +895,7 @@ const MAX_BTTS_PER_PARLAY = 1;
   const chosen = [];
   let prod = 1;
 
-  let bttsCount = 0; // total BTTS picks (max 1)
+  let bttsNoCount = 0; // total BTTS picks (max 1)
   let ouCount = 0;
   let ahCount = 0;
 
@@ -898,7 +915,7 @@ const MAX_BTTS_PER_PARLAY = 1;
     const b = bucket(c);
 
     // Hard limit: BTTS NO (Ambos marcan: NO) máximo 1 por parlay
-    if (b === "BTTS" && bttsCount >= MAX_BTTS_PER_PARLAY) return false;
+    if (b === "BTTS" && isBttsNo(cand) && bttsNoCount >= MAX_BTTSNO_PER_PARLAY) return false;
     if (b === "OU" && ouCount >= MAX_OU_PER_PARLAY) return false;
     if (b === "AH" && ahCount >= MAX_AH_PER_PARLAY) return false;
 
@@ -913,7 +930,7 @@ const MAX_BTTS_PER_PARLAY = 1;
     usedFix.add(fx);
 
     const b = bucket(c);
-    if (b === "BTTS") { bttsCount += 1; }
+    if (b === "BTTS" && isBttsNo(c)) { bttsNoCount += 1; }
     if (b === "OU") ouCount += 1;
     if (b === "AH") ahCount += 1;
   };
@@ -962,7 +979,7 @@ const MAX_BTTS_PER_PARLAY = 1;
       if (!Number.isFinite(o) || o <= 1 || o > 3) continue;
 
       const b = bucket(c);
-      if (b === "BTTS" && bttsCount >= MAX_BTTS_PER_PARLAY) continue;
+      if (b === "BTTS" && isBttsNo(c) && bttsNoCount >= MAX_BTTSNO_PER_PARLAY) continue;
       if (b === "OU" && ouCount >= MAX_OU_PER_PARLAY) continue;
       if (b === "AH" && ahCount >= MAX_AH_PER_PARLAY) continue;
 
@@ -1014,7 +1031,7 @@ export function buildValueList(candidatesByFixture, minEdge = 0.06) {
           if (usedFix.has(String(c.fixtureId))) continue;
           const o = _fv_legOdd(c);
           if (!Number.isFinite(o) || o <= 1 || o > capLegOdd) continue;
-          if (isBTTSNO(c) && bttsCount >= 1) continue;
+          if (isBTTSNO(c) && bttsNoCount >= MAX_BTTSNO_PER_PARLAY) continue;
           addCand(c);
           return true;
         }
