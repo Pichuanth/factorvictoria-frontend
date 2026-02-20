@@ -1,4 +1,30 @@
 
+function __fv_extendParlay(base, extraPool, minExtra=1){
+  const used = new Set(base.map(p=>p.fixtureId));
+  const extra = extraPool.filter(p=>p && !used.has(p.fixtureId));
+  return base.concat(extra.slice(0,minExtra));
+}
+
+
+function __fv_prioritizeGreenData(pool){
+  const full = pool.filter(p => p && p.hasFullData === true);
+  if(full.length > 0) return full;
+  return pool;
+}
+
+
+function __fv_hardLimitBTTS(picks){
+  let count = 0;
+  return picks.filter(p=>{
+    if(p && p.pickType === "BTTS_NO"){
+      if(count >= 1) return false;
+      count++;
+    }
+    return true;
+  });
+}
+
+
 // ================= PROFESSIONAL GLOBAL CONSTANTS =================
 const FV_GLOBALS = {
   CAP_MAX_NORMAL: 2.5,
