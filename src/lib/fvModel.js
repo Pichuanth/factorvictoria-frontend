@@ -15,6 +15,14 @@
     return sel.includes("NO") || lab.includes("NO");
   }
 
+
+  function isHandicapPick(c) {
+    const m = String(c?.market ?? c?.type ?? "").toUpperCase();
+    const lab = String(c?.label ?? c?.pick ?? "").toUpperCase();
+    // Soporta "Hándicap" con y sin tilde
+    return m.includes("HANDICAP") || lab.includes("HANDICAP") || lab.includes("HÁNDICAP") || lab.includes("HÁNDICAP");
+  }
+
 // src/lib/fvModel.js
 // Motor MVP de probabilidades + armado de parlays para Factor Victoria.
 
@@ -824,13 +832,17 @@ export function buildParlay({ candidatesByFixture, target, cap = 100, hardMaxOdd
     // Market repetition caps (per parlay)
     let under25Count = 0;
     let bttsNoCount = 0;
+    let handicapCount = 0;
+
     const bumpAdd = (p) => {
       if (isUnder25Pick(p)) under25Count += 1;
       if (isBttsNo(p)) bttsNoCount += 1;
+      if (isHandicapPick(p)) handicapCount += 1;
     };
     const bumpRemove = (p) => {
       if (isUnder25Pick(p)) under25Count = Math.max(0, under25Count - 1);
       if (isBttsNo(p)) bttsNoCount = Math.max(0, bttsNoCount - 1);
+      if (isHandicapPick(p)) handicapCount = Math.max(0, handicapCount - 1);
     };
 
 
@@ -843,6 +855,7 @@ export function buildParlay({ candidatesByFixture, target, cap = 100, hardMaxOdd
       const o = candOdd(pick);
       if (!o) continue;
       legs.push(pick);
+      bumpAdd(pick);
       usedFixtures.add(String(fid));
       prod *= o;
     }
@@ -880,6 +893,7 @@ export function buildParlay({ candidatesByFixture, target, cap = 100, hardMaxOdd
           // Cap repeated markets inside a single parlay
           if (isUnder25Pick(c) && under25Count >= 1) continue;
           if (isBttsNo(c) && bttsNoCount >= 1) continue;
+          if (isHandicapPick(c) && handicapCount >= 2) continue;
           const o = candOdd(c);
           if (!o) continue;
           const next = prod * o;

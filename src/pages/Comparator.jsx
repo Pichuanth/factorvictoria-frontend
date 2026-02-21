@@ -1676,8 +1676,12 @@ const ensureFvPack = useCallback(
           ? selectedPool
           : fixtures.slice(0, Math.min(28, fixtures.length));
 
-      if (mode === "selected" && pool.length < 2) {
-        setParlayError("Selecciona al menos 2 partidos de la lista superior.");
+      if (pool.length < 2) {
+        setParlayError(
+          mode === "selected"
+            ? "Selecciona al menos 2 partidos de la lista superior."
+            : "Para generar combinadas necesitas al menos 2 partidos. Amplía el rango (días) o agrega otra liga."
+        );
         return;
       }
      
