@@ -755,3 +755,187 @@ export function buildValueList(candidatesByFixture, minEdge = 0.06) {
       if (hasAnyAH) pickOne(isAH);
     }
 }
+
+// -----------------------------
+// Parlay builder (exported)
+// Deterministic, tries to get close to target without using single odds above hardMaxOdd.
+// candidatesByFixture: { [fixtureId]: CandidatePick[] }
+// CandidatePick should include: fixtureId, marketOdd (or fvOdd), prob, dataQuality ('complete'|'partial'), market, selection.
+// Returns: { target, legs, finalOdd }
+export function buildParlay({ candidatesByFixture, target, cap = 100, hardMaxOdd = 2.5, mustIncludeFixtures = [] }) {
+  try {
+    const byFix = candidatesByFixture || {};
+    const fixtureIds = Object.keys(byFix);
+
+    if (!fixtureIds.length) return null;
+
+    // Helper: candidate odd used for parlay multiplication / display
+    const candOdd = (c) => {
+      const o = Number(c?.marketOdd ?? c?.odd ?? c?.fvOdd ?? c?.usedOdd);
+      return Number.isFinite(o) && o > 1 ? o : null;
+    };
+
+    const qualityBonus = (c) => {
+      const q = String(c?.dataQuality || "").toLowerCase();
+      if (q === "complete" || q === "completo" || q === "datos completos") return 1.0;
+      if (q === "partial" || q === "parcial" || q === "datos parciales") return 0.6;
+      return 0.4;
+    };
+
+    const probScore = (c) => {
+      const p = Number(c?.prob ?? c?.p ?? c?.probability);
+      return Number.isFinite(p) ? Math.max(0, Math.min(1, p)) : 0;
+    };
+
+    const usable = (c) => {
+      const o = candOdd(c);
+      return o && o <= hardMaxOdd;
+    };
+
+    const bestForFixture = (fixtureId, preferLow = false) => {
+      const arr = Array.isArray(byFix[fixtureId]) ? byFix[fixtureId] : [];
+      const filtered = arr.filter(usable);
+      if (!filtered.length) return null;
+
+      // Score: prioritize dataComplete + high prob. Optionally prefer lower odds for small targets.
+      filtered.sort((a, b) => {
+        const oa = candOdd(a) || 999;
+        const ob = candOdd(b) || 999;
+        const sa = (probScore(a) * 1.2 + qualityBonus(a)) - (preferLow ? oa * 0.15 : 0);
+        const sb = (probScore(b) * 1.2 + qualityBonus(b)) - (preferLow ? ob * 0.15 : 0);
+        if (sb !== sa) return sb - sa;
+        return preferLow ? (oa - ob) : (ob - oa);
+      });
+
+      // Keep top-3 diversity
+      return filtered.slice(0, 3);
+    };
+
+    const usedFixtures = new Set();
+    const legs = [];
+    let prod = 1;
+
+    // 1) Forced fixtures first (selected mode)
+    for (const fid of mustIncludeFixtures || []) {
+      if (!fid || usedFixtures.has(String(fid))) continue;
+      const opts = bestForFixture(String(fid), true);
+      if (!opts?.length) continue;
+      const pick = opts[0];
+      const o = candOdd(pick);
+      if (!o) continue;
+      legs.push(pick);
+      usedFixtures.add(String(fid));
+      prod *= o;
+    }
+
+    // If already too high above cap, stop early
+    if (prod > cap) {
+      return { target, legs, finalOdd: round2(prod) };
+    }
+
+    // 2) Greedy "closest to target" selection
+    const logT = Math.log(Math.max(1.0001, target || 1));
+    const maxLegs = 12;
+
+    // Precompute candidate options per fixture
+    const options = {};
+    for (const fid of fixtureIds) {
+      if (usedFixtures.has(fid)) continue;
+      const preferLow = (target || 1) <= 5;
+      const opts = bestForFixture(fid, preferLow);
+      if (opts?.length) options[fid] = opts;
+    }
+
+    const remaining = () => Object.keys(options).filter((fid) => !usedFixtures.has(fid));
+
+    while (legs.length < maxLegs && prod < (target || 1) * 0.99) {
+      const candFids = remaining();
+      if (!candFids.length) break;
+
+      let best = null;
+      let bestScore = Infinity;
+
+      for (const fid of candFids) {
+        const opts = options[fid] || [];
+        for (const c of opts) {
+          const o = candOdd(c);
+          if (!o) continue;
+          const next = prod * o;
+
+          // Objective: closeness in log-space to target + penalty if overshoot too much for small targets.
+          const logErr = Math.abs(Math.log(next) - logT);
+
+          const overshoot = next > (target || 1) ? (next / (target || 1)) : 1;
+          const overshootPenalty = (target || 1) <= 5 ? Math.max(0, overshoot - 1) * 0.8 : Math.max(0, overshoot - 1) * 0.25;
+
+          // Prefer complete data + higher prob
+          const qualityPen = (1.1 - qualityBonus(c)) * 0.9;
+          const probPen = (1 - probScore(c)) * 0.7;
+
+          // Avoid extremely tiny odds (can make all targets look the same)
+          const tinyPenalty = o < 1.08 ? (1.08 - o) * 6 : 0;
+
+          const score = logErr + overshootPenalty + qualityPen + probPen + tinyPenalty;
+
+          if (score < bestScore) {
+            bestScore = score;
+            best = { fid, pick: c, odd: o };
+          }
+        }
+      }
+
+      if (!best) break;
+      legs.push(best.pick);
+      usedFixtures.add(best.fid);
+      prod *= best.odd;
+
+      if (prod > cap) break;
+    }
+
+    // 3) If still far from target and we have room, allow a controlled upgrade (slightly higher odd within hardMaxOdd)
+    if (prod < (target || 1) * 0.8 && legs.length < maxLegs) {
+      const candFids = remaining();
+      for (const fid of candFids) {
+        const opts = (options[fid] || []).slice().sort((a, b) => (candOdd(b) || 0) - (candOdd(a) || 0));
+        const c = opts[0];
+        const o = candOdd(c);
+        if (!o) continue;
+        legs.push(c);
+        usedFixtures.add(fid);
+        prod *= o;
+        if (prod >= (target || 1) * 0.9 || legs.length >= maxLegs) break;
+      }
+    }
+
+    if (!legs.length) return null;
+
+    // Ensure we don't return identical legs for very close targets (x3/x5) too often:
+    // If prod is way above target for small targets, trim highest-odd legs.
+    if ((target || 1) <= 5 && prod > (target || 1) * 1.9 && legs.length > 2) {
+      // sort by odd desc and pop until closer
+      const withOdds = legs.map((p) => ({ p, o: candOdd(p) || 1.01 }));
+      withOdds.sort((a, b) => b.o - a.o);
+      let tmp = prod;
+      const kept = legs.slice();
+      for (const it of withOdds) {
+        if (kept.length <= 2) break;
+        const idx = kept.indexOf(it.p);
+        if (idx >= 0) {
+          const next = tmp / it.o;
+          if (next >= (target || 1) * 0.95) {
+            kept.splice(idx, 1);
+            tmp = next;
+          }
+        }
+      }
+      prod = tmp;
+      legs.length = 0;
+      legs.push(...kept);
+    }
+
+    return { target, legs, finalOdd: round2(prod) };
+  } catch (e) {
+    console.error("[fvModel] buildParlay error", e);
+    return null;
+  }
+}
