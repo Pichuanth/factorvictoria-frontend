@@ -1,4 +1,4 @@
-// fvModel patch marker v6
+// fvModel patch marker v7
   function isBttsNo(c) {
     const m = String(c?.market ?? c?.type ?? "").toUpperCase();
     const lab = String(c?.label ?? "").toUpperCase();
@@ -670,7 +670,7 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
   const hasAnyFull = fullFixtureCount > 0;
 
   // Reglas: si hay suficientes fixtures con datos completos, mostrar 3–4 picks.
-  const giftCanMulti = totalFixtures >= 8 && fullFixtureCount >= 3;
+  const giftCanMulti = totalFixtures >= 10 && fullFixtureCount >= 3;
   const giftMinLegsEff = giftCanMulti ? 3 : 1;
   const giftMaxLegsEff = giftCanMulti ? 4 : 1;
 
@@ -679,7 +679,7 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
   const maxOddEff = giftCanMulti ? Math.min(maxOdd, 2.6) : maxOdd;
 
   // Evitar picks con cuotas absurdamente bajas en regalo (ej 1.01)
-  const minLegOdd = giftCanMulti ? 1.20 : 1.35;
+  const minLegOdd = giftCanMulti ? 1.10 : 1.25;
 
 
   // cuando hay mucho pool (para obligar a cuotas seguras)
@@ -732,7 +732,7 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
 
     if (next > maxOddEff * 1.03) continue;
 
-    legs.push({ ...cand, fixtureId, usedOdd: odd, odd });
+    legs.push({ ...cand, fixtureId, usedOdd: odd, odd, marketOdd: odd, displayOdd: odd });
     prod = next;
     if (isBttsNo(cand)) bttsNoCount++;
 
@@ -757,7 +757,7 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
       const odd = __fv_legOdd(cand);
       const next = prod * odd;
       if (next > maxOddEff * 1.03) continue;
-      legs.push({ ...cand, fixtureId: fx, usedOdd: odd, odd });
+      legs.push({ ...cand, fixtureId: fx, usedOdd: odd, odd, marketOdd: odd, displayOdd: odd });
       prod = next;
       if (isBttsNo(cand)) bttsNoCount++;
       if (prod >= minOddEff && legs.length >= giftMinLegsEff) break;
@@ -769,7 +769,7 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
     const best = pool[0];
     if (!best) return null;
     legs.length = 0;
-    legs.push({ ...best, fixtureId: getFixtureId(best), usedOdd: __fv_legOdd(best), odd: __fv_legOdd(best) });
+    legs.push({ ...best, fixtureId: getFixtureId(best), usedOdd: __fv_legOdd(best), odd: __fv_legOdd(best), marketOdd: __fv_legOdd(best), displayOdd: __fv_legOdd(best) });
     prod = __fv_legOdd(best);
   }
 
@@ -794,6 +794,22 @@ function __fv_legOdd(c) {
   if (Number.isFinite(m) && m > 1) return m;
   const f = Number(c?.fvOdd);
   if (Number.isFinite(f) && f > 1) return f;
+
+  // Fallback: derive a synthetic odd from probability when market odd is missing.
+  // This is ONLY for display/combination logic; it's clamped to avoid absurd values.
+  const pRaw = Number(c?.probFV ?? c?.prob ?? c?.probability ?? c?.p);
+  let p = Number.isFinite(pRaw) ? pRaw : NaN;
+  if (Number.isFinite(p)) {
+    // Accept both 0..1 and 0..100 formats
+    if (p > 1.001) p = p / 100;
+    // Guardrails
+    p = Math.min(0.97, Math.max(0.05, p));
+    const syn = 1 / p;
+    if (Number.isFinite(syn) && syn > 1) {
+      return Math.min(2.5, Math.max(1.08, syn));
+    }
+  }
+
   return null;
 }
 
@@ -1023,7 +1039,7 @@ export function buildParlay(arg1, target, opts = {}) {
   };
 
   const add = (c, o) => {
-    chosen.push({ ...c, usedOdd: o, odd: o, displayOdd: o });
+    chosen.push({ ...c, usedOdd: o, odd: o, marketOdd: o, displayOdd: o });
     prod *= o;
 
     const fx = getFixtureIdLocal(c);
