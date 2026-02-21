@@ -878,8 +878,8 @@ export function buildParlay({ candidatesByFixture, target, cap = 100, hardMaxOdd
         const opts = options[fid] || [];
         for (const c of opts) {
           // Cap repeated markets inside a single parlay
-          if (isUnder25Pick(c) && under25Count >= 2) continue;
-          if (isBttsNo(c) && bttsNoCount >= 2) continue;
+          if (isUnder25Pick(c) && under25Count >= 1) continue;
+          if (isBttsNo(c) && bttsNoCount >= 1) continue;
           const o = candOdd(c);
           if (!o) continue;
           const next = prod * o;
