@@ -491,7 +491,8 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
       pickType: "OU_O05",
       prob: clamp(pOver05, 0, 1),
       fvOdd: round2(1 / (clamp(pOver05, 0.01, 0.999) + 0.03)),
-      usedOdd: null,
+      marketOdd: markets?.OU_05?.over ?? markets?.OU_05?.o ?? null,
+      usedOdd: (markets?.OU_05?.over ?? markets?.OU_05?.o ?? null) ?? round2(1 / (clamp(pOver05, 0.01, 0.999) + 0.03)),
       dataQuality,
     });
   }
@@ -656,472 +657,63 @@ function __fv_sameLegSet(aLegs, bLegs) {
   return true;
 }
 
-export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 3.0) {
-  const byFix = candidatesByFixture || {};
-  const totalFixtures = Object.keys(byFix).length;
-  const all = Object.values(byFix).flat().filter(Boolean);
+export function buildGiftPickBundle(
+  candidatesByFixture,
+  { minOdd = 1.08, maxOdd = 2.2, probMin = 0.75 } = {}
+) {
+  try {
+    const pool = [];
+    for (const [fixtureId, candList] of Object.entries(candidatesByFixture || {})) {
+      for (const c of candList || []) {
+        const o = __fv_legOdd(c);
+        if (!Number.isFinite(o)) continue;
+        if (o < minOdd || o > maxOdd) continue;
+        const p = Number(c?.prob ?? 0);
+        if (p < probMin) continue;
+        pool.push({
+          ...c,
+          fixtureId: c.fixtureId ?? fixtureId,
+          __fv_legOdd: o,
+          fixtureFull: !!c.fixtureFull,
+        });
+      }
+    }
 
-  // Conteo de fixtures con "datos completos" (verde)
-  const fullFixtureCount = Object.values(byFix).filter((list) => {
-    const arr = Array.isArray(list) ? list : [];
-    return arr.some((c) => c && c.dataQuality === "full");
-  }).length;
+    if (!pool.length) return null;
 
-  const hasAnyFull = fullFixtureCount > 0;
+    const poolFull = pool.filter((c) => c.fixtureFull);
+    const pickFrom = poolFull.length ? poolFull : pool;
 
-  // Reglas: si hay suficientes fixtures con datos completos, mostrar 3–4 picks.
-  const giftCanMulti = totalFixtures >= 10 && fullFixtureCount >= 3;
-  const giftMinLegsEff = giftCanMulti ? 3 : 1;
-  const giftMaxLegsEff = giftCanMulti ? 4 : 1;
-
-  // Cap más estricto  // Odds objetivo del regalo: dentro de x1.5–x3 (ideal x1.6–x2.5)
-  const minOddEff = Math.max(minOdd, giftCanMulti ? 1.6 : 1.5);
-  const maxOddEff = giftCanMulti ? Math.min(maxOdd, 2.6) : maxOdd;
-
-  // Evitar picks con cuotas absurdamente bajas en regalo (ej 1.01)
-  const minLegOdd = giftCanMulti ? 1.10 : 1.25;
-
-
-  // cuando hay mucho pool (para obligar a cuotas seguras)
-  // Regla: pool <= 18: ~2.15 | pool 19–30: ~2.05 | pool > 30: ~1.95–2.00
-  const capMax =
-    totalFixtures > 50 ? 1.95 :
-    totalFixtures > 30 ? 2.0 :
-    totalFixtures >= 19 ? 2.05 :
-    2.15;
-
-  // Pool: preferir FULL si existe; filtrar por prob mínima y odds válidas
-  const poolFull = all.filter((c) => c && c.dataQuality === "full");
-  const poolAny = all.slice();
-  // Pool: preferir FULL pero permitir completar con parciales si faltan legs
-  let pool = hasAnyFull ? poolFull.slice() : poolAny.slice();
-
-  const probMin = giftCanMulti ? 0.78 : 0.85;
-
-  pool = pool
-    .filter((c) => Number.isFinite(pr(c)) && pr(c) >= probMin)
-    .filter((c) => {
-      const o = __fv_legOdd(c);
-      return Number.isFinite(o) && o >= minLegOdd && o <= capMax;
+    // Prefer "datos completos" and the highest probability; break ties by lower odds.
+    pickFrom.sort((a, b) => {
+      if (!!b.fixtureFull !== !!a.fixtureFull) return (b.fixtureFull ? 1 : 0) - (a.fixtureFull ? 1 : 0);
+      const pa = Number(a.prob ?? 0);
+      const pb = Number(b.prob ?? 0);
+      if (pb !== pa) return pb - pa;
+      return Number(a.__fv_legOdd) - Number(b.__fv_legOdd);
     });
 
-  if (!pool.length) return null;
+    const best = pickFrom[0];
+    const o = round2(Number(best.__fv_legOdd));
 
-  // Orden: mayor prob (y luego menor cuota)
-  pool.sort((a, b) => (pr(b) - pr(a)) || (__fv_legOdd(a) - __fv_legOdd(b)));
-
-  const legs = [];
-  let prod = 1;
-  let bttsNoCount = 0;
-
-  for (const cand of pool) {
-    if (legs.length >= giftMaxLegsEff) break;
-
-    const fixtureId = getFixtureId(cand);
-    if (!fixtureId) continue;
-    if (legs.some((l) => String(getFixtureId(l)) === String(fixtureId))) continue;
-
-    // Evitar "Ambos marcan: NO" en exceso
-    if (isBttsNo(cand) && bttsNoCount >= 1) continue;
-
-    const odd = __fv_legOdd(cand);
-    if (!Number.isFinite(odd) || odd <= 1) continue;
-    const lab = String(cand?.label ?? "");
-    if (lab.includes("+3") && odd < 1.12) continue;
-    const next = prod * odd;
-
-    if (next > maxOddEff * 1.03) continue;
-
-    legs.push({ ...cand, fixtureId, usedOdd: odd, odd, marketOdd: odd, displayOdd: odd });
-    prod = next;
-    if (isBttsNo(cand)) bttsNoCount++;
-
-    if (prod >= minOddEff && legs.length >= giftMinLegsEff) break;
+    return {
+      legs: [
+        {
+          ...best,
+          marketOdd: o,
+          usedOdd: o,
+          displayOdd: o,
+          odds: o,
+        },
+      ],
+      finalOdd: o,
+      prob: Number(best.prob ?? 0),
+      fixtureFull: !!best.fixtureFull,
+    };
+  } catch {
+    return null;
   }
-
-    // Si falta completar legs, permitir parciales (pero manteniendo cuota mínima)
-  if (giftCanMulti && legs.length < 3 && poolAny.length) {
-    const pool2 = poolAny
-      .filter((c) => Number.isFinite(pr(c)) && pr(c) >= 0.80)
-      .filter((c) => {
-        const o = __fv_legOdd(c);
-        return Number.isFinite(o) && o >= minLegOdd && o <= capMax;
-      })
-      .sort((a, b) => (pr(b) - pr(a)) || (__fv_legOdd(a) - __fv_legOdd(b)));
-    for (const cand of pool2) {
-      if (legs.length >= giftMaxLegsEff) break;
-      const fx = getFixtureId(cand);
-      if (!fx) continue;
-      if (legs.some((l) => String(getFixtureId(l)) === String(fx))) continue;
-      if (isBttsNo(cand) && bttsNoCount >= 1) continue;
-      const odd = __fv_legOdd(cand);
-      const next = prod * odd;
-      if (next > maxOddEff * 1.03) continue;
-      legs.push({ ...cand, fixtureId: fx, usedOdd: odd, odd, marketOdd: odd, displayOdd: odd });
-      prod = next;
-      if (isBttsNo(cand)) bttsNoCount++;
-      if (prod >= minOddEff && legs.length >= giftMinLegsEff) break;
-    }
-  }
-
-// Si no alcanzó 3 legs cuando debería, caer a 1 pick (mejor que forzar picks malos)
-  if (giftCanMulti && legs.length < 3) {
-    const best = pool[0];
-    if (!best) return null;
-    legs.length = 0;
-    legs.push({ ...best, fixtureId: getFixtureId(best), usedOdd: __fv_legOdd(best), odd: __fv_legOdd(best), marketOdd: __fv_legOdd(best), displayOdd: __fv_legOdd(best) });
-    prod = __fv_legOdd(best);
-  }
-
-  if (!legs.length) return null;
-
-  __fv_lastGiftLegs = legs.slice();
-  __fv_lastGiftCat = _cat(legs[0]);
-
-  return {
-    games: legs.length,
-    finalOdd: round2(prod),
-    legs,
-    reached: prod >= minOddEff && prod <= maxOddEff * 1.05,
-  };
 }
-
-
-function __fv_legOdd(c) {
-  const o = Number(c?.usedOdd ?? c?.odd ?? c?.useodd ?? c?.usedodd);
-  if (Number.isFinite(o) && o > 1) return o;
-  const m = Number(c?.marketOdd);
-  if (Number.isFinite(m) && m > 1) return m;
-  const f = Number(c?.fvOdd);
-  if (Number.isFinite(f) && f > 1) return f;
-
-  // Fallback: derive a synthetic odd from probability when market odd is missing.
-  // This is ONLY for display/combination logic; it's clamped to avoid absurd values.
-  const pRaw = Number(c?.probFV ?? c?.prob ?? c?.probability ?? c?.p);
-  let p = Number.isFinite(pRaw) ? pRaw : NaN;
-  if (Number.isFinite(p)) {
-    // Accept both 0..1 and 0..100 formats
-    if (p > 1.001) p = p / 100;
-    // Guardrails
-    p = Math.min(0.97, Math.max(0.05, p));
-    const syn = 1 / p;
-    if (Number.isFinite(syn) && syn > 1) {
-      return Math.min(2.5, Math.max(1.08, syn));
-    }
-  }
-
-  return null;
-}
-
-function __fv_legScore(c, oddWeight = 0.35) {
-  // Ranking: prioritize probability and (lightly) higher odds for high targets.
-  const p = pr(c);
-  const odd = __fv_legOdd(c);
-  const edge = Number(c?.valueEdge);
-  const e = Number.isFinite(edge) ? edge : 0;
-  const oddTerm = odd > 1 ? Math.log(odd) : 0;
-  return p + Math.max(0, e) * 0.06 + oddWeight * oddTerm;
-}
-
-
-export function buildParlay(arg1, target, opts = {}) {
-  // Compat: buildParlay(candidatesByFixture, target, opts)  OR buildParlay({ candidatesByFixture, target, ...opts })
-  let byFix = arg1;
-  let t = Number(target);
-
-  if (arg1 && typeof arg1 === "object" && !Array.isArray(arg1) && arg1.candidatesByFixture) {
-    byFix = arg1.candidatesByFixture;
-    t = Number(arg1.target ?? target);
-    opts = { ...arg1, ...opts };
-  }
-
-  const poolObj = byFix || {};
-  const candAll = Object.values(poolObj).flat().filter(Boolean);
-  const poolFixtures = Object.keys(poolObj).length;
-
-  if (!candAll.length || !poolFixtures) return null;
-
-  // --- Caps ---
-  const hardMaxOdd = Number.isFinite(Number(opts.hardMaxOdd)) ? Number(opts.hardMaxOdd) : 2.5;
-
-  // Dynamic "soft" cap by pool size (still bounded by hardMaxOdd)
-  const softCap =
-    poolFixtures > 60 ? 2.00 :
-    poolFixtures > 30 ? 2.10 :
-    poolFixtures >= 19 ? 2.20 :
-    2.30;
-
-  const capLegOdd = Math.min(hardMaxOdd, softCap);
-
-  // Minimum leg odd (avoid silly 1.01–1.05 picks unless absolutely necessary)
-  const minLegOddEff = (() => {
-    const forced = Number(opts.minLegOdd);
-    if (Number.isFinite(forced) && forced > 1) return forced;
-
-    if (t >= 100) return 1.22;
-    if (t >= 50) return 1.20;
-    if (t >= 20) return 1.18;
-    if (t >= 10) return 1.15;
-    if (t >= 5) return 1.12;
-    return 1.10;
-  })();
-
-  const pr = (c) => {
-    const a = Number(c?.probFV);
-    if (Number.isFinite(a)) return a;
-    const b = Number(c?.prob);
-    return Number.isFinite(b) ? b : 0;
-  };
-
-  const getFixtureIdLocal = (c) => {
-    const v =
-      c?.fixtureId ??
-      c?.fixture?.fixture?.id ??
-      c?.fixture?.id ??
-      c?.fixture?.fixture_id ??
-      c?.id;
-    const n = Number(v);
-    return Number.isFinite(n) ? String(n) : (v != null ? String(v) : "");
-  };
-
-  const marketKey = (c) => String(c?.market ?? c?.type ?? "").toUpperCase();
-  const bucket = (c) => {
-    const m = marketKey(c);
-    const lab = String(c?.label ?? "").toUpperCase();
-    if (m.includes("BTTS") || lab.includes("AMBOS")) return "BTTS";
-    if (m === "AH" || lab.includes("HÁNDICAP") || lab.includes("HANDICAP")) return "AH";
-    if (m === "OU" || lab.includes("OVER") || lab.includes("UNDER")) return "OU";
-    if (m.includes("DC") || lab.includes("DOBLE")) return "DC";
-    return "OTHER";
-  };
-
-  // Filter invalid & enforce caps/mins
-  let pool = candAll
-    .map((c) => ({ c, o: __fv_legOdd(c), p: pr(c) }))
-    .filter((x) => Number.isFinite(x.o) && x.o > 1 && x.p >= (Number(opts.minProb) || 0));
-
-  if (!pool.length) return null;
-
-  // First pass: enforce minLegOddEff..capLegOdd
-  let poolMain = pool.filter((x) => x.o >= minLegOddEff && x.o <= capLegOdd);
-
-  // Fallback: if too few candidates, allow slightly lower odds, but never > hardMaxOdd
-  if (poolMain.length < Math.min(12, pool.length)) {
-    const floor = Math.max(1.02, minLegOddEff - 0.08);
-    poolMain = pool.filter((x) => x.o >= floor && x.o <= capLegOdd);
-  }
-
-  if (!poolMain.length) return null;
-
-  // Score: probability first; penalize ultra-low odds; mild preference for mid odds.
-  const score = (x) => {
-    const o = x.o;
-    const p = x.p;
-
-    const ultraLowPenalty = o < 1.08 ? 2.5 : (o < 1.12 ? 1.2 : 0);
-    const lowPenalty = o < minLegOddEff ? 1.0 : 0;
-
-    // prefer odds around 1.35–1.75 depending target
-    const center = t >= 50 ? 1.45 : (t >= 20 ? 1.40 : 1.35);
-    const dist = Math.abs(o - center);
-
-    return (p * 1000) + (o - 1) * 35 - dist * 20 - (ultraLowPenalty + lowPenalty) * 800;
-  };
-
-  poolMain.sort((a, b) => score(b) - score(a));
-
-  // Legs range: in big pools, "lucirse" with more legs and lower odds promedio
-  const minLegsForTarget = () => {
-    // Targets chicos no deben "pasarse" ni repetirse (x3/x5)
-    if (t <= 3.5) return 2;
-    if (t <= 5.5) return poolFixtures > 30 ? 4 : 3;
-    if (poolFixtures > 30) {
-      if (t >= 100) return 10;
-      if (t >= 50) return 9;
-      if (t >= 20) return 8;
-      if (t >= 10) return 7;
-      return 6;
-    }
-    if (poolFixtures > 18) {
-      if (t >= 100) return 9;
-      if (t >= 50) return 8;
-      if (t >= 20) return 7;
-      if (t >= 10) return 6;
-      return 5;
-    }
-    if (poolFixtures > 10) {
-      if (t >= 100) return 8;
-      if (t >= 50) return 7;
-      if (t >= 20) return 6;
-      if (t >= 10) return 5;
-      return 4;
-    }
-    if (t >= 100) return 7;
-    if (t >= 50) return 6;
-    if (t >= 20) return 5;
-    if (t >= 10) return 4;
-    return 3;
-  };
-
-  const maxLegsForTarget = () => {
-    if (t <= 3.5) return 3;
-    if (t <= 5.5) return poolFixtures > 30 ? 5 : 4;
-    if (poolFixtures > 30) {
-      if (t >= 100) return 13;
-      if (t >= 50) return 12;
-      if (t >= 20) return 11;
-      if (t >= 10) return 10;
-      return 8;
-    }
-    if (poolFixtures > 18) {
-      if (t >= 100) return 11;
-      if (t >= 50) return 10;
-      if (t >= 20) return 9;
-      if (t >= 10) return 8;
-      return 7;
-    }
-    if (poolFixtures > 10) {
-      if (t >= 100) return 9;
-      if (t >= 50) return 8;
-      if (t >= 20) return 7;
-      if (t >= 10) return 6;
-      return 5;
-    }
-    if (t >= 100) return 8;
-    if (t >= 50) return 7;
-    if (t >= 20) return 6;
-    if (t >= 10) return 5;
-    return 4;
-  };
-
-  const minLegs = Math.min(minLegsForTarget(), poolFixtures || minLegsForTarget());
-  const maxLegs = Math.min(maxLegsForTarget(), poolFixtures || maxLegsForTarget());
-
-  const chosen = [];
-  let prod = 1;
-
-  // Variety constraints
-  const MAX_BTTSNO_PER_PARLAY = (poolFixtures >= 10 ? 1 : 2);
-  const MAX_OU_PER_PARLAY = 3;
-  const MAX_AH_PER_PARLAY = 3;
-  const MAX_DC_PER_PARLAY = (poolFixtures >= 19 ? 3 : 4);
-  const MAX_CONSEC_DC = 2;
-
-  let bttsNoCount = 0;
-  let ouCount = 0;
-  let ahCount = 0;
-  let dcCount = 0;
-  const lastBuckets = [];
-  const usedFix = new Set();
-
-  const mustInclude = new Set((opts.mustIncludeFixtures || []).map(String));
-
-  const canTake = (c, o) => {
-    const fx = getFixtureIdLocal(c);
-    if (!fx) return false;
-    if (usedFix.has(fx)) return false;
-
-    if (!Number.isFinite(o) || o <= 1) return false;
-    if (o > hardMaxOdd) return false;
-
-    const b = bucket(c);
-    if (b === "BTTS" && isBttsNo(c) && bttsNoCount >= MAX_BTTSNO_PER_PARLAY) return false;
-    if (b === "OU" && ouCount >= MAX_OU_PER_PARLAY) return false;
-    if (b === "AH" && ahCount >= MAX_AH_PER_PARLAY) return false;
-
-    if (b === "DC") {
-      if (dcCount >= MAX_DC_PER_PARLAY) return false;
-      const n = lastBuckets.length;
-      const consec = (n >= 1 && lastBuckets[n - 1] === "DC" ? 1 : 0) + (n >= 2 && lastBuckets[n - 2] === "DC" ? 1 : 0);
-      if (consec >= MAX_CONSEC_DC) return false;
-    }
-    return true;
-  };
-
-  const add = (c, o) => {
-    chosen.push({ ...c, usedOdd: o, odd: o, marketOdd: o, displayOdd: o });
-    prod *= o;
-
-    const fx = getFixtureIdLocal(c);
-    usedFix.add(fx);
-
-    const b = bucket(c);
-    lastBuckets.push(b);
-    if (lastBuckets.length > 6) lastBuckets.shift();
-
-    if (b === "BTTS" && isBttsNo(c)) bttsNoCount += 1;
-    if (b === "OU") ouCount += 1;
-    if (b === "AH") ahCount += 1;
-    if (b === "DC") dcCount += 1;
-  };
-
-  // 1) Seed must-include fixtures first (best candidate per fixture)
-  if (mustInclude.size) {
-    for (const fx of mustInclude) {
-      const arr = poolObj?.[fx] || poolObj?.[Number(fx)] || [];
-      const best = (arr || [])
-        .map((c) => ({ c, o: __fv_legOdd(c), p: pr(c) }))
-        .filter((x) => Number.isFinite(x.o) && x.o > 1 && x.o <= hardMaxOdd)
-        .sort((a, b) => score(b) - score(a))[0];
-      if (best && canTake(best.c, best.o)) add(best.c, best.o);
-    }
-  }
-
-  // 2) Variety pass: try include OU & AH early
-  const bestOf = (b) => poolMain.find((x) => bucket(x.c) === b && canTake(x.c, x.o));
-  const wantOU = bestOf("OU");
-  if (wantOU) add(wantOU.c, wantOU.o);
-
-  const wantAH = bestOf("AH");
-  if (wantAH) add(wantAH.c, wantAH.o);
-
-  const wantBTTS = bestOf("BTTS");
-  if (wantBTTS && Number(opts.allowBtts ?? 1) === 1) add(wantBTTS.c, wantBTTS.o);
-
-  // 3) Fill greedily
-  for (const x of poolMain) {
-    if (chosen.length >= maxLegs) break;
-    if (!canTake(x.c, x.o)) continue;
-
-    if (chosen.length < minLegs) {
-      add(x.c, x.o);
-      continue;
-    }
-
-    if (prod < t) {
-      add(x.c, x.o);
-      continue;
-    }
-
-    // Avoid overshooting too much for small targets
-    const overshootOk = (t <= 5 ? 1.30 : (t <= 10 ? 1.20 : 1.12));
-    if (prod * x.o <= t * overshootOk) add(x.c, x.o);
-  }
-
-  // 4) If still under target and we have room, allow slightly lower odds candidates to finish (but never 1.01 spam)
-  if (prod < t && chosen.length < maxLegs) {
-    const floor2 = Math.max(1.08, minLegOddEff - 0.12);
-    const poolFinish = pool
-      .filter((x) => x.o >= floor2 && x.o <= capLegOdd)
-      .sort((a, b) => score(b) - score(a));
-    for (const x of poolFinish) {
-      if (chosen.length >= maxLegs) break;
-      if (prod >= t) break;
-      if (!canTake(x.c, x.o)) continue;
-      add(x.c, x.o);
-    }
-  }
-
-  if (!chosen.length) return null;
-
-  return {
-    target: t,
-    finalOdd: Number(prod.toFixed(2)),
-    legsCount: chosen.length,
-    legs: chosen,
-  };
-}
-
 
 export function buildValueList(candidatesByFixture, minEdge = 0.06) {
   const all = Object.values(candidatesByFixture || {}).flat();
