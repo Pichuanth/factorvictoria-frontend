@@ -1900,8 +1900,28 @@ const giftBundle = buildGiftPickBundle(candidatesByFixtureSanitized, 1.5, 3.0, 3
   const candidatesByFixtureLocked = applyGiftLock(candidatesByFixture, giftLeg);
 
 // ===================== TARGETS + PARLAYS =====================
-const targets = [3, 5, 10, 20, 50, 100].filter((t) => t <= maxBoost);
-console.log("[PARLAY] targets =", targets);
+// Cantidad real de partidos disponibles para generar
+const availableCount = pool.length;
+
+// Validación mínima
+if (availableCount < 3) {
+  setParlayError(
+    "Muy pocos partidos disponibles. Para generar parlays potenciados necesitas al menos 3–5 partidos."
+  );
+  setParlayResult(null);
+  return;
+}
+
+// Targets dinámicos inteligentes
+let targets = [];
+
+if (availableCount >= 3 && availableCount < 5) {
+  targets = [3];
+} else if (availableCount === 5) {
+  targets = [3, 5];
+} else {
+  targets = [3, 5, 10, 20, 50, 100];
+}
 
 // Construimos tiers siempre (3,5,10,20,50,100) para no dejar casillas vacías.
 // Regla: prioriza VERDES; si para x50/x100 no alcanza, se muestra igualmente el mejor parlay
