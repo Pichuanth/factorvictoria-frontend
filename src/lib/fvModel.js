@@ -1,4 +1,10 @@
 // fvModel patch marker v7
+  function isUnder25Pick(c) {
+    const m = String(c?.market ?? c?.type ?? "").toUpperCase();
+    const lab = String(c?.label ?? "").toUpperCase();
+    return m.includes("UNDER_25") || m.includes("U25") || lab.includes("UNDER 2.5") || lab.includes("U2.5");
+  }
+
   function isBttsNo(c) {
     const m = String(c?.market ?? c?.type ?? "").toUpperCase();
     const lab = String(c?.label ?? "").toUpperCase();
@@ -815,30 +821,17 @@ export function buildParlay({ candidatesByFixture, target, cap = 100, hardMaxOdd
     const legs = [];
     let prod = 1;
 
-  // --- Market diversity controls ---
-  // Hard cap: avoid excessive "Under 2.5" legs that make parlays look repetitive/unprofessional.
-  const marketCounts = new Map(); // key: `${market}|${selection}`
-  const getKey = (c) => `${c.market}|${c.selection}`;
-  const getCount = (c) => marketCounts.get(getKey(c)) || 0;
-  const getCountAfterReplace = (cand, oldLeg) => {
-    let cnt = getCount(cand);
-    if (oldLeg && getKey(oldLeg) === getKey(cand)) cnt = Math.max(0, cnt - 1); // old will be removed
-    return cnt;
-  };
-  const wouldExceedCaps = (c) => {
-    // Max 2 occurrences of Under 2.5 per parlay (selection "under" on market "OU_25")
-    if (c.market === "OU_25" && c.selection === "under" && getCount(c) >= 2) return true;
-    return false;
-  };
-  const wouldExceedCapsAfterReplace = (cand, oldLeg) => {
-    if (cand.market === "OU_25" && cand.selection === "under" && getCountAfterReplace(cand, oldLeg) >= 2) return true;
-    return false;
-  };
-  const bumpCount = (c) => marketCounts.set(getKey(c), (marketCounts.get(getKey(c)) || 0) + 1);
-  const rebuildCounts = (legsArr) => {
-    marketCounts.clear();
-    for (const l of legsArr) bumpCount(l);
-  };
+    // Market repetition caps (per parlay)
+    let under25Count = 0;
+    let bttsNoCount = 0;
+    const bumpAdd = (p) => {
+      if (isUnder25Pick(p)) under25Count += 1;
+      if (isBttsNo(p)) bttsNoCount += 1;
+    };
+    const bumpRemove = (p) => {
+      if (isUnder25Pick(p)) under25Count = Math.max(0, under25Count - 1);
+      if (isBttsNo(p)) bttsNoCount = Math.max(0, bttsNoCount - 1);
+    };
 
 
     // 1) Forced fixtures first (selected mode)
@@ -884,13 +877,15 @@ export function buildParlay({ candidatesByFixture, target, cap = 100, hardMaxOdd
       for (const fid of candFids) {
         const opts = options[fid] || [];
         for (const c of opts) {
+          // Cap repeated markets inside a single parlay
+          if (isUnder25Pick(c) && under25Count >= 2) continue;
+          if (isBttsNo(c) && bttsNoCount >= 2) continue;
           const o = candOdd(c);
           if (!o) continue;
           const next = prod * o;
 
           // Objective: closeness in log-space to target + penalty if overshoot too much for small targets.
           const logErr = Math.abs(Math.log(next) - logT);
-          const diversityPenalty = getCount(c) * 0.25;
 
           const overshoot = next > (target || 1) ? (next / (target || 1)) : 1;
           const overshootPenalty = (target || 1) <= 5 ? Math.max(0, overshoot - 1) * 0.8 : Math.max(0, overshoot - 1) * 0.25;
@@ -913,6 +908,7 @@ export function buildParlay({ candidatesByFixture, target, cap = 100, hardMaxOdd
 
       if (!best) break;
       legs.push(best.pick);
+      bumpAdd(best.pick);
       usedFixtures.add(best.fid);
       prod *= best.odd;
 
