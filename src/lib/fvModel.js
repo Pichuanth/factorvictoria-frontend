@@ -1,4 +1,4 @@
-// fvModel patch marker v2
+// fvModel patch marker v6
   function isBttsNo(c) {
     const m = String(c?.market ?? c?.type ?? "").toUpperCase();
     const lab = String(c?.label ?? "").toUpperCase();
@@ -418,9 +418,9 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
       pickType: "AH_P3_HOME",
       prob: clamp(pAhH3, 0, 1),
       fvOdd: round2(1 / (clamp(pAhH3, 0.01, 0.999) + 0.04)),
-      usedOdd: null,
+      usedOdd: round2(1 / (clamp(pAhH3, 0.01, 0.999) + 0.04)),
       dataQuality,
-      marketOdd: null,
+      marketOdd: round2(1 / (clamp(pAhH3, 0.01, 0.999) + 0.04)),
     });
   }
 
@@ -436,9 +436,9 @@ export function buildCandidatePicks({ fixture, pack, markets }) {
       pickType: "AH_P3_AWAY",
       prob: clamp(pAhA3, 0, 1),
       fvOdd: round2(1 / (clamp(pAhA3, 0.01, 0.999) + 0.04)),
-      usedOdd: null,
+      usedOdd: round2(1 / (clamp(pAhA3, 0.01, 0.999) + 0.04)),
       dataQuality,
-      marketOdd: null,
+      marketOdd: round2(1 / (clamp(pAhA3, 0.01, 0.999) + 0.04)),
     });
   }
 
@@ -670,13 +670,17 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
   const hasAnyFull = fullFixtureCount > 0;
 
   // Reglas: si hay suficientes fixtures con datos completos, mostrar 3–4 picks.
-  const giftCanMulti = totalFixtures >= 10 && fullFixtureCount >= 3;
+  const giftCanMulti = totalFixtures >= 8 && fullFixtureCount >= 3;
   const giftMinLegsEff = giftCanMulti ? 3 : 1;
   const giftMaxLegsEff = giftCanMulti ? 4 : 1;
 
   // Cap más estricto  // Odds objetivo del regalo: dentro de x1.5–x3 (ideal x1.6–x2.5)
   const minOddEff = Math.max(minOdd, giftCanMulti ? 1.6 : 1.5);
   const maxOddEff = giftCanMulti ? Math.min(maxOdd, 2.6) : maxOdd;
+
+  // Evitar picks con cuotas absurdamente bajas en regalo (ej 1.01)
+  const minLegOdd = giftCanMulti ? 1.20 : 1.35;
+
 
   // cuando hay mucho pool (para obligar a cuotas seguras)
   // Regla: pool <= 18: ~2.15 | pool 19–30: ~2.05 | pool > 30: ~1.95–2.00
@@ -687,7 +691,10 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
     2.15;
 
   // Pool: preferir FULL si existe; filtrar por prob mínima y odds válidas
-  let pool = hasAnyFull ? all.filter((c) => c && c.dataQuality === "full") : all.slice();
+  const poolFull = all.filter((c) => c && c.dataQuality === "full");
+  const poolAny = all.slice();
+  // Pool: preferir FULL pero permitir completar con parciales si faltan legs
+  let pool = hasAnyFull ? poolFull.slice() : poolAny.slice();
 
   const probMin = giftCanMulti ? 0.78 : 0.85;
 
@@ -695,7 +702,7 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
     .filter((c) => Number.isFinite(pr(c)) && pr(c) >= probMin)
     .filter((c) => {
       const o = __fv_legOdd(c);
-      return Number.isFinite(o) && o > 1 && o <= capMax;
+      return Number.isFinite(o) && o >= minLegOdd && o <= capMax;
     });
 
   if (!pool.length) return null;
@@ -718,23 +725,51 @@ export function buildGiftPickBundle(candidatesByFixture, minOdd = 1.5, maxOdd = 
     if (isBttsNo(cand) && bttsNoCount >= 1) continue;
 
     const odd = __fv_legOdd(cand);
+    if (!Number.isFinite(odd) || odd <= 1) continue;
+    const lab = String(cand?.label ?? "");
+    if (lab.includes("+3") && odd < 1.12) continue;
     const next = prod * odd;
 
     if (next > maxOddEff * 1.03) continue;
 
-    legs.push({ ...cand, fixtureId });
+    legs.push({ ...cand, fixtureId, usedOdd: odd, odd });
     prod = next;
     if (isBttsNo(cand)) bttsNoCount++;
 
     if (prod >= minOddEff && legs.length >= giftMinLegsEff) break;
   }
 
-  // Si no alcanzó 3 legs cuando debería, caer a 1 pick (mejor que forzar picks malos)
+    // Si falta completar legs, permitir parciales (pero manteniendo cuota mínima)
+  if (giftCanMulti && legs.length < 3 && poolAny.length) {
+    const pool2 = poolAny
+      .filter((c) => Number.isFinite(pr(c)) && pr(c) >= 0.80)
+      .filter((c) => {
+        const o = __fv_legOdd(c);
+        return Number.isFinite(o) && o >= minLegOdd && o <= capMax;
+      })
+      .sort((a, b) => (pr(b) - pr(a)) || (__fv_legOdd(a) - __fv_legOdd(b)));
+    for (const cand of pool2) {
+      if (legs.length >= giftMaxLegsEff) break;
+      const fx = getFixtureId(cand);
+      if (!fx) continue;
+      if (legs.some((l) => String(getFixtureId(l)) === String(fx))) continue;
+      if (isBttsNo(cand) && bttsNoCount >= 1) continue;
+      const odd = __fv_legOdd(cand);
+      const next = prod * odd;
+      if (next > maxOddEff * 1.03) continue;
+      legs.push({ ...cand, fixtureId: fx, usedOdd: odd, odd });
+      prod = next;
+      if (isBttsNo(cand)) bttsNoCount++;
+      if (prod >= minOddEff && legs.length >= giftMinLegsEff) break;
+    }
+  }
+
+// Si no alcanzó 3 legs cuando debería, caer a 1 pick (mejor que forzar picks malos)
   if (giftCanMulti && legs.length < 3) {
     const best = pool[0];
     if (!best) return null;
     legs.length = 0;
-    legs.push({ ...best, fixtureId: getFixtureId(best) });
+    legs.push({ ...best, fixtureId: getFixtureId(best), usedOdd: __fv_legOdd(best), odd: __fv_legOdd(best) });
     prod = __fv_legOdd(best);
   }
 
@@ -881,6 +916,9 @@ export function buildParlay(arg1, target, opts = {}) {
 
   // Legs range: in big pools, "lucirse" with more legs and lower odds promedio
   const minLegsForTarget = () => {
+    // Targets chicos no deben "pasarse" ni repetirse (x3/x5)
+    if (t <= 3.5) return 2;
+    if (t <= 5.5) return poolFixtures > 30 ? 4 : 3;
     if (poolFixtures > 30) {
       if (t >= 100) return 10;
       if (t >= 50) return 9;
@@ -910,6 +948,8 @@ export function buildParlay(arg1, target, opts = {}) {
   };
 
   const maxLegsForTarget = () => {
+    if (t <= 3.5) return 3;
+    if (t <= 5.5) return poolFixtures > 30 ? 5 : 4;
     if (poolFixtures > 30) {
       if (t >= 100) return 13;
       if (t >= 50) return 12;
@@ -983,7 +1023,7 @@ export function buildParlay(arg1, target, opts = {}) {
   };
 
   const add = (c, o) => {
-    chosen.push({ ...c, usedOdd: o });
+    chosen.push({ ...c, usedOdd: o, odd: o, displayOdd: o });
     prod *= o;
 
     const fx = getFixtureIdLocal(c);
