@@ -294,17 +294,20 @@ const COUNTRY_ALIAS = {
   chile: "Chile",
   argentina: "Argentina",
   españa: "Spain",
-  espana: "Spain",
+  spain: "Spain",
   inglaterra: "England",
+  england: "England",
   francia: "France",
-  portugal: "Portugal",
-  italia: "Italy",
-  alemania: "Germany",
-  mexico: "Mexico",
+  france: "France",
   brasil: "Brazil",
-  eeuu: "USA",
-  estadosunidos: "USA",
-  colombia: "Colombia"
+  brazil: "Brazil",
+  alemania: "Germany",
+  germany: "Germany",
+  italia: "Italy",
+  italy: "Italy",
+  portugal: "Portugal",
+  méxico: "Mexico",
+  mexico: "Mexico",
 };
 
 function normalizeCountryQuery(q) {
@@ -814,7 +817,7 @@ function VisitorPlansGrid() {
         title="Plan Mensual"
         price="$19.990 · x10"
         href="/#plan-mensual"
-        bullets={["Cuotas potenciadas hasta x10", "Cuota segura (regalo)", "Acceso a herramientas base"]}
+        bullets={["Cuotas potenciadas hasta x10", "Cuota de regalo", "Acceso a herramientas base"]}
       />
       <LockedPlanCard
         title="Plan Trimestral"
@@ -1664,19 +1667,13 @@ const ensureFvPack = useCallback(
 
       // Pool de trabajo:
       // - auto: usa un subconjunto para velocidad
-      // - selected: incluye seleccionados, pero también agrega más fixtures del rango para poder armar x10/x20 con cuotas bajas
+      // - selected: USA SOLO los fixtureIds seleccionados (NO rellena con otros partidos)
       const basePool = fixtures.slice(0, Math.min(60, fixtures.length));
       const selectedPool = fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)));
 
       const pool =
         mode === "selected"
-          ? Array.from(
-              new Map(
-                [...selectedPool, ...basePool]
-                  .map((fx) => [String(getFixtureId(fx) || ""), fx])
-                  .filter(([id]) => id)
-              ).values()
-            )
+          ? selectedPool
           : fixtures.slice(0, Math.min(28, fixtures.length));
 
       if (mode === "selected" && pool.length < 2) {
@@ -2012,6 +2009,8 @@ if (best) setParlayResult({ mode, ...best });
 
 const handleAutoParlay = () => runGeneration("auto");
 const handleSelectedParlay = () => runGeneration("selected");
+const handleGenerateSelected = handleSelectedParlay; // alias: botón gris
+
 
     async function handleGenerate() {
     setParlayError("");
@@ -2030,7 +2029,7 @@ const handleSelectedParlay = () => runGeneration("selected");
     const pool = fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)));
     pool.map(getFixtureId).filter(Boolean).forEach((id) => ensureOdds(id));
 
-    // Generación completa (cuota segura + potenciadas + value + etc.) con los seleccionados.
+    // Generación completa (cuota de regalo + potenciadas + value + etc.) con los seleccionados.
     await runGeneration("selected");
   }
 
@@ -2333,7 +2332,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 
       {/* 4) MÓDULOS premium */}
       <section className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-        <FeatureCard title="Cuota segura (regalo)" badge="Alta probabilidad" locked={!features.giftPick}>
+        <FeatureCard title="Cuota de regalo" badge="Alta probabilidad" locked={!features.giftPick}>
           <div className="text-xs text-slate-300">
    Pick con mayor probabilidad de acierto. Prioriza partidos con estadísticas y datos completos. 
 </div>
@@ -2375,7 +2374,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 
             <button
               type="button"
-              onClick={handleSelectedParlay}
+              onClick={handleGenerateSelected}
               className="px-4 py-2 rounded-full text-xs font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition"
             >
               Generar con seleccionados ({selectedCount})
