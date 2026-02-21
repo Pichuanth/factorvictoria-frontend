@@ -17,10 +17,11 @@
 
 
   function isHandicapPick(c) {
-    const m = String(c?.market ?? c?.type ?? "").toUpperCase();
-    const lab = String(c?.label ?? c?.pick ?? "").toUpperCase();
-    // Soporta "Hándicap" con y sin tilde
-    return m.includes("HANDICAP") || lab.includes("HANDICAP") || lab.includes("HÁNDICAP") || lab.includes("HÁNDICAP");
+    const m = String(c?.market ?? c?.pickType ?? c?.type ?? "").toUpperCase();
+    const pt = String(c?.pickType ?? "").toUpperCase();
+    const lab = String(c?.label ?? "").toUpperCase();
+    // Detect Asian Handicap conservative picks used in FV: AH_P3_HOME / AH_P3_AWAY (+2/+3)
+    return m.startsWith("AH_") || pt.startsWith("AH_") || lab.includes("HÁNDICAP");
   }
 
 // src/lib/fvModel.js
@@ -833,7 +834,6 @@ export function buildParlay({ candidatesByFixture, target, cap = 100, hardMaxOdd
     let under25Count = 0;
     let bttsNoCount = 0;
     let handicapCount = 0;
-
     const bumpAdd = (p) => {
       if (isUnder25Pick(p)) under25Count += 1;
       if (isBttsNo(p)) bttsNoCount += 1;
@@ -852,6 +852,10 @@ export function buildParlay({ candidatesByFixture, target, cap = 100, hardMaxOdd
       const opts = bestForFixture(String(fid), true);
       if (!opts?.length) continue;
       const pick = opts[0];
+      // Caps per parlay
+      if (isUnder25Pick(pick) && under25Count >= 1) continue;
+      if (isBttsNo(pick) && bttsNoCount >= 1) continue;
+      if (isHandicapPick(pick) && handicapCount >= 2) continue;
       const o = candOdd(pick);
       if (!o) continue;
       legs.push(pick);
@@ -935,9 +939,14 @@ export function buildParlay({ candidatesByFixture, target, cap = 100, hardMaxOdd
       for (const fid of candFids) {
         const opts = (options[fid] || []).slice().sort((a, b) => (candOdd(b) || 0) - (candOdd(a) || 0));
         const c = opts[0];
+        // Caps per parlay
+        if (isUnder25Pick(c) && under25Count >= 1) continue;
+        if (isBttsNo(c) && bttsNoCount >= 1) continue;
+        if (isHandicapPick(c) && handicapCount >= 2) continue;
         const o = candOdd(c);
         if (!o) continue;
         legs.push(c);
+        bumpAdd(c);
         usedFixtures.add(fid);
         prod *= o;
         if (prod >= (target || 1) * 0.9 || legs.length >= maxLegs) break;
