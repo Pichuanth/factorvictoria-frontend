@@ -817,7 +817,7 @@ function VisitorPlansGrid() {
         title="Plan Mensual"
         price="$19.990 · x10"
         href="/#plan-mensual"
-        bullets={["Cuotas potenciadas hasta x10", "Cuota segura (regalo)", "Acceso a herramientas base"]}
+        bullets={["Cuotas potenciadas hasta x10", "Cuota de regalo", "Acceso a herramientas base"]}
       />
       <LockedPlanCard
         title="Plan Trimestral"
@@ -1667,23 +1667,21 @@ const ensureFvPack = useCallback(
 
       // Pool de trabajo:
       // - auto: usa un subconjunto para velocidad
-      // - selected: incluye seleccionados, pero también agrega más fixtures del rango para poder armar x10/x20 con cuotas bajas
+      // - selected: USA SOLO los fixtureIds seleccionados (NO rellena con otros partidos)
       const basePool = fixtures.slice(0, Math.min(60, fixtures.length));
       const selectedPool = fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)));
 
       const pool =
         mode === "selected"
-          ? Array.from(
-              new Map(
-                [...selectedPool, ...basePool]
-                  .map((fx) => [String(getFixtureId(fx) || ""), fx])
-                  .filter(([id]) => id)
-              ).values()
-            )
+          ? selectedPool
           : fixtures.slice(0, Math.min(28, fixtures.length));
 
-      if (mode === "selected" && pool.length < 2) {
-        setParlayError("Selecciona al menos 2 partidos de la lista superior.");
+      if (pool.length < 2) {
+        setParlayError(
+          mode === "selected"
+            ? "Selecciona al menos 2 partidos de la lista superior."
+            : "Para generar combinadas necesitas al menos 2 partidos. Amplía el rango (días) o agrega otra liga."
+        );
         return;
       }
      
@@ -2015,7 +2013,8 @@ if (best) setParlayResult({ mode, ...best });
 
 const handleAutoParlay = () => runGeneration("auto");
 const handleSelectedParlay = () => runGeneration("selected");
-
+// Botón gris (selected): dejamos este nombre explícito para evitar errores en build/deploy
+const handleGenerateSelected = () => runGeneration("selected");
     async function handleGenerate() {
     setParlayError("");
     setParlayResult(null);
@@ -2033,7 +2032,7 @@ const handleSelectedParlay = () => runGeneration("selected");
     const pool = fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)));
     pool.map(getFixtureId).filter(Boolean).forEach((id) => ensureOdds(id));
 
-    // Generación completa (cuota segura + potenciadas + value + etc.) con los seleccionados.
+    // Generación completa (cuota de regalo + potenciadas + value + etc.) con los seleccionados.
     await runGeneration("selected");
   }
 
@@ -2099,7 +2098,7 @@ if (firstId && !window.__fixturesFirstOnce[firstId]) {
 
       let items = itemsRaw;
 
-      if (selectedCountries.length >= 1) {
+      if (selectedCountries.length > 1) {
         items = items.filter((fx) => selectedCountries.includes(getCountryName(fx)));
       }
 
@@ -2110,14 +2109,8 @@ if (firstId && !window.__fixturesFirstOnce[firstId]) {
       const filteredTop = base.filter((fx) => isAllowedCompetition(getCountryName(fx), getLeagueName(fx)));
 
       if (!filteredTop.length) {
-        setErr("No encontramos partidos de ligas TOP para ese rango. Prueba 2–3 días, amplía el rango o agrega otra liga/filtro.");
+        setErr("No encontramos partidos de ligas TOP para ese rango. Prueba 7–14 días y sin filtro.");
         setFixtures([]);
-        return;
-      }
-
-      if (filteredTop.length < 2) {
-        setErr("Solo encontramos 1 partido TOP para ese rango. Amplía el rango (2–7 días) o agrega otra liga para poder armar combinadas.");
-        setFixtures(filteredTop);
         return;
       }
 
@@ -2342,7 +2335,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 
       {/* 4) MÓDULOS premium */}
       <section className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-        <FeatureCard title="Cuota segura (regalo)" badge="Alta probabilidad" locked={!features.giftPick}>
+        <FeatureCard title="Cuota de regalo" badge="Alta probabilidad" locked={!features.giftPick}>
           <div className="text-xs text-slate-300">
    Pick con mayor probabilidad de acierto. Prioriza partidos con estadísticas y datos completos. 
 </div>
