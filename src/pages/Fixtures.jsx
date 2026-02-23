@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 
@@ -8,10 +8,22 @@ import { useAuth } from "../lib/auth";
 
 const WIDGET_SCRIPT_SRC = "https://widgets.api-sports.io/3.1.0/widgets.js";
 
-// Ligas esenciales para mantener la pestaña liviana (se muestran en el widget de Ligas)
-// England PL=39, Spain LaLiga=140, Italy Serie A=135, Germany Bundesliga=78, France Ligue 1=61, Portugal Primeira Liga=94,
-// Mexico Liga MX=262, Argentina Primera=128, Brazil Serie A=71, Chile Primera=265, Colombia Primera A=239
-const ALLOWED_LEAGUES = "39,140,135,78,61,94,262,128,71,265,239";
+
+// Ligas "core" para mantener esta pestaña liviana (solo lo esencial)
+const LEAGUE_PRESETS = [
+  { country: "Argentina", league: "Liga Profesional", id: 128 },
+  { country: "Argentina", league: "Copa Argentina", id: 130 },
+  { country: "Brazil", league: "Serie A", id: 71 },
+  { country: "Chile", league: "Primera División", id: 265 },
+  { country: "Colombia", league: "Primera A", id: 239 },
+  { country: "Mexico", league: "Liga MX", id: 262 },
+  { country: "Spain", league: "La Liga", id: 140 },
+  { country: "England", league: "Premier League", id: 39 },
+  { country: "Italy", league: "Serie A", id: 135 },
+  { country: "Germany", league: "Bundesliga", id: 78 },
+  { country: "Portugal", league: "Primeira Liga", id: 94 },
+  { country: "France", league: "Ligue 1", id: 61 },
+];
 
 function ensureWidgetScriptLoaded() {
   return new Promise((resolve, reject) => {
@@ -54,6 +66,14 @@ function refreshApiSportsWidgets() {
 export default function Fixtures() {
   const navigate = useNavigate();
   const { isLoggedIn, user } = useAuth();
+
+// Selector liviano (evita cargar miles de ligas/países en el widget de "leagues")
+const [leagueId, setLeagueId] = useState(LEAGUE_PRESETS[0].id);
+const [season, setSeason] = useState(new Date().getFullYear());
+const [day, setDay] = useState(() => {
+  const d = new Date();
+  return d.toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
+});
 
   // Ajusta esto si tu backend/front maneja planes de otra forma.
   const hasMembership = !!(user && (user.planId || user.plan || user.membership));
@@ -159,9 +179,66 @@ export default function Fixtures() {
           <div id="leagues-list" className="rounded-2xl border border-white/10 bg-white/5 p-3 min-h-[520px]">
             <div className="text-sm font-semibold text-white/80 mb-2">Ligas</div>
             <div className="rounded-xl overflow-hidden">
-              <api-sports-widget data-type="leagues" data-show="list" data-leagues={ALLOWED_LEAGUES}></api-sports-widget>
+<div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+  <div className="mb-2 flex items-baseline justify-between">
+    <div className="text-sm font-semibold text-white/90">Ligas esenciales</div>
+    <div className="text-[11px] text-white/50">rápido</div>
+  </div>
+
+  <div className="grid grid-cols-1 gap-2">
+    {LEAGUE_PRESETS.map((l) => {
+      const active = l.id === leagueId;
+      return (
+        <button
+          key={`${l.id}-${l.league}`}
+          className={
+            "w-full rounded-xl border px-3 py-2 text-left transition " +
+            (active
+              ? "border-emerald-400/40 bg-emerald-400/10"
+              : "border-white/10 bg-white/5 hover:bg-white/10")
+          }
+          onClick={() => setLeagueId(l.id)}
+          type="button"
+          title={`${l.country} · ${l.league}`}
+        >
+          <div className="text-[11px] text-white/60">{l.country}</div>
+          <div className="text-sm font-medium text-white/90">{l.league}</div>
+        </button>
+      );
+    })}
+  </div>
+
+  <div className="mt-3 rounded-xl border border-white/10 bg-black/20 p-3">
+    <div className="mb-2 text-[11px] text-white/60">Filtros</div>
+    <div className="flex flex-col gap-2">
+      <label className="flex items-center justify-between gap-2 text-[12px] text-white/70">
+        <span>Fecha</span>
+        <input
+          className="rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-white/90"
+          type="date"
+          value={day}
+          onChange={(e) => setDay(e.target.value)}
+        />
+      </label>
+      <label className="flex items-center justify-between gap-2 text-[12px] text-white/70">
+        <span>Temporada</span>
+        <input
+          className="w-28 rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-white/90"
+          type="number"
+          min={2000}
+          max={2100}
+          value={season}
+          onChange={(e) => setSeason(Number(e.target.value || new Date().getFullYear()))}
+        />
+      </label>
+      <div className="text-[11px] text-white/40">
+        Si una copa no carga, prueba otro año.
+      </div>
+    </div>
+  </div>
+</div>
+
             </div>
-          </div>
         </div>
 
         {/* Partidos */}
@@ -169,7 +246,7 @@ export default function Fixtures() {
           <div id="games-list" className="rounded-2xl border border-white/10 bg-white/5 p-3 min-h-[520px]">
             <div className="text-sm font-semibold text-white/80 mb-2">Partidos</div>
             <div className="rounded-xl overflow-hidden">
-              <api-sports-widget data-type="games"></api-sports-widget>
+              <api-sports-widget data-type="games" data-league={String(leagueId)} data-season={String(season)} data-date={day}></api-sports-widget>
             </div>
           </div>
         </div>
