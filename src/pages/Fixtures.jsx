@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../lib/auth";
 
 // Página PARTIDOS (re-hecha): centro de estadísticas con Widgets oficiales de API-FOOTBALL.
 // Requiere membresía (o al menos sesión) para acceder.
