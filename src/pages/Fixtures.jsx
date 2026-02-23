@@ -22,284 +22,233 @@ const ALLOWED_COUNTRIES = [
   "France",
 ];
 
-function setupLeaguesCountryFilter() {
-  // Filtra visualmente el listado de países/ligas para que SOLO queden los países allowlist.
-  // Importante: esto NO cambia la data que descarga el widget (eso depende de config del widget),
-  // pero sí reduce el ruido visual y hace la UI más usable, especialmente en móvil.
-  if (window.__FV_leaguesFilterSetup) return;
-  window.__FV_leaguesFilterSetup = true;
 
-  const allowed = new Set(ALLOWED_COUNTRIES.map((c) => c.toLowerCase()));
+// Ligas prioritarias para el panel "Detalle" (para evitar que quede pegado en World Cup 2022)
+const PREFERRED_LEAGUES = [
+  "UEFA Champions League",
+  "England : Premier League",
+  "Premier League",
+  "Spain : La Liga",
+  "La Liga",
+  "Italy : Serie A",
+  "Serie A",
+  "Germany : Bundesliga",
+  "Bundesliga",
+  "France : Ligue 1",
+  "Ligue 1",
+  "Portugal : Primeira Liga",
+  "Primeira Liga",
+  "Chile : Primera Division",
+  "Primera Division",
+  "Mexico : Liga MX",
+  "Liga MX",
+  "Brazil : Serie A",
+  "Argentina : Liga Profesional",
+];
 
-  const isCountryLabel = (txt) => {
-    const t = (txt || "").trim();
-    if (!t) return false;
-    if (t.length > 30) return false;
-    // solo letras/espacios/guiones (evita nombres largos de ligas)
-    if (!/^[\p{L}\s-]+$/u.test(t)) return false;
-    // muchos widgets muestran países con Title Case; esto es un filtro suave
-    return true;
-  };
+// Normaliza texto (quita acentos) para comparar de forma robusta
+function norm(s) {
+  return (s || "")
+    .toString()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
 
-  const hideCountryGroup = (labelEl) => {
-    // Intentamos ocultar el bloque completo del país (header + leagues)
-    const group =
-      labelEl.closest("li") ||
-      labelEl.closest("[class*='country']") ||
-      labelEl.closest("[class*='Country']") ||
-      labelEl.closest("div");
-    (group || labelEl).style.display = "none";
-  };
+function extractCountry(rawText) {
+  // Ejemplos reales del widget:
+  // "Chile 5", "Chinese-Taipei 1", "Japan : J2 League", "Mexico : Liga MX"
+  const t = (rawText || "").replace(/\s+/g, " ").trim();
+  if (!t) return "";
+  const beforeColon = t.includes(":") ? t.split(":")[0] : t;
+  // quita contadores al final ("Chile 5", "Japan 12")
+  const noCount = beforeColon.replace(/\s*\d+\s*$/g, "").trim();
+  return noCount;
+}
 
-  const tryFilter = () => {
+function isAllowedCountry(country) {
+  const c = norm(country);
+  if (!c) return false;
+  // Alias comunes / tolerancia
+  if (c === "brasil") return true; // a veces viene en español
+  if (c === "méxico" || c === "mexico") return true;
+  return new Set(ALLOWED_COUNTRIES.map((x) => norm(x))).has(c);
+}
+
+function looksLikeCountryRow(el) {
+  // Heurística: filas "clickeables" o items de lista
+  if (!el || el.nodeType !== 1) return false;
+  const tag = el.tagName?.toLowerCase();
+  if (!["li", "a", "button", "div"].includes(tag)) return false;
+  const txt = (el.textContent || "").trim();
+  if (!txt) return false;
+  // La fila de país suele ser corta y tiene algún contador o flecha
+  if (txt.length > 60) return false;
+  // Debe contener letras
+  if (!/[a-zA-Z]/.test(txt)) return false;
+  return true;
+}
+
+function setupWidgetsFiltersAndDefaults() {
+  if (window.__FV_widgetsFiltersSetup) return;
+  window.__FV_widgetsFiltersSetup = true;
+
+  const allowedSet = new Set(ALLOWED_COUNTRIES.map((c) => norm(c)));
+
+  const filterLeaguesPanel = () => {
     const root = document.getElementById("leagues-list");
     if (!root) return;
 
-    // 1) Encuentra candidatos a “nombre de país” dentro del widget
-    const candidates = Array.from(
-      root.querySelectorAll(
-        "[class*='country'], [class*='Country'], h1, h2, h3, h4, h5, strong, span, li, div"
-      )
-    );
+    // Intentamos encontrar items dentro del widget
+    const candidates = Array.from(root.querySelectorAll("li, a, button, div"))
+      .filter(looksLikeCountryRow);
 
     for (const el of candidates) {
-      const raw = (el.textContent || "").trim();
-      if (!isCountryLabel(raw)) continue;
+      const txt = (el.textContent || "").trim();
+      const country = extractCountry(txt);
+      const c = norm(country);
 
-      const key = raw.toLowerCase();
-      // Si el texto coincide exacto con un país y NO está permitido, lo ocultamos.
-      // Si coincide con uno permitido, lo dejamos.
-      if (allowed.has(key)) continue;
+      // Si el item NO parece país (no se puede extraer), no lo tocamos
+      if (!c) continue;
 
-      // Heurística: solo ocultar cuando “parece” un país (evita ocultar ligas cortas)
-      // - En muchos widgets el país aparece aislado en una línea/header.
-      const hasFewChildren = el.children?.length <= 2;
-      const isShortSingleLine = raw.split(/\s+/).length <= 3;
-      const looksLikeHeader =
-        /country/i.test(el.className || "") ||
-        ["H1", "H2", "H3", "H4", "H5", "STRONG"].includes(el.tagName);
-
-      if (looksLikeHeader || (hasFewChildren && isShortSingleLine)) {
-        hideCountryGroup(el);
+      // OJO: aquí si NO está permitido, removemos la fila completa
+      if (!allowedSet.has(c) && c !== "brasil" && c !== "mexico" && c !== "méxico") {
+        // Pero evitamos remover contenedores grandes: solo si la fila es “pequeña”
+        if ((el.textContent || "").trim().length <= 60) {
+          el.remove();
+        }
       }
     }
   };
 
-  // Observamos cambios porque el widget pinta async (SPA + script externo).
-  const root = document.getElementById("leagues-list");
-  const obsTarget = root || document.body;
-
-  const observer = new MutationObserver(() => {
-    tryFilter();
-  });
-
-  observer.observe(obsTarget, { childList: true, subtree: true });
-
-  // Primeras pasadas
-  tryFilter();
-  setTimeout(tryFilter, 250);
-  setTimeout(tryFilter, 800);
-}
-
-function setupWidgetUiPrune() {
-  // Oculta secciones/tabs que no aportan (sobre todo en móvil):
-  // - “Tabla / Standings”
-  // - “Equipo / Jugadores / Squad / Players”
-  // No tocamos la lógica interna del widget: solo ocultamos elementos del DOM cuando aparezcan.
-  if (window.__FV_widgetUiPruneSetup) return;
-  window.__FV_widgetUiPruneSetup = true;
-
-  const SHOULD_HIDE = [
-    "tabla",
-    "standings",
-    "equipo",
-    "jugadores",
-    "players",
-    "squad",
-    "alineación",
-    "lineup",
-  ];
-
-  const shouldHide = (txt) => {
-    const t = (txt || "").toLowerCase().replace(/\s+/g, " ").trim();
-    if (!t) return false;
-    return SHOULD_HIDE.some((k) => t === k || t.includes(k));
+  const isHeaderText = (t) => {
+    const s = (t || "").replace(/\s+/g, " ").trim();
+    if (!s) return false;
+    // headers típicos: "Japan : J2 League"
+    return s.includes(":") && s.length <= 80 && /[a-zA-Z]/.test(s.split(":")[0] || "");
   };
 
-  const prune = () => {
-    const scope = document.querySelector("#leagues-list, #games-list, #game-content") || document.body;
+  const removeSectionFromHeaderBlock = (headerEl) => {
+    const block = headerEl.closest("li, div") || headerEl;
+    const parent = block.parentElement;
+    if (!parent) return;
 
-    const clickable = Array.from(scope.querySelectorAll("button, a, li, span, div"))
-      .filter((el) => {
-        const txt = (el.textContent || "").trim();
-        if (!txt) return false;
-        // Evita borrar contenedores grandes; prioriza elementos “tipo botón/tab”
-        const isInteractive =
-          el.tagName === "BUTTON" ||
-          el.tagName === "A" ||
-          (el.getAttribute?.("role") || "").toLowerCase().includes("tab") ||
-          (el.className || "").toString().toLowerCase().includes("tab");
-        return isInteractive || txt.length <= 20;
-      });
+    // Eliminamos el bloque del header y los siguientes siblings hasta el próximo header
+    let node = block;
+    while (node) {
+      const next = node.nextElementSibling;
+      node.remove();
+      if (!next) break;
 
-    for (const el of clickable) {
-      const txt = (el.textContent || "").trim();
-      if (!shouldHide(txt)) continue;
+      // Si el siguiente sibling contiene un header, paramos
+      const nextText = (next.textContent || "").trim();
+      if (isHeaderText(nextText)) break;
 
-      // Oculta el tab/botón y, si corresponde, el contenedor cercano.
-      el.style.display = "none";
-
-      const wrap =
-        el.closest("[role='tab']") ||
-        el.closest("[class*='tab']") ||
-        el.closest("li") ||
-        el.closest("button") ||
-        null;
-      if (wrap && wrap !== el) wrap.style.display = "none";
+      node = next;
     }
   };
 
-  const observer = new MutationObserver(() => prune());
-  observer.observe(document.body, { childList: true, subtree: true });
-
-  prune();
-  setTimeout(prune, 250);
-  setTimeout(prune, 800);
-}
-
-
-
-function setupGamesCountryFilter() {
-  // Filtra visualmente la lista de “Partidos” para ocultar ligas cuyo país NO esté en allowlist.
-  // Esto reduce el ruido (Japón/Australia/etc) y mejora el scroll.
-  if (window.__FV_gamesCountryFilterSetup) return;
-  window.__FV_gamesCountryFilterSetup = true;
-
-  const allowed = new Set(ALLOWED_COUNTRIES.map((c) => c.toLowerCase()));
-
-  const parseCountryLeague = (txt) => {
-    const t = (txt || "").replace(/\s+/g, " ").trim();
-    if (!t) return null;
-    if (t.length > 80) return null;
-    const m = t.match(/^([\p{L}\s-]{2,})\s*:\s*(.+)$/u);
-    if (!m) return null;
-    const country = (m[1] || "").trim();
-    const league = (m[2] || "").trim();
-    if (!country || !league) return null;
-    // Evita falsos positivos donde el “country” en realidad no es país (muy largo o con números)
-    if (country.length > 30) return null;
-    if (/\d/.test(country)) return null;
-    return { country, league };
-  };
-
-  const hideLeagueSection = (headerEl) => {
-    // Intentamos ocultar el bloque completo de esa liga (header + partidos)
-    const block =
-      headerEl.closest("li") ||
-      headerEl.closest("[class*='league']") ||
-      headerEl.closest("[class*='League']") ||
-      headerEl.closest("[class*='competition']") ||
-      headerEl.closest("[class*='Competition']") ||
-      headerEl.closest("div");
-    (block || headerEl).style.display = "none";
-  };
-
-  const filterGames = () => {
+  const filterGamesPanel = () => {
     const root = document.getElementById("games-list");
     if (!root) return;
 
-    const candidates = Array.from(
-      root.querySelectorAll("button, a, h1, h2, h3, h4, strong, span, div, li")
+    // Encontrar headers de secciones dentro de "Partidos"
+    const allEls = Array.from(root.querySelectorAll("li, div, a, button"));
+    const headers = allEls.filter((el) => isHeaderText((el.textContent || "").trim()));
+
+    for (const h of headers) {
+      const txt = (h.textContent || "").replace(/\s+/g, " ").trim();
+      const country = extractCountry(txt);
+      if (!country) continue;
+
+      if (!isAllowedCountry(country)) {
+        removeSectionFromHeaderBlock(h);
+      }
+    }
+  };
+
+  let lastAutoPick = 0;
+
+  const tryPickBetterDefault = () => {
+    const now = Date.now();
+    if (now - lastAutoPick < 2000) return; // throttle
+    lastAutoPick = now;
+
+    const detailRoot = document.getElementById("game-content");
+    const detailText = (detailRoot?.textContent || "");
+    const isStaleWorldCup =
+      /world\s*:\s*world\s*cup/i.test(detailText) ||
+      /world\s*cup/i.test(detailText);
+
+    if (!isStaleWorldCup) return;
+
+    const gamesRoot = document.getElementById("games-list");
+    if (!gamesRoot) return;
+
+    const normText = (s) => norm((s || "").replace(/\s+/g, " "));
+    const pref = PREFERRED_LEAGUES.map((x) => normText(x));
+
+    // Buscamos el primer partido clickeable dentro de una liga preferida
+    const clickable = Array.from(gamesRoot.querySelectorAll("a, button, li, div")).filter(
+      (el) => {
+        const t = (el.textContent || "").trim();
+        if (!t || t.length > 120) return false;
+        // partido suele tener 2 equipos (múltiples palabras) y/o un score
+        const hasTwoTeams = (t.match(/\n/g) || []).length >= 1 || /\s\d+\s*-\s*\d+\s*/.test(t);
+        return hasTwoTeams;
+      }
     );
 
-    for (const el of candidates) {
-      const raw = (el.textContent || "").trim();
-      const parsed = parseCountryLeague(raw);
-      if (!parsed) continue;
+    // Recorremos el DOM y elegimos el primer click bajo una cabecera preferida
+    // (Heurística: buscamos cabeceras y luego el siguiente item clickeable)
+    const headers = Array.from(gamesRoot.querySelectorAll("li, div")).filter((el) =>
+      isHeaderText((el.textContent || "").trim())
+    );
 
-      const key = parsed.country.toLowerCase();
-      if (allowed.has(key)) continue;
+    for (const h of headers) {
+      const ht = normText((h.textContent || "").trim());
+      if (!pref.some((p) => ht.includes(p))) continue;
 
-      // El header de liga suele ser clickeable o tener estilo de “fila”
-      const isInteractive =
-        el.tagName === "BUTTON" ||
-        el.tagName === "A" ||
-        (el.getAttribute?.("role") || "").toLowerCase().includes("button") ||
-        (el.className || "").toString().toLowerCase().includes("header") ||
-        (el.className || "").toString().toLowerCase().includes("league");
-
-      // Heurística: ocultamos sólo si parece encabezado de liga
-      if (isInteractive || raw.split(":").length === 2) {
-        hideLeagueSection(el);
+      // Tomamos el siguiente sibling como primer partido de esa liga
+      let sib = (h.closest("li, div") || h).nextElementSibling;
+      while (sib) {
+        const t = (sib.textContent || "").trim();
+        if (t && t.length <= 160) {
+          // Intento click
+          try {
+            sib.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+            return;
+          } catch (_) {}
+        }
+        // no nos vamos demasiado abajo
+        sib = sib.nextElementSibling;
       }
     }
-  };
 
-  const observer = new MutationObserver(() => filterGames());
-  observer.observe(document.body, { childList: true, subtree: true });
-
-  filterGames();
-  setTimeout(filterGames, 250);
-  setTimeout(filterGames, 800);
-}
-
-function setupDefaultDetailSelection() {
-  // Evita que el panel “Detalle” quede mostrando cosas viejas (World Cup 2022).
-  // Intentamos auto-seleccionar una liga más actual (Champions / ligas top).
-  if (window.__FV_defaultDetailSetup) return;
-  window.__FV_defaultDetailSetup = true;
-
-  const PREFERRED = [
-    "UEFA Champions League",
-    "Champions League",
-    "Premier League",
-    "La Liga",
-    "Serie A",
-    "Bundesliga",
-    "Ligue 1",
-    "Primeira Liga",
-    "Liga MX",
-    "Serie A Brazil",
-    "Brasileirão",
-    "Liga Profesional",
-    "Primera División",
-    "Primera A",
-  ];
-
-  const tryClick = () => {
-    const scopes = [
-      document.getElementById("leagues-list"),
-      document.getElementById("games-list"),
-      document.getElementById("game-content"),
-      document.body,
-    ].filter(Boolean);
-
-    const all = [];
-    for (const s of scopes) {
-      all.push(...Array.from(s.querySelectorAll("button, a, li, div, span, strong")));
-    }
-
-    for (const pref of PREFERRED) {
-      const prefLc = pref.toLowerCase();
-      const el = all.find((x) => ((x.textContent || "").toLowerCase().includes(prefLc)));
-      if (!el) continue;
-
-      // Click en el elemento más “interactivo” posible
-      const clickable = el.closest("button, a, li") || el;
+    // Fallback: click al primer elemento clickeable encontrado
+    if (clickable[0]) {
       try {
-        clickable.click();
-        return true;
-      } catch (_) {
-        // no-op
-      }
+        clickable[0].dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      } catch (_) {}
     }
-    return false;
   };
 
-  // Varias pasadas porque los widgets cargan async
-  setTimeout(tryClick, 400);
-  setTimeout(tryClick, 900);
-  setTimeout(tryClick, 1600);
+  const runAll = () => {
+    filterLeaguesPanel();
+    filterGamesPanel();
+    tryPickBetterDefault();
+  };
+
+  // Observer global y también por contenedor (porque el widget refresca por data-refresh)
+  const obs = new MutationObserver(() => runAll());
+  obs.observe(document.body, { childList: true, subtree: true });
+
+  // ticks iniciales
+  runAll();
+  setTimeout(runAll, 400);
+  setTimeout(runAll, 1200);
+  setTimeout(runAll, 2500);
 }
 
 function ensureWidgetScriptLoaded() {
@@ -365,16 +314,7 @@ export default function Fixtures() {
         await ensureWidgetScriptLoaded();
 
     // Filtra países para que el widget de ligas quede liviano
-    setupLeaguesCountryFilter();
-
-    // Oculta tabs/paneles que no aportan (Tabla/Equipo/Jugadores)
-    setupWidgetUiPrune();
-
-    // Filtra el listado central de Partidos (oculta ligas de países fuera de allowlist)
-    setupGamesCountryFilter();
-
-    // Ajusta detalle por defecto (evita World Cup viejo)
-    setupDefaultDetailSelection();
+    setupWidgetsFiltersAndDefaults();
         if (cancelled) return;
 
         // Espera un tick para asegurar que el DOM esté montado
