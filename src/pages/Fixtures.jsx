@@ -8,89 +8,71 @@ import { useAuth } from "../lib/auth";
 
 const WIDGET_SCRIPT_SRC = "https://widgets.api-sports.io/3.1.0/widgets.js";
 
-// Reducir ruido visual: mostramos solo países/ligas principales.
-// OJO: Esto filtra la UI del widget (no reduce el payload que descarga API-SPORTS).
 const ALLOWED_COUNTRIES = [
   "Argentina",
-  "Brasil",
   "Brazil",
   "Chile",
   "Colombia",
   "Mexico",
-  "México",
-  "España",
   "Spain",
-  "Inglaterra",
   "England",
-  "Italia",
   "Italy",
-  "Alemania",
   "Germany",
   "Portugal",
-  "Francia",
   "France",
 ];
 
-function _norm(str) {
-  return (str || "")
-    .toString()
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
+function setupLeaguesCountryFilter() {
+  // Filtra la lista de países del widget de ligas para que quede liviana.
+  // OJO: esto actúa sobre el DOM que renderiza el widget (no cambia la data que baja),
+  // pero reduce muchísimo la cantidad de items visibles y mejora la UX.
+  if (window.__FV_leaguesFilterSetup) return;
+  window.__FV_leaguesFilterSetup = true;
 
-function installAllowedCountriesFilter() {
-  const allow = new Set(ALLOWED_COUNTRIES.map(_norm));
-  const leaguesWidget = document.querySelector(
-    '#leagues-list api-sports-widget[data-type="leagues"]'
-  );
-  if (!leaguesWidget) return () => {};
+  const allowed = new Set(ALLOWED_COUNTRIES.map((c) => c.toLowerCase()));
 
   const tryFilter = () => {
-    const root = leaguesWidget.shadowRoot || leaguesWidget;
-    if (!root) return;
+    const root = document.getElementById("leagues-list");
+    if (!root) return false;
 
-    const candidates = root.querySelectorAll("li, a, button, div");
-    if (!candidates || candidates.length === 0) return;
+    // Buscamos filas que contengan nombre de país (normalmente el texto del item).
+    const rows = Array.from(root.querySelectorAll("li, .item, .country, div"))
+      .filter((el) => {
+        const txt = (el.textContent || "").trim();
+        if (!txt) return false;
+        // Heurística: filas cortas con nombre país (evitar sub-ligas y otros textos largos).
+        return txt.length <= 30;
+      });
 
-    candidates.forEach((el) => {
-      const tag = (el.tagName || "").toLowerCase();
-      if (tag === "input" || tag === "svg" || tag === "path") return;
-      const txt = _norm(el.textContent);
-      if (!txt) return;
+    let removed = 0;
+    for (const el of rows) {
+      const txt = (el.textContent || "").trim().toLowerCase();
 
-      const isCountryLike = txt.length <= 20 && txt.split(" ").length <= 3;
-      if (isCountryLike) {
-        const ok = Array.from(allow).some(
-          (a) => txt === a || txt.startsWith(a + " ") || txt.includes(a)
-        );
-        if (!ok) el.style.display = "none";
+      // Si coincide exactamente con un país no permitido, lo removemos.
+      if (txt && !allowed.has(txt) && /^[a-z\s-]+$/i.test(txt)) {
+        el.remove();
+        removed++;
       }
-    });
-  };
-
-  const root = leaguesWidget.shadowRoot || leaguesWidget;
-  const obs = new MutationObserver(() => tryFilter());
-  try {
-    obs.observe(root, { childList: true, subtree: true });
-  } catch (_) {
-    // no-op
-  }
-
-  tryFilter();
-  const t1 = setTimeout(tryFilter, 300);
-  const t2 = setTimeout(tryFilter, 900);
-
-  return () => {
-    clearTimeout(t1);
-    clearTimeout(t2);
-    try {
-      obs.disconnect();
-    } catch (_) {
-      // no-op
     }
+
+    // Si el widget aún no termina de pintar, esto puede quedar en 0.
+    return removed > 0;
   };
+
+  // Observamos cambios porque el widget pinta async.
+  const root = document.getElementById("leagues-list");
+  const obsTarget = root || document.body;
+
+  const observer = new MutationObserver(() => {
+    tryFilter();
+  });
+
+  observer.observe(obsTarget, { childList: true, subtree: true });
+
+  // Primer intento inmediato + reintentos cortos
+  tryFilter();
+  setTimeout(tryFilter, 300);
+  setTimeout(tryFilter, 800);
 }
 
 function ensureWidgetScriptLoaded() {
@@ -131,20 +113,6 @@ function refreshApiSportsWidgets() {
   }
 }
 
-function waitForWidgetConfig(maxTries = 30) {
-  return new Promise((resolve) => {
-    let tries = 0;
-    const tick = () => {
-      tries += 1;
-      const cfg = document.querySelector('api-sports-widget[data-type="config"]');
-      if (cfg) return resolve(true);
-      if (tries >= maxTries) return resolve(false);
-      setTimeout(tick, 100);
-    };
-    tick();
-  });
-}
-
 export default function Fixtures() {
   const navigate = useNavigate();
   const { isLoggedIn, user } = useAuth();
@@ -164,23 +132,19 @@ export default function Fixtures() {
 
   useEffect(() => {
     let cancelled = false;
-    let uninstallFilter = null;
 
     (async () => {
       try {
         await ensureWidgetScriptLoaded();
-        if (cancelled) return;
 
-        await waitForWidgetConfig(30);
+    // Filtra países para que el widget de ligas quede liviano
+    setupLeaguesCountryFilter();
         if (cancelled) return;
 
         // Espera un tick para asegurar que el DOM esté montado
         setTimeout(() => {
           if (cancelled) return;
           refreshApiSportsWidgets();
-
-          // Filtra países del listado de Ligas (UI)
-          uninstallFilter = installAllowedCountriesFilter();
         }, 50);
       } catch (e) {
         // Si falla la carga del script, igual dejamos la UI (con mensaje).
@@ -190,7 +154,6 @@ export default function Fixtures() {
 
     return () => {
       cancelled = true;
-      if (typeof uninstallFilter === "function") uninstallFilter();
     };
   }, []);
 
@@ -278,20 +241,6 @@ export default function Fixtures() {
 
         {/* Columna derecha */}
         <div className="lg:col-span-4 flex flex-col gap-4">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-3 min-h-[220px]">
-            <div className="text-sm font-semibold text-white/80 mb-2">Tabla / standings</div>
-            <div className="rounded-xl overflow-hidden">
-              <div id="standings-content"></div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-3 min-h-[220px]">
-            <div className="text-sm font-semibold text-white/80 mb-2">Equipo / jugadores</div>
-            <div className="rounded-xl overflow-hidden">
-              <div id="team-content"></div>
-            </div>
-          </div>
-
           <div id="game-content" className="rounded-2xl border border-white/10 bg-white/5 p-3 min-h-[320px]">
             <div className="text-sm font-semibold text-white/80 mb-2">Detalle</div>
             <div className="card-body rounded-xl overflow-hidden">
@@ -314,16 +263,13 @@ export default function Fixtures() {
           data-show-logos="true"
           data-refresh="30"
           data-favorite="true"
-          data-standings="true"
-          data-team-squad="true"
-          data-team-statistics="true"
-          data-player-statistics="true"
+          data-standings="false"
+          data-team-squad="false"
+          data-team-statistics="false"
+          data-player-statistics="false"
           data-game-tab="statistics"
-          data-target-player="modal"
           data-target-league="#games-list"
-          data-target-team="#team-content"
           data-target-game="#game-content .card-body"
-          data-target-standings="#standings-content"
           style={{ display: "none" }}
         ></api-sports-widget>
       )}
