@@ -2110,7 +2110,7 @@ if (firstId && !window.__fixturesFirstOnce[firstId]) {
       const filteredTop = base.filter((fx) => isAllowedCompetition(getCountryName(fx), getLeagueName(fx)));
 
       if (!filteredTop.length) {
-        setErr("No encontramos partidos de ligas TOP para ese rango. Prueba 7–14 días y sin filtro.");
+        setErr("Para generar parlays potenciados necesitas al menos 3–5 partidos o minimo 2 a 3 ligas. Amplía a 2–14 días o quita filtros.");
         setFixtures([]);
         return;
       }
@@ -2364,7 +2364,9 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
         </FeatureCard>
 
         <FeatureCard title="Cuotas potenciadas" badge={`Hasta x${maxBoost}`} locked={!features.boosted}>
-          <div className="text-xs text-slate-300">Arma una combinada automática o con partidos seleccionados.</div>
+          <div className="text-xs text-slate-300">Arma una combinada automática o con partidos seleccionados. 
+            Recomendado: seleccionar al menos 5 partidos para mejores resultados.
+          </div>
 
           <div className="mt-3 flex flex-col sm:flex-row gap-2">
             <button
