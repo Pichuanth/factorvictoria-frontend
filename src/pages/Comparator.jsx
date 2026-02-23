@@ -2153,16 +2153,17 @@ if (firstId && !window.__fixturesFirstOnce[firstId]) {
       VISITANTE (NO LOGUEADO)
      ========================= */
   if (!isLoggedIn) {
-    return (
-      <PageShell>
+  return (
+    <PageShell>
+      <div className="space-y-6">
         <VisitorBanner />
         <Simulator bg={BG_DINERO} />
         <PriceCalculatorCard bg={BG_DINERO} />
-
         <VisitorEndingHero />
-      </PageShell>
-    );
-  }
+      </div>
+    </PageShell>
+  );
+}
 
   /* =========================
       LOGUEADO (COMPARADOR)
