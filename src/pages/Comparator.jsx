@@ -2155,7 +2155,7 @@ if (firstId && !window.__fixturesFirstOnce[firstId]) {
   if (!isLoggedIn) {
   return (
     <PageShell>
-      <div className="space-y-6">
+      <div className="space-y-4">
         <VisitorBanner />
         <Simulator bg={BG_DINERO} />
         <PriceCalculatorCard bg={BG_DINERO} />
