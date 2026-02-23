@@ -8,6 +8,20 @@ import { useAuth } from "../lib/auth";
 
 const WIDGET_SCRIPT_SRC = "https://widgets.api-sports.io/3.1.0/widgets.js";
 
+const TOP_LEAGUES_BY_COUNTRY = {
+  Chile: ["Primera División", "Copa Chile", "Primera B", "Super Cup", "Segunda División"],
+  Argentina: ["Liga Profesional", "Copa de la Liga", "Copa Argentina", "Primera Nacional", "Super Cup"],
+  Brazil: ["Serie A", "Serie B", "Copa do Brasil", "Paulista A1", "Carioca"],
+  Colombia: ["Primera A", "Copa Colombia", "Primera B", "Super Cup", "Liga Femenina"],
+  Mexico: ["Liga MX", "Liga Premier Serie A", "Liga de Expansión", "Copa MX", "Liga MX Femenil"],
+  Spain: ["La Liga", "Copa del Rey", "Segunda División", "Super Cup", "Primera RFEF"],
+  England: ["Premier League", "FA Cup", "Championship", "EFL Cup", "Community Shield"],
+  Italy: ["Serie A", "Coppa Italia", "Serie B", "Super Cup", "Primavera"],
+  Germany: ["Bundesliga", "DFB Pokal", "2. Bundesliga", "Super Cup", "3. Liga"],
+  Portugal: ["Primeira Liga", "Taça de Portugal", "Liga 2", "Super Cup", "Liga 3"],
+  France: ["Ligue 1", "Coupe de France", "Ligue 2", "Trophée des Champions", "National"]
+};
+
 const ALLOWED_COUNTRIES = [
   "Argentina",
   "Brazil",
@@ -21,6 +35,8 @@ const ALLOWED_COUNTRIES = [
   "Portugal",
   "France",
 ];
+
+
 
 function setupLeaguesCountryFilter() {
   // Filtra el panel izquierdo (países) SIN romper el widget:
@@ -96,6 +112,171 @@ function setupLeaguesCountryFilter() {
   setTimeout(filter, 250);
   setTimeout(filter, 900);
 }
+
+function setupDefaultFavoritesBootstrap() {
+  // Idea: dejar el widget intacto, pero marcar favoritos por defecto y abrir la pestaña "FAVORITOS".
+  // - No removemos nodos (rompe listeners internos).
+  // - Solo hacemos clicks controlados en estrellas / tabs.
+  // - Se ejecuta UNA vez por navegador (localStorage), con reintentos seguros porque el widget renderiza async.
+  if (window.__FV_favoritesBootstrapSetup) return;
+  window.__FV_favoritesBootstrapSetup = true;
+
+  const LS_KEY = "fv_fixtures_bootstrap_favs_v1";
+
+  const normalize = (s) =>
+    (s || "")
+      .replace(/\u00A0/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+
+  const stripTrailingCount = (s) => (s || "").replace(/\s+\d+\s*$/g, "").trim();
+
+  const findTabButton = (label) => {
+    const want = normalize(label);
+    const scope = document.querySelector("#leagues-list")?.closest(".card") || document.body;
+    const btns = Array.from(scope.querySelectorAll("button, a, [role='tab'], div"));
+    return (
+      btns.find((b) => normalize(b.textContent) === want) ||
+      btns.find((b) => normalize(b.textContent).includes(want)) ||
+      null
+    );
+  };
+
+  const clickSafe = (el) => {
+    try {
+      el?.click?.();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  };
+
+  const findStarControlInRow = (row) => {
+    if (!row) return null;
+
+    // Heurística: el icono de favorito suele estar al inicio de la fila
+    const candidates = [
+      row.querySelector("[class*='star']"),
+      row.querySelector("[class*='fav']"),
+      row.querySelector("button"),
+      row.querySelector("svg"),
+      row.querySelector("span"),
+      row.querySelector("i"),
+    ].filter(Boolean);
+
+    // Preferimos algo clickeable cercano
+    for (const c of candidates) {
+      // si es svg, normalmente el click va al parent
+      if (c.tagName === "svg" || c.tagName === "SVG") return c.parentElement || c;
+      // botones/spans suelen funcionar directo
+      return c;
+    }
+    return null;
+  };
+
+  const isFavorited = (row) => {
+    // No hay API oficial; intentamos deducir por clases comunes o aria-pressed.
+    const star =
+      row?.querySelector("[aria-pressed]") ||
+      row?.querySelector("[class*='active']") ||
+      row?.querySelector("[class*='selected']") ||
+      null;
+    if (!star) return false;
+    const ap = star.getAttribute?.("aria-pressed");
+    if (ap === "true") return true;
+    const cls = (star.className || "").toString().toLowerCase();
+    return cls.includes("active") || cls.includes("selected") || cls.includes("on");
+  };
+
+  const ensureFavorited = (row) => {
+    if (!row) return false;
+    if (isFavorited(row)) return true;
+    const star = findStarControlInRow(row);
+    if (!star) return false;
+    return clickSafe(star);
+  };
+
+  const getLeagueRowsUnderExpandedCountry = (root) => {
+    // En el widget, las ligas suelen ser <li> sin bandera dentro del mismo root.
+    // No hay estructura fija; buscamos li que no tengan img bandera y que tengan texto corto.
+    const all = Array.from(root.querySelectorAll("li"));
+    return all.filter((li) => {
+      const t = stripTrailingCount(li.textContent || "").trim();
+      if (!t) return false;
+      const hasFlag = !!li.querySelector("img");
+      // ligas suelen venir sin bandera o con icono pequeño
+      return !hasFlag && t.length > 2 && t.length < 60;
+    });
+  };
+
+  const attempt = () => {
+    if (localStorage.getItem(LS_KEY) === "1") return true;
+
+    const root = document.getElementById("leagues-list");
+    if (!root) return false;
+
+    // 1) Abrir tab FAVORITOS (si existe). Si no existe, seguimos.
+    const favTab = findTabButton("Favoritos") || findTabButton("Favorites");
+    if (favTab) clickSafe(favTab);
+
+    // 2) Marcar países permitidos como favoritos
+    const allowed = new Set(ALLOWED_COUNTRIES.map((c) => normalize(c)));
+
+    const countryRows = Array.from(root.querySelectorAll("li")).filter((li) => !!li.querySelector("img"));
+    for (const row of countryRows) {
+      const name = normalize(stripTrailingCount(row.textContent || ""));
+      if (!name) continue;
+      if (!allowed.has(name)) continue;
+      ensureFavorited(row);
+    }
+
+    // 3) Para cada país permitido: expandir (click en el row) y marcar top ligas
+    for (const country of ALLOWED_COUNTRIES) {
+      const cKey = normalize(country);
+
+      // encuentra fila del país
+      const row = countryRows.find((r) => normalize(stripTrailingCount(r.textContent || "")) === cKey);
+      if (!row) continue;
+
+      // expandir
+      clickSafe(row);
+
+      // marcar ligas top (hasta 5)
+      const wanted = (TOP_LEAGUES_BY_COUNTRY[country] || []).slice(0, 5).map(normalize);
+      if (!wanted.length) continue;
+
+      const leagueRows = getLeagueRowsUnderExpandedCountry(root);
+      for (const leagueName of wanted) {
+        const lr = leagueRows.find((li) => normalize(li.textContent || "").includes(leagueName));
+        if (lr) ensureFavorited(lr);
+      }
+    }
+
+    // 4) Volver a FAVORITOS para que el usuario vea solo lo marcado
+    if (favTab) clickSafe(favTab);
+
+    localStorage.setItem(LS_KEY, "1");
+    return true;
+  };
+
+  // Reintentos con debounce, porque el widget renderiza async y refresca.
+  let t = null;
+  const schedule = () => {
+    if (t) clearTimeout(t);
+    t = setTimeout(() => attempt(), 300);
+  };
+
+  const observer = new MutationObserver(() => schedule());
+  observer.observe(document.body, { childList: true, subtree: true });
+
+  // Primeras pasadas
+  setTimeout(() => attempt(), 1200);
+  setTimeout(() => attempt(), 2400);
+  setTimeout(() => attempt(), 4200);
+}
+
+
 
 
 function setupWidgetUiPrune() {
@@ -176,20 +357,18 @@ function setupGamesCountryFilter() {
   const allowedCountries = new Set(ALLOWED_COUNTRIES.map((c) => c.toLowerCase()));
   const MAX_LEAGUES_PER_COUNTRY = 5;
 
-  // Top leagues por país (match flexible por "includes")
-  const TOP_LEAGUES = {
-    argentina: ["liga profesional", "copa", "primera nacional", "supercopa", "reserva"],
-    brazil: ["serie a", "serie b", "copa do brasil", "paulista", "carioca"],
-    chile: ["primera", "copa chile", "primera b", "supercopa", "femen"],
-    colombia: ["primera a", "copa", "primera b", "superliga", "femen"],
-    mexico: ["liga mx", "liga premier", "expans", "copa", "femen"],
-    spain: ["la liga", "copa del rey", "segunda", "supercopa", "primera"],
-    england: ["premier league", "fa cup", "championship", "efl", "community"],
-    italy: ["serie a", "coppa italia", "serie b", "supercoppa", "primavera"],
-    germany: ["bundesliga", "dfb", "2. bundesliga", "supercup", "3. liga"],
-    portugal: ["primeira", "taça", "liga 2", "supertaça", "liga 3"],
-    france: ["ligue 1", "coupe", "ligue 2", "troph", "national"],
-  };
+
+  // Top leagues por país (match flexible por "includes").
+  // Usamos TOP_LEAGUES_BY_COUNTRY para mantener una sola fuente de verdad.
+  const TOP_LEAGUE_PATTERNS = (() => {
+    const out = {};
+    for (const [country, leagues] of Object.entries(TOP_LEAGUES_BY_COUNTRY || {})) {
+      const key = (country || "").toLowerCase();
+      out[key] = (leagues || []).map((x) => (x || "").toLowerCase());
+    }
+    return out;
+  })();
+
 
   const normalize = (s) =>
     (s || "")
@@ -211,7 +390,7 @@ function setupGamesCountryFilter() {
   };
 
   const scoreLeague = (countryKey, leagueName) => {
-    const list = TOP_LEAGUES[countryKey] || [];
+    const list = TOP_LEAGUE_PATTERNS[countryKey] || [];
     const l = leagueName.toLowerCase();
     // score 0..N (más alto = mejor)
     for (let i = 0; i < list.length; i++) {
@@ -475,6 +654,8 @@ export default function Fixtures() {
         setTimeout(() => {
           if (cancelled) return;
           refreshApiSportsWidgets();
+          // Marcar favoritos por defecto y abrir tab FAVORITOS
+          setupDefaultFavoritesBootstrap();
         }, 50);
       } catch (e) {
         // Si falla la carga del script, igual dejamos la UI (con mensaje).
