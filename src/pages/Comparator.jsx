@@ -1766,8 +1766,9 @@ for (const fx of pool) {
     if (!s) return false;
     // API/BD a veces devuelve "--" o "-" cuando no hay datos
     if (s === "--" || s === "-" || s.includes("--")) return false;
-    // esperamos letras tipo W-D-L o similares
-    return /[WDL]/i.test(s);
+    // Normaliza: a veces viene con guiones/espacios ("W-W-D-L-W").
+    const clean = s.toUpperCase().replace(/[^WDL]/g, "");
+    return clean.length >= 3;
   };
   const dataQuality = (hasRacha(pack?.last5?.home?.form) && hasRacha(pack?.last5?.away?.form))
     ? "full"
@@ -1903,6 +1904,9 @@ const giftBundle = buildGiftPickBundle(candidatesByFixtureSanitized, 1.5, 3.0, 3
 const targets = [3, 5, 10, 20, 50, 100].filter((t) => t <= maxBoost);
 console.log("[PARLAY] targets =", targets);
 
+// Cantidad de fixtures reales disponibles para armar parlays
+const availableFixturesCount = Object.keys(candidatesByFixtureSanitized || {}).length;
+
 // Construimos tiers siempre (3,5,10,20,50,100) para no dejar casillas vacías.
 // Regla: prioriza VERDES; si para x50/x100 no alcanza, se muestra igualmente el mejor parlay
 // disponible con un mensaje sugeriendo ampliar rango.
@@ -1914,6 +1918,9 @@ const builtParlays = targets
       cap: maxBoost,
       hardMaxOdd: 2.5,
       mustIncludeFixtures: mode === "selected" ? selectedIds : [],
+      // Plan mensual: si hay buen pool, fuerza x10 con al menos 5 legs (se ve más “pro”).
+      // Si hay poco pool, dejamos que caiga a 3 legs.
+      minLegs: (t === 10 && maxBoost <= 10 && availableFixturesCount >= 7) ? 5 : 0,
     });
     console.log("[PARLAY] buildParlay target", t, "=>", r1);
     if (r1) {
@@ -2153,18 +2160,17 @@ if (firstId && !window.__fixturesFirstOnce[firstId]) {
       VISITANTE (NO LOGUEADO)
      ========================= */
   if (!isLoggedIn) {
-    return (
-      <PageShell>
+  return (
+    <PageShell>
+      <div className="space-y-4">
         <VisitorBanner />
-        <VisitorPlansGrid />
-
         <Simulator bg={BG_DINERO} />
         <PriceCalculatorCard bg={BG_DINERO} />
-
         <VisitorEndingHero />
-      </PageShell>
-    );
-  }
+      </div>
+    </PageShell>
+  );
+}
 
   /* =========================
       LOGUEADO (COMPARADOR)
@@ -2445,53 +2451,6 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 
 </FeatureCard>
         )}
-
-        <FeatureCard
-          title="Desfase del mercado"
-          badge="Value"
-          locked={!features.marketValue}
-          lockText="Disponible desde Plan Vitalicio."
-        >
-          <div className="text-xs text-slate-300">
-            Picks con posible valor (cuando tu estimación FV sugiere que el mercado está pagando “de más”).
-          </div>
-
-          {fvOutput?.valueList?.length ? (
-            <div className="mt-3 space-y-2">
-              {fvOutput.valueList.slice(0, 8).map((v, idx) => (
-                <div
-                  key={`${v.fixtureId || "fx"}-${v.label || v.pick || idx}-${idx}`}
-                  className="rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2"
-                >
-                  <div className="text-[11px] text-slate-300"> {" "}<span className="text-slate-500">{idx + 1}.</span>{" "}
-                    <span className="text-slate-100 font-semibold">{v.label || v.pick}</span>
-                    {v.home && v.away ? (
-                      <>
-                        {" "}
-                        <span className="text-slate-500">—</span> {v.home} vs {v.away}
-                      </>
-                    ) : null}
-                  </div>
-
-                  <div className="mt-1 text-[11px] text-slate-300">
-                    FV: <span className="text-emerald-200 font-semibold">x{toOdd(v.fvOdd) ?? v.fvOdd}</span>{" "}
-                    <span className="text-slate-500">·</span>{" "}
-                    Mercado: <span className="text-amber-200 font-semibold">x{toOdd(v.marketOdd) ?? v.marketOdd}</span>{" "}
-                    {v.valueEdge != null ? (
-                      <>
-                        <span className="text-slate-500">·</span>{" "}
-                        Value: <span className="text-emerald-200 font-semibold">+{Math.round(Number(v.valueEdge) * 100)}%</span>
-                      </>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="mt-3 text-[11px] text-slate-400">Genera una combinada para calcular value.</div>
-          )}
-        </FeatureCard>
-
         {ENABLE_SCORERS && (
         <FeatureCard
           title="Goleadores / Remates / Value"
@@ -2553,6 +2512,56 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 
       {/* 5) Manual Picks */}
       <ManualPicksSection />
+
+      {/* 6) Desfase del mercado */}
+      <section className="mt-6">
+                <FeatureCard
+                  title="Desfase del mercado"
+                  badge="Value"
+                  locked={!features.marketValue}
+                  lockText="Disponible desde Plan Vitalicio."
+                >
+                  <div className="text-xs text-slate-300">
+                    Picks con posible valor (cuando tu estimación FV sugiere que el mercado está pagando “de más”).
+                  </div>
+
+                  {fvOutput?.valueList?.length ? (
+                    <div className="mt-3 space-y-2">
+                      {fvOutput.valueList.slice(0, 8).map((v, idx) => (
+                        <div
+                          key={`${v.fixtureId || "fx"}-${v.label || v.pick || idx}-${idx}`}
+                          className="rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2"
+                        >
+                          <div className="text-[11px] text-slate-300"> {" "}<span className="text-slate-500">{idx + 1}.</span>{" "}
+                            <span className="text-slate-100 font-semibold">{v.label || v.pick}</span>
+                            {v.home && v.away ? (
+                              <>
+                                {" "}
+                                <span className="text-slate-500">—</span> {v.home} vs {v.away}
+                              </>
+                            ) : null}
+                          </div>
+
+                          <div className="mt-1 text-[11px] text-slate-300">
+                            FV: <span className="text-emerald-200 font-semibold">x{toOdd(v.fvOdd) ?? v.fvOdd}</span>{" "}
+                            <span className="text-slate-500">·</span>{" "}
+                            Mercado: <span className="text-amber-200 font-semibold">x{toOdd(v.marketOdd) ?? v.marketOdd}</span>{" "}
+                            {v.valueEdge != null ? (
+                              <>
+                                <span className="text-slate-500">·</span>{" "}
+                                Value: <span className="text-emerald-200 font-semibold">+{Math.round(Number(v.valueEdge) * 100)}%</span>
+                              </>
+                            ) : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-3 text-[11px] text-slate-400">Genera una combinada para calcular value.</div>
+                  )}
+                </FeatureCard>
+      </section>
+
 
       {/* 7) Calculadora */}
       <PriceCalculatorCard bg={BG_DINERO} />

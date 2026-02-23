@@ -15,15 +15,6 @@
     return sel.includes("NO") || lab.includes("NO");
   }
 
-
-  function isHandicapPick(c) {
-    const m = String(c?.market ?? c?.pickType ?? c?.type ?? "").toUpperCase();
-    const pt = String(c?.pickType ?? "").toUpperCase();
-    const lab = String(c?.label ?? "").toUpperCase();
-    // Detect Asian Handicap conservative picks used in FV: AH_P3_HOME / AH_P3_AWAY (+2/+3)
-    return m.startsWith("AH_") || pt.startsWith("AH_") || lab.includes("HÁNDICAP");
-  }
-
 // src/lib/fvModel.js
 // Motor MVP de probabilidades + armado de parlays para Factor Victoria.
 
@@ -777,7 +768,7 @@ export function buildValueList(candidatesByFixture, minEdge = 0.06) {
 // candidatesByFixture: { [fixtureId]: CandidatePick[] }
 // CandidatePick should include: fixtureId, marketOdd (or fvOdd), prob, dataQuality ('complete'|'partial'), market, selection.
 // Returns: { target, legs, finalOdd }
-export function buildParlay({ candidatesByFixture, target, cap = 100, hardMaxOdd = 2.5, mustIncludeFixtures = [] }) {
+export function buildParlay({ candidatesByFixture, target, cap = 100, hardMaxOdd = 2.5, mustIncludeFixtures = [], minLegs = 0 }) {
   try {
     const byFix = candidatesByFixture || {};
     const fixtureIds = Object.keys(byFix);
@@ -830,19 +821,19 @@ export function buildParlay({ candidatesByFixture, target, cap = 100, hardMaxOdd
     const legs = [];
     let prod = 1;
 
+    const minLegsEff = Math.max(0, Number(minLegs) || 0);
+    const minLegsHard = Math.max(3, minLegsEff);
+
     // Market repetition caps (per parlay)
     let under25Count = 0;
     let bttsNoCount = 0;
-    let handicapCount = 0;
     const bumpAdd = (p) => {
       if (isUnder25Pick(p)) under25Count += 1;
       if (isBttsNo(p)) bttsNoCount += 1;
-      if (isHandicapPick(p)) handicapCount += 1;
     };
     const bumpRemove = (p) => {
       if (isUnder25Pick(p)) under25Count = Math.max(0, under25Count - 1);
       if (isBttsNo(p)) bttsNoCount = Math.max(0, bttsNoCount - 1);
-      if (isHandicapPick(p)) handicapCount = Math.max(0, handicapCount - 1);
     };
 
 
@@ -852,14 +843,9 @@ export function buildParlay({ candidatesByFixture, target, cap = 100, hardMaxOdd
       const opts = bestForFixture(String(fid), true);
       if (!opts?.length) continue;
       const pick = opts[0];
-      // Caps per parlay
-      if (isUnder25Pick(pick) && under25Count >= 1) continue;
-      if (isBttsNo(pick) && bttsNoCount >= 1) continue;
-      if (isHandicapPick(pick) && handicapCount >= 2) continue;
       const o = candOdd(pick);
       if (!o) continue;
       legs.push(pick);
-      bumpAdd(pick);
       usedFixtures.add(String(fid));
       prod *= o;
     }
@@ -877,14 +863,18 @@ export function buildParlay({ candidatesByFixture, target, cap = 100, hardMaxOdd
     const options = {};
     for (const fid of fixtureIds) {
       if (usedFixtures.has(fid)) continue;
-      const preferLow = (target || 1) <= 5;
+      // Para targets bajos y/o cuando se fuerza minLegs, preferimos odds más bajas
+      // para poder armar más legs sin disparar la cuota final.
+      const preferLow = (target || 1) <= 10 || minLegsEff >= 5;
       const opts = bestForFixture(fid, preferLow);
       if (opts?.length) options[fid] = opts;
     }
 
     const remaining = () => Object.keys(options).filter((fid) => !usedFixtures.has(fid));
 
-    while (legs.length < maxLegs && prod < (target || 1) * 0.99) {
+    while (legs.length < maxLegs) {
+      // Si ya llegamos al target y cumplimos mínimo de legs, cortamos.
+      if (prod >= (target || 1) * 0.99 && legs.length >= minLegsHard) break;
       const candFids = remaining();
       if (!candFids.length) break;
 
@@ -897,7 +887,6 @@ export function buildParlay({ candidatesByFixture, target, cap = 100, hardMaxOdd
           // Cap repeated markets inside a single parlay
           if (isUnder25Pick(c) && under25Count >= 1) continue;
           if (isBttsNo(c) && bttsNoCount >= 1) continue;
-          if (isHandicapPick(c) && handicapCount >= 2) continue;
           const o = candOdd(c);
           if (!o) continue;
           const next = prod * o;
@@ -939,14 +928,9 @@ export function buildParlay({ candidatesByFixture, target, cap = 100, hardMaxOdd
       for (const fid of candFids) {
         const opts = (options[fid] || []).slice().sort((a, b) => (candOdd(b) || 0) - (candOdd(a) || 0));
         const c = opts[0];
-        // Caps per parlay
-        if (isUnder25Pick(c) && under25Count >= 1) continue;
-        if (isBttsNo(c) && bttsNoCount >= 1) continue;
-        if (isHandicapPick(c) && handicapCount >= 2) continue;
         const o = candOdd(c);
         if (!o) continue;
         legs.push(c);
-        bumpAdd(c);
         usedFixtures.add(fid);
         prod *= o;
         if (prod >= (target || 1) * 0.9 || legs.length >= maxLegs) break;
