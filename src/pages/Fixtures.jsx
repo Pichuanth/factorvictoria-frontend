@@ -741,7 +741,7 @@ export default function Fixtures() {
   if (!isLoggedIn || !hasMembership) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center px-4">
-        <div className="max-w-2xl w-full rounded-2xl border border-white/10 bg-white/5 p-6">
+        <div className="max-w-2xl w-full rounded-2xl border border-emerald-400/10 bg-emerald-950/20 p-6">
           <div className="text-sm text-white/60">Módulo premium</div>
           <h1 className="mt-1 text-2xl font-semibold text-white">
             Partidos & Estadísticas
@@ -758,7 +758,7 @@ export default function Fixtures() {
               Ver planes
             </button>
             <button
-              className="px-4 py-2 rounded-xl border border-white/15 text-white hover:bg-white/5"
+              className="px-4 py-2 rounded-xl border border-white/15 text-white hover:bg-emerald-950/20"
               onClick={() => navigate("/login")}
             >
               Iniciar sesión
@@ -773,8 +773,8 @@ export default function Fixtures() {
   const showKeyWarning = !widgetKey;
 
   return (
-    <div className="px-4 md:px-8 py-6">
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+    <div className="min-h-screen px-4 md:px-8 py-6 bg-gradient-to-b from-emerald-950/35 via-slate-950 to-slate-950">
+      <div className="rounded-2xl border border-emerald-400/10 bg-emerald-950/20 p-5">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-sm text-white/60">Centro de estadísticas</div>
@@ -784,11 +784,13 @@ export default function Fixtures() {
             <p className="mt-1 text-white/70">
               Selecciona una liga, revisa los partidos del día y abre el detalle con estadísticas.
             </p>
-            <div className="mt-3 inline-flex items-center rounded-lg bg-emerald-500/15 px-3 py-2 text-sm text-emerald-200 border border-emerald-500/30">
-            Elegir tus <span className="mx-1 font-semibold">5 ligas favoritas
-            </span> para una mayor rapidez en la carga de estadísticas.
-            </div>
-          </div>
+                        <div className="mt-3 rounded-xl border border-emerald-400/25 bg-emerald-950/35 p-4">
+                          <p className="text-sm leading-relaxed text-emerald-100 text-left break-normal hyphens-none">
+                            <span className="font-semibold text-emerald-200">Sugerencia:</span>{" "}
+                            elige tus <span className="font-semibold text-emerald-200">5 ligas favoritas</span>{" "}
+                            para una carga más rápida de estadísticas.
+                          </p>
+                        </div>          </div>
           <div className="text-xs text-white/50">Datos oficiales Factor Victoria</div>
         </div>
 
@@ -805,7 +807,7 @@ export default function Fixtures() {
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Ligas */}
         <div className="lg:col-span-3">
-          <div id="leagues-list" className="rounded-2xl border border-white/10 bg-white/5 p-3 min-h-[520px]">
+          <div id="leagues-list" className="rounded-2xl border border-emerald-400/10 bg-emerald-950/20 p-3 min-h-[520px]">
             <div className="text-sm font-semibold text-white/80 mb-2">Ligas</div>
             <div className="rounded-xl overflow-hidden">
               <api-sports-widget data-type="leagues"></api-sports-widget>
@@ -815,7 +817,7 @@ export default function Fixtures() {
 
         {/* Partidos */}
         <div className="lg:col-span-5">
-          <div id="games-list" className="rounded-2xl border border-white/10 bg-white/5 p-3 min-h-[520px]">
+          <div id="games-list" className="rounded-2xl border border-emerald-400/10 bg-emerald-950/20 p-3 min-h-[520px]">
             <div className="text-sm font-semibold text-white/80 mb-2">Partidos</div>
             <div className="rounded-xl overflow-hidden">
               <api-sports-widget data-type="games"></api-sports-widget>
@@ -825,7 +827,7 @@ export default function Fixtures() {
 
         {/* Columna derecha */}
         <div className="lg:col-span-4 flex flex-col gap-4">
-          <div id="game-content" className="rounded-2xl border border-white/10 bg-white/5 p-3 min-h-[320px]">
+          <div id="game-content" className="rounded-2xl border border-emerald-400/10 bg-emerald-950/20 p-3 min-h-[320px]">
             <div className="text-sm font-semibold text-white/80 mb-2">Detalle</div>
             <div className="card-body rounded-xl overflow-hidden">
               {/* Un game-id inicial para que el widget renderice algo; luego se reemplaza al seleccionar partido */}
