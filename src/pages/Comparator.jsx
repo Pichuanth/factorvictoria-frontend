@@ -1908,7 +1908,7 @@ console.log("[PARLAY] targets =", targets);
 // disponible con un mensaje sugeriendo ampliar rango.
 const builtParlays = targets
   .map((t) => {
-    let r1 = buildParlay({
+    const r1 = buildParlay({
       candidatesByFixture: candidatesByFixtureSanitized,
       target: t,
       cap: maxBoost,
@@ -1916,34 +1916,6 @@ const builtParlays = targets
       mustIncludeFixtures: mode === "selected" ? selectedIds : [],
     });
     console.log("[PARLAY] buildParlay target", t, "=>", r1);
-
-    // En plan Mensual (maxBoost=10) y en general para la tier x10:
-    // si hay suficientes partidos/candidatos, forzamos un mínimo de legs usando un hardMaxOdd más estricto.
-    // Esto evita que x10 salga con 3 legs cuando hay 7–19 partidos disponibles.
-    if (t === 10) {
-      const minLegs10 = 5;
-      const fixtureCount = Object.keys(candidatesByFixtureSanitized || {}).length;
-
-      if (fixtureCount >= minLegs10) {
-        const legsCount = Array.isArray(r1?.legs) ? r1.legs.length : 0;
-
-        if (legsCount > 0 && legsCount < minLegs10) {
-          const tightened = buildParlay({
-            candidatesByFixture: candidatesByFixtureSanitized,
-            target: t,
-            cap: 100,
-            hardMaxOdd: 1.8
-          });
-
-          const tightenedLegs = Array.isArray(tightened?.legs) ? tightened.legs.length : 0;
-
-          // Nos quedamos con el tightened solo si logra el mínimo de legs
-          if (tightenedLegs >= minLegs10) {
-            r1 = tightened;
-          }
-        }
-      }
-    }
     if (r1) {
       const ratio = (r1.finalOdd || 0) / (t || 1);
       return {
