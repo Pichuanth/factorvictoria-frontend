@@ -23,90 +23,82 @@ const ALLOWED_COUNTRIES = [
 ];
 
 function setupLeaguesCountryFilter() {
-  // Filtra visualmente el listado de países/ligas (panel “Ligas”) para que SOLO queden los países allowlist.
-  // Nota: esto no impide que el widget descargue data global, pero evita “basura” visual y mejora UX.
+  // Filtra visualmente el listado de países/ligas para que SOLO queden los países allowlist.
+  // Importante: esto NO cambia la data que descarga el widget (eso depende de config del widget),
+  // pero sí reduce el ruido visual y hace la UI más usable, especialmente en móvil.
   if (window.__FV_leaguesFilterSetup) return;
   window.__FV_leaguesFilterSetup = true;
 
   const allowed = new Set(ALLOWED_COUNTRIES.map((c) => c.toLowerCase()));
 
-  const norm = (s) => (s || "").toString().replace(/\s+/g, " ").trim();
-  const getCountryFromNode = (node) => {
-    if (!node) return "";
-    // 1) Atributos típicos
-    const attrCandidates = [
-      node.getAttribute?.("data-country"),
-      node.getAttribute?.("aria-label"),
-      node.getAttribute?.("title"),
-    ].filter(Boolean);
-    for (const a of attrCandidates) {
-      const t = norm(a);
-      if (t && t.length <= 40) return t;
-    }
-
-    // 2) Imagen con alt/title (común cuando sólo se ven banderas)
-    const img =
-      node.querySelector?.("img[alt]") ||
-      node.querySelector?.("img[title]") ||
-      node.querySelector?.("svg[aria-label]");
-    if (img) {
-      const t = norm(img.getAttribute?.("alt") || img.getAttribute?.("title") || img.getAttribute?.("aria-label"));
-      if (t && t.length <= 40) return t;
-    }
-
-    // 3) Texto visible (fallback)
-    const txt = norm(node.textContent);
-    // Si hay formato "Pais : Liga", nos quedamos con el país
-    const m = txt.match(/^([\p{L}\s-]{2,})\s*:/u);
-    if (m?.[1]) return norm(m[1]);
-    // Si parece un país (corto y solo letras)
-    if (txt && txt.length <= 30 && /^[\p{L}\s-]+$/u.test(txt)) return txt;
-    return "";
+  const isCountryLabel = (txt) => {
+    const t = (txt || "").trim();
+    if (!t) return false;
+    if (t.length > 30) return false;
+    // solo letras/espacios/guiones (evita nombres largos de ligas)
+    if (!/^[\p{L}\s-]+$/u.test(t)) return false;
+    // muchos widgets muestran países con Title Case; esto es un filtro suave
+    return true;
   };
 
-  const hideBlock = (el) => {
-    const block =
-      el.closest("li") ||
-      el.closest("[class*='country']") ||
-      el.closest("[class*='Country']") ||
-      el.closest("[class*='wg-item']") ||
-      el.closest("div");
-    (block || el).style.display = "none";
+  const hideCountryGroup = (labelEl) => {
+    // Intentamos ocultar el bloque completo del país (header + leagues)
+    const group =
+      labelEl.closest("li") ||
+      labelEl.closest("[class*='country']") ||
+      labelEl.closest("[class*='Country']") ||
+      labelEl.closest("div");
+    (group || labelEl).style.display = "none";
   };
 
-  const filter = () => {
+  const tryFilter = () => {
     const root = document.getElementById("leagues-list");
     if (!root) return;
 
-    // En este widget, los países suelen ser items (li/div/button) con bandera y a veces sin texto.
-    const items = Array.from(root.querySelectorAll("li, button, a, div"))
-      .filter((el) => el.offsetParent !== null); // visibles
+    // 1) Encuentra candidatos a “nombre de país” dentro del widget
+    const candidates = Array.from(
+      root.querySelectorAll(
+        "[class*='country'], [class*='Country'], h1, h2, h3, h4, h5, strong, span, li, div"
+      )
+    );
 
-    for (const el of items) {
-      const country = getCountryFromNode(el);
-      if (!country) continue;
+    for (const el of candidates) {
+      const raw = (el.textContent || "").trim();
+      if (!isCountryLabel(raw)) continue;
 
-      const key = country.toLowerCase();
+      const key = raw.toLowerCase();
+      // Si el texto coincide exacto con un país y NO está permitido, lo ocultamos.
+      // Si coincide con uno permitido, lo dejamos.
       if (allowed.has(key)) continue;
 
-      // Heurística: solo ocultar cuando el item parece “país” (bandera/favorito)
-      const hasFlag = !!el.querySelector?.("img, svg");
-      const shortText = norm(el.textContent).length <= 25;
+      // Heurística: solo ocultar cuando “parece” un país (evita ocultar ligas cortas)
+      // - En muchos widgets el país aparece aislado en una línea/header.
+      const hasFewChildren = el.children?.length <= 2;
+      const isShortSingleLine = raw.split(/\s+/).length <= 3;
+      const looksLikeHeader =
+        /country/i.test(el.className || "") ||
+        ["H1", "H2", "H3", "H4", "H5", "STRONG"].includes(el.tagName);
 
-      if (hasFlag || shortText) {
-        hideBlock(el);
+      if (looksLikeHeader || (hasFewChildren && isShortSingleLine)) {
+        hideCountryGroup(el);
       }
     }
   };
 
+  // Observamos cambios porque el widget pinta async (SPA + script externo).
   const root = document.getElementById("leagues-list");
   const obsTarget = root || document.body;
-  const observer = new MutationObserver(() => filter());
+
+  const observer = new MutationObserver(() => {
+    tryFilter();
+  });
+
   observer.observe(obsTarget, { childList: true, subtree: true });
 
-  filter();
-  setTimeout(filter, 250);
-  setTimeout(filter, 800);
+  // Primeras pasadas
+  tryFilter();
+  setTimeout(tryFilter, 250);
+  setTimeout(tryFilter, 800);
 }
 
 function setupWidgetUiPrune() {
@@ -178,49 +170,32 @@ function setupWidgetUiPrune() {
 
 
 function setupGamesCountryFilter() {
-  // Filtra visualmente la lista de “Partidos” (panel central) para ocultar ligas cuyo país NO esté en allowlist.
-  // Además, permite “Europe : UEFA Champions League” aunque Europe no esté en allowlist.
+  // Filtra visualmente la lista de “Partidos” para ocultar ligas cuyo país NO esté en allowlist.
+  // Esto reduce el ruido (Japón/Australia/etc) y mejora el scroll.
   if (window.__FV_gamesCountryFilterSetup) return;
   window.__FV_gamesCountryFilterSetup = true;
 
-  const allowedCountries = new Set(ALLOWED_COUNTRIES.map((c) => c.toLowerCase()));
-  const allowedLeagueKeywords = [
-    "uefa champions league",
-    "champions league",
-  ];
+  const allowed = new Set(ALLOWED_COUNTRIES.map((c) => c.toLowerCase()));
 
-  const norm = (s) => (s || "").toString().replace(/\s+/g, " ").trim();
   const parseCountryLeague = (txt) => {
-    const t = norm(txt);
-    if (!t || t.length > 100) return null;
+    const t = (txt || "").replace(/\s+/g, " ").trim();
+    if (!t) return null;
+    if (t.length > 80) return null;
     const m = t.match(/^([\p{L}\s-]{2,})\s*:\s*(.+)$/u);
     if (!m) return null;
-    const country = norm(m[1]);
-    const league = norm(m[2]);
+    const country = (m[1] || "").trim();
+    const league = (m[2] || "").trim();
     if (!country || !league) return null;
-    if (country.length > 35) return null;
+    // Evita falsos positivos donde el “country” en realidad no es país (muy largo o con números)
+    if (country.length > 30) return null;
     if (/\d/.test(country)) return null;
     return { country, league };
   };
 
-  const isAllowed = ({ country, league }) => {
-    const c = country.toLowerCase();
-    const l = league.toLowerCase();
-    if (allowedCountries.has(c)) return true;
-    // excepción: Champions League (normalmente viene como Europe)
-    if (allowedLeagueKeywords.some((k) => l.includes(k))) return true;
-    return false;
-  };
-
-  const hideSection = (headerEl) => {
+  const hideLeagueSection = (headerEl) => {
     // Intentamos ocultar el bloque completo de esa liga (header + partidos)
-    // El widget suele usar <li> por sección; si no, caemos a un div cercano.
-    const li = headerEl.closest("li");
-    if (li) {
-      li.style.display = "none";
-      return;
-    }
     const block =
+      headerEl.closest("li") ||
       headerEl.closest("[class*='league']") ||
       headerEl.closest("[class*='League']") ||
       headerEl.closest("[class*='competition']") ||
@@ -233,37 +208,35 @@ function setupGamesCountryFilter() {
     const root = document.getElementById("games-list");
     if (!root) return;
 
-    // Buscamos encabezados tipo "Country : League"
-    const nodes = Array.from(root.querySelectorAll("button, a, li, div, span, strong, h1, h2, h3, h4"))
-      .filter((el) => {
-        const t = norm(el.textContent);
-        return t.includes(":") && t.length <= 120;
-      });
+    const candidates = Array.from(
+      root.querySelectorAll("button, a, h1, h2, h3, h4, strong, span, div, li")
+    );
 
-    for (const el of nodes) {
-      const parsed = parseCountryLeague(el.textContent);
+    for (const el of candidates) {
+      const raw = (el.textContent || "").trim();
+      const parsed = parseCountryLeague(raw);
       if (!parsed) continue;
-      if (isAllowed(parsed)) continue;
 
-      // Solo ocultamos cuando parece un header (clickeable o con flecha)
+      const key = parsed.country.toLowerCase();
+      if (allowed.has(key)) continue;
+
+      // El header de liga suele ser clickeable o tener estilo de “fila”
       const isInteractive =
         el.tagName === "BUTTON" ||
         el.tagName === "A" ||
         (el.getAttribute?.("role") || "").toLowerCase().includes("button") ||
         (el.className || "").toString().toLowerCase().includes("header") ||
-        (el.className || "").toString().toLowerCase().includes("league") ||
-        !!el.querySelector?.("svg, i");
+        (el.className || "").toString().toLowerCase().includes("league");
 
-      if (isInteractive || norm(el.textContent).split(":").length === 2) {
-        hideSection(el);
+      // Heurística: ocultamos sólo si parece encabezado de liga
+      if (isInteractive || raw.split(":").length === 2) {
+        hideLeagueSection(el);
       }
     }
   };
 
-  const root = document.getElementById("games-list");
-  const obsTarget = root || document.body;
   const observer = new MutationObserver(() => filterGames());
-  observer.observe(obsTarget, { childList: true, subtree: true });
+  observer.observe(document.body, { childList: true, subtree: true });
 
   filterGames();
   setTimeout(filterGames, 250);
@@ -277,85 +250,56 @@ function setupDefaultDetailSelection() {
   window.__FV_defaultDetailSetup = true;
 
   const PREFERRED = [
-    // Europe
     "UEFA Champions League",
     "Champions League",
-    // Top leagues
-    "England : Premier League",
     "Premier League",
-    "Spain : La Liga",
     "La Liga",
-    "Italy : Serie A",
     "Serie A",
-    "Germany : Bundesliga",
     "Bundesliga",
-    "France : Ligue 1",
     "Ligue 1",
-    "Portugal : Primeira Liga",
     "Primeira Liga",
-    // LatAm
-    "Chile : Primera División",
-    "Campeonato Nacional",
-    "Mexico : Liga MX",
     "Liga MX",
-    "Brazil : Serie A",
+    "Serie A Brazil",
     "Brasileirão",
-    "Argentina : Liga Profesional",
     "Liga Profesional",
+    "Primera División",
+    "Primera A",
   ];
 
-  const norm = (s) => (s || "").toString().toLowerCase().replace(/\s+/g, " ").trim();
+  const tryClick = () => {
+    const scopes = [
+      document.getElementById("leagues-list"),
+      document.getElementById("games-list"),
+      document.getElementById("game-content"),
+      document.body,
+    ].filter(Boolean);
 
-  const trySelect = () => {
-    const gamesRoot = document.getElementById("games-list");
-    const leaguesRoot = document.getElementById("leagues-list");
-    const scopes = [leaguesRoot, gamesRoot, document.body].filter(Boolean);
-
-    const candidates = [];
+    const all = [];
     for (const s of scopes) {
-      candidates.push(...Array.from(s.querySelectorAll("button, a, li, div, span, strong")));
+      all.push(...Array.from(s.querySelectorAll("button, a, li, div, span, strong")));
     }
 
-    // 1) Click en liga preferida (si existe)
     for (const pref of PREFERRED) {
-      const prefLc = norm(pref);
-      const el = candidates.find((x) => norm(x.textContent).includes(prefLc));
+      const prefLc = pref.toLowerCase();
+      const el = all.find((x) => ((x.textContent || "").toLowerCase().includes(prefLc)));
       if (!el) continue;
 
+      // Click en el elemento más “interactivo” posible
       const clickable = el.closest("button, a, li") || el;
       try {
         clickable.click();
-        break;
-      } catch (_) {}
-    }
-
-    // 2) Click en el primer partido visible para poblar el panel “Detalle”
-    if (gamesRoot) {
-      const matchCandidate = Array.from(gamesRoot.querySelectorAll("a, button, li, div"))
-        .find((el) => {
-          if (el.offsetParent === null) return false;
-          const t = (el.textContent || "").trim();
-          // Heurística: filas con 2 equipos suelen tener más texto que un header y NO contienen ":"
-          if (!t || t.length < 8) return false;
-          if (t.includes(":")) return false;
-          // suele tener dos nombres + quizá marcador
-          return t.split("\n").length >= 2 || t.split(" ").length >= 3;
-        });
-
-      if (matchCandidate) {
-        try {
-          (matchCandidate.closest("a,button,li") || matchCandidate).click();
-          return true;
-        } catch (_) {}
+        return true;
+      } catch (_) {
+        // no-op
       }
     }
-
     return false;
   };
 
-  setTimeout(trySelect, 600);
-  setTimeout(trySelect, 1200);
-  setTimeout(trySelect, 2200);
+  // Varias pasadas porque los widgets cargan async
+  setTimeout(tryClick, 400);
+  setTimeout(tryClick, 900);
+  setTimeout(tryClick, 1600);
 }
 
 function ensureWidgetScriptLoaded() {
