@@ -8,6 +8,11 @@ import { useAuth } from "../lib/auth";
 
 const WIDGET_SCRIPT_SRC = "https://widgets.api-sports.io/3.1.0/widgets.js";
 
+// Ligas esenciales para mantener la pestaña liviana (se muestran en el widget de Ligas)
+// England PL=39, Spain LaLiga=140, Italy Serie A=135, Germany Bundesliga=78, France Ligue 1=61, Portugal Primeira Liga=94,
+// Mexico Liga MX=262, Argentina Primera=128, Brazil Serie A=71, Chile Primera=265, Colombia Primera A=239
+const ALLOWED_LEAGUES = "39,140,135,78,61,94,262,128,71,265,239";
+
 function ensureWidgetScriptLoaded() {
   return new Promise((resolve, reject) => {
     const existing = document.querySelector(`script[src="${WIDGET_SCRIPT_SRC}"]`);
@@ -154,7 +159,7 @@ export default function Fixtures() {
           <div id="leagues-list" className="rounded-2xl border border-white/10 bg-white/5 p-3 min-h-[520px]">
             <div className="text-sm font-semibold text-white/80 mb-2">Ligas</div>
             <div className="rounded-xl overflow-hidden">
-              <api-sports-widget data-type="leagues"></api-sports-widget>
+              <api-sports-widget data-type="leagues" data-show="list" data-leagues={ALLOWED_LEAGUES}></api-sports-widget>
             </div>
           </div>
         </div>
