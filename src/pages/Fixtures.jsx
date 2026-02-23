@@ -785,7 +785,8 @@ export default function Fixtures() {
               Selecciona una liga, revisa los partidos del día y abre el detalle con estadísticas.
             </p>
             <div className="mt-3 inline-flex items-center rounded-lg bg-emerald-500/15 px-3 py-2 text-sm text-emerald-200 border border-emerald-500/30">
-              Se sugiere elegir tus <span className="mx-1 font-semibold">5 ligas favoritas</span> para una mayor rapidez en la carga de estadísticas.
+            Elegir tus <span className="mx-1 font-semibold">5 ligas favoritas
+            </span> para una mayor rapidez en la carga de estadísticas.
             </div>
           </div>
           <div className="text-xs text-white/50">Datos oficiales Factor Victoria</div>
@@ -844,7 +845,7 @@ export default function Fixtures() {
           data-theme="grey"
           data-show-error="true"
           data-show-logos="true"
-          data-refresh="120"
+          data-refresh="900"
           data-favorite="true"
           data-standings="false"
           data-team-squad="false"
