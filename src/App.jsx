@@ -172,7 +172,7 @@ function Home() {
         <section id="planes" className="mt-10">
           <div className="flex items-end justify-between gap-4 mb-4">
             <h2 className="text-xl md:text-2xl font-bold">Planes</h2>
-            <div className="text-xs text-slate-400">Pronto más cupos disponibles.</div>
+            <div className="text-xs text-slate-400">cupos disponibles.</div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

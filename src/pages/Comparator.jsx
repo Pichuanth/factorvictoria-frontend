@@ -817,7 +817,7 @@ function VisitorPlansGrid() {
         title="Plan Mensual"
         price="$19.990 · x10"
         href="/#plan-mensual"
-        bullets={["Cuotas potenciadas hasta x10", "Cuota de regalo", "Acceso a herramientas base"]}
+        bullets={["Cuotas potenciadas hasta x10", "Cuota segura (regalo)", "Acceso a herramientas base"]}
       />
       <LockedPlanCard
         title="Plan Trimestral"
@@ -1667,21 +1667,23 @@ const ensureFvPack = useCallback(
 
       // Pool de trabajo:
       // - auto: usa un subconjunto para velocidad
-      // - selected: USA SOLO los fixtureIds seleccionados (NO rellena con otros partidos)
+      // - selected: incluye seleccionados, pero también agrega más fixtures del rango para poder armar x10/x20 con cuotas bajas
       const basePool = fixtures.slice(0, Math.min(60, fixtures.length));
       const selectedPool = fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)));
 
       const pool =
         mode === "selected"
-          ? selectedPool
+          ? Array.from(
+              new Map(
+                [...selectedPool, ...basePool]
+                  .map((fx) => [String(getFixtureId(fx) || ""), fx])
+                  .filter(([id]) => id)
+              ).values()
+            )
           : fixtures.slice(0, Math.min(28, fixtures.length));
 
-      if (pool.length < 2) {
-        setParlayError(
-          mode === "selected"
-            ? "Selecciona al menos 2 partidos de la lista superior."
-            : "Para generar combinadas necesitas al menos 2 partidos. Amplía el rango (días) o agrega otra liga."
-        );
+      if (mode === "selected" && pool.length < 2) {
+        setParlayError("Selecciona al menos 2 partidos de la lista superior.");
         return;
       }
      
@@ -1899,6 +1901,9 @@ const giftBundle = buildGiftPickBundle(candidatesByFixtureSanitized, 1.5, 3.0, 3
 
   const candidatesByFixtureLocked = applyGiftLock(candidatesByFixture, giftLeg);
 
+
+  // Cantidad real de partidos disponibles para generar parlays
+  const availableCount = (mode === "selected" ? selectedIds : Object.keys(candidatesByFixtureSanitized)).length;
 // ===================== TARGETS + PARLAYS =====================
 const targets = [3, 5, 10, 20, 50, 100].filter((t) => t <= maxBoost);
 console.log("[PARLAY] targets =", targets);
@@ -1913,6 +1918,8 @@ const builtParlays = targets
       target: t,
       cap: maxBoost,
       hardMaxOdd: 2.5,
+      // Para x10 (plan mensual) preferimos más piernas cuando hay pool suficiente
+      minLegs: t === 10 && availableCount >= 5 ? 5 : 0,
       mustIncludeFixtures: mode === "selected" ? selectedIds : [],
     });
     console.log("[PARLAY] buildParlay target", t, "=>", r1);
@@ -2013,8 +2020,7 @@ if (best) setParlayResult({ mode, ...best });
 
 const handleAutoParlay = () => runGeneration("auto");
 const handleSelectedParlay = () => runGeneration("selected");
-// Botón gris (selected): dejamos este nombre explícito para evitar errores en build/deploy
-const handleGenerateSelected = () => runGeneration("selected");
+
     async function handleGenerate() {
     setParlayError("");
     setParlayResult(null);
@@ -2032,7 +2038,7 @@ const handleGenerateSelected = () => runGeneration("selected");
     const pool = fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)));
     pool.map(getFixtureId).filter(Boolean).forEach((id) => ensureOdds(id));
 
-    // Generación completa (cuota de regalo + potenciadas + value + etc.) con los seleccionados.
+    // Generación completa (cuota segura + potenciadas + value + etc.) con los seleccionados.
     await runGeneration("selected");
   }
 
@@ -2153,17 +2159,18 @@ if (firstId && !window.__fixturesFirstOnce[firstId]) {
       VISITANTE (NO LOGUEADO)
      ========================= */
   if (!isLoggedIn) {
-  return (
-    <PageShell>
-      <div className="space-y-4">
+    return (
+      <PageShell>
         <VisitorBanner />
+        <VisitorPlansGrid />
+
         <Simulator bg={BG_DINERO} />
         <PriceCalculatorCard bg={BG_DINERO} />
+
         <VisitorEndingHero />
-      </div>
-    </PageShell>
-  );
-}
+      </PageShell>
+    );
+  }
 
   /* =========================
       LOGUEADO (COMPARADOR)
@@ -2334,7 +2341,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 
       {/* 4) MÓDULOS premium */}
       <section className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-        <FeatureCard title="Cuota de regalo" badge="Alta probabilidad" locked={!features.giftPick}>
+        <FeatureCard title="Cuota segura (regalo)" badge="Alta probabilidad" locked={!features.giftPick}>
           <div className="text-xs text-slate-300">
    Pick con mayor probabilidad de acierto. Prioriza partidos con estadísticas y datos completos. 
 </div>
@@ -2444,6 +2451,53 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 
 </FeatureCard>
         )}
+
+        <FeatureCard
+          title="Desfase del mercado"
+          badge="Value"
+          locked={!features.marketValue}
+          lockText="Disponible desde Plan Vitalicio."
+        >
+          <div className="text-xs text-slate-300">
+            Picks con posible valor (cuando tu estimación FV sugiere que el mercado está pagando “de más”).
+          </div>
+
+          {fvOutput?.valueList?.length ? (
+            <div className="mt-3 space-y-2">
+              {fvOutput.valueList.slice(0, 8).map((v, idx) => (
+                <div
+                  key={`${v.fixtureId || "fx"}-${v.label || v.pick || idx}-${idx}`}
+                  className="rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2"
+                >
+                  <div className="text-[11px] text-slate-300"> {" "}<span className="text-slate-500">{idx + 1}.</span>{" "}
+                    <span className="text-slate-100 font-semibold">{v.label || v.pick}</span>
+                    {v.home && v.away ? (
+                      <>
+                        {" "}
+                        <span className="text-slate-500">—</span> {v.home} vs {v.away}
+                      </>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-1 text-[11px] text-slate-300">
+                    FV: <span className="text-emerald-200 font-semibold">x{toOdd(v.fvOdd) ?? v.fvOdd}</span>{" "}
+                    <span className="text-slate-500">·</span>{" "}
+                    Mercado: <span className="text-amber-200 font-semibold">x{toOdd(v.marketOdd) ?? v.marketOdd}</span>{" "}
+                    {v.valueEdge != null ? (
+                      <>
+                        <span className="text-slate-500">·</span>{" "}
+                        Value: <span className="text-emerald-200 font-semibold">+{Math.round(Number(v.valueEdge) * 100)}%</span>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-3 text-[11px] text-slate-400">Genera una combinada para calcular value.</div>
+          )}
+        </FeatureCard>
+
         {ENABLE_SCORERS && (
         <FeatureCard
           title="Goleadores / Remates / Value"
@@ -2505,56 +2559,6 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
 
       {/* 5) Manual Picks */}
       <ManualPicksSection />
-
-      {/* 6) Desfase del mercado */}
-      <section className="mt-6">
-                <FeatureCard
-                  title="Desfase del mercado"
-                  badge="Value"
-                  locked={!features.marketValue}
-                  lockText="Disponible desde Plan Vitalicio."
-                >
-                  <div className="text-xs text-slate-300">
-                    Picks con posible valor (cuando tu estimación FV sugiere que el mercado está pagando “de más”).
-                  </div>
-
-                  {fvOutput?.valueList?.length ? (
-                    <div className="mt-3 space-y-2">
-                      {fvOutput.valueList.slice(0, 8).map((v, idx) => (
-                        <div
-                          key={`${v.fixtureId || "fx"}-${v.label || v.pick || idx}-${idx}`}
-                          className="rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2"
-                        >
-                          <div className="text-[11px] text-slate-300"> {" "}<span className="text-slate-500">{idx + 1}.</span>{" "}
-                            <span className="text-slate-100 font-semibold">{v.label || v.pick}</span>
-                            {v.home && v.away ? (
-                              <>
-                                {" "}
-                                <span className="text-slate-500">—</span> {v.home} vs {v.away}
-                              </>
-                            ) : null}
-                          </div>
-
-                          <div className="mt-1 text-[11px] text-slate-300">
-                            FV: <span className="text-emerald-200 font-semibold">x{toOdd(v.fvOdd) ?? v.fvOdd}</span>{" "}
-                            <span className="text-slate-500">·</span>{" "}
-                            Mercado: <span className="text-amber-200 font-semibold">x{toOdd(v.marketOdd) ?? v.marketOdd}</span>{" "}
-                            {v.valueEdge != null ? (
-                              <>
-                                <span className="text-slate-500">·</span>{" "}
-                                Value: <span className="text-emerald-200 font-semibold">+{Math.round(Number(v.valueEdge) * 100)}%</span>
-                              </>
-                            ) : null}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="mt-3 text-[11px] text-slate-400">Genera una combinada para calcular value.</div>
-                  )}
-                </FeatureCard>
-      </section>
-
 
       {/* 7) Calculadora */}
       <PriceCalculatorCard bg={BG_DINERO} />
