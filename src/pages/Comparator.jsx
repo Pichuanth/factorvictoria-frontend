@@ -558,23 +558,29 @@ function normalizePlanId(raw) {
 
 function normalizeTier(rawTier, rawPlanId) {
   const t = (rawTier || "").toString().trim().toLowerCase();
-  if (t) return t;
-  const pid = normalizePlanId(rawPlanId);
-  if (pid.includes("vip") || pid.includes("vital") || pid.includes("leyenda")) return "vip";
-  if (pid.includes("pro") || pid.includes("anual") || pid.includes("trimes")) return "pro";
+
+  // Fuente de verdad: membership.tier (NO usamos plan_id)
+  if (["basic", "goleador", "campeon", "leyenda"].includes(t)) return t;
+
+  // Compatibilidad con tiers antiguos si existen registros viejos
+  if (t === "vip" || t === "lifetime") return "leyenda";
+  if (t === "pro") return "campeon";
+
   return "basic";
 }
 
 function getMaxBoostByTier(tier) {
-  // Ajusta aquí si quieres límites distintos por tier
-  if (tier === "basic") return 10;   // hasta x10
-  if (tier === "pro") return 50;     // ejemplo: hasta x50 (puedes subir a 100 si quieres)
-  if (tier === "vip") return 100;    // hasta x100
+  // Límites oficiales por membresía
+  if (tier === "basic") return 10;      // x10
+  if (tier === "goleador") return 20;   // x20
+  if (tier === "campeon") return 50;    // x50
+  if (tier === "leyenda") return 100;   // x100
   return 10;
 }
 
 function getFeaturesByTier(tier) {
-  if (tier === "vip") {
+  // Permisos/limites por membresía (UI + controles; NO toca fvModel)
+  if (tier === "leyenda") {
     return {
       maxBoost: 100,
       maxDays: 10,
@@ -585,10 +591,21 @@ function getFeaturesByTier(tier) {
       picks: true,
     };
   }
-  if (tier === "pro") {
+  if (tier === "campeon") {
     return {
       maxBoost: 50,
       maxDays: 7,
+      canParlayAuto: true,
+      canParlaySelected: true,
+      pdfs: true,
+      referees: false,
+      picks: true,
+    };
+  }
+  if (tier === "goleador") {
+    return {
+      maxBoost: 20,
+      maxDays: 5,
       canParlayAuto: true,
       canParlaySelected: true,
       pdfs: true,
@@ -1391,7 +1408,13 @@ export default function Comparator() {
 
   const planInfo = useMemo(() => {
     const label =
-      tier === "vip" ? "VIP" : tier === "pro" ? "PRO" : "BÁSICO";
+      tier === "leyenda"
+        ? "LEYENDA"
+        : tier === "campeon"
+        ? "CAMPEÓN"
+        : tier === "goleador"
+        ? "GOLEADOR"
+        : "INICIO";
     return {
       label,
       boost: maxBoost,
@@ -1402,8 +1425,8 @@ const features = useMemo(() => {
     return {
       giftPick: true,
       boosted: true,
-      marketValue: tier === "vip",
-      scorersValue: tier === "vip",
+      marketValue: tier === "leyenda",
+      scorersValue: tier === "leyenda",
     };
   }, [tier]);
 
