@@ -3,6 +3,7 @@ import React from "react";
 import { Routes, Route, Navigate, Link, useLocation } from "react-router-dom";
 
 import Login from "./pages/Login";
+import Checkout from "./pages/Checkout";
 import Comparator from "./pages/Comparator";
 import Fixtures from "./pages/Fixtures";
 import Profile from "./pages/Profile";
@@ -25,6 +26,7 @@ function Home() {
   const plans = [
     {
       tag: "Mensual",
+      id: "mensual",
       planName: "Plan Inicio",
       price: "$19.990",
       sub: "Mensual",
@@ -39,6 +41,7 @@ function Home() {
     },
     {
       tag: "Trimestral",
+      id: "trimestral",
       planName: "Plan Goleador",
       price: "$44.990",
       sub: "+1 Mes de Regalo 🎁",
@@ -57,6 +60,7 @@ function Home() {
     },
     {
       tag: "Anual",
+      id: "anual",
       planName: "Plan Campeón",
       price: "$99.990",
       sub: "Anual",
@@ -77,6 +81,7 @@ function Home() {
     },
     {
       tag: "Vitalicio",
+      id: "vitalicio",
       planName: "Plan Leyenda",
       price: "$249.990",
       sub: "Vitalicio",
@@ -459,7 +464,8 @@ function AppInner() {
 
           <Route path="/login" element={<Login />} />
 
-          <Route path="*" element={<Navigate to="/" replace />} />
+          
+        <Route path="/checkout" element={<Checkout />} /><Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
     </div>
@@ -469,4 +475,3 @@ function AppInner() {
 export default function App() {
   return <AppInner />;
 }
-

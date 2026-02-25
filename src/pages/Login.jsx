@@ -1,123 +1,69 @@
 // src/pages/Login.jsx
 import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth";
-import { useNavigate } from "react-router-dom";
 
 export default function Login() {
   const { login } = useAuth();
-  const navigate = useNavigate();
-
+  const nav = useNavigate();
   const [email, setEmail] = useState("");
-  const [pass, setPass] = useState("");
-  const [show, setShow] = useState(false);
+  const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
 
-  const onSubmit = (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault();
     setErr("");
-    const ok = login(email, pass);
-    if (!ok) {
-      setErr("Correo o contraseña inválidos.");
+    const res = await login(email, password);
+    if (!res.ok) {
+      setErr(res.message || "Correo o contraseña inválidos.");
       return;
     }
-    // éxito → ir directo al comparador
-    navigate("/app");
+    nav("/comparator");
   };
 
   return (
-    <div className="min-h-[70vh] bg-slate-900 flex items-center">
-      <div className="w-full max-w-[22rem] sm:max-w-sm md:max-w-md mx-auto px-4 py-10">
-        {/* Logo centrado grande */}
-        <div className="flex flex-col items-center mb-6">
-          <img
-            src="/logo-fv.png"
-            alt="Factor Victoria"
-            className="h-20 md:h-22 w-auto scale-[1.50] mb-6"
-          />
+    <div className="min-h-screen flex items-center justify-center bg-[#0b1020] px-4">
+      <div className="w-full max-w-md rounded-2xl bg-[#0f1730] border border-white/10 p-6 shadow-xl">
+        <div className="text-center mb-6">
+          <div className="text-2xl font-semibold text-white">Iniciar sesión</div>
+          <div className="text-sm text-white/60 mt-1">
+            Ingresa tu correo (de compra) para activar el modo correspondiente.
+          </div>
         </div>
 
-        <h1 className="text-white text-2xl font-bold mb-2">Iniciar sesión</h1>
-
-        <form onSubmit={onSubmit}>
+        <form onSubmit={onSubmit} className="space-y-3">
           <input
-            type="email"
-            placeholder="Correo"
+            className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white outline-none focus:border-white/30"
+            placeholder="correo@gmail.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-2 w-full px-4 py-3 rounded-2xl bg-white text-slate-900"
-            autoComplete="username"
-            required
+            autoComplete="email"
+          />
+          <input
+            className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white outline-none focus:border-white/30"
+            placeholder="contraseña (opcional)"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
           />
 
-          {/* Contraseña + botón ojo */}
-          <div className="relative mt-3">
-            <input
-              type={show ? "text" : "password"}
-              placeholder="Contraseña"
-              value={pass}
-              onChange={(e) => setPass(e.target.value)}
-              className="w-full px-4 py-3 rounded-2xl bg-white text-slate-900 pr-12"
-              autoComplete="current-password"
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setShow((s) => !s)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-700"
-              aria-label={show ? "Ocultar contraseña" : "Mostrar contraseña"}
-              title={show ? "Ocultar contraseña" : "Mostrar contraseña"}
-            >
-              {show ? (
-                // ojo abierto
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="22"
-                  height="22"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-              ) : (
-                // ojo tachado
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="22"
-                  height="22"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.77 21.77 0 0 1 5.06-5.94" />
-                  <path d="M1 1l22 22" />
-                  <path d="M9.88 9.88A3 3 0 0 0 12 15a3 3 0 0 0 2.12-.88" />
-                  <path d="M12 5c7 0 11 7 11 7a21.9 21.9 0 0 1-3.17 4.5" />
-                </svg>
-              )}
-            </button>
-          </div>
-
-          <div className="mt-2 text-xs text-white/70">¿Olvidaste tu contraseña?</div>
-
-          {err && <div className="mt-3 text-sm text-red-400">{err}</div>}
+          {err ? <div className="text-sm text-red-400">{err}</div> : null}
 
           <button
-            className="mt-4 w-full px-4 py-3 rounded-2xl bg-[#E6C464] text-slate-900 font-semibold hover:opacity-90"
+            type="submit"
+            className="w-full rounded-xl bg-[#E6C464] text-[#0b1020] font-semibold py-3"
           >
             Entrar
           </button>
-
-          <div className="mt-4 text-sm text-white/80">
-            ¿Aún no tienes cuenta?{" "}
-            <a href="/#planes" className="text-amber-300 underline">
-              Regístrate
-            </a>
-          </div>
         </form>
+
+        <div className="mt-4 text-sm text-white/70">
+          ¿Aún no tienes membresía?{" "}
+          <Link className="text-[#E6C464] underline" to="/#planes">
+            Ver planes
+          </Link>
+        </div>
       </div>
     </div>
   );

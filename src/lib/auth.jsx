@@ -1,93 +1,89 @@
 // src/lib/auth.jsx
-import React, { createContext, useContext, useMemo, useState } from "react";
-
-/** Jerarquía de planes */
-export const PLAN_RANK = {
-  basic: 0,        // x10
-  trimestral: 1,   // x20
-  anual: 2,        // x50
-  vitalicio: 3,    // x100
-};
-
-/** Usuarios demo */
-const USERS = {
-  "mensual@demo.cl": {
-    email: "mensual@demo.cl",
-    planId: "basic",
-    rank: PLAN_RANK.basic,
-    name: "Demo Mensual",
-  },
-  "trimestral@demo.cl": {
-    email: "trimestral@demo.cl",
-    planId: "trimestral",
-    rank: PLAN_RANK.trimestral,
-    name: "Demo Trimestral",
-  },
-  "anual@demo.cl": {
-    email: "anual@demo.cl",
-    planId: "anual",
-    rank: PLAN_RANK.anual,
-    name: "Demo Anual",
-  },
-  "vitalicio@demo.cl": {
-    email: "vitalicio@demo.cl",
-    planId: "vitalicio",
-    rank: PLAN_RANK.vitalicio,
-    name: "Demo Vitalicio",
-  },
-};
-
-const DEMO_PASS = "Factor1986?";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 const AuthCtx = createContext(null);
 
+// Plan rank used to gate features in UI
+const PLAN_RANK = {
+  mensual: 0,
+  basic: 0,
+  trimestral: 1,
+  anual: 2,
+  vitalicio: 3,
+};
+
+const API_BASE = import.meta.env.VITE_API_BASE || "";
+
+// Persisted user (email + plan) so refresh doesn't log out
+const STORAGE_KEY = "fv_user_v1";
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
+  const [user, setUser] = useState(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // Restore session
+  useEffect(() => {
     try {
-      const raw = localStorage.getItem("fv:user");
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  });
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const u = JSON.parse(raw);
+        if (u?.email) {
+          setUser(u);
+          setIsLoggedIn(true);
+        }
+      }
+    } catch {}
+  }, []);
 
-  const value = useMemo(() => {
-    const login = (email, pass) => {
-      const key = String(email || "").trim().toLowerCase();
-      const u = USERS[key];
-      if (!u || pass !== DEMO_PASS) return false;
+  const login = async (email, _password) => {
+    const e = (email || "").trim().toLowerCase();
+    if (!e) return { ok: false, message: "Ingresa tu correo" };
 
+    try {
+      const url = `${API_BASE}/api/membership?email=${encodeURIComponent(e)}`;
+      const r = await fetch(url, { method: "GET" });
+      const data = await r.json();
+
+      if (!data?.ok) return { ok: false, message: "Error consultando membresía" };
+      if (!data?.active) return { ok: false, message: "Tu membresía no está activa aún" };
+
+      const planId = data?.membership?.plan_id || "mensual";
+      const tier = data?.membership?.tier || (planId === "mensual" ? "basic" : "pro");
+
+      const u = { email: e, planId, tier, rank: PLAN_RANK[planId] ?? 0 };
       setUser(u);
+      setIsLoggedIn(true);
       try {
-        localStorage.setItem("fv:user", JSON.stringify(u));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
       } catch {}
-      return true;
-    };
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, message: "No se pudo conectar al servidor" };
+    }
+  };
 
-    const logout = () => {
-      setUser(null);
-      try {
-        localStorage.removeItem("fv:user");
-      } catch {}
-    };
+  const logout = () => {
+    setUser(null);
+    setIsLoggedIn(false);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {}
+  };
 
-    return {
+  const value = useMemo(
+    () => ({
       user,
-      isLoggedIn: !!user,
-      planId: user?.planId || null,
-      rank: Number.isFinite(user?.rank) ? user.rank : -1,
-      hasMembership: !!user, // demo = tiene membresía
-      getUser: () => user,
+      isLoggedIn,
       login,
       logout,
-    };
-  }, [user]);
+      PLAN_RANK,
+    }),
+    [user, isLoggedIn]
+  );
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }
 
 export function useAuth() {
-  const ctx = useContext(AuthCtx);
-  if (!ctx) throw new Error("useAuth must be used within <AuthProvider>");
-  return ctx;
+  return useContext(AuthCtx);
 }
