@@ -556,6 +556,58 @@ function normalizePlanId(raw) {
   return "basic";
 }
 
+function normalizeTier(rawTier, rawPlanId) {
+  const t = (rawTier || "").toString().trim().toLowerCase();
+  if (t) return t;
+  const pid = normalizePlanId(rawPlanId);
+  if (pid.includes("vip") || pid.includes("vital") || pid.includes("leyenda")) return "vip";
+  if (pid.includes("pro") || pid.includes("anual") || pid.includes("trimes")) return "pro";
+  return "basic";
+}
+
+function getMaxBoostByTier(tier) {
+  // Ajusta aquí si quieres límites distintos por tier
+  if (tier === "basic") return 10;   // hasta x10
+  if (tier === "pro") return 50;     // ejemplo: hasta x50 (puedes subir a 100 si quieres)
+  if (tier === "vip") return 100;    // hasta x100
+  return 10;
+}
+
+function getFeaturesByTier(tier) {
+  if (tier === "vip") {
+    return {
+      maxBoost: 100,
+      maxDays: 10,
+      canParlayAuto: true,
+      canParlaySelected: true,
+      pdfs: true,
+      referees: false, // si aún no está listo, déjalo en false
+      picks: true,
+    };
+  }
+  if (tier === "pro") {
+    return {
+      maxBoost: 50,
+      maxDays: 7,
+      canParlayAuto: true,
+      canParlaySelected: true,
+      pdfs: true,
+      referees: false,
+      picks: true,
+    };
+  }
+  // basic
+  return {
+    maxBoost: 10,
+    maxDays: 3,
+    canParlayAuto: true,
+    canParlaySelected: false,
+    pdfs: false,
+    referees: false,
+    picks: false,
+  };
+}
+
 function getFeaturesByPlanId(planId) {
   const base = { giftPick: true, boosted: true };
   if (planId === "basic") return { ...base, referees: false, scorersValue: false, marketValue: false };
@@ -1294,15 +1346,68 @@ export default function Comparator() {
   const fvRef = useRef({});
   const [fvErrByFixture, setFvErrByFixture] = useState({});
 
-  const planId = useMemo(() => {
-    const raw = user?.planId || user?.plan?.id || user?.plan || user?.membership || "basic";
-    return normalizePlanId(raw);
-  }, [user]);
+  // Membership/tier (fuente de verdad: backend /api/membership)
+  const [membershipInfo, setMembershipInfo] = useState(null);
 
-  const planInfo = useMemo(() => PLAN_LABELS[planId] || PLAN_LABELS.basic, [planId]);
-  const maxBoost = planInfo.boost;
-  const features = useMemo(() => getFeaturesByPlanId(planId), [planId]);
-  const canReferees = !!features?.referees; // ✅ AQUÍ (dentro del componente)
+  useEffect(() => {
+    let cancelled = false;
+    async function loadMembership() {
+      if (!isLoggedIn) return;
+      const email = user?.email;
+      if (!email) return;
+      try {
+        const res = await fetch(
+          `${API_BASE}/api/membership?email=${encodeURIComponent(email)}`
+        );
+        const data = await res.json();
+        if (!cancelled && data?.ok) {
+          setMembershipInfo(data.membership || null);
+        }
+      } catch {
+        // silencio: si falla, seguimos con lo que haya en el user
+      }
+    }
+    loadMembership();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, user?.email]);
+
+  const planId = useMemo(() => {
+    return normalizePlanId(
+      membershipInfo?.plan_id ||
+        membershipInfo?.planId ||
+        user?.planId ||
+        user?.plan_id ||
+        "basic"
+    );
+  }, [membershipInfo, user]);
+
+  const tier = useMemo(() => {
+    return normalizeTier(membershipInfo?.tier || user?.tier, planId);
+  }, [membershipInfo, user, planId]);
+
+  const maxBoost = useMemo(() => getMaxBoostByTier(tier), [tier]);
+
+  const planInfo = useMemo(() => {
+    const label =
+      tier === "vip" ? "VIP" : tier === "pro" ? "PRO" : "BÁSICO";
+    return {
+      label,
+      boost: maxBoost,
+    };
+  }, [tier, maxBoost]);
+
+const features = useMemo(() => {
+    return {
+      giftPick: true,
+      boosted: true,
+      marketValue: tier === "vip",
+      scorersValue: tier === "vip",
+    };
+  }, [tier]);
+
+const canReferees = !!features?.referees; // ✅ AQUÍ (dentro del componente)
 
   // combinadas
   const [parlayResult, setParlayResult] = useState(null);
