@@ -5,6 +5,10 @@ import { useAuth } from "../lib/auth";
 
 const GOLD = "#E6C464";
 
+
+const API_BASE =
+  (import.meta.env.VITE_API_BASE || "").replace(/\/$/, "") ||
+  "https://factorvictoria-backend.vercel.app";
 /* ------------------- Helpers de plan ------------------- */
 function getSupportLabel(planLabel = "") {
   const p = String(planLabel || "").toUpperCase();
@@ -243,17 +247,56 @@ export default function Profile() {
     }
   }, [avatarUrl]);
 
+  const tier = useMemo(() => normalizeTier(membershipInfo?.tier || user?.tier), [membershipInfo, user]);
+
   const planLabel = useMemo(() => {
-    const raw = user?.planId || user?.plan?.id || user?.plan || user?.membership || "";
-    return String(raw || "ACTIVA").toUpperCase();
-  }, [user]);
+    if (tier === "leyenda") return "VITALICIO";
+    if (tier === "campeon") return "ANUAL";
+    if (tier === "goleador") return "TRIMESTRAL";
+    return "MENSUAL";
+  }, [tier]);
 
   const theme = useMemo(() => getPlanTheme(planLabel), [planLabel]);
 
-  const displayName = useMemo(() => user?.name || user?.fullName || user?.email || "Usuario", [user]);
+const displayName = useMemo(() => user?.name || user?.fullName || user?.email || "Usuario", [user]);
   const email = useMemo(() => user?.email || "—", [user]);
 
-  const createdAt = useMemo(() => {
+  
+
+  // Membership real desde backend (fuente de verdad)
+  const [membershipInfo, setMembershipInfo] = useState(null);
+
+  // PDFs visibles por tier
+  const [docs, setDocs] = useState([]);
+
+  // Mensaje cancelar
+  const [cancelMsg, setCancelMsg] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      if (!isLoggedIn) return;
+      const em = user?.email;
+      if (!em) return;
+
+      try {
+        const r = await fetch(`${API_BASE}/api/membership?email=${encodeURIComponent(em)}`);
+        const data = await r.json();
+        if (!cancelled && data?.ok) setMembershipInfo(data.membership || null);
+      } catch {}
+
+      try {
+        const r2 = await fetch(`${API_BASE}/api/pdfs?email=${encodeURIComponent(em)}`);
+        const data2 = await r2.json();
+        if (!cancelled && data2?.ok) setDocs(data2.docs || []);
+      } catch {}
+    }
+
+    load();
+    return () => { cancelled = true; };
+  }, [isLoggedIn, user?.email]);
+const createdAt = useMemo(() => {
     const raw = user?.createdAt || user?.created_at || user?.created || "";
     if (!raw) return "—";
     const d = new Date(raw);
@@ -628,6 +671,35 @@ export default function Profile() {
                   </button>
                 ) : null}
               </div>
+
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              setCancelMsg("");
+              const r = await fetch(`${API_BASE}/api/membership`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: user?.email, action: "cancel" }),
+              });
+              const data = await r.json();
+              if (data?.ok) {
+                setMembershipInfo(data.membership || null);
+                setCancelMsg("Suscripción cancelada al fin del período (mantienes acceso hasta la fecha de término).");
+              } else {
+                setCancelMsg("No se pudo cancelar. Intenta nuevamente.");
+              }
+            } catch {
+              setCancelMsg("No se pudo cancelar. Intenta nuevamente.");
+            }
+          }}
+          className="w-full md:w-auto px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition"
+        >
+          Cancelar suscripción
+        </button>
+
+        {cancelMsg ? <div className="mt-2 text-sm text-slate-300">{cancelMsg}</div> : null}
+
 
               <div className="mt-3 text-xs text-slate-300">
                 Sube o baja tu membresía directamente, sin esperar soporte.
