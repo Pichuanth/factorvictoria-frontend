@@ -5,10 +5,10 @@ import { useAuth } from "../lib/auth";
 
 const GOLD = "#E6C464";
 
-
 const API_BASE =
-  (import.meta.env.VITE_API_BASE || "").replace(/\/$/, "") ||
+  (import.meta.env.VITE_API_BASE || "").replace(/\/\/$/, "") ||
   "https://factorvictoria-backend.vercel.app";
+
 /* ------------------- Helpers de plan ------------------- */
 function getSupportLabel(planLabel = "") {
   const p = String(planLabel || "").toUpperCase();
@@ -82,6 +82,22 @@ function getPlanTheme(planLabel = "") {
     hudA: "rgba(148,163,184,0.55)",
     hudB: "rgba(16,185,129,0.35)",
   };
+}
+
+
+function normalizeTier(rawTier) {
+  const t = String(rawTier || "").trim().toLowerCase();
+  if (["basic", "goleador", "campeon", "leyenda"].includes(t)) return t;
+  if (t === "vip" || t === "lifetime") return "leyenda";
+  if (t === "pro") return "campeon";
+  return "basic";
+}
+
+function planLabelFromTier(tier) {
+  if (tier === "leyenda") return "VITALICIO-249990";
+  if (tier === "campeon") return "ANUAL-99990";
+  if (tier === "goleador") return "TRIMESTRAL-44990";
+  return "MENSUAL-19990";
 }
 
 /* ------------------- Avatar persistente ------------------- */
@@ -247,29 +263,9 @@ export default function Profile() {
     }
   }, [avatarUrl]);
 
-  const tier = useMemo(() => normalizeTier(membershipInfo?.tier || user?.tier), [membershipInfo, user]);
-
-  const planLabel = useMemo(() => {
-    if (tier === "leyenda") return "VITALICIO";
-    if (tier === "campeon") return "ANUAL";
-    if (tier === "goleador") return "TRIMESTRAL";
-    return "MENSUAL";
-  }, [tier]);
-
-  const theme = useMemo(() => getPlanTheme(planLabel), [planLabel]);
-
-const displayName = useMemo(() => user?.name || user?.fullName || user?.email || "Usuario", [user]);
-  const email = useMemo(() => user?.email || "—", [user]);
-
-  
-
-  // Membership real desde backend (fuente de verdad)
+  // Membership real (fuente de verdad)
   const [membershipInfo, setMembershipInfo] = useState(null);
-
-  // PDFs visibles por tier
   const [docs, setDocs] = useState([]);
-
-  // Mensaje cancelar
   const [cancelMsg, setCancelMsg] = useState("");
 
   useEffect(() => {
@@ -277,7 +273,7 @@ const displayName = useMemo(() => user?.name || user?.fullName || user?.email ||
 
     async function load() {
       if (!isLoggedIn) return;
-      const em = user?.email;
+      const em = String(user?.email || "").trim();
       if (!em) return;
 
       try {
@@ -294,9 +290,24 @@ const displayName = useMemo(() => user?.name || user?.fullName || user?.email ||
     }
 
     load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [isLoggedIn, user?.email]);
-const createdAt = useMemo(() => {
+
+  const tier = useMemo(() => normalizeTier(membershipInfo?.tier || user?.tier), [membershipInfo, user]);
+
+  const planLabel = useMemo(() => {
+    // Evita inconsistencias: el plan mostrado depende SOLO del tier real
+    return planLabelFromTier(tier);
+  }, [tier]);
+
+  const theme = useMemo(() => getPlanTheme(planLabel), [planLabel]);
+
+  const displayName = useMemo(() => user?.name || user?.fullName || user?.email || "Usuario", [user]);
+  const email = useMemo(() => user?.email || "—", [user]);
+
+  const createdAt = useMemo(() => {
     const raw = user?.createdAt || user?.created_at || user?.created || "";
     if (!raw) return "—";
     const d = new Date(raw);
@@ -672,34 +683,43 @@ const createdAt = useMemo(() => {
                 ) : null}
               </div>
 
-        <button
-          type="button"
-          onClick={async () => {
-            try {
-              setCancelMsg("");
-              const r = await fetch(`${API_BASE}/api/membership`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: user?.email, action: "cancel" }),
-              });
-              const data = await r.json();
-              if (data?.ok) {
-                setMembershipInfo(data.membership || null);
-                setCancelMsg("Suscripción cancelada al fin del período (mantienes acceso hasta la fecha de término).");
-              } else {
-                setCancelMsg("No se pudo cancelar. Intenta nuevamente.");
-              }
-            } catch {
-              setCancelMsg("No se pudo cancelar. Intenta nuevamente.");
-            }
-          }}
-          className="w-full md:w-auto px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition"
-        >
-          Cancelar suscripción
-        </button>
 
-        {cancelMsg ? <div className="mt-2 text-sm text-slate-300">{cancelMsg}</div> : null}
+              <div className="mt-3 flex flex-col md:flex-row gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      setCancelMsg("");
+                      const em = String(user?.email || "").trim();
+                      if (!em) {
+                        setCancelMsg("No se encontró tu correo. Vuelve a iniciar sesión.");
+                        return;
+                      }
+                      const r = await fetch(`${API_BASE}/api/membership`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ email: em, action: "cancel" }),
+                      });
+                      const data = await r.json();
+                      if (data?.ok) {
+                        setMembershipInfo(data.membership || null);
+                        setCancelMsg(
+                          "Suscripción cancelada al fin del período (mantienes acceso hasta la fecha de término)."
+                        );
+                      } else {
+                        setCancelMsg("No se pudo cancelar. Intenta nuevamente.");
+                      }
+                    } catch {
+                      setCancelMsg("No se pudo cancelar. Intenta nuevamente.");
+                    }
+                  }}
+                  className="w-full md:w-auto px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition"
+                >
+                  Cancelar suscripción
+                </button>
+              </div>
 
+              {cancelMsg ? <div className="mt-2 text-sm text-slate-300">{cancelMsg}</div> : null}
 
               <div className="mt-3 text-xs text-slate-300">
                 Sube o baja tu membresía directamente, sin esperar soporte.
@@ -758,22 +778,36 @@ const createdAt = useMemo(() => {
   <div className="p-5 md:p-6 flex flex-col min-h-[260px] md:min-h-[280px]">
     <div>
       <div className="text-sm font-semibold">Documentos de tu membresía</div>
-      <p className="text-xs text-slate-300 mt-1">Próximamente.</p>
+      <p className="text-xs text-slate-300 mt-1">Accede a los documentos disponibles según tu plan.</p>
     </div>
 
-    {/* Empuja el botón hacia abajo */}
-    <div className="mt-auto pt-6">
-      <button
-        type="button"
-        disabled
-        className="w-full md:w-fit px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 text-slate-300 cursor-not-allowed"
-      >
-        Documentos PDF
-      </button>
-
-      <div className="mt-2 text-[11px] text-slate-400">
-        Estamos preparando el documento con beneficios, condiciones y regalos físicos según tu plan.
-      </div>
+    {/* Contenido */}
+    <div className="mt-4">
+      {docs?.length ? (
+        <ul className="space-y-2">
+          {docs.map((d) => (
+            <li
+              key={d.id}
+              className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-950/20 px-4 py-3"
+            >
+              <span className="text-sm text-slate-200">{d.title}</span>
+              <a
+                className="px-4 py-2 rounded-full text-xs font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition"
+                href={`${API_BASE}/api/pdfs?email=${encodeURIComponent(String(user?.email || "").trim())}&docId=${encodeURIComponent(
+                  d.id
+                )}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Descargar
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div className="text-sm text-slate-300">No hay documentos disponibles para tu plan.</div>
+      )}
+    </div>
     </div>
   </div>
 </HudCard>
