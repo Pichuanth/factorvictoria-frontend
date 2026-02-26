@@ -1270,6 +1270,15 @@ function localPenalty(label, odd) {
   const usedFx = new Set();
   const legs = [];
 
+  // Diversidad: evitar abuso de Hándicap +3 como 'relleno'
+  let hcap3Count = 0;
+  let hcap2Count = 0;
+  const _labelOf = (c) => String(c?.label || c?.pick || "");
+  const _isHandicapPlus = (c, n) => {
+    const s = _labelOf(c).toLowerCase();
+    return (s.includes("hándicap") || s.includes("handicap")) && s.includes(`+${n}`);
+  };
+
   while (legs.length < maxLegs && product < target * 0.98) {
     let best = null;
 
@@ -1281,6 +1290,12 @@ function localPenalty(label, odd) {
       const top = fx.candidates.slice(0, 5);
 
       for (const c of top) {
+        // Cap: máx 3 picks de Hándicap +3 por parlay.
+        // Y para permitir 3×(+3), exigimos que exista al menos 1×(+2) en el mismo parlay.
+        if (_isHandicapPlus(c, 3)) {
+          if (hcap3Count >= 3) continue;
+          if (hcap3Count >= 2 && hcap2Count < 1) continue;
+        }
         const next = product * c._odd;
 
         // score: preferimos acercarnos al target; si lo sobrepasa un poco no importa
@@ -1295,6 +1310,9 @@ function localPenalty(label, odd) {
 
     if (!best) break;
     legs.push(best.c);
+    // actualizar conteo de handicaps (+2/+3)
+    if (_isHandicapPlus(best.c, 3)) hcap3Count += 1;
+    if (_isHandicapPlus(best.c, 2)) hcap2Count += 1;
     usedFx.add(best.c._fxId);
     product = best.next;
   }
