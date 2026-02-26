@@ -1204,12 +1204,22 @@ function buildBoostedParlayLocal({ candidatesByFixture, target, cap, minProb = 0
   const fixtureIds = Object.keys(candidatesByFixture || {});
   if (!fixtureIds.length) return null;
 
-function localPenalty(label) {
+function localPenalty(label, odd) {
   const s = String(label || "").toLowerCase();
   let p = 1;
+
+  // penaliza cuotas ultra bajas (relleno típico)
+  if (odd != null && odd <= 1.08) p *= 0.55;
+
+  // penaliza handicaps “de regalo” repetitivos (+3/+4/+5)
+  if (s.includes("hándicap") || s.includes("handicap")) {
+    if (s.includes("+3") || s.includes("+4") || s.includes("+5")) p *= 0.55;
+  }
+
   if (s.includes("2.5") && (s.includes("over") || s.includes("under") || s.includes("goles"))) p *= 0.82;
   if ((s.includes("over") || s.includes("under")) && !s.includes("1x") && !s.includes("x2")) p *= 0.92;
   if (s.includes("btts") || s.includes("both teams") || s.includes("ambos")) p *= 0.95;
+
   return p;
 }
 
@@ -1231,7 +1241,7 @@ function localPenalty(label) {
       .filter((c) => c._odd != null && c._odd > 1.01)
       .filter((c) => c._prob == null || c._prob >= minProb)
       .map((c) => {
-        const pen = localPenalty(c.label || c.pick);
+        const pen = localPenalty(c.label || c.pick, c._odd);
         return { ...c, _penalty: pen, _scoreOdd: (c._odd || 0) * pen };
       })
       .sort((a, b) => (b._scoreOdd || 0) - (a._scoreOdd || 0)); // prioriza odds (con penalización)
