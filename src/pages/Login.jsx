@@ -25,6 +25,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-[#0b1020] px-4">
       <div className="w-full max-w-md rounded-2xl bg-[#0f1730] border border-white/10 p-6 shadow-xl">
         <div className="text-center mb-6">
+          <img src="/logo-fv.png" alt="Factor Victoria" className="mx-auto mb-5 w-28 md:w-36" />
           <div className="text-2xl font-semibold text-white">Iniciar sesión</div>
           <div className="text-sm text-white/60 mt-1">
             Ingresa tu correo (de compra) para activar el modo correspondiente.
