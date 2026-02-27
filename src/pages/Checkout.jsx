@@ -1,5 +1,5 @@
 // src/pages/Checkout.jsx
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "";
@@ -16,7 +16,36 @@ export default function Checkout() {
   const planId = sp.get("plan") || "";
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState("");
+  const [activationLink, setActivationLink] = useState("");
   const [err, setErr] = useState("");
+
+// Fallback: al volver desde Flow, activa membresía (si notify/confirm no lo hizo) y muestra link de activación.
+useEffect(() => {
+  const flow = sp.get("flow");
+  const order = sp.get("order");
+  if (flow !== "return" || !order) return;
+
+  (async () => {
+    setErr("");
+    setSuccess("Verificando pago...");
+    try {
+      const r = await fetch(`${API_BASE}/api/pay/flow/return?order=${encodeURIComponent(order)}`);
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data?.ok) {
+        setSuccess("");
+        setErr(data?.error || "No pudimos verificar el pago todavía. Si pagaste, espera 1-2 minutos y recarga.");
+        return;
+      }
+      if (data?.activationLink) setActivationLink(data.activationLink);
+      setSuccess("Pago verificado ✅ Revisa tu correo para crear tu contraseña y activar tu cuenta.");
+    } catch (e) {
+      setSuccess("");
+      setErr("Error verificando el pago. Recarga la página.");
+    }
+  })();
+}, [sp]);
+
 
   const planLabel = useMemo(() => PLAN_LABEL[planId] || "Plan", [planId]);
 
@@ -31,7 +60,7 @@ export default function Checkout() {
       const r = await fetch(`${API_BASE}/api/pay/flow/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId, email: e }),
+        body: JSON.stringify({ planId, email: e, returnPath: "/checkout" }),
       });
       const data = await r.json();
       if (!data?.ok || !data?.url) {
@@ -62,6 +91,17 @@ export default function Checkout() {
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
           />
+
+          {success ? <div className="text-sm text-emerald-300">{success}</div> : null}
+
+          {activationLink ? (
+            <div className="text-sm text-white/80">
+              Si no te llega el correo, puedes activar aquí:{" "}
+              <a className="text-[#E6C464] underline" href={activationLink}>
+                Crear contraseña
+              </a>
+            </div>
+          ) : null}
 
           {err ? <div className="text-sm text-red-400">{err}</div> : null}
 

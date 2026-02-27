@@ -1,9 +1,10 @@
 // src/App.jsx
 import React from "react";
-import { Routes, Route, Navigate, Link, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, Link, useLocation, useNavigate } from "react-router-dom";
 
 import Login from "./pages/Login";
 import Checkout from "./pages/Checkout";
+import Activate from "./pages/Activate";
 import Comparator from "./pages/Comparator";
 import Fixtures from "./pages/Fixtures";
 import Profile from "./pages/Profile";
@@ -23,6 +24,7 @@ const GOLD = "#E6C464";
 
 /* -------------------- Landing (Inicio) -------------------- */
 function Home() {
+  const nav = useNavigate();
   const plans = [
     {
       tag: "Mensual",
@@ -241,7 +243,7 @@ function Home() {
                     type="button"
                     className="mt-5 w-fit px-5 py-2.5 rounded-full text-sm font-semibold"
                     style={{ backgroundColor: GOLD, color: "#0f172a" }}
-                    onClick={() => alert("Checkout próximamente (Flow).")}
+                    onClick={() => nav(`/checkout?plan=${p.id}`)}
                   >
                     Comprar
                   </button>
@@ -465,7 +467,8 @@ function AppInner() {
           <Route path="/login" element={<Login />} />
 
           
-        <Route path="/checkout" element={<Checkout />} /><Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/checkout" element={<Checkout />} />
+          <Route path="/activar" element={<Activate />} /><Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
     </div>
