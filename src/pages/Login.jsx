@@ -23,7 +23,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0b1020] px-4">
-      <div className="w-full max-w-md rounded-2xl bg-[#0f1730] border border-white/10 p-6 shadow-xl">
+      <div className="w-full max-w-md p-6">
         <div className="text-center mb-6">
           <img src="/logo-fv.png" alt="Factor Victoria" className="mx-auto mb-5 w-28 md:w-36" />
           <div className="text-2xl font-semibold text-white">Iniciar sesión</div>
@@ -34,14 +34,14 @@ export default function Login() {
 
         <form onSubmit={onSubmit} className="space-y-3">
           <input
-            className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white outline-none focus:border-white/30"
+            className="w-full px-4 py-3 rounded-xl bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-400"
             placeholder="correo@gmail.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
           />
           <input
-            className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white outline-none focus:border-white/30"
+            className="w-full px-4 py-3 rounded-xl bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-400"
             placeholder="contraseña (opcional)"
             type="password"
             value={password}
