@@ -131,11 +131,11 @@ export default function Checkout() {
 
   <div className="flex justify-center">
     <img
-      src="/Logo_pagos.png"
-      alt="Medios de pago"
-      className="h-12 w-auto"
-      loading="lazy"
-    />
+  src="/Logo_pagos.png"
+  alt="Medios de pago"
+  className="w-full max-w-[260px] h-auto object-contain"
+  loading="lazy"
+  />
   </div>
 
   <div className="mt-4 text-sm text-slate-700 text-center">
