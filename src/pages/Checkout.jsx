@@ -105,7 +105,7 @@ export default function Checkout() {
         <div className="space-y-3">
           <input
             className="w-full rounded-xl bg-white border border-white/10 px-4 py-3 text-[#0b1020] outline-none focus:border-white/30"
-            placeholder="correo@gmail.com"
+            placeholder="correo@gmail.com (obligatorio)"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
@@ -124,20 +124,21 @@ export default function Checkout() {
           </button>
 
           {/* Pago seguro (fondo blanco + logos) */}
-          <div className="mt-4 rounded-xl bg-white/95 p-4 text-slate-900">
-  <div className="flex items-center justify-between gap-3">
-    <div className="text-sm font-semibold">Pago seguro</div>
+          <div className="mt-4 rounded-2xl bg-white p-5 text-slate-900 shadow-sm border border-black/5">
+  <div className="text-sm font-semibold mb-3">
+    Pago seguro
+  </div>
 
-    {/* OJO: respeta el nombre EXACTO del archivo en /public */}
+  <div className="flex justify-center">
     <img
       src="/Logo_pagos.png"
       alt="Medios de pago"
-      className="h-7 w-auto opacity-90"
+      className="h-12 w-auto"
       loading="lazy"
     />
   </div>
 
-  <div className="mt-2 text-sm text-slate-700">
+  <div className="mt-4 text-sm text-slate-700 text-center">
     Débito / Crédito • Confirmación automática • Acceso inmediato con tu correo
   </div>
 </div>
