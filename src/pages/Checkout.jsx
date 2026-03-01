@@ -115,13 +115,17 @@ export default function Checkout() {
 
           {/* Confianza / conversión */}
           <button
-            type="button"
-            onClick={startPay}
-            disabled={loading || !normalizeEmail(email)}
-            className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-          >
-            {loading ? "Abriendo pago..." : "Pagar con Débito/Crédito"}
-          </button>
+  type="button"
+  onClick={startPay}
+  disabled={loading || !email}
+  className={[
+    "mt-3 w-full rounded-xl px-4 py-3 font-semibold text-white shadow transition",
+    "bg-emerald-600 hover:bg-emerald-700",
+    "disabled:opacity-100 disabled:bg-emerald-600 disabled:hover:bg-emerald-600 disabled:cursor-not-allowed",
+  ].join(" ")}
+>
+  {loading ? "Abriendo pago..." : "Pagar con Débito/Crédito"}
+</button>
 
           {/* Pago seguro (fondo blanco + logos) */}
           <div className="mt-4 rounded-2xl bg-white p-5 text-slate-900 shadow-sm border border-black/5">
