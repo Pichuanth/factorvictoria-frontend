@@ -124,25 +124,23 @@ export default function Checkout() {
           </button>
 
           {/* Pago seguro (fondo blanco + logos) */}
-          <div className="mt-4 rounded-xl bg-white/95 p-3 text-slate-900">
-            <div className="flex items-center gap-2 font-semibold">
-              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-white">
-                ✓
-              </span>
-              Pago seguro
-            </div>
+          <div className="mt-4 rounded-xl bg-white/95 p-4 text-slate-900">
+  <div className="flex items-center justify-between gap-3">
+    <div className="text-sm font-semibold">Pago seguro</div>
 
-            <div className="mt-2 text-sm text-slate-700">
-              Débito / Crédito • Confirmación automática • Acceso inmediato con tu correo
-            </div>
+    {/* OJO: respeta el nombre EXACTO del archivo en /public */}
+    <img
+      src="/Logo_pagos.png"
+      alt="Medios de pago"
+      className="h-7 w-auto opacity-90"
+      loading="lazy"
+    />
+  </div>
 
-            <img
-              src="/logo_pagos.png"
-              alt="Medios de pago"
-              className="mt-3 h-10 w-auto"
-              loading="lazy"
-            />
-          </div>
+  <div className="mt-2 text-sm text-slate-700">
+    Débito / Crédito • Confirmación automática • Acceso inmediato con tu correo
+  </div>
+</div>
 
           <div className="text-sm text-white/60">
             Después del pago, vuelve a{" "}
