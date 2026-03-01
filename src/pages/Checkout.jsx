@@ -16,35 +16,40 @@ export default function Checkout() {
   const planId = sp.get("plan") || "";
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState("");
-  const [activationLink, setActivationLink] = useState("");
   const [err, setErr] = useState("");
 
-// Fallback: al volver desde Flow, activa membresía (si notify/confirm no lo hizo) y muestra link de activación.
-useEffect(() => {
-  const flow = sp.get("flow");
-  const order = sp.get("order");
-  if (flow !== "return" || !order) return;
+  // Prefill email from query or localStorage to reduce steps
+  useEffect(() => {
+    const qEmail = sp.get("email");
+    const saved = localStorage.getItem("fv_email");
+    const initial = (qEmail || saved || "").trim().toLowerCase();
+    if (initial) setEmail(initial);
+  }, [sp]);
 
-  (async () => {
-    setErr("");
-    setSuccess("Verificando pago...");
-    try {
-      const r = await fetch(`${API_BASE}/api/pay/flow/return?order=${encodeURIComponent(order)}`);
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok || !data?.ok) {
-        setSuccess("");
-        setErr(data?.error || "No pudimos verificar el pago todavía. Si pagaste, espera 1-2 minutos y recarga.");
-        return;
-      }
-      if (data?.activationLink) setActivationLink(data.activationLink);
-      setSuccess("Pago verificado ✅ Revisa tu correo para crear tu contraseña y activar tu cuenta.");
-    } catch (e) {
-      setSuccess("");
-      setErr("Error verificando el pago. Recarga la página.");
-    }
-  })();
-}, [sp]);
+  // Keep email stored for future one-click checkout
+  useEffect(() => {
+    const e = (email || "").trim().toLowerCase();
+    if (e) localStorage.setItem("fv_email", e);
+  }, [email]);
+
+  // Nota: el retorno desde Flow redirige a /login?email=...&paid=1
+  // La activación real ocurre por /confirm (webhook). Aquí no hacemos verificación extra.
+
+  // One-click checkout: if ?auto=1 and we already have an email, start payment immediately
+  useEffect(() => {
+    const auto = sp.get("auto") === "1";
+    if (!auto) return;
+    const e = (email || "").trim().toLowerCase();
+    if (!planId || !e) return;
+    // avoid loops on back/refresh
+    if (sp.get("flow") === "return") return;
+
+    const t = setTimeout(() => {
+      startPay();
+    }, 250);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sp, planId, email]);
 
 
   const planLabel = useMemo(() => PLAN_LABEL[planId] || "Plan", [planId]);
@@ -79,29 +84,28 @@ useEffect(() => {
     <div className="min-h-screen flex items-center justify-center bg-[#0b1020] px-4">
       <div className="w-full max-w-md rounded-2xl bg-[#0f1730] border border-white/10 p-6 shadow-xl">
         <div className="text-center mb-6">
+          {/* Logo (mismo que inicio/login) */}
+          <img
+            src="/logo-fv.png"
+            alt="Factor Victoria"
+            className="mx-auto mb-5 w-28 md:w-36"
+            onError={(e) => {
+              // si no existe el logo, evita romper la UI
+              e.currentTarget.style.display = "none";
+            }}
+          />
           <div className="text-2xl font-semibold text-white">Pagar membresía</div>
           <div className="text-sm text-white/60 mt-1">{planLabel}</div>
         </div>
 
         <div className="space-y-3">
           <input
-            className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-white outline-none focus:border-white/30"
+            className="w-full rounded-xl bg-white border border-white/10 px-4 py-3 text-[#0b1020] outline-none focus:border-white/30"
             placeholder="correo@gmail.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
           />
-
-          {success ? <div className="text-sm text-emerald-300">{success}</div> : null}
-
-          {activationLink ? (
-            <div className="text-sm text-white/80">
-              Si no te llega el correo, puedes activar aquí:{" "}
-              <a className="text-[#E6C464] underline" href={activationLink}>
-                Crear contraseña
-              </a>
-            </div>
-          ) : null}
 
           {err ? <div className="text-sm text-red-400">{err}</div> : null}
 
@@ -110,8 +114,22 @@ useEffect(() => {
             disabled={loading}
             className="w-full rounded-xl bg-[#E6C464] text-[#0b1020] font-semibold py-3 disabled:opacity-60"
           >
-            {loading ? "Abriendo Flow..." : "Pagar con Flow"}
+            {loading ? "Abriendo pago..." : "Pagar con Débito/Crédito"}
           </button>
+
+          {/* Confianza / conversión */}
+          <div
+            className="text-xs text-white/80 rounded-xl p-3 border"
+            style={{
+              background: "rgba(255,255,255,0.04)",
+              borderColor: "rgba(255,255,255,0.10)",
+            }}
+          >
+            <div className="font-semibold text-white/90">Pago seguro</div>
+            <div className="mt-1 text-white/70">
+              • Débito / Crédito • Confirmación automática • Acceso inmediato con tu correo
+            </div>
+          </div>
 
           <div className="text-sm text-white/60">
             Después del pago, vuelve a <Link className="text-[#E6C464] underline" to="/login">Iniciar sesión</Link> con el mismo correo.
