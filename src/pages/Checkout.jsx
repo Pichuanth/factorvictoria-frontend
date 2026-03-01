@@ -127,10 +127,10 @@ export default function Checkout() {
   {loading ? "Abriendo pago..." : "Pagar con Débito/Crédito"}
 </button>
 
-          {/* Pago seguro (fondo blanco + logos) */}
+          {/* Pago 100% seguro (fondo blanco + logos) */}
           <div className="mt-4 rounded-2xl bg-white p-5 text-slate-900 shadow-sm border border-black/5">
   <div className="text-sm font-semibold mb-3">
-    Pago seguro
+    Pago 100% seguro
   </div>
 
   <div className="flex justify-center">
@@ -142,8 +142,27 @@ export default function Checkout() {
   />
   </div>
 
-  <div className="mt-4 text-sm text-slate-700 text-center">
-    Débito / Crédito • Confirmación automática • Acceso inmediato con tu correo
+  <div className="mt-5 space-y-2 text-sm text-slate-800">
+    <div className="flex items-center gap-2">
+      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold">
+        ✓
+      </span>
+      Confirmación automática
+    </div>
+
+    <div className="flex items-center gap-2">
+      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold">
+        ✓
+      </span>
+      Acceso inmediato
+    </div>
+
+    <div className="flex items-center gap-2">
+      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold">
+        ✓
+      </span>
+      Cancela cuando quieras
+    </div>
   </div>
 </div>
 
