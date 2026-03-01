@@ -112,22 +112,29 @@ export default function Checkout() {
           <button
             onClick={startPay}
             disabled={loading}
-            className="w-full rounded-xl bg-[#E6C464] text-[#0b1020] font-semibold py-3 disabled:opacity-60"
+            className="w-full rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-3 disabled:opacity-60 transition-colors"
           >
-            {loading ? "Abriendo pago..." : "Pagar con Débito/Crédito"}
-          </button>
+            {loading ? "Abriendo pago..." : "Pagar con Débito/Créd{/* Confianza / conversión */}
+          <div className="mt-4 rounded-xl bg-white/95 p-3 text-slate-900">
+            <div className="flex items-center gap-2 font-semibold">
+              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-white">
+                ✓
+              </span>
+              Pago seguro
+            </div>
 
-          {/* Confianza / conversión */}
-          <div
-            className="text-xs text-white/80 rounded-xl p-3 border"
-            style={{
-              background: "rgba(255,255,255,0.04)",
-              borderColor: "rgba(255,255,255,0.10)",
-            }}
-          >
-            <div className="font-semibold text-white/90">Pago seguro</div>
-            <div className="mt-1 text-white/70">
-              • Débito / Crédito • Confirmación automática • Acceso inmediato con tu correo
+            <div className="mt-2 text-sm text-slate-700">
+              Débito / Crédito • Confirmación automática • Acceso inmediato con tu correo
+            </div>
+
+            <img
+              src="/logo_pagos.png"
+              alt="Medios de pago"
+              className="mt-3 h-10 w-auto"
+              loading="lazy"
+            />
+          </div>
+ correo
             </div>
           </div>
 
