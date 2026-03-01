@@ -11,6 +11,10 @@ const PLAN_LABEL = {
   vitalicio: "Vitalicio",
 };
 
+function normalizeEmail(v) {
+  return String(v || "").trim().toLowerCase();
+}
+
 export default function Checkout() {
   const [sp] = useSearchParams();
   const planId = sp.get("plan") || "";
@@ -22,27 +26,24 @@ export default function Checkout() {
   useEffect(() => {
     const qEmail = sp.get("email");
     const saved = localStorage.getItem("fv_email");
-    const initial = (qEmail || saved || "").trim().toLowerCase();
+    const initial = normalizeEmail(qEmail || saved);
     if (initial) setEmail(initial);
   }, [sp]);
 
   // Keep email stored for future one-click checkout
   useEffect(() => {
-    const e = (email || "").trim().toLowerCase();
+    const e = normalizeEmail(email);
     if (e) localStorage.setItem("fv_email", e);
   }, [email]);
 
   // Nota: el retorno desde Flow redirige a /login?email=...&paid=1
-  // La activación real ocurre por /confirm (webhook). Aquí no hacemos verificación extra.
-
-  // One-click checkout: if ?auto=1 and we already have an email, start payment immediately
+  // La activación real ocurre por /confirm (webhook). Aquí solo iniciamos el pago.
   useEffect(() => {
     const auto = sp.get("auto") === "1";
     if (!auto) return;
-    const e = (email || "").trim().toLowerCase();
+    const e = normalizeEmail(email);
     if (!planId || !e) return;
-    // avoid loops on back/refresh
-    if (sp.get("flow") === "return") return;
+    if (sp.get("flow") === "return") return; // evita loops
 
     const t = setTimeout(() => {
       startPay();
@@ -51,12 +52,12 @@ export default function Checkout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sp, planId, email]);
 
-
   const planLabel = useMemo(() => PLAN_LABEL[planId] || "Plan", [planId]);
 
   const startPay = async () => {
     setErr("");
-    const e = (email || "").trim().toLowerCase();
+    const e = normalizeEmail(email);
+
     if (!planId) return setErr("Plan inválido. Vuelve a seleccionar un plan.");
     if (!e) return setErr("Ingresa tu correo.");
 
@@ -67,14 +68,18 @@ export default function Checkout() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ planId, email: e, returnPath: "/checkout" }),
       });
-      const data = await r.json();
-      if (!data?.ok || !data?.url) {
+
+      const data = await r.json().catch(() => ({}));
+
+      if (!r.ok || !data?.ok || !data?.url) {
         setErr(data?.error || "No se pudo iniciar el pago.");
         setLoading(false);
         return;
       }
+
       window.location.href = data.url;
-    } catch {
+    } catch (e) {
+      console.log("[CHECKOUT] startPay error:", e?.message || e);
       setErr("No se pudo conectar al servidor.");
       setLoading(false);
     }
@@ -90,7 +95,6 @@ export default function Checkout() {
             alt="Factor Victoria"
             className="mx-auto mb-5 w-28 md:w-36"
             onError={(e) => {
-              // si no existe el logo, evita romper la UI
               e.currentTarget.style.display = "none";
             }}
           />
@@ -109,15 +113,20 @@ export default function Checkout() {
 
           {err ? <div className="text-sm text-red-400">{err}</div> : null}
 
+          {/* Confianza / conversión */}
           <button
+            type="button"
             onClick={startPay}
-            disabled={loading}
-            className="w-full rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-3 disabled:opacity-60 transition-colors"
+            disabled={loading || !normalizeEmail(email)}
+            className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
           >
-            {loading ? "Abriendo pago..." : "Pagar con Débito/Créd{/* Confianza / conversión */}
+            {loading ? "Abriendo pago..." : "Pagar con Débito/Crédito"}
+          </button>
+
+          {/* Pago seguro (fondo blanco + logos) */}
           <div className="mt-4 rounded-xl bg-white/95 p-3 text-slate-900">
             <div className="flex items-center gap-2 font-semibold">
-              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-white">
+              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-white">
                 ✓
               </span>
               Pago seguro
@@ -134,12 +143,13 @@ export default function Checkout() {
               loading="lazy"
             />
           </div>
- correo
-            </div>
-          </div>
 
           <div className="text-sm text-white/60">
-            Después del pago, vuelve a <Link className="text-[#E6C464] underline" to="/login">Iniciar sesión</Link> con el mismo correo.
+            Después del pago, vuelve a{" "}
+            <Link className="text-[#E6C464] underline" to="/login">
+              Iniciar sesión
+            </Link>{" "}
+            con el mismo correo.
           </div>
 
           <div className="text-sm">
