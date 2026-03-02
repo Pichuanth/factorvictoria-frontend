@@ -22,18 +22,25 @@ export default function Checkout() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
+  const isValidEmail = (s) => {
+    const v = String(s || "").trim();
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+  };
+
+
   // Prefill email from query or localStorage to reduce steps
   useEffect(() => {
-    const qEmail = sp.get("email");
-    const saved = localStorage.getItem("fv_email");
-    const initial = normalizeEmail(qEmail || saved);
+    const q = normalizeEmail(sp.get("email"));
+    const saved = normalizeEmail(localStorage.getItem("fv_email"));
+    const initial = isValidEmail(q) ? q : (isValidEmail(saved) ? saved : "");
     if (initial) setEmail(initial);
   }, [sp]);
 
   // Keep email stored for future one-click checkout
   useEffect(() => {
     const e = normalizeEmail(email);
-    if (e) localStorage.setItem("fv_email", e);
+    if (isValidEmail(e)) localStorage.setItem("fv_email", e);
+    else localStorage.removeItem("fv_email");
   }, [email]);
 
   // Nota: el retorno desde Flow redirige a /login?email=...&paid=1
@@ -106,10 +113,12 @@ export default function Checkout() {
           <input
             className="w-full rounded-xl bg-white border border-white/10 px-4 py-3 text-[#0b1020] outline-none focus:border-white/30"
             placeholder="correo@gmail.com (obligatorio)"
-            value={email}
+            placeholder="correo@gmail.com (obligatorio)"
+            type="email"
+            inputMode="email"
+            value={email || ""}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
-          />
 
           {err ? <div className="text-sm text-red-400">{err}</div> : null}
 
@@ -129,8 +138,9 @@ export default function Checkout() {
 
           {/* Pago 100% seguro (fondo blanco + logos) */}
           <div className="mt-4 rounded-2xl bg-white p-5 text-slate-900 shadow-sm border border-black/5">
-  <div className="text-sm font-semibold mb-3">
-    Pago 100% seguro
+  <div className="flex items-center gap-2 text-sm font-semibold mb-3">
+    <img src="/pago_seguro.png" alt="" className="h-5 w-5 object-contain" loading="lazy" />
+    <span>Pago 100% seguro</span>
   </div>
 
   <div className="flex justify-center">
