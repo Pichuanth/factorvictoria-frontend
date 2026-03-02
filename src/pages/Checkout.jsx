@@ -104,12 +104,14 @@ export default function Checkout() {
 
         <div className="space-y-3">
           <input
-            className="w-full rounded-xl bg-white border border-white/10 px-4 py-3 text-[#0b1020] outline-none focus:border-white/30"
-            placeholder="correo@gmail.com (obligatorio)"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-          />
+  type="email"
+  className="w-full rounded-xl bg-white border border-white/10 px-4 py-3 text-[#0b1020] outline-none focus:border-white/30"
+  placeholder="correo@gmail.com (obligatorio)"
+  value={email || ""}
+  onChange={(e) => setEmail(e.target.value)}
+  autoComplete="email"
+  inputMode="email"
+/>
 
           {err ? <div className="text-sm text-red-400">{err}</div> : null}
 
