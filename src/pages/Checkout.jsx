@@ -124,7 +124,7 @@ export default function Checkout() {
     "disabled:opacity-100 disabled:bg-emerald-600 disabled:hover:bg-emerald-600 disabled:cursor-not-allowed",
   ].join(" ")}
 >
-  {loading ? "Abriendo pago..." : "Pagar con Débito/Crédito"}
+  {loading ? "Abriendo pago..." : "Activar Membresía Ahora"}
 </button>
 
           {/* Pago 100% seguro (fondo blanco + logos) */}
