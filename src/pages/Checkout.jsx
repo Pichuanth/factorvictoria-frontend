@@ -1,102 +1,94 @@
-// src/pages/Checkout.jsx
-import React, { useMemo, useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-
-const API_BASE = import.meta.env.VITE_API_BASE || "";
-
-const PLAN_LABEL = {
-  mensual: "Mensual",
-  trimestral: "Trimestral (+1 mes regalo)",
-  anual: "Anual",
-  vitalicio: "Vitalicio",
-};
-
-function normalizeEmail(v) {
-  return String(v || "").trim().toLowerCase();
-}
 
 export default function Checkout() {
   const [sp] = useSearchParams();
-  const planId = sp.get("plan") || "";
+
+  const plan = (sp.get("plan") || "mensual").toLowerCase();
+  const planLabel = useMemo(() => {
+    if (plan === "trimestral" || plan === "3m" || plan === "3") return "Trimestral";
+    if (plan === "anual" || plan === "12m" || plan === "12") return "Anual";
+    if (plan === "vitalicio" || plan === "lifetime") return "Vitalicio";
+    return "Mensual";
+  }, [plan]);
+
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  const [success, setSuccess] = useState("");
+  const [activationLink, setActivationLink] = useState("");
 
-  const isValidEmail = (s) => {
-    const v = String(s || "").trim();
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-  };
-
-
-  // Prefill email from query or localStorage to reduce steps
+  // Prefill email from URL (?email=) or localStorage, but only if it looks like an email.
   useEffect(() => {
-    const q = normalizeEmail(sp.get("email"));
-    const saved = normalizeEmail(localStorage.getItem("fv_email"));
-    const initial = isValidEmail(q) ? q : (isValidEmail(saved) ? saved : "");
-    if (initial) setEmail(initial);
-  }, [sp]);
+    const fromQuery = (sp.get("email") || "").trim();
+    const fromStorage = (localStorage.getItem("fv_email") || "").trim();
+    const candidate = fromQuery || fromStorage;
 
-  // Keep email stored for future one-click checkout
-  useEffect(() => {
-    const e = normalizeEmail(email);
-    if (isValidEmail(e)) localStorage.setItem("fv_email", e);
-    else localStorage.removeItem("fv_email");
-  }, [email]);
-
-  // Nota: el retorno desde Flow redirige a /login?email=...&paid=1
-  // La activación real ocurre por /confirm (webhook). Aquí solo iniciamos el pago.
-  useEffect(() => {
-    const auto = sp.get("auto") === "1";
-    if (!auto) return;
-    const e = normalizeEmail(email);
-    if (!planId || !e) return;
-    if (sp.get("flow") === "return") return; // evita loops
-
-    const t = setTimeout(() => {
-      startPay();
-    }, 250);
-    return () => clearTimeout(t);
+    if (candidate && candidate.includes("@") && candidate.includes(".")) {
+      setEmail(candidate);
+    } else {
+      setEmail("");
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sp, planId, email]);
+  }, []);
 
-  const planLabel = useMemo(() => PLAN_LABEL[planId] || "Plan", [planId]);
+  useEffect(() => {
+    try {
+      if (email) localStorage.setItem("fv_email", email);
+    } catch {}
+  }, [email]);
 
   const startPay = async () => {
     setErr("");
-    const e = normalizeEmail(email);
+    setSuccess("");
+    setActivationLink("");
 
-    if (!planId) return setErr("Plan inválido. Vuelve a seleccionar un plan.");
-    if (!e) return setErr("Ingresa tu correo.");
+    const cleanEmail = (email || "").trim();
+
+    if (!cleanEmail || !cleanEmail.includes("@")) {
+      setErr("Ingresa un correo válido.");
+      return;
+    }
 
     setLoading(true);
     try {
-      const r = await fetch(`${API_BASE}/api/pay/flow/create`, {
+      // Tu endpoint de backend que crea el pago (Flow / etc.)
+      const r = await fetch(`/api/pay/create?plan=${encodeURIComponent(plan)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId, email: e, returnPath: "/checkout" }),
+        body: JSON.stringify({ email: cleanEmail }),
       });
 
       const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        throw new Error(data?.error || "No se pudo iniciar el pago.");
+      }
 
-      if (!r.ok || !data?.ok || !data?.url) {
-        setErr(data?.error || "No se pudo iniciar el pago.");
-        setLoading(false);
+      // Esperamos que el backend devuelva una URL para redirigir al checkout (Flow / Webpay / etc.)
+      if (data?.url) {
+        window.location.href = data.url;
         return;
       }
 
-      window.location.href = data.url;
+      // Fallback: si devuelve un link de activación directa (best effort)
+      if (data?.activationLink) {
+        setActivationLink(data.activationLink);
+        setSuccess("Pago iniciado. Revisa tu correo para activar tu cuenta.");
+        return;
+      }
+
+      setSuccess("Pago iniciado. Revisa tu correo para continuar.");
     } catch (e) {
-      console.log("[CHECKOUT] startPay error:", e?.message || e);
-      setErr("No se pudo conectar al servidor.");
+      setErr(e?.message || "Error iniciando pago.");
+    } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0b1020] px-4">
-      <div className="w-full max-w-md rounded-2xl bg-[#0f1730] border border-white/10 p-6 shadow-xl">
-        <div className="text-center mb-6">
-          {/* Logo (mismo que inicio/login) */}
+    <div className="min-h-screen bg-[#070a12] px-4 py-10">
+      <div className="mx-auto w-full max-w-xl rounded-2xl bg-[#0b1020]/70 border border-white/10 p-6 shadow-xl">
+        <div className="text-center">
           <img
             src="/logo-fv.png"
             alt="Factor Victoria"
@@ -109,53 +101,85 @@ export default function Checkout() {
           <div className="text-sm text-white/60 mt-1">{planLabel}</div>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-3 mt-6">
           <input
-            className="w-full rounded-xl bg-white border border-white/10 px-4 py-3 text-[#0b1020] outline-none focus:border-white/30"
-            placeholder="correo@gmail.com (obligatorio)"
-            placeholder="correo@gmail.com (obligatorio)"
             type="email"
             inputMode="email"
+            className="w-full rounded-xl bg-white border border-white/10 px-4 py-3 text-[#0b1020] outline-none focus:border-white/30"
+            placeholder="correo@gmail.com (obligatorio)"
             value={email || ""}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
+          />
+
+          {success ? <div className="text-sm text-emerald-300">{success}</div> : null}
+
+          {activationLink ? (
+            <div className="text-sm text-white/80">
+              Si no te llega el correo, puedes activar aquí:{" "}
+              <a className="text-[#E6C464] underline" href={activationLink}>
+                Crear contraseña
+              </a>
+            </div>
+          ) : null}
 
           {err ? <div className="text-sm text-red-400">{err}</div> : null}
 
           {/* Confianza / conversión */}
           <button
-  type="button"
-  onClick={startPay}
-  disabled={loading || !email}
-  className={[
-    "mt-3 w-full rounded-xl px-4 py-3 font-semibold text-white shadow transition",
-    "bg-emerald-600 hover:bg-emerald-700",
-    "disabled:opacity-100 disabled:bg-emerald-600 disabled:hover:bg-emerald-600 disabled:cursor-not-allowed",
-  ].join(" ")}
->
-  {loading ? "Abriendo pago..." : "Activar Membresía Ahora"}
-</button>
+            type="button"
+            onClick={startPay}
+            disabled={loading || !email}
+            className={[
+              "w-full rounded-xl px-4 py-3 font-semibold text-white shadow transition",
+              "bg-emerald-600 hover:bg-emerald-700",
+              "disabled:opacity-60 disabled:hover:bg-emerald-600 disabled:cursor-not-allowed",
+            ].join(" ")}
+          >
+            {loading ? "Abriendo pago..." : "Activar Membresía Ahora"}
+          </button>
 
-          {/* Pago 100% seguro (fondo blanco + logos) */}
-          <div className="mt-4 rounded-2xl bg-white p-5 text-slate-900 shadow-sm border border-black/5">
-  <div className="flex items-center gap-2 text-sm font-semibold mb-3">
-    <img src="/pago_seguro.png" alt="" className="h-5 w-5 object-contain" loading="lazy" />
-    <span>Pago 100% seguro</span>
-  </div>
+          <div className="mt-4 rounded-xl bg-white px-4 py-4 text-[#0b1020]">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 font-semibold">
+                <img
+                  src="/pago_seguro.png"
+                  alt="Pago seguro"
+                  className="h-6 w-6 object-contain"
+                  loading="lazy"
+                />
+                <span>Pago 100% seguro</span>
+              </div>
 
-  <div className="flex justify-center">
-    <img
-  src="/Logo_pagos.png"
-  alt="Medios de pago"
-  className="w-full max-w-[260px] h-auto object-contain"
-  loading="lazy"
-  />
-  </div>
+              <img
+                src="/Logo_pagos.png"
+                alt="Medios de pago"
+                className="h-7 w-auto object-contain"
+                loading="lazy"
+              />
+            </div>
 
-  <div className="mt-4 text-sm text-slate-700 text-center">
-    Débito / Crédito • Confirmación automática • Acceso inmediato con tu correo
-  </div>
-</div>
+            <div className="mt-4 space-y-2 text-sm text-slate-700">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white text-xs">
+                  ✓
+                </span>
+                <span>Confirmación automática</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white text-xs">
+                  ✓
+                </span>
+                <span>Acceso inmediato</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white text-xs">
+                  ✓
+                </span>
+                <span>Cancela cuando quieras</span>
+              </div>
+            </div>
+          </div>
 
           <div className="text-sm text-white/60">
             Después del pago, vuelve a{" "}
