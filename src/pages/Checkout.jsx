@@ -132,8 +132,14 @@ export default function Checkout() {
 
           {/* Pago 100% seguro (fondo blanco + logos) */}
           <div className="mt-4 rounded-2xl bg-white p-5 text-slate-900 shadow-sm border border-black/5">
-  <div className="text-sm font-semibold mb-3">
-    Pago 100% seguro
+  <div className="flex items-center gap-2 text-sm font-semibold mb-3">
+    <img
+      src="/pago_seguro.png"
+      alt="Pago seguro"
+      className="h-5 w-5 object-contain"
+      loading="lazy"
+    />
+    <span>Pago 100% seguro</span>
   </div>
 
   <div className="flex justify-center">
