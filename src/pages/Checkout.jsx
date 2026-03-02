@@ -99,7 +99,7 @@ export default function Checkout() {
               e.currentTarget.style.display = "none";
             }}
           />
-          <div className="text-2xl font-semibold text-white">Pagar membresía</div>
+          <div className="text-2xl font-semibold text-white">Únete a Factor Victoria</div>
           <div className="text-sm text-white/60 mt-1">{planLabel}</div>
         </div>
 
