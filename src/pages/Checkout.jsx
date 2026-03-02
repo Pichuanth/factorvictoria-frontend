@@ -104,14 +104,12 @@ export default function Checkout() {
 
         <div className="space-y-3">
           <input
-  type="email"
-  className="w-full rounded-xl bg-white border border-white/10 px-4 py-3 text-[#0b1020] outline-none focus:border-white/30"
-  placeholder="correo@gmail.com (obligatorio)"
-  value={email || ""}
-  onChange={(e) => setEmail(e.target.value)}
-  autoComplete="email"
-  inputMode="email"
-/>
+            className="w-full rounded-xl bg-white border border-white/10 px-4 py-3 text-[#0b1020] outline-none focus:border-white/30"
+            placeholder="correo@gmail.com (obligatorio)"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+          />
 
           {err ? <div className="text-sm text-red-400">{err}</div> : null}
 
@@ -144,27 +142,8 @@ export default function Checkout() {
   />
   </div>
 
-  <div className="mt-5 space-y-2 text-sm text-slate-800">
-    <div className="flex items-center gap-2">
-      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold">
-        ✓
-      </span>
-      Confirmación automática
-    </div>
-
-    <div className="flex items-center gap-2">
-      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold">
-        ✓
-      </span>
-      Acceso inmediato
-    </div>
-
-    <div className="flex items-center gap-2">
-      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold">
-        ✓
-      </span>
-      Cancela cuando quieras
-    </div>
+  <div className="mt-4 text-sm text-slate-700 text-center">
+    Débito / Crédito • Confirmación automática • Acceso inmediato con tu correo
   </div>
 </div>
 
@@ -186,5 +165,3 @@ export default function Checkout() {
     </div>
   );
 }
-
-// build: force-212037
