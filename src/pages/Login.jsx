@@ -41,54 +41,60 @@ export default function Login() {
       setBanner("");
     }
   }, [q]);
-
-  // Auto-confirmación: si vienes de Flow (?paid=0|1&email=...), revisa la membresía cada 3s
-  // y cuando esté activa, intenta login automático (password vacío) o deja el banner listo.
+  // Auto-confirmación post-pago: si venimos de Flow con paid=0, hacemos polling cada 3s
+  // hasta que la membresía aparezca activa en el backend, y entonces actualizamos la URL a paid=1.
   useEffect(() => {
+    const email = q.get("email") || "";
     const paid = q.get("paid");
-    const qEmail = (q.get("email") || "").trim().toLowerCase();
-    if (!qEmail) return;
-    if (paid !== "0" && paid !== "1") return;
+    // Solo aplica cuando hay email y venimos recién del flujo de pago
+    if (!email || paid !== "0") return;
 
     let alive = true;
+    let attempts = 0;
     const controller = new AbortController();
-    const base = (import.meta.env.VITE_API_BASE || "https://factorvictoria-backend.vercel.app").replace(/\/, "");
+
+    const base = (import.meta.env.VITE_API_BASE || "https://factorvictoria-backend.vercel.app")
+      .replace(/\/$/, "");
 
     const tick = async () => {
+      attempts += 1;
       try {
-        const r = await fetch(`/api/membership?email=${encodeURIComponent(qEmail)}`, {
-          method: "GET",
-          signal: controller.signal,
-        });
-        const data = await r.json();
+        const url = `${base}/api/membership?email=${encodeURIComponent(email)}`;
+        const r = await fetch(url, { signal: controller.signal, credentials: "omit" });
+        const j = await r.json().catch(() => null);
 
         if (!alive) return;
 
-        if (data?.active) {
-          setBanner("Pago confirmado ✅. Activamos tu membresía. Entrando automáticamente…");
-          const res = await login(qEmail, "");
-          if (res?.ok) {
-            nav("/comparator");
-            return;
-          }
-          setBanner(
-            "Pago confirmado ✅. Ya puedes entrar con tu correo. (Si configuraste contraseña, úsala; si no, deja el campo vacío)."
-          );
+        if (j && j.ok && j.active === true) {
+          // Fuerza URL a paid=1 (sin recargar toda la app)
+          const next = new URL(window.location.href);
+          next.searchParams.set("paid", "1");
+          window.history.replaceState({}, "", next.toString());
+          setPaidMsg("✅ Pago confirmado. Ya puedes ingresar.");
+          controller.abort();
           return;
         }
-      } catch (_) {
-        // silencio
-      }
 
-      if (alive) setTimeout(tick, 3000);
+        // corta después de ~2 min (40 intentos * 3s)
+        if (attempts >= 40) {
+          controller.abort();
+          return;
+        }
+      } catch (e) {
+        // si abortamos, no hacemos nada
+      }
     };
 
+    // primera verificación inmediata + luego cada 3s
     tick();
+    const id = setInterval(tick, 3000);
+
     return () => {
       alive = false;
       controller.abort();
+      clearInterval(id);
     };
-  }, [q, login, nav]);
+  }, [q]);
 
   const onSubmit = async (e) => {
     e.preventDefault();
