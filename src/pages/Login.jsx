@@ -42,6 +42,54 @@ export default function Login() {
     }
   }, [q]);
 
+  // Auto-confirmación: si vienes de Flow (?paid=0|1&email=...), revisa la membresía cada 3s
+  // y cuando esté activa, intenta login automático (password vacío) o deja el banner listo.
+  useEffect(() => {
+    const paid = q.get("paid");
+    const qEmail = (q.get("email") || "").trim().toLowerCase();
+    if (!qEmail) return;
+    if (paid !== "0" && paid !== "1") return;
+
+    let alive = true;
+    const controller = new AbortController();
+    const base = (import.meta.env.VITE_API_BASE || "https://factorvictoria-backend.vercel.app").replace(/\/, "");
+
+    const tick = async () => {
+      try {
+        const r = await fetch(`/api/membership?email=${encodeURIComponent(qEmail)}`, {
+          method: "GET",
+          signal: controller.signal,
+        });
+        const data = await r.json();
+
+        if (!alive) return;
+
+        if (data?.active) {
+          setBanner("Pago confirmado ✅. Activamos tu membresía. Entrando automáticamente…");
+          const res = await login(qEmail, "");
+          if (res?.ok) {
+            nav("/comparator");
+            return;
+          }
+          setBanner(
+            "Pago confirmado ✅. Ya puedes entrar con tu correo. (Si configuraste contraseña, úsala; si no, deja el campo vacío)."
+          );
+          return;
+        }
+      } catch (_) {
+        // silencio
+      }
+
+      if (alive) setTimeout(tick, 3000);
+    };
+
+    tick();
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [q, login, nav]);
+
   const onSubmit = async (e) => {
     e.preventDefault();
     setErr("");
