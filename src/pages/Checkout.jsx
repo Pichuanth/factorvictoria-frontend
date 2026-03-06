@@ -19,7 +19,8 @@ export default function Checkout() {
   const [sp] = useSearchParams();
   const planId = sp.get("plan") || "";
   const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loadingFlow, setLoadingFlow] = useState(false);
+  const [loadingMP, setLoadingMP] = useState(false);
   const [err, setErr] = useState("");
 
   // Prefill email from query or localStorage to reduce steps
@@ -62,7 +63,7 @@ export default function Checkout() {
     if (!planId) return setErr("Plan inválido. Vuelve a seleccionar un plan.");
     if (!e) return setErr("Ingresa tu correo.");
 
-    setLoading(true);
+    setLoadingFlow(true);
     try {
       const r = await fetch(`${API_BASE}/api/pay/flow/create`, {
         method: "POST",
@@ -74,7 +75,7 @@ export default function Checkout() {
 
       if (!r.ok || !data?.ok || !data?.url) {
         setErr(data?.error || "No se pudo iniciar el pago.");
-        setLoading(false);
+        setLoadingFlow(false);
         return;
       }
 
@@ -82,7 +83,7 @@ export default function Checkout() {
     } catch (e) {
       console.log("[CHECKOUT] startPay error:", e?.message || e);
       setErr("No se pudo conectar al servidor.");
-      setLoading(false);
+      setLoadingFlow(false);
     }
   };
   const startPayMP = async () => {
@@ -91,7 +92,7 @@ export default function Checkout() {
     if (!e) return setErr("Ingresa tu correo.");
     if (!planId) return setErr("Plan inválido. Vuelve a seleccionar un plan.");
 
-    setLoading(true);
+    setLoadingMP(true);
     try {
       const r = await fetch(`${API_BASE}/api/pay/mercadopago/create`, {
         method: "POST",
@@ -107,7 +108,7 @@ export default function Checkout() {
     } catch (e) {
       setErr(e.message || "Error Mercado Pago");
     } finally {
-      setLoading(false);
+      setLoadingMP(false);
     }
   };
 
@@ -145,28 +146,28 @@ export default function Checkout() {
           {/* Confianza / conversión */}
           <button
   type="button"
-  onClick={startPay}
-  disabled={loading || !email}
+  onClick={(e) => { e.preventDefault(); e.stopPropagation(); startPay(); }}
+  disabled={loadingFlow || loadingMP || !email}
   className={[
     "mt-3 w-full rounded-xl px-4 py-3 font-semibold text-white shadow transition",
     "bg-emerald-600 hover:bg-emerald-700",
     "disabled:opacity-100 disabled:bg-emerald-600 disabled:hover:bg-emerald-600 disabled:cursor-not-allowed",
   ].join(" ")}
 >
-  {loading ? "Abriendo pago..." : "Pagar con Flow"}
+  {loadingFlow ? "Abriendo Flow..." : "Activar con Flow"}
 </button>
 
 <button
   type="button"
-  onClick={startPayMP}
-  disabled={loading || !email}
+  onClick={(e) => { e.preventDefault(); e.stopPropagation(); startPayMP(); }}
+  disabled={loadingFlow || loadingMP || !email}
   className={[
     "mt-3 w-full rounded-xl px-4 py-3 font-semibold shadow transition border",
-    "border-slate-300 bg-white text-slate-900 hover:bg-slate-50",
+    "border-[#009EE3] bg-[#009EE3] text-white hover:bg-[#0086c3]",
     "disabled:opacity-60 disabled:cursor-not-allowed",
   ].join(" ")}
 >
-  {loading ? "Abriendo pago..." : "Pagar con Mercado Pago"}
+  {loadingMP ? "Abriendo Mercado Pago..." : "Activar con Mercado Pago"}
 </button>
 
           {/* Pago 100% seguro (fondo blanco + logos) */}
