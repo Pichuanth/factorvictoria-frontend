@@ -85,13 +85,11 @@ export default function Checkout() {
       setLoading(false);
     }
   };
-
   const startPayMP = async () => {
     setErr("");
     const e = normalizeEmail(email);
-
-    if (!planId) return setErr("Plan inválido. Vuelve a seleccionar un plan.");
     if (!e) return setErr("Ingresa tu correo.");
+    if (!planId) return setErr("Plan inválido. Vuelve a seleccionar un plan.");
 
     setLoading(true);
     try {
@@ -101,18 +99,18 @@ export default function Checkout() {
         body: JSON.stringify({ email: e, planId }),
       });
       const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data?.error || "No se pudo iniciar Mercado Pago");
 
-      if (!r.ok || !data?.init_point) {
-        throw new Error(data?.error || "No se pudo iniciar Mercado Pago");
-      }
-
-      window.location.href = data.init_point;
+      // MercadoPago redirect
+      if (data.init_point) window.location.href = data.init_point;
+      else throw new Error("Respuesta sin init_point");
     } catch (e) {
-      console.log("[CHECKOUT] startPayMP error:", e?.message || e);
-      setErr(e?.message || "Error Mercado Pago");
+      setErr(e.message || "Error Mercado Pago");
+    } finally {
       setLoading(false);
     }
   };
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0b1020] px-4">
@@ -144,56 +142,58 @@ export default function Checkout() {
 
           {err ? <div className="text-sm text-red-400">{err}</div> : null}
 
+          {/* Confianza / conversión */}
           <button
-            type="button"
-            onClick={startPay}
-            disabled={loading || !email}
-            className={[
-              "mt-3 w-full rounded-xl px-4 py-3 font-semibold text-white shadow transition",
-              "bg-emerald-600 hover:bg-emerald-700",
-              "disabled:opacity-100 disabled:bg-emerald-600 disabled:hover:bg-emerald-600 disabled:cursor-not-allowed",
-            ].join(" ")}
-          >
-            {loading ? "Abriendo pago..." : "Pagar con Flow"}
-          </button>
+  type="button"
+  onClick={startPay}
+  disabled={loading || !email}
+  className={[
+    "mt-3 w-full rounded-xl px-4 py-3 font-semibold text-white shadow transition",
+    "bg-emerald-600 hover:bg-emerald-700",
+    "disabled:opacity-100 disabled:bg-emerald-600 disabled:hover:bg-emerald-600 disabled:cursor-not-allowed",
+  ].join(" ")}
+>
+  {loading ? "Abriendo pago..." : "Pagar con Flow"}
+</button>
 
-          <button
-            type="button"
-            onClick={startPayMP}
-            disabled={loading || !email}
-            className={[
-              "mt-3 w-full rounded-xl px-4 py-3 font-semibold shadow transition border",
-              "border-slate-300 bg-white text-slate-900 hover:bg-slate-50",
-              "disabled:opacity-60 disabled:cursor-not-allowed",
-            ].join(" ")}
-          >
-            {loading ? "Abriendo pago..." : "Pagar con Mercado Pago"}
-          </button>
+<button
+  type="button"
+  onClick={startPayMP}
+  disabled={loading || !email}
+  className={[
+    "mt-3 w-full rounded-xl px-4 py-3 font-semibold shadow transition border",
+    "border-slate-300 bg-white text-slate-900 hover:bg-slate-50",
+    "disabled:opacity-60 disabled:cursor-not-allowed",
+  ].join(" ")}
+>
+  {loading ? "Abriendo pago..." : "Pagar con Mercado Pago"}
+</button>
 
+          {/* Pago 100% seguro (fondo blanco + logos) */}
           <div className="mt-4 rounded-2xl bg-white p-5 text-slate-900 shadow-sm border border-black/5">
-            <div className="flex items-center gap-2 text-sm font-semibold mb-3">
-              <img
-                src="/pago_seguro.png"
-                alt="Pago seguro"
-                className="h-5 w-5 object-contain"
-                loading="lazy"
-              />
-              <span>Pago 100% seguro</span>
-            </div>
+  <div className="flex items-center gap-2 text-sm font-semibold mb-3">
+    <img
+      src="/pago_seguro.png"
+      alt="Pago seguro"
+      className="h-5 w-5 object-contain"
+      loading="lazy"
+    />
+    <span>Pago 100% seguro</span>
+  </div>
 
-            <div className="flex justify-center">
-              <img
-                src="/Logo_pagos.png"
-                alt="Medios de pago"
-                className="block w-full max-w-[240px] sm:max-w-[280px] h-auto object-contain mx-auto"
-                loading="lazy"
-              />
-            </div>
+  <div className="flex justify-center">
+    <img
+  src="/Logo_pagos.png"
+  alt="Medios de pago"
+  className="block w-full max-w-[240px] sm:max-w-[280px] h-auto object-contain mx-auto"
+  loading="lazy"
+  />
+  </div>
 
-            <div className="mt-4 text-sm text-slate-700 text-center">
-              Débito / Crédito • Confirmación automática • Acceso inmediato con tu correo
-            </div>
-          </div>
+  <div className="mt-4 text-sm text-slate-700 text-center">
+    Débito / Crédito • Confirmación automática • Acceso inmediato con tu correo
+  </div>
+</div>
 
           <div className="text-sm text-white/60">
             Después del pago, vuelve a{" "}
