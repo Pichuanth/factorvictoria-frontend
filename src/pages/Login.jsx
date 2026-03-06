@@ -14,6 +14,7 @@ export default function Login() {
   const q = useQuery();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPwd, setShowPwd] = useState(false);
   const [err, setErr] = useState("");
   const [banner, setBanner] = useState("");
 
@@ -140,14 +141,25 @@ export default function Login() {
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
           />
-          <input
-            className="w-full px-4 py-3 rounded-xl bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-            placeholder="contraseña (opcional)"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-          />
+          
+<div className="relative">
+  <input
+    className="w-full px-4 py-3 pr-12 rounded-xl bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+    placeholder="contraseña (opcional)"
+    type={showPwd ? "text" : "password"}
+    value={password}
+    onChange={(e) => setPassword(e.target.value)}
+    autoComplete="current-password"
+  />
+  <button
+    type="button"
+    onClick={() => setShowPwd(!showPwd)}
+    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600"
+  >
+    {showPwd ? "🙈" : "👁️"}
+  </button>
+</div>
+
 
           {err ? <div className="text-sm text-red-400">{err}</div> : null}
 
