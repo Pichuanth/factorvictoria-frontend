@@ -466,9 +466,11 @@ function AppInner() {
 
           <Route path="/login" element={<Login />} />
 
-          
-        <Route path="/checkout" element={<Checkout />} />
-          <Route path="/activar" element={<Activate />} /><Route path="*" element={<Navigate to="/" replace />} />
+
+          <Route path="/checkout" element={<Checkout />} />
+          <Route path="/activar" element={<Activate />} />
+          <Route path="/set-password" element={<Activate />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
     </div>
