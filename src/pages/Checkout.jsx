@@ -85,6 +85,30 @@ export default function Checkout() {
       setLoading(false);
     }
   };
+  const startPayMP = async () => {
+    setErr("");
+    if (!email || !planId) return;
+
+    setLoading(true);
+    try {
+      const r = await fetch("/api/pay/mercadopago/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, planId }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data?.error || "No se pudo iniciar Mercado Pago");
+
+      // MercadoPago redirect
+      if (data.init_point) window.location = data.init_point;
+      else throw new Error("Respuesta sin init_point");
+    } catch (e) {
+      setErr(e.message || "Error Mercado Pago");
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0b1020] px-4">
@@ -127,7 +151,20 @@ export default function Checkout() {
     "disabled:opacity-100 disabled:bg-emerald-600 disabled:hover:bg-emerald-600 disabled:cursor-not-allowed",
   ].join(" ")}
 >
-  {loading ? "Abriendo pago..." : "Activar Membresía Ahora"}
+  {loading ? "Abriendo pago..." : "Pagar con Flow"}
+</button>
+
+<button
+  type="button"
+  onClick={startPayMP}
+  disabled={loading || !email}
+  className={[
+    "mt-3 w-full rounded-xl px-4 py-3 font-semibold shadow transition border",
+    "border-slate-300 bg-white text-slate-900 hover:bg-slate-50",
+    "disabled:opacity-60 disabled:cursor-not-allowed",
+  ].join(" ")}
+>
+  {loading ? "Abriendo pago..." : "Pagar con Mercado Pago"}
 </button>
 
           {/* Pago 100% seguro (fondo blanco + logos) */}
