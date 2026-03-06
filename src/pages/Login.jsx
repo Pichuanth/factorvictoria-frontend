@@ -156,7 +156,7 @@ export default function Login() {
     onClick={() => setShowPwd(!showPwd)}
     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600"
   >
-    {showPwd ? "🙈" : "👁️"}
+    {showPwd ? (<svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C7 20 2.73 16.11 1 12c.73-1.63 1.9-3.13 3.37-4.37M9.9 4.24A10.94 10.94 0 0 1 12 4c5 0 9.27 3.89 11 8a11.05 11.05 0 0 1-4.06 5.06M1 1l22 22"/></svg>) : (<svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>)}
   </button>
 </div>
 
