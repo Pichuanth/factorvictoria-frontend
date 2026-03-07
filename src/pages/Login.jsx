@@ -104,7 +104,11 @@ export default function Login() {
     if (eMail) localStorage.setItem("fv_email", eMail);
     const res = await login(eMail, password);
     if (!res.ok) {
+      if (res.message === "membership_inactive") {
+      setErr("Revisa los datos ingresados o activa un plan con ese correo.");
+    } else {
       setErr(res.message || "Correo o contraseña inválidos.");
+    }
       return;
     }
     nav("/comparator");
