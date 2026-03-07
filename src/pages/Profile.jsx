@@ -395,6 +395,7 @@ export default function Profile() {
 
   const suggestUp = upgradeSuggestion();
   const suggestDown = downgradeSuggestion();
+  const isLifetime = theme.planKey === "VITALICIO";
 
   if (!isLoggedIn) {
     return (
@@ -624,7 +625,7 @@ export default function Profile() {
                   {[
                     { label: "Acceso", value: "Activo", color: "rgba(167,243,208,0.95)" },
                     { label: "Plan", value: planLabel, color: theme.accent },
-                    { label: "Soporte", value: getSupportLabel(planLabel), color: "rgba(226,232,240,0.92)" },
+                    { label: "Soporte", value: "contacto@factorvictoria.com", color: "rgba(226,232,240,0.92)" },
                   ].map((x) => (
                     <div
                       key={x.label}
@@ -678,15 +679,6 @@ export default function Profile() {
               <div className="mt-4 flex flex-col md:flex-row gap-2">
                 <button
                   type="button"
-                  onClick={sendAccessLink}
-                  disabled={sendingLink}
-                  className="w-full md:w-auto px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {sendingLink ? "Enviando enlace..." : "Crear clave"}
-                </button>
-
-                <button
-                  type="button"
                   onClick={() => goToPlans()}
                   className="w-full md:w-auto px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition"
                 >
@@ -721,6 +713,18 @@ export default function Profile() {
                     Bajar a {suggestDown}
                   </button>
                 ) : null}
+              </div>
+
+
+              <div className="mt-3 flex flex-col md:flex-row gap-2">
+                <button
+                  type="button"
+                  onClick={sendAccessLink}
+                  disabled={sendingLink}
+                  className="w-full md:w-auto px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {sendingLink ? "Enviando enlace..." : "Crear clave"}
+                </button>
 
                 <button
                   type="button"
