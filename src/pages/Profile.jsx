@@ -678,6 +678,15 @@ export default function Profile() {
               <div className="mt-4 flex flex-col md:flex-row gap-2">
                 <button
                   type="button"
+                  onClick={sendAccessLink}
+                  disabled={sendingLink}
+                  className="w-full md:w-auto px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {sendingLink ? "Enviando enlace..." : "Crear clave"}
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => goToPlans()}
                   className="w-full md:w-auto px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition"
                 >
@@ -712,18 +721,6 @@ export default function Profile() {
                     Bajar a {suggestDown}
                   </button>
                 ) : null}
-              </div>
-
-
-              <div className="mt-3 flex flex-col md:flex-row gap-2">
-                <button
-                  type="button"
-                  onClick={sendAccessLink}
-                  disabled={sendingLink}
-                  className="w-full md:w-auto px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {sendingLink ? "Enviando enlace..." : "Crear clave"}
-                </button>
 
                 <button
                   type="button"
