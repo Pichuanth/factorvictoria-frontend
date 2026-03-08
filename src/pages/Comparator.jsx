@@ -571,18 +571,18 @@ function normalizeTier(rawTier, rawPlanId) {
 
 function getMaxBoostByTier(tier) {
   // Límites oficiales por membresía
-  if (tier === "basic") return 10;      // x10
-  if (tier === "goleador") return 20;   // x20
-  if (tier === "campeon") return 50;    // x50
-  if (tier === "leyenda") return 100;   // x100
-  return 10;
+  if (tier === "basic") return 20;      // x10
+  if (tier === "goleador") return 40;   // x20
+  if (tier === "campeon") return 100;    // x50
+  if (tier === "leyenda") return 200;   // x100
+  return 20;
 }
 
 function getFeaturesByTier(tier) {
   // Permisos/limites por membresía (UI + controles; NO toca fvModel)
   if (tier === "leyenda") {
     return {
-      maxBoost: 100,
+      maxBoost: 200,
       maxDays: 10,
       canParlayAuto: true,
       canParlaySelected: true,
@@ -593,7 +593,7 @@ function getFeaturesByTier(tier) {
   }
   if (tier === "campeon") {
     return {
-      maxBoost: 50,
+      maxBoost: 100,
       maxDays: 7,
       canParlayAuto: true,
       canParlaySelected: true,
@@ -604,7 +604,7 @@ function getFeaturesByTier(tier) {
   }
   if (tier === "goleador") {
     return {
-      maxBoost: 20,
+      maxBoost: 40,
       maxDays: 5,
       canParlayAuto: true,
       canParlaySelected: true,
@@ -615,7 +615,7 @@ function getFeaturesByTier(tier) {
   }
   // basic
   return {
-    maxBoost: 10,
+    maxBoost: 20,
     maxDays: 3,
     canParlayAuto: true,
     canParlaySelected: false,

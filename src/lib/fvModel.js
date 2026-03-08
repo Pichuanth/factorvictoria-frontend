@@ -827,13 +827,21 @@ export function buildParlay({ candidatesByFixture, target, cap = 100, hardMaxOdd
     // Market repetition caps (per parlay)
     let under25Count = 0;
     let bttsNoCount = 0;
+    let ahPlus3Count = 0;
+    const isAhPlus3Pick = (c) => {
+      const m = String(c?.market ?? c?.type ?? "").toUpperCase();
+      const lab = String(c?.label ?? "").toUpperCase();
+      return m.includes("AH_P3") || lab.includes("HÁNDICAP +3") || lab.includes("HANDICAP +3");
+    };
     const bumpAdd = (p) => {
       if (isUnder25Pick(p)) under25Count += 1;
       if (isBttsNo(p)) bttsNoCount += 1;
+      if (isAhPlus3Pick(p)) ahPlus3Count += 1;
     };
     const bumpRemove = (p) => {
       if (isUnder25Pick(p)) under25Count = Math.max(0, under25Count - 1);
       if (isBttsNo(p)) bttsNoCount = Math.max(0, bttsNoCount - 1);
+      if (isAhPlus3Pick(p)) ahPlus3Count = Math.max(0, ahPlus3Count - 1);
     };
 
 
@@ -887,6 +895,7 @@ export function buildParlay({ candidatesByFixture, target, cap = 100, hardMaxOdd
           // Cap repeated markets inside a single parlay
           if (isUnder25Pick(c) && under25Count >= 1) continue;
           if (isBttsNo(c) && bttsNoCount >= 1) continue;
+          if (isAhPlus3Pick(c) && ahPlus3Count >= 2) continue;
           const o = candOdd(c);
           if (!o) continue;
           const next = prod * o;
