@@ -27,10 +27,10 @@ function asset(path) {
 }
 
 const PLAN_LABELS = {
-  basic: { name: "Plan Inicio", price: "$19.990", boost: 10 },
-  trimestral: { name: "Plan Goleador", price: "$44.990", boost: 20 },
-  anual: { name: "Plan Campeón", price: "$99.990", boost: 50 },
-  vitalicio: { name: "Plan Leyenda", price: "$249.990", boost: 100 },
+  basic: { name: "Plan Inicio", price: "$19.990", boost: 20 },
+  trimestral: { name: "Plan Goleador", price: "$44.990", boost: 40 },
+  anual: { name: "Plan Campeón", price: "$99.990", boost: 100 },
+  vitalicio: { name: "Plan Leyenda", price: "$249.990", boost: 200 },
 };
 
 /** Fondos (public/) */
@@ -2057,7 +2057,7 @@ const giftBundle = buildGiftPickBundle(candidatesByFixtureSanitized, 1.5, 3.0, 3
   const candidatesByFixtureLocked = applyGiftLock(candidatesByFixture, giftLeg);
 
 // ===================== TARGETS + PARLAYS =====================
-const targets = [3, 5, 10, 20, 50, 100].filter((t) => t <= maxBoost);
+const targets = [3, 5, 10, 20, 40, 100, 200].filter((t) => t <= maxBoost);
 console.log("[PARLAY] targets =", targets);
 
 // Cantidad de fixtures reales disponibles para armar parlays
