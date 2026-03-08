@@ -235,68 +235,6 @@ function HudCard({
       <div className="absolute inset-0" style={{ background: o3 }} />
 
       <div className="relative">{children}</div>
-      {showCancelOffer && retentionOffer ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-          <div
-            className="w-full max-w-md rounded-3xl border p-6 backdrop-blur-xl"
-            style={{
-              borderColor: "rgba(255,255,255,0.12)",
-              background:
-                "linear-gradient(180deg, rgba(2,6,23,0.96) 0%, rgba(15,23,42,0.92) 100%)",
-              boxShadow: `0 0 40px ${theme.glow}, 0 24px 70px rgba(0,0,0,0.55)`,
-            }}
-          >
-            <div className="text-lg font-bold text-white">Espera un momento</div>
-            <div className="mt-2 text-sm text-slate-300">
-              {retentionOffer.text}
-            </div>
-
-            <div
-              className="mt-4 rounded-2xl border px-4 py-4 text-center"
-              style={{
-                borderColor: "rgba(230,196,100,0.28)",
-                background: "rgba(230,196,100,0.08)",
-              }}
-            >
-              <div className="text-xs uppercase tracking-[0.18em] text-slate-300">Oferta especial</div>
-              <div className="mt-2 text-3xl font-extrabold" style={{ color: GOLD }}>
-                {retentionOffer.price}
-              </div>
-              <div className="mt-1 text-sm text-slate-300">
-                Mantén tu acceso sin perder tu historial ni tus beneficios.
-              </div>
-            </div>
-
-            <div className="mt-5 grid grid-cols-1 gap-2">
-              <button
-                type="button"
-                onClick={() => setShowCancelOffer(false)}
-                className="w-full rounded-full px-5 py-3 text-sm font-semibold"
-                style={{ backgroundColor: GOLD, color: "#0f172a", boxShadow: `0 0 26px ${theme.glow}` }}
-              >
-                Quedarme con la oferta
-              </button>
-
-              <button
-                type="button"
-                onClick={confirmCancelMembership}
-                className="w-full rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10 transition"
-              >
-                Continuar cancelación
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowCancelOffer(false)}
-                className="w-full rounded-full px-5 py-2 text-sm text-slate-300 hover:text-white transition"
-              >
-                Volver
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
     </div>
   );
 }
@@ -331,7 +269,6 @@ export default function Profile() {
   const [cancelMsg, setCancelMsg] = useState("");
   const [linkMsg, setLinkMsg] = useState("");
   const [sendingLink, setSendingLink] = useState(false);
-  const [showCancelOffer, setShowCancelOffer] = useState(false);
 
   async function sendAccessLink() {
     try {
@@ -458,51 +395,6 @@ export default function Profile() {
 
   const suggestUp = upgradeSuggestion();
   const suggestDown = downgradeSuggestion();
-
-  function getRetentionOffer() {
-    if (theme.planKey === "ANUAL") {
-      return { price: "$69.990", text: "No te vayas. Quédate por $69.990" };
-    }
-    if (theme.planKey === "TRIMESTRAL") {
-      return { price: "$29.990", text: "No te vayas. Quédate por $29.990" };
-    }
-    if (theme.planKey === "MENSUAL") {
-      return { price: "$12.990", text: "No te vayas. Quédate por $12.990" };
-    }
-    return null;
-  }
-
-  const retentionOffer = getRetentionOffer();
-
-  async function confirmCancelMembership() {
-    try {
-      setCancelMsg("");
-      const em = String(user?.email || "").trim();
-      if (!em) {
-        setCancelMsg("No se encontró tu correo. Vuelve a iniciar sesión.");
-        return;
-      }
-      const r = await fetch(`${API_BASE}/api/membership`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: em, action: "cancel" }),
-      });
-      const data = await r.json();
-      if (data?.ok) {
-        setMembershipInfo(data.membership || null);
-        setCancelMsg(
-          "Suscripción cancelada al fin del período (mantienes acceso hasta la fecha de término)."
-        );
-      } else {
-        setCancelMsg("No se pudo cancelar. Intenta nuevamente.");
-      }
-    } catch {
-      setCancelMsg("No se pudo cancelar. Intenta nuevamente.");
-    } finally {
-      setShowCancelOffer(false);
-    }
-  }
-  const isLifetime = theme.planKey === "VITALICIO";
 
   if (!isLoggedIn) {
     return (
@@ -732,7 +624,7 @@ export default function Profile() {
                   {[
                     { label: "Acceso", value: "Activo", color: "rgba(167,243,208,0.95)" },
                     { label: "Plan", value: planLabel, color: theme.accent },
-                    { label: "Soporte", value: "contacto@factorvictoria.com", color: "rgba(226,232,240,0.92)" },
+                    { label: "Soporte", value: getSupportLabel(planLabel), color: "rgba(226,232,240,0.92)" },
                   ].map((x) => (
                     <div
                       key={x.label}
@@ -786,6 +678,15 @@ export default function Profile() {
               <div className="mt-4 flex flex-col md:flex-row gap-2">
                 <button
                   type="button"
+                  onClick={sendAccessLink}
+                  disabled={sendingLink}
+                  className="w-full md:w-auto px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {sendingLink ? "Enviando enlace..." : "Crear clave"}
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => goToPlans()}
                   className="w-full md:w-auto px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition"
                 >
@@ -820,24 +721,34 @@ export default function Profile() {
                     Bajar a {suggestDown}
                   </button>
                 ) : null}
-              </div>
-
-
-              <div className="mt-3 flex flex-col md:flex-row gap-2">
-                <button
-                  type="button"
-                  onClick={sendAccessLink}
-                  disabled={sendingLink}
-                  className="w-full md:w-auto px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {sendingLink ? "Enviando enlace..." : "Crear clave"}
-                </button>
 
                 <button
                   type="button"
-                  onClick={() => {
-                    if (retentionOffer) setShowCancelOffer(true);
-                    else confirmCancelMembership();
+                  onClick={async () => {
+                    try {
+                      setCancelMsg("");
+                      const em = String(user?.email || "").trim();
+                      if (!em) {
+                        setCancelMsg("No se encontró tu correo. Vuelve a iniciar sesión.");
+                        return;
+                      }
+                      const r = await fetch(`${API_BASE}/api/membership`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ email: em, action: "cancel" }),
+                      });
+                      const data = await r.json();
+                      if (data?.ok) {
+                        setMembershipInfo(data.membership || null);
+                        setCancelMsg(
+                          "Suscripción cancelada al fin del período (mantienes acceso hasta la fecha de término)."
+                        );
+                      } else {
+                        setCancelMsg("No se pudo cancelar. Intenta nuevamente.");
+                      }
+                    } catch {
+                      setCancelMsg("No se pudo cancelar. Intenta nuevamente.");
+                    }
                   }}
                   className="w-full md:w-auto px-5 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition"
                 >
@@ -943,68 +854,6 @@ export default function Profile() {
       <div className="mt-8 text-center text-xs text-slate-500">
         © {new Date().getFullYear()} Factor Victoria
       </div>
-      {showCancelOffer && retentionOffer ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-          <div
-            className="w-full max-w-md rounded-3xl border p-6 backdrop-blur-xl"
-            style={{
-              borderColor: "rgba(255,255,255,0.12)",
-              background:
-                "linear-gradient(180deg, rgba(2,6,23,0.96) 0%, rgba(15,23,42,0.92) 100%)",
-              boxShadow: `0 0 40px ${theme.glow}, 0 24px 70px rgba(0,0,0,0.55)`,
-            }}
-          >
-            <div className="text-lg font-bold text-white">Espera un momento</div>
-            <div className="mt-2 text-sm text-slate-300">
-              {retentionOffer.text}
-            </div>
-
-            <div
-              className="mt-4 rounded-2xl border px-4 py-4 text-center"
-              style={{
-                borderColor: "rgba(230,196,100,0.28)",
-                background: "rgba(230,196,100,0.08)",
-              }}
-            >
-              <div className="text-xs uppercase tracking-[0.18em] text-slate-300">Oferta especial</div>
-              <div className="mt-2 text-3xl font-extrabold" style={{ color: GOLD }}>
-                {retentionOffer.price}
-              </div>
-              <div className="mt-1 text-sm text-slate-300">
-                Mantén tu acceso sin perder tu historial ni tus beneficios.
-              </div>
-            </div>
-
-            <div className="mt-5 grid grid-cols-1 gap-2">
-              <button
-                type="button"
-                onClick={() => setShowCancelOffer(false)}
-                className="w-full rounded-full px-5 py-3 text-sm font-semibold"
-                style={{ backgroundColor: GOLD, color: "#0f172a", boxShadow: `0 0 26px ${theme.glow}` }}
-              >
-                Quedarme con la oferta
-              </button>
-
-              <button
-                type="button"
-                onClick={confirmCancelMembership}
-                className="w-full rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10 transition"
-              >
-                Continuar cancelación
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowCancelOffer(false)}
-                className="w-full rounded-full px-5 py-2 text-sm text-slate-300 hover:text-white transition"
-              >
-                Volver
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
     </div>
   );
 }
