@@ -2073,7 +2073,7 @@ const builtParlays = targets
       target: t,
       cap: maxBoost,
       hardMaxOdd: 2.5,
-      mustIncludeFixtures: mode === "selected" ? selectedIds : [],
+      mustIncludeFixtures: [],
       // Plan mensual: si hay buen pool, fuerza x10 con al menos 5 legs (se ve más “pro”).
       // Si hay poco pool, dejamos que caiga a 3 legs.
       minLegs: (t === 10 && maxBoost <= 10 && availableFixturesCount >= 7) ? 5 : 0,
@@ -2195,7 +2195,7 @@ const handleGenerateSelected = () => runGeneration("selected");
     const pool = fixtures.filter((fx) => selectedIds.includes(getFixtureId(fx)));
     pool.map(getFixtureId).filter(Boolean).forEach((id) => ensureOdds(id));
 
-    // Generación completa (cuota de regalo + potenciadas + value + etc.) con los seleccionados.
+    // Generación completa con los seleccionados como pool permitido (sin forzar que entren todos en cada parlay).
     await runGeneration("selected");
   }
 
