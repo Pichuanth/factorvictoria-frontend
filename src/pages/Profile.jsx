@@ -624,7 +624,7 @@ export default function Profile() {
                   {[
                     { label: "Acceso", value: "Activo", color: "rgba(167,243,208,0.95)" },
                     { label: "Plan", value: planLabel, color: theme.accent },
-                    { label: "Soporte", value: getSupportLabel(planLabel), color: "rgba(226,232,240,0.92)" },
+                    { label: "Soporte • contacto@factorvictoria.com", value: getSupportLabel(planLabel), color: "rgba(226,232,240,0.92)" },
                   ].map((x) => (
                     <div
                       key={x.label}
