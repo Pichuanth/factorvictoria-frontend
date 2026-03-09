@@ -6,46 +6,33 @@
     <title>Factor Victoria</title>
     <link rel="icon" type="image/png" href="/logo-fv.png" />
 
-    <!-- Meta Pixel Code -->
-    <!-- Reemplaza TU_PIXEL_ID por el ID real de tu Pixel de Meta --> 
     <script>
       !(function (f, b, e, v, n, t, s) {
         if (f.fbq) return;
         n = f.fbq = function () {
-          n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
+          n.callMethod
+            ? n.callMethod.apply(n, arguments)
+            : n.queue.push(arguments);
         };
         if (!f._fbq) f._fbq = n;
         n.push = n;
         n.loaded = true;
-        n.version = '2.0';
+        n.version = "2.0";
         n.queue = [];
         t = b.createElement(e);
         t.async = true;
         t.src = v;
         s = b.getElementsByTagName(e)[0];
         s.parentNode.insertBefore(t, s);
-      })(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
+      })(window, document, "script", "https://connect.facebook.net/en_US/fbevents.js");
 
-      fbq('init', '1617748422601622');
-      fbq('track', 'PageView');
+      fbq("init", "1617748422601622");
+      fbq("track", "PageView");
     </script>
-    <noscript>
-      <img
-        height="1"
-        width="1"
-        style="display: none"
-        src="https://www.facebook.com/tr?id=TU_PIXEL_ID&ev=PageView&noscript=1"
-      />
-    </noscript>
-    <!-- End Meta Pixel Code -->
   </head>
   <body class="bg-white">
     <div id="root"></div>
-
-    <!-- En desarrollo apunta a /src/main.jsx; en producción Vite lo reemplaza por /assets/index-XXXX.js -->
     <script type="module" src="/src/main.jsx"></script>
-
-    <!-- Opcional: Tailwind CDN para estilos rápidos -->
     <script src="https://cdn.tailwindcss.com"></script>
   </body>
 </html>
