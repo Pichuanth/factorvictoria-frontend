@@ -927,7 +927,7 @@ function WelcomeProCard({ planInfo }) {
     <HudCard bg={BG_BIENVENIDO} overlayVariant="casillas" className="mt-4" glow="gold">
       <div className="p-5 md:p-6">
         <div className="text-emerald-200/90 text-xs font-semibold tracking-wide">Bienvenido a Factor Victoria PRO</div>
-        <div className="mt-1 text-xl md:text-2xl font-bold text-slate-100">{planInfo.name} activo</div>
+        <div className="mt-1 text-xl md:text-2xl font-bold text-slate-100">{planInfo.name} Activo</div>
 
         <div className="mt-3 text-sm text-slate-300 leading-relaxed">
           Este es el punto donde apostar deja de ser intuición y pasa a ser <span className="font-semibold">estrategia</span>.
@@ -1146,18 +1146,18 @@ function FeatureCard({ title, badge, children, locked, lockText, bg }) {
 /* ------------------- Manual Picks ------------------- */
 function ManualPicksSection() {
   const singles = [
-    { label: "Arsenal gana (1X)", odd: 1.3, note: "Alta probabilidad" },
-    { label: "Real Madrid (handicap+4)", odd: 1.1, note: "Conservador" },
+    { label: "Pick en desarrollo", odd: 1.80, note: "Alta probabilidad" },
+    { label: "Pick en desarrollo", odd: 1.70, note: "Conservador" },
   ];
 
   const combos = [
-    { label: "Barcelona doble oportunidad", odd: 1.3, note: "Cuota media" },
-    { label: "1+ goles en el primer tiempo", odd: 1.35, note: "Más riesgo" },
+    { label: "Selección en preparación", odd: 1.50, note: "Cuota media" },
+    { label: "Selección en preparación", odd: 1.35, note: "Más riesgo" },
   ];
 
   const players = [
-    { label: "Raphinha +1.5 remates", odd: 2.8, note: "Si es titular" },
-    { label: "Raúl Asencio 0.5 faltas concedidas", odd: 1.45, note: "Tendencia" },
+    { label: "En análisis", odd: 2.20, note: "Si es titular" },
+    { label: "En análisis", odd: 1.45, note: "Tendencia" },
   ];
 
   function Card({ title, items }) {
@@ -2620,7 +2620,7 @@ const fvPack = fvPackRaw && !fvPackRaw.__error ? fvPackRaw : null;
         )}
 
         <FeatureCard title="Parlays potenciados" badge="Parlays" locked={!features.boosted} lockText="Disponible en todos los planes.">
-          <div className="text-xs text-slate-300">Parlays potenciados que genera el modelo ( x3, x5, x10, x20, x50, x100.) </div>
+          <div className="text-xs text-slate-300">Parlays potenciados que genera el modelo (x3, x5, x10, x20, x40, x100 y x200 según tu plan). </div>
 
           {fvOutput?.parlays?.length ? (
          <div className="mt-3 space-y-3">

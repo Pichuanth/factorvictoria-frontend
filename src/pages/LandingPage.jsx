@@ -19,10 +19,10 @@ export default function Landing() {
   const base = parseInt(amount.replace(/\D/g, ""), 10) || 0;
 
   const plansSim = [
-    { id: "mensual", label: "Mensual", multiplier: 10 },
-    { id: "trimestral", label: "Trimestral", multiplier: 20 },
-    { id: "anual", label: "Anual", multiplier: 50 },
-    { id: "vitalicio", label: "Vitalicio", multiplier: 100 },
+    { id: "mensual", label: "Mensual", multiplier: 20 },
+    { id: "trimestral", label: "Trimestral", multiplier: 40 },
+    { id: "anual", label: "Anual", multiplier: 100 },
+    { id: "vitalicio", label: "Vitalicio", multiplier: 200 },
   ];
 
   return (

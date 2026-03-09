@@ -37,7 +37,7 @@ function Home() {
         "Picks análisis básicos diarios",
         "Simulador de ganancias incluido",
         "Cuotas x1.5 de regalo",
-        "Cuotas potenciadas x10",
+        "Cuotas potenciadas x20",
       ],
       highlight: false,
     },
@@ -56,7 +56,7 @@ function Home() {
         "Picks análisis ampliados",
         "Simulador de ganancias incluido",
         "Alertas claves de partidos",
-        "Cuotas potenciadas x20",
+        "Cuotas potenciadas x40",
       ],
       highlight: false,
     },
@@ -71,12 +71,11 @@ function Home() {
         "Medalla Conmemorativa Oficial",
         "Guía de estrategia PRO",
         "2 Estrategias VIP incluidas",
-        "Cuotas x1.5 a x3 de regalo",
-        "Cuota Corrección del mercado",
+        "Cuotas x1.5 a x3 de regalo",        
         "Picks análisis ampliados",
         "Simulador de ganancias incluido",
         "Alertas claves de partidos",
-        "Cuotas potenciadas x50",
+        "Cuotas potenciadas x100",
       ],
       highlight: true,
       badge: "Más popular",
@@ -99,7 +98,7 @@ function Home() {
         "Picks análisis PRO",
         "Simulador de ganancias incluido",
         "Informe mensual personalizado",
-        "Cuotas potenciadas x100",
+        "Cuotas potenciadas x200",
       ],
       highlight: false,
     },
@@ -130,10 +129,10 @@ function Home() {
   }
 
   const simCards = [
-    { label: "Mensual • x10", mult: 10 },
-    { label: "Trimestral • x20", mult: 20 },
-    { label: "Anual • x50", mult: 50 },
-    { label: "Vitalicio • x100", mult: 100 },
+    { label: "Mensual • x10", mult: 20 },
+    { label: "Trimestral • x20", mult: 40 },
+    { label: "Anual • x50", mult: 100 },
+    { label: "Vitalicio • x100", mult: 200 },
   ];
 
   return (
