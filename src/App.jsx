@@ -22,6 +22,111 @@ const BG_USUARIOS_INICIO = asset("hero-usuarios-inicio.png");
 
 const GOLD = "#E6C464";
 
+
+const RESULTADOS_REALES = [
+  {
+    id: "cuota1",
+    src: "/cuota1.png",
+    badge: "Alto retorno",
+    title: "Prueba destacada",
+    note: "Apuesta de prueba de $2.000 con retorno de $297.901.",
+  },
+  {
+    id: "cuota2",
+    src: "/cuota2.png",
+    badge: "Builder corto",
+    title: "Combinada equilibrada",
+    note: "Selecciones trabajadas con lógica de mercado y lectura de cuota.",
+  },
+  {
+    id: "cuota3",
+    src: "/cuota3.png",
+    badge: "Builder premium",
+    title: "Valor detectado",
+    note: "Builders de mayor retorno cuando el sistema encuentra valor real.",
+  },
+  {
+    id: "cuota4",
+    src: "/cuota4.png",
+    badge: "Consistencia",
+    title: "Picks conservadores",
+    note: "Mercados más controlados para construir regularidad.",
+  },
+  {
+    id: "cuota5",
+    src: "/cuota5.png",
+    badge: "Mercado chileno",
+    title: "Lectura local",
+    note: "Ejemplos reales sobre partidos y mercados que conocemos bien.",
+  },
+  {
+    id: "cuota6",
+    src: "/cuota6.png",
+    badge: "Combinada lógica",
+    title: "Cuota media",
+    note: "Selecciones enlazadas con criterio, no por impulso.",
+  },
+  {
+    id: "cuota7",
+    src: "/cuota7.png",
+    badge: "Builder sólido",
+    title: "Transparencia total",
+    note: "Capturas reales con montos, cuotas y retornos visibles.",
+  },
+  {
+    id: "cuota8",
+    src: "/cuota8.png",
+    badge: "Gestión de banca",
+    title: "Pruebas del sistema",
+    note: "Resultados reales probados con enfoque estadístico y disciplinado.",
+  },
+];
+
+function ResultadosRealesCarousel() {
+  return (
+    <section className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-5 md:p-7">
+      <div className="flex items-end justify-between gap-4 mb-5">
+        <div>
+          <h2 className="text-xl md:text-2xl font-bold">Resultados reales de pruebas realizadas</h2>
+          <p className="text-slate-300 text-sm mt-2 max-w-3xl">
+            Capturas reales de jugadas trabajadas con criterio, combinaciones lógicas y lectura de cuotas.
+          </p>
+        </div>
+        <div className="hidden md:block text-xs text-slate-400">Desliza para ver más pruebas</div>
+      </div>
+
+      <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory [scrollbar-width:thin]">
+        {RESULTADOS_REALES.map((item) => (
+          <article
+            key={item.id}
+            className="min-w-[290px] max-w-[290px] md:min-w-[340px] md:max-w-[340px] rounded-3xl border border-white/10 bg-slate-950/40 overflow-hidden snap-start shrink-0"
+          >
+            <div className="relative bg-slate-900">
+              <img
+                src={item.src}
+                alt={item.title}
+                className="w-full h-[380px] md:h-[430px] object-cover object-top"
+                loading="lazy"
+              />
+              <div className="absolute left-3 top-3">
+                <span className="inline-flex rounded-full border border-yellow-400/30 bg-yellow-500/15 px-3 py-1 text-[11px] font-semibold text-yellow-200 backdrop-blur-sm">
+                  {item.badge}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-4 md:p-5">
+              <h3 className="text-base md:text-lg font-semibold text-white">{item.title}</h3>
+              <p className="text-sm text-slate-300 mt-2 leading-relaxed">{item.note}</p>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+
 /* -------------------- Landing (Inicio) -------------------- */
 function Home() {
   const nav = useNavigate();
@@ -174,6 +279,90 @@ function Home() {
           </div>
         </section>
 
+        <ResultadosRealesCarousel />
+
+        {/* Simulador */}
+        <section className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-5 md:p-7">
+          <h3 className="text-lg md:text-xl font-bold mb-1">Simula tus ganancias</h3>
+          <p className="text-slate-300 text-sm mb-4">
+            Ingresa tu monto y calcula cuánto podrías ganar según tu plan.
+          </p>
+
+          <div className="flex flex-col gap-2 md:max-w-md">
+            <div className="text-xs text-slate-400">Elige tu moneda local para simular ganancias</div>
+
+            <div className="relative">
+              <input
+                value={stakeNum ? stakeDisplay() : ""}
+                onChange={(e) => {
+                  const digits = String(e.target.value || "").replace(/[^\d]/g, "");
+                  setStake(digits);
+                }}
+                inputMode="numeric"
+                placeholder="Monto a apostar (elige tu moneda)"
+                className="w-full rounded-2xl bg-white/10 text-white px-4 py-3 pr-28 border border-white/10"
+              />
+
+              <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                <div className="relative">
+                  <select
+                    value={currency}
+                    onChange={(e) => setCurrency(e.target.value)}
+                    className="appearance-none rounded-xl bg-slate-950/50 text-white text-sm px-3 py-2 pr-8 border border-white/10"
+                  >
+                    {CURRENCIES.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.code}
+                      </option>
+                    ))}
+                  </select>
+
+                  <svg
+                    className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                  >
+                    <path
+                      d="M6 8l4 4 4-4"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      opacity="0.85"
+                    />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+            {simCards.map((c) => {
+              const win = stakeNum * c.mult;
+              const cur = CURRENCIES.find((x) => x.code === currency) || CURRENCIES[0];
+
+              return (
+                <div
+                  key={c.label}
+                  className="rounded-2xl border border-white/10 bg-slate-950/30 p-4"
+                >
+                  <div className="text-sm font-semibold">{c.label}</div>
+
+                  <div className="text-xs text-slate-400 mt-1">
+                    Apuesta: {stakeNum ? `${cur.symbol}${fmtMoney(stakeNum)}` : `${cur.symbol}0`}
+                  </div>
+
+                  <div className="text-sm font-bold mt-2 text-emerald-300">
+                    Ganancia: {stakeNum ? `${cur.symbol}${fmtMoney(win)}` : `${cur.symbol}0`}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
         {/* Planes */}
         <section id="planes" className="mt-10">
           <div className="flex items-end justify-between gap-4 mb-4">
@@ -272,88 +461,6 @@ function Home() {
     />
   </div>
 </section>
-
-        {/* Simulador */}
-        <section className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-5 md:p-7">
-          <h3 className="text-lg md:text-xl font-bold mb-1">Simula tus ganancias</h3>
-          <p className="text-slate-300 text-sm mb-4">
-            Ingresa tu monto y calcula cuánto podrías ganar según tu plan.
-          </p>
-
-          <div className="flex flex-col gap-2 md:max-w-md">
-            <div className="text-xs text-slate-400">Elige tu moneda local para simular ganancias</div>
-
-            <div className="relative">
-              <input
-                value={stakeNum ? stakeDisplay() : ""}
-                onChange={(e) => {
-                  const digits = String(e.target.value || "").replace(/[^\d]/g, "");
-                  setStake(digits);
-                }}
-                inputMode="numeric"
-                placeholder="Monto a apostar (elige tu moneda)"
-                className="w-full rounded-2xl bg-white/10 text-white px-4 py-3 pr-28 border border-white/10"
-              />
-
-              <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                <div className="relative">
-                  <select
-                    value={currency}
-                    onChange={(e) => setCurrency(e.target.value)}
-                    className="appearance-none rounded-xl bg-slate-950/50 text-white text-sm px-3 py-2 pr-8 border border-white/10"
-                  >
-                    {CURRENCIES.map((c) => (
-                      <option key={c.code} value={c.code}>
-                        {c.code}
-                      </option>
-                    ))}
-                  </select>
-
-                  <svg
-                    className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 20 20"
-                    fill="none"
-                  >
-                    <path
-                      d="M6 8l4 4 4-4"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      opacity="0.85"
-                    />
-                  </svg>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-            {simCards.map((c) => {
-              const win = stakeNum * c.mult;
-              const cur = CURRENCIES.find((x) => x.code === currency) || CURRENCIES[0];
-
-              return (
-                <div
-                  key={c.label}
-                  className="rounded-2xl border border-white/10 bg-slate-950/30 p-4"
-                >
-                  <div className="text-sm font-semibold">{c.label}</div>
-
-                  <div className="text-xs text-slate-400 mt-1">
-                    Apuesta: {stakeNum ? `${cur.symbol}${fmtMoney(stakeNum)}` : `${cur.symbol}0`}
-                  </div>
-
-                  <div className="text-sm font-bold mt-2 text-emerald-300">
-                    Ganancia: {stakeNum ? `${cur.symbol}${fmtMoney(win)}` : `${cur.symbol}0`}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
 
         {/* Imagen final */}
         <section className="mt-10 rounded-3xl border border-white/10 overflow-hidden bg-white/5">
