@@ -58,6 +58,76 @@ export default function Home() {
         </Link>
       </section>
 
+
+      {/* Resultados reales */}
+      <section className="max-w-6xl mx-auto px-4 pb-10">
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-6 md:p-8 overflow-hidden">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h2 className="text-white text-3xl font-bold mb-3">
+                Resultados reales de pruebas realizadas
+              </h2>
+              <p className="text-white/80 max-w-3xl">
+                Capturas reales de jugadas trabajadas con criterio, combinaciones lógicas y lectura de cuotas.
+              </p>
+            </div>
+            <span className="text-white/60 text-sm pt-2">Desliza para ver más pruebas</span>
+          </div>
+
+          <div className="mt-8 flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory">
+            {[
+              {
+                img: "/cuota1.png",
+                tag: "Prueba destacada",
+                title: "Prueba destacada",
+                desc: "Apuesta de prueba de $2.000 con retorno de $297.901.",
+              },
+              {
+                img: "/cuota2.png",
+                tag: "Picks conservadores",
+                title: "Picks conservadores",
+                desc: "Mercados más controlados para construir regularidad.",
+              },
+              {
+                img: "/cuota3.png",
+                tag: "Lectura local",
+                title: "Lectura local",
+                desc: "Ejemplos reales sobre partidos y mercados que conocemos bien.",
+              },
+              {
+                img: "/cuota4.png",
+                tag: "Cuota media",
+                title: "Cuota media",
+                desc: "Selecciones enlazadas con criterio, no por impulso.",
+              },
+            ].map((card, i) => (
+              <article
+                key={i}
+                className="min-w-[280px] md:min-w-[320px] max-w-[320px] rounded-3xl border border-white/10 bg-slate-950/90 overflow-hidden snap-start shadow-xl"
+              >
+                <div className="relative px-4 pt-4 bg-slate-100 flex items-center justify-center">
+                  <span
+                    className="absolute left-4 top-4 px-3 py-1 rounded-full text-xs font-semibold"
+                    style={{ backgroundColor: "rgba(230,196,100,0.18)", color: GOLD, border: `1px solid ${GOLD}` }}
+                  >
+                    {card.tag}
+                  </span>
+                  <img
+                    src={card.img}
+                    alt={card.title}
+                    className="w-full h-[420px] object-contain rounded-2xl"
+                    loading="lazy"
+                  />
+                </div>
+                <div className="p-6 bg-slate-950">
+                  <h3 className="text-white text-2xl font-bold">{card.title}</h3>
+                  <p className="mt-4 text-white/85 text-lg leading-8">{card.desc}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
       {/* Planes */}
       <section id="planes" className="max-w-6xl mx-auto px-4 -mt-8">
         <div className="grid gap-6 md:grid-cols-2">
