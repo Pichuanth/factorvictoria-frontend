@@ -126,7 +126,7 @@ export default function Checkout() {
               e.currentTarget.style.display = "none";
             }}
           />
-          <div className="text-2xl font-semibold text-white">Únete a Factor Victoria</div>
+          <div className="text-2xl font-semibold text-white">Activa tu Membresía Ahora</div>
           <div className="text-sm text-white/60 mt-1">{planLabel}</div>
         </div>
 
@@ -154,7 +154,7 @@ export default function Checkout() {
     "disabled:opacity-100 disabled:bg-emerald-600 disabled:hover:bg-emerald-600 disabled:cursor-not-allowed",
   ].join(" ")}
 >
-  {loadingFlow ? "Abriendo Flow..." : "Activar con Flow"}
+  {loadingFlow ? "Abriendo Flow..." : "Activar con Debito/crédito"}
 </button>
 
 <button
