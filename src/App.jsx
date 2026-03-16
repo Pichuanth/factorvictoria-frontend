@@ -215,18 +215,28 @@ function Home() {
 
           <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-              <h3 className="text-base font-bold">¿Por qué usar un sistema y no seguir tipsters o grupos?</h3>
+              <h3 className="text-base font-bold">Combinadas generadas</h3>
               <p className="mt-2 text-sm text-slate-300">
-                Porque aquí no dependes de picks de terceros. Factor Victoria analiza datos y genera
-                combinadas automáticamente para que tomes decisiones con más información.
+                La plataforma detecta oportunidades en mercados concretos como:
+                • Over 2.5 goles — Barcelona vs Alavés 1.80
+                • Doble oportunidad Local — Real Madrid vs Monaco 1.45
+                • Ambos marcan: NO — Arsenal vs Liverpool 1.90
+
+               Son selecciones analizadas con estadísticas, contexto del partido y cuotas del mercado.
+               Aqui combinamos partidos hasta generar la cuota esperada x40,x100 etc.
               </p>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-              <h3 className="text-base font-bold">¿Qué ventaja tiene apostar usando estadísticas y datos?</h3>
+              <h3 className="text-base font-bold">Cuotas exclusivas para miembros</h3>
               <p className="mt-2 text-sm text-slate-300">
-                Apostar con datos te ayuda a dejar atrás decisiones impulsivas. El sistema analiza
-                cuotas y tendencias para generar combinadas optimizadas con base real.
+                Además del análisis general, los miembros acceden a mercados más específicos como:
+              • Raphinha +1.5 remates al arco Barcelona
+              • Tarjeta amarilla para Erick Pulgar Flamengo
+              • Gol de Erling Haaland Manchester City
+              • Tarjeta Roja Pedro neto Chelsea
+
+             Estas oportunidades se publican solo para miembros y apuntan a mercados que muchas veces pasan desapercibidos.
               </p>
             </div>
 
@@ -234,7 +244,7 @@ function Home() {
               <h3 className="text-base font-bold">¿Puedo elegir los partidos o equipos que quiero analizar?</h3>
               <p className="mt-2 text-sm text-slate-300">
                 Sí. Puedes elegir tus partidos o equipos favoritos y dejar que el sistema genere
-                combinadas automáticamente con esos encuentros.
+                combinadas automáticamente con esos encuentros,tambien puedes ver estadisticas en vivo y calendario de partidos.
               </p>
             </div>
           </div>
