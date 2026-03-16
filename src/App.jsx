@@ -176,6 +176,70 @@ function Home() {
           </div>
         </section>
 
+        {/* Cómo funciona + dudas clave */}
+        <section className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-5 md:p-7">
+          <h2 className="text-xl md:text-2xl font-bold">Cómo funciona Factor Victoria</h2>
+          <p className="text-slate-300 text-sm mt-2 max-w-3xl">
+            No vendemos picks. Usas un sistema que analiza estadísticas, cuotas y tendencias
+            del mercado para generar combinadas optimizadas automáticamente.
+          </p>
+
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+              <div className="text-xs font-bold" style={{ color: GOLD }}>Paso 1</div>
+              <h3 className="mt-2 text-base font-bold">Elige tus partidos o equipos</h3>
+              <p className="mt-2 text-sm text-slate-300">
+                Selecciona los partidos o equipos que te interesan. Puedes elegir tus favoritos
+                o trabajar con los encuentros del día.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+              <div className="text-xs font-bold" style={{ color: GOLD }}>Paso 2</div>
+              <h3 className="mt-2 text-base font-bold">El sistema analiza estadísticas y cuotas</h3>
+              <p className="mt-2 text-sm text-slate-300">
+                Factor Victoria revisa datos reales, tendencias y cuotas del mercado para detectar
+                combinaciones con valor según el análisis disponible.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+              <div className="text-xs font-bold" style={{ color: GOLD }}>Paso 3</div>
+              <h3 className="mt-2 text-base font-bold">Genera combinadas automáticamente</h3>
+              <p className="mt-2 text-sm text-slate-300">
+                El sistema construye combinadas optimizadas automáticamente y puedes generar nuevas
+                las veces que quieras.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+              <h3 className="text-base font-bold">¿Por qué usar un sistema y no seguir tipsters o grupos?</h3>
+              <p className="mt-2 text-sm text-slate-300">
+                Porque aquí no dependes de picks de terceros. Factor Victoria analiza datos y genera
+                combinadas automáticamente para que tomes decisiones con más información.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+              <h3 className="text-base font-bold">¿Qué ventaja tiene apostar usando estadísticas y datos?</h3>
+              <p className="mt-2 text-sm text-slate-300">
+                Apostar con datos te ayuda a dejar atrás decisiones impulsivas. El sistema analiza
+                cuotas y tendencias para generar combinadas optimizadas con base real.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+              <h3 className="text-base font-bold">¿Puedo elegir los partidos o equipos que quiero analizar?</h3>
+              <p className="mt-2 text-sm text-slate-300">
+                Sí. Puedes elegir tus partidos o equipos favoritos y dejar que el sistema genere
+                combinadas automáticamente con esos encuentros.
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* Planes */}
         <section id="planes" className="mt-10">
           <div className="flex items-end justify-between gap-4 mb-4">
