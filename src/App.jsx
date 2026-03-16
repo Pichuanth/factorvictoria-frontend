@@ -258,7 +258,22 @@ Estas oportunidades se publican solo para miembros y apuntan a mercados que much
             </div>
           </div>
         </section>
+<div className="mt-10 mb-10 text-center">
+  <h2 className="text-xl md:text-2xl font-bold mb-4">
+    ¿Por qué Factor Victoria es diferente?
+  </h2>
 
+  <p className="text-slate-300 max-w-2xl mx-auto mb-6">
+    Mientras muchas plataformas venden picks o tips aislados, Factor Victoria utiliza
+    datos reales, estadísticas y análisis del mercado.
+  </p>
+
+  <img
+    src="/versus.png"
+    alt="Factor Victoria vs otras plataformas"
+    className="mx-auto rounded-xl border border-white/10 shadow-lg"
+  />
+</div>
         {/* Planes */}
         <section id="planes" className="mt-10">
           <div className="flex items-end justify-between gap-4 mb-4">
