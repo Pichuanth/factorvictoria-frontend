@@ -153,13 +153,14 @@ function Home() {
             </div>
 
             <h1 className="text-3xl md:text-5xl font-extrabold leading-tight">
-              Convierte información
+              Generador automático de parlays. 
               <br />
               <span className="text-white">en ventaja</span>
             </h1>
 
             <p className="text-slate-300 max-w-2xl">
-              Estadísticas, pronósticos y simulador de ganancias para apostar con criterio.
+              La plataforma cuenta con un algoritmo que construye apuestas optimizadas automáticamente con datos reales.
+              Elige los partidos y deja que el sistema analice estadísticas y cuotas por ti.
             </p>
 
             <div className="flex flex-wrap gap-2">
