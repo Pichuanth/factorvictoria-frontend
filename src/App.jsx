@@ -160,7 +160,7 @@ function Home() {
 
             <p className="text-slate-300 max-w-2xl">
               La plataforma cuenta con un algoritmo que construye apuestas con datos reales.
-              Elige los partidos y deja que el sistema analice estadísticas y cuotas para crear combinadas optimizadas automáticamente 
+              Elige tus partidos o equipos favoritos y deja que el sistema analice estadísticas y cuotas para crear combinadas optimizadas automáticamente 
               las veces que quieras.
             </p>
 
