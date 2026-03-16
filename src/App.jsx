@@ -153,9 +153,9 @@ function Home() {
             </div>
 
             <h1 className="text-3xl md:text-5xl font-extrabold leading-tight">
-              Generador automático de parlays. 
+              Generador automático de 
               <br />
-              <span className="text-white">en ventaja</span>
+              <span className="text-white">parlays</span>
             </h1>
 
             <p className="text-slate-300 max-w-2xl">
