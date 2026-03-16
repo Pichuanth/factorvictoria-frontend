@@ -180,8 +180,7 @@ function Home() {
         <section className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-5 md:p-7">
           <h2 className="text-xl md:text-2xl font-bold">Cómo funciona Factor Victoria</h2>
           <p className="text-slate-300 text-sm mt-2 max-w-3xl">
-            No vendemos picks. Usas un sistema que analiza estadísticas, cuotas y tendencias
-            del mercado para generar combinadas optimizadas automáticamente.
+            Selecciona partidos, analiza datos y genera combinadas en segundos.
           </p>
 
           <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
