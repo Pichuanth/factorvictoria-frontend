@@ -153,14 +153,15 @@ function Home() {
             </div>
 
             <h1 className="text-3xl md:text-5xl font-extrabold leading-tight">
-              Generador automático de parlays.
+              Generador automático de parlays
               <br />
-              <span className="text-white"></span>
+              <span className="text-white">Con datos reales</span>
             </h1>
 
             <p className="text-slate-300 max-w-2xl">
-              La plataforma cuenta con un algoritmo que construye apuestas optimizadas automáticamente con datos reales.
-              Elige los partidos y deja que el sistema analice estadísticas y cuotas por ti.
+              La plataforma cuenta con un algoritmo que construye apuestas con datos reales.
+              Elige los partidos y deja que el sistema analice estadísticas y cuotas para crear combinadas optimizadas automáticamente 
+              las veces que quieras.
             </p>
 
             <div className="flex flex-wrap gap-2">
@@ -169,7 +170,7 @@ function Home() {
                 className="inline-flex items-center justify-center px-5 py-2.5 rounded-full text-sm font-semibold"
                 style={{ backgroundColor: GOLD, color: "#0f172a" }}
               >
-                Ver planes
+                Ver planes y probar el sistema
               </a>
             </div>
           </div>
@@ -361,9 +362,9 @@ function Home() {
           <div className="p-5 md:p-7">
             <h3 className="text-lg md:text-xl font-bold">Convierte información en ventaja</h3>
             <p className="text-slate-300 text-sm mt-1">
-              Nuestra IA analiza estadísticas y señales del mercado en tiempo real para detectar cuotas
-              con verdadero valor. Deja atrás las decisiones improvisadas y apuesta con datos, planificación
-              y visión ganadora.
+              No caigas en retos escalera ni pagues por picks cada vez que hay un partido importante.
+              Usa un sistema que analiza estadísticas, cuotas y tendencias del mercado para generar combinadas 
+              optimizadas automáticamente con datos reales todas las veces que quieras.
             </p>
           </div>
 
