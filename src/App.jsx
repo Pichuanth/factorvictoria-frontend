@@ -217,27 +217,32 @@ function Home() {
             <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
               <h3 className="text-base font-bold">Combinadas generadas</h3>
               <p className="mt-2 text-sm text-slate-300">
-                La plataforma detecta oportunidades en mercados concretos como:
-                • Over 2.5 goles — Barcelona vs Alavés 1.80
-                • Doble oportunidad Local — Real Madrid vs Monaco 1.45
-                • Ambos marcan: NO — Arsenal vs Liverpool 1.90
+La plataforma detecta oportunidades en mercados concretos como:
+</p>
 
-               Son selecciones analizadas con estadísticas, contexto del partido y cuotas del mercado.
-               Aqui combinamos partidos hasta generar la cuota esperada x40,x100 etc.
-              </p>
+<ul className="mt-2 text-sm text-slate-300 space-y-1 list-disc list-inside">
+<li>Over 2.5 goles — Barcelona vs Alavés <span className="text-yellow-400">1.80</span></li>
+<li>Doble oportunidad Local — Real Madrid vs Monaco <span className="text-yellow-400">1.45</span></li>
+<li>Ambos marcan: NO — Arsenal vs Liverpool <span className="text-yellow-400">1.90</span></li>
+</ul>
+
+<p className="mt-3 text-sm text-slate-300">
+Son selecciones analizadas con estadísticas, contexto del partido y cuotas del mercado.
+Aquí combinamos partidos hasta generar cuotas x40, x100 o más.
+</p>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
               <h3 className="text-base font-bold">Cuotas exclusivas para miembros</h3>
               <p className="mt-2 text-sm text-slate-300">
-                Además del análisis general, los miembros acceden a mercados más específicos como:
-              • Raphinha +1.5 remates al arco Barcelona
-              • Tarjeta amarilla para Erick Pulgar Flamengo
-              • Gol de Erling Haaland Manchester City
-              • Tarjeta Roja Pedro neto Chelsea
+Además del análisis general, los miembros acceden a mercados más específicos como:
+• Raphinha +1.5 remates al arco Barcelona
+• Tarjeta amarilla para Erick Pulgar Flamengo
+• Gol de Erling Haaland Manchester City
+• Tarjeta Roja Pedro neto Chelsea
 
-             Estas oportunidades se publican solo para miembros y apuntan a mercados que muchas veces pasan desapercibidos.
-              </p>
+Estas oportunidades se publican solo para miembros y apuntan a mercados que muchas veces pasan desapercibidos.
+</p>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
