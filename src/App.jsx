@@ -221,9 +221,9 @@ La plataforma detecta oportunidades en mercados concretos como:
 </p>
 
 <ul className="mt-2 text-sm text-slate-300 space-y-1 list-disc list-inside">
-<li>Over 2.5 goles — Barcelona vs Alavés <span className="text-yellow-400">1.80</span></li>
-<li>Doble oportunidad Local — Real Madrid vs Monaco <span className="text-yellow-400">1.45</span></li>
-<li>Ambos marcan: NO — Arsenal vs Liverpool <span className="text-yellow-400">1.90</span></li>
+<li>Over 2.5 goles — Barcelona vs Alavés <span className="text-emerald-400">1.80</span></li>
+<li>Doble oportunidad Local — Real Madrid vs Monaco <span className="text-emerald-400">1.45</span></li>
+<li>Ambos marcan: NO — Arsenal vs Liverpool <span className="text-emerald-400">1.90</span></li>
 </ul>
 
 <p className="mt-3 text-sm text-slate-300">
@@ -236,11 +236,16 @@ Aquí combinamos partidos hasta generar cuotas x40, x100 o más.
               <h3 className="text-base font-bold">Cuotas exclusivas para miembros</h3>
               <p className="mt-2 text-sm text-slate-300">
 Además del análisis general, los miembros acceden a mercados más específicos como:
-• Raphinha +1.5 remates al arco Barcelona
-• Tarjeta amarilla para Erick Pulgar Flamengo
-• Gol de Erling Haaland Manchester City
-• Tarjeta Roja Pedro neto Chelsea
+</p>
 
+<ul className="mt-2 text-sm text-slate-300 space-y-1 list-disc list-inside">
+<li>Raphinha +1.5 remates al arco — Barcelona</li>
+<li>Tarjeta amarilla — Erick Pulgar (Flamengo)</li>
+<li>Gol de Erling Haaland — Manchester City</li>
+<li>Tarjeta roja — Pedro Neto (Chelsea)</li>
+</ul>
+
+<p className="mt-3 text-sm text-slate-300">
 Estas oportunidades se publican solo para miembros y apuntan a mercados que muchas veces pasan desapercibidos.
 </p>
             </div>
