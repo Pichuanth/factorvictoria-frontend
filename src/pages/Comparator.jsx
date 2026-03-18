@@ -1156,7 +1156,7 @@ function ManualPicksSection() {
   ];
 
   const players = [
-    { label: "Raphina +0.5 Remates", odd: 2.20, note: "Si es titular" },
+    { label: "Raphina +0.5 Remates", odd: 1.30, note: "Si es titular" },
     { label: "Luis Diaz +0.5 Remates", odd: 1.45, note: "Tendencia" },
   ];
 
