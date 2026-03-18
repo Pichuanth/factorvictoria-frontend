@@ -1157,7 +1157,7 @@ function ManualPicksSection() {
 
   const players = [
     { label: "Raphina +0.5 Remates", odd: 1.30, note: "Si es titular" },
-    { label: "Luis Diaz +0.5 Remates", odd: 1.45, note: "Tendencia" },
+    { label: "Joelinton Newcastle 1 tarjeta amarilla", odd: 4.0, note: "Tendencia" },
   ];
 
   function Card({ title, items }) {
