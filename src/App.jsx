@@ -129,10 +129,10 @@ function Home() {
   }
 
   const simCards = [
-    { label: "Mensual • x10", mult: 20 },
-    { label: "Trimestral • x20", mult: 40 },
-    { label: "Anual • x50", mult: 100 },
-    { label: "Vitalicio • x100", mult: 200 },
+    { label: "Mensual • x20", mult: 20 },
+    { label: "Trimestral • x40", mult: 40 },
+    { label: "Anual • x100", mult: 100 },
+    { label: "Vitalicio • x200", mult: 200 },
   ];
 
   return (
