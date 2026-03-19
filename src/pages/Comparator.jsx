@@ -1146,18 +1146,18 @@ function FeatureCard({ title, badge, children, locked, lockText, bg }) {
 /* ------------------- Manual Picks ------------------- */
 function ManualPicksSection() {
   const singles = [
-    { label: "Tottenham vs At. Madrid +1.5 goles", odd: 1.20, note: "Alta probabilidad" },
-    { label: " Galatasaray Handicap +4", odd: 1.18, note: "Conservador" },
+    { label: "Pick en Desarrollo", odd: 1.60, note: "Alta probabilidad" },
+    { label: "Pick en Desarrollo", odd: 1.18, note: "Conservador" },
   ];
 
   const combos = [
-    { label: " Newcastle Handicap +3", odd: 1.20, note: "Cuota media" },
-    { label: "Newcastle vs Barcelona +1.5 goles", odd: 1.20, note: "Más riesgo" },
+    { label: "Selección en Preparación", odd: 1.50, note: "Cuota media" },
+    { label: "Selección en Preparación", odd: 2.20, note: "Más riesgo" },
   ];
 
   const players = [
-    { label: "Raphina +0.5 Remates", odd: 1.30, note: "Si es titular" },
-    { label: "Joelinton Newcastle 1 tarjeta amarilla", odd: 4.0, note: "Tendencia" },
+    { label: "En Análisis", odd: 1.30, note: "Si es titular" },
+    { label: "En Análisis", odd: 4.0, note: "Tendencia" },
   ];
 
   function Card({ title, items }) {
