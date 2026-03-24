@@ -461,7 +461,9 @@ if (intlAllowedExact.has(l)) return true;
     { country: "chile", league: "primera división" },
     { country: "chile", league: "primera" },         // opcional si quieres más amplio
     { country: "chile", league: "copa chile" },
-
+    { country: "chile", league: "copa de la liga" },
+    { country: "chile", league: "copa liga" },
+    { country: "chile", league: "league cup chile" },
 
   ];
 
