@@ -365,6 +365,9 @@ function leaguePriority(leagueName) {
   if (n.includes("ligue 1")) return 7;
   if (n.includes("primera division") || n.includes("primera división") || n.includes("campeonato itau") || n.includes("campeonato itaú")) return 8;
   if (n.includes("copa chile")) return 9;
+  if (n.includes("copa de la liga")) return 9;
+  if (n.includes("league cup chile")) return 9;
+  if (n.includes("copa liga")) return 9;
 
   // América
   if (n.includes("liga mx")) return 10;
