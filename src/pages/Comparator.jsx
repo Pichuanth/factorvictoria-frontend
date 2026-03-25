@@ -368,6 +368,16 @@ function leaguePriority(leagueName) {
   if (n.includes("copa de la liga")) return 9;
   if (n.includes("league cup chile")) return 9;
   if (n.includes("copa liga")) return 9;
+  // 🌍 Internacional
+if (n.includes("fifa series")) return 6;
+if (n.includes("friendly") || n.includes("friendlies") || n.includes("amistoso")) return 12;
+if (
+  n.includes("world cup") ||
+  n.includes("wc qualification") ||
+  n.includes("qualification") ||
+  n.includes("play-off") ||
+  n.includes("playoff")
+) return 4;
 
   // América
   if (n.includes("liga mx")) return 10;
@@ -392,7 +402,6 @@ if (n.includes("colombia")) return 20;
 
 // CONCACAF Champions Cup (por tu screenshot de partidos)
 if (n.includes("concacaf") && (n.includes("champions") || n.includes("champions cup"))) return 21;
-
 
   return 50;
 }
@@ -433,6 +442,17 @@ const intlAllowedIncludes = [
   "efl cup",
   "copa argentina",
   "liga colombiana",
+  // 🌍 NUEVO
+  "fifa series",
+  "friendly",
+  "friendlies",
+  "amistoso",
+  "international",
+  "world cup",
+  "wc qualification",
+  "qualification",
+  "play-off",
+  "playoff",
 ];
 
 if (intlAllowedIncludes.some((k) => l.includes(k))) return true;
