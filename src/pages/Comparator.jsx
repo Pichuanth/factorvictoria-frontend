@@ -360,6 +360,7 @@ function leaguePriority(leagueName) {
   if (n.includes("uefa champions league")) return 0;
   if (n.includes("premier league")) return 3;
   if (n.includes("la liga") || n.includes("laliga")) return 4;
+  if (n.includes("fifa") || n.includes("world cup")) return 4;
   if (n.includes("serie a")) return 5;
   if (n.includes("bundesliga") && !n.includes("2.")) return 6;
   if (n.includes("ligue 1")) return 7;
@@ -409,14 +410,14 @@ if (n.includes("concacaf") && (n.includes("champions") || n.includes("champions 
 function isAllowedCompetition(countryName, leagueName) {
   const c = normStr(countryName);
   const l = normStr(leagueName);
-
+  console.log("LEAGUE ORIGINAL:", leagueName);
+  console.log("LEAGUE NORMALIZADA:", l);
   const bannedPatterns = [
     "u23","u22","u21","u20","u19","u18","u17","u16",
     "youth","juvenil","reserves","reserve","b team"," ii",
     "development","professional development",
     "premier league 2","premier league 2 division",
     "women","femenil","femenino","femin","wsl",
-    "friendly","friendlies","amistoso",
     "non league",
     "national league - south",
     "national league - north",
@@ -434,25 +435,36 @@ function isAllowedCompetition(countryName, leagueName) {
 
   // ✅ Copas internacionales (permitidas)
 const intlAllowedIncludes = [
+  // copas internacionales
   "libertadores",
   "sudamericana",
-  "dfb pokal",          // copa alemania
-  "copa alemania",
-  "carabao cup",
-  "efl cup",
+
+  // copas locales
   "copa argentina",
-  "liga colombiana",
-  // 🌍 NUEVO
+  "copa chile",
+  "copa de la liga",
+  "copa liga",
+  "league cup",
+  "copa colombia",
+
+  // 🌍 internacionales (MEJORADO)
   "fifa series",
   "friendly",
   "friendlies",
+  "international friendlies",
   "amistoso",
-  "international",
+
+  // mundial y clasificación
   "world cup",
+  "fifa world cup",
+  "world cup qualification",
   "wc qualification",
   "qualification",
-  "play-off",
+  "qualifiers",
+
+  // playoffs
   "playoff",
+  "play-off",
 ];
 
 if (intlAllowedIncludes.some((k) => l.includes(k))) return true;
