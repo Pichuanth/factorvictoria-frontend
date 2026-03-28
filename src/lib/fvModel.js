@@ -676,31 +676,30 @@ export function buildGiftPickBundle(
         if (o < minOdd || o > maxOdd) continue;
         const p = Number(c?.prob ?? 0);
         if (p < probMin) continue;
-        pool.push({
-          ...c,
-          fixtureId: c.fixtureId ?? fixtureId,
-          __fv_legOdd: o,
-          fixtureFull: !!c.fixtureFull,
-        });
+       pool.push({
+       ...c,
+       fixtureId: c.fixtureId ?? fixtureId,
+       __fv_legOdd: o,
+       fixtureFull: !!c.fixtureFull,
+       _prob: p,
+       _fullData: !!c?.homeForm && !!c?.awayForm,
+       _giftScore:
+       ((!!c?.homeForm && !!c?.awayForm) ? 1000 : 0) +
+       (Number(c?.prob ?? 0) * 100) +
+       (2.5 - Math.abs(1.65 - o)),
+       });
       }
     }
 
     if (!pool.length) return null;
 
-    const poolFull = pool.filter((c) => c.fixtureFull);
-    const pickFrom = poolFull.length ? poolFull : pool;
+const poolFull = pool.filter((c) => c._fullData);
+const pickFrom = poolFull.length ? poolFull : pool;
 
-    // Prefer "datos completos" and the highest probability; break ties by lower odds.
-    pickFrom.sort((a, b) => {
-      if (!!b.fixtureFull !== !!a.fixtureFull) return (b.fixtureFull ? 1 : 0) - (a.fixtureFull ? 1 : 0);
-      const pa = Number(a.prob ?? 0);
-      const pb = Number(b.prob ?? 0);
-      if (pb !== pa) return pb - pa;
-      return Number(a.__fv_legOdd) - Number(b.__fv_legOdd);
-    });
+pickFrom.sort((a, b) => b._giftScore - a._giftScore);
 
-    const best = pickFrom[0];
-    const o = round2(Number(best.__fv_legOdd));
+const best = pickFrom[0];
+const o = round2(Number(best.__fv_legOdd));
 
     return {
       legs: [

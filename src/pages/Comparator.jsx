@@ -1249,8 +1249,9 @@ function localPenalty(label, odd) {
 
   // penaliza handicaps “de regalo” repetitivos (+3/+4/+5)
   if (s.includes("hándicap") || s.includes("handicap")) {
-    if (s.includes("+3") || s.includes("+4") || s.includes("+5")) p *= 0.55;
-  }
+  if (s.includes("+3") || s.includes("+4") || s.includes("+5")) p *= 0.15;
+  else if (s.includes("+2")) p *= 0.75;
+ }
 
   if (s.includes("2.5") && (s.includes("over") || s.includes("under") || s.includes("goles"))) p *= 0.82;
   if ((s.includes("over") || s.includes("under")) && !s.includes("1x") && !s.includes("x2")) p *= 0.92;
@@ -1328,10 +1329,9 @@ function localPenalty(label, odd) {
       for (const c of top) {
         // Cap: máx 3 picks de Hándicap +3 por parlay.
         // Y para permitir 3×(+3), exigimos que exista al menos 1×(+2) en el mismo parlay.
-        if (_isHandicapPlus(c, 3)) {
-          if (hcap3Count >= 3) continue;
-          if (hcap3Count >= 2 && hcap2Count < 1) continue;
-        }
+        if (_isHandicapPlus(c, 3)) continue;
+        if (_isHandicapPlus(c, 2) && hcap2Count >= 2) continue;
+        
         const next = product * c._odd;
 
         // score: preferimos acercarnos al target; si lo sobrepasa un poco no importa
