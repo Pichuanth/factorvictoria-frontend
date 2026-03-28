@@ -1182,18 +1182,18 @@ function FeatureCard({ title, badge, children, locked, lockText, bg }) {
 /* ------------------- Manual Picks ------------------- */
 function ManualPicksSection() {
   const singles = [
-    { label: "Chile v/s C.verde +1.5 goles", odd: 1.60, note: "Alta probabilidad" },
-    { label: "España v/s Servia +1.5 goles", odd: 1.18, note: "Conservador" },
+    { label: "Escocia v/s Japon Ambos anotan", odd: 1.90, note: "Alta probabilidad" },
+    { label: "Mexico v/s Portugal +1.5 goles", odd: 1.30, note: "Conservador" },
   ];
 
   const combos = [
-    { label: "Inglaterra v/s Uruguay +1.5 goles", odd: 1.40, note: "Cuota media" },
-    { label: "Dani Olmo +0.5 remates al arco", odd: 1.30, note: "Más riesgo" },
+    { label: "Generando picks", odd: 1.40, note: "Cuota media" },
+    { label: "Generando picks", odd: 1.30, note: "Más riesgo" },
   ];
 
   const players = [
-    { label: "Cole Palmer +0.5 remates al arco", odd: 1.60, note: "Si es titular" },
-    { label: "Kilyan Mbappé +0.5 goles ", odd: 1.98, note: "Tendencia" },
+    { label: "Generando picks", odd: 1.40, note: "Si es titular" },
+    { label: "Vitinha +0.5 remates al arco, Portugal ", odd: 2.98, note: "Tendencia" },
   ];
 
   function Card({ title, items }) {
