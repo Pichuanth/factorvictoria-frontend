@@ -428,7 +428,8 @@ function isAllowedCompetition(countryName, leagueName) {
     "tercera division rfef",
     "paulista","paulista a2","baiano","goiano","cearense","pernambucano",
     "matogrossense","maranhense","potiguar","acreano","ofc",
-    "ofc champions league",
+    "ofc champions league","club friendlies",
+    "friendlies clubs",
 
   ];
   if (bannedPatterns.some((p) => l.includes(p))) return false;
@@ -449,8 +450,6 @@ const intlAllowedIncludes = [
 
   // 🌍 internacionales (MEJORADO)
   "fifa series",
-  "friendly",
-  "friendlies",
   "international friendlies",
   "amistoso",
 
