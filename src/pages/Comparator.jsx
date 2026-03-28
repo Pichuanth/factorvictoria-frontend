@@ -393,7 +393,7 @@ if (n.includes("sudamericana")) return 16;
 if (n.includes("dfb") || n.includes("pokal") || n.includes("copa alemania")) return 17;
 
 // Carabao Cup puede venir como "efl cup" o "carabao"
-if (n.includes("carabao") || n.includes("efl cup") || n.includes("league cup")) return 18;
+if (n.includes("carabao") || n.includes("efl cup")) return 18;
 
 // Copa Argentina
 if (n.includes("copa argentina")) return 19;
@@ -445,12 +445,12 @@ const intlAllowedIncludes = [
   "copa chile",
   "copa de la liga",
   "copa liga",
-  "league cup",
   "copa colombia",
 
   // 🌍 internacionales (MEJORADO)
   "fifa series",
   "international friendlies",
+  "friendlies",
   "amistoso",
 
   // mundial y clasificación
@@ -575,7 +575,7 @@ function isYouthOrWomenOrReserve(fx) {
     "u17","u18","u19","u20","u21","u23",
     "reserves","reserve","youth","juvenil","sub-","sub ",
     " women","womens","femen"," fem"," w "," ii"," b ",
-    "friendly","amistoso",
+    
   ];
   return banned.some((p) => blob.includes(p));
 }
