@@ -1182,18 +1182,18 @@ function FeatureCard({ title, badge, children, locked, lockText, bg }) {
 /* ------------------- Manual Picks ------------------- */
 function ManualPicksSection() {
   const singles = [
-    { label: "Generando picks", odd: 1.90, note: "Alta probabilidad" },
-    { label: "Generando picks", odd: 1.98, note: "Conservador" },
+    { label: "Picks en desarrollo", odd: 1.90, note: "Alta probabilidad" },
+    { label: "Picks en desarrollo", odd: 1.98, note: "Conservador" },
   ];
 
   const combos = [
-    { label: "Colombia v/s Francia +1.5 goles total", odd: 1.30, note: "Cuota media" },
-    { label: "Colombia v/s Francia +.05 goles 1er tiempo", odd: 1.30, note: "Más riesgo" },
+    { label: "Picks en desarrollo", odd: 1.30, note: "Cuota media" },
+    { label: "Picks en desarrollo", odd: 1.30, note: "Más riesgo" },
   ];
 
   const players = [
-    { label: "Kilyan Mbappé +0.5 goles", odd: 1.90, note: "Si es titular" },
-    { label: "Generando picks", odd: 1.90, note: "Tendencia" },
+    { label: "Picks en desarrollo", odd: 1.90, note: "Si es titular" },
+    { label: "Picks en desarrollo", odd: 1.90, note: "Tendencia" },
   ];
 
   function Card({ title, items }) {

@@ -156,7 +156,7 @@ export default function Landing() {
             <div className="rounded-3xl bg-slate-900/80 border border-slate-700/80 p-5 flex flex-col">
               <h3 className="text-lg font-semibold mb-2">Mensual</h3>
               <p className="text-3xl font-extrabold mb-1">
-                $19.990{" "}
+                $14.990{" "}
                 <span className="text-sm font-semibold text-slate-300">
                   Mensual
                 </span>

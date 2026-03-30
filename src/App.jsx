@@ -30,13 +30,14 @@ function Home() {
       tag: "Mensual",
       id: "mensual",
       planName: "Plan Inicio",
-      price: "$19.990",
+      price: "$14.990",
       sub: "Mensual",
       bullets: [
+        "Ideal para probar el sistema",
+        "Incluye acceso a cuotas exclusivas para miembros",
         "Guía para principiantes",
         "Picks análisis básicos diarios",
         "Simulador de ganancias incluido",
-        "Cuotas x1.5 de regalo",
         "Cuotas potenciadas x20",
       ],
       highlight: false,
@@ -49,6 +50,7 @@ function Home() {
       sub: "+1 Mes de Regalo 🎁",
       bullets: [
         "4 meses modo Profesional",
+        "Acceso incluido a cuotas exclusivas para miembros",
         "Medalla Conmemorativa Oficial",
         "Guía de estrategia y gestión de banca",
         "1 Estrategia VIP incluida",
@@ -68,6 +70,7 @@ function Home() {
       sub: "Anual",
       bullets: [
         "Trofeo Profesional Factor Victoria",
+        "Acceso incluido a cuotas exclusivas para miembros",
         "Medalla Conmemorativa Oficial",
         "Guía de estrategia PRO",
         "2 Estrategias VIP incluidas",
@@ -88,6 +91,7 @@ function Home() {
       sub: "Vitalicio",
       bullets: [
         "Copa Leyenda Edición elite",
+        "Acceso incluido a cuotas exclusivas para miembros",
         "Trofeo profesional Factor Victoria",
         "Medalla conmemorativa oficial",
         "Guía de estrategia PRO",
