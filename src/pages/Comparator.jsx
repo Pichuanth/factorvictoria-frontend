@@ -1182,18 +1182,18 @@ function FeatureCard({ title, badge, children, locked, lockText, bg }) {
 /* ------------------- Manual Picks ------------------- */
 function ManualPicksSection() {
   const singles = [
-    { label: "Barcelona v/s At. Madrid. 1.5 goles", odd: 1.18, note: "Alta probabilidad" },
-    { label: "U.Catolica Handicap +2", odd: 1.16, note: "Conservador" },
+    { label: "Barcelona v/s At. Madrid. 1.5 goles", odd: 1.15, note: "Alta probabilidad" },
+    { label: "Cruzeiro v/s U.Catolica 1.5 goles", odd: 1.16, note: "Conservador" },
   ];
 
   const combos = [
-    { label: "PSG gana el partido", odd: 1.30, note: "Cuota media" },
+    { label: "PSG gana el partido", odd: 1.80, note: "Cuota media" },
     { label: "R.Madrid v/s Bayern Ambos anotan", odd: 1.40, note: "Más riesgo" },
   ];
 
   const players = [
-    { label: "Antoine Griezmann 0.5 remates al arco", odd: 1.20, note: "Si es titular" },
-    { label: "Kylian Mbappe 0.5 remates al arco", odd: 1.18, note: "Tendencia" },
+    { label: "Kylian Mbappe 0.5 remates al arco", odd: 1.20, note: "Si es titular" },
+    { label: "Barcelona +0.5 offside", odd: 1.25, note: "Tendencia" },
   ];
 
   function Card({ title, items }) {
